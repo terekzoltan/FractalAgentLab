@@ -1,0 +1,8 @@
+# Coordination and planning docs
+/ops/*.md
+/docs/**/*.md
+/docs/**/*.docx
+
+# Local runtime data
+/data/*
+!/data/.gitignore

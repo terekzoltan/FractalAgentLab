@@ -1,0 +1,13 @@
+runtime:
+  default_timeout_seconds: 60
+  max_retries: 2
+  tracing_enabled: true
+
+identity:
+  enabled: false
+  store_backend: json
+  data_subdir: identity
+
+paths:
+  data_dir: data
+  examples_dir: examples

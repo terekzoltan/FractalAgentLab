@@ -1,0 +1,11 @@
+default_provider: mock
+
+providers:
+  openai:
+    enabled: false
+    api_key_env: OPENAI_API_KEY
+  openrouter:
+    enabled: false
+    api_key_env: OPENROUTER_API_KEY
+  local:
+    enabled: false
