@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from fractal_agent_lab.core.contracts import AgentSpec
 from fractal_agent_lab.core.contracts import WorkflowExecutionMode, WorkflowSpec, WorkflowStepSpec
+from fractal_agent_lab.workflows import (
+    H1_LITE_WORKFLOW_ID,
+    build_h1_lite_agent_pack,
+    build_h1_lite_workflow_spec,
+)
 
 
 def list_workflow_ids() -> list[str]:
@@ -12,6 +18,17 @@ def list_workflow_ids() -> list[str]:
 def get_workflow_spec(workflow_id: str) -> WorkflowSpec:
     try:
         factory = _WORKFLOWS[workflow_id]
+    except KeyError as error:
+        available = ", ".join(list_workflow_ids()) or "none"
+        raise ValueError(
+            f"Unknown workflow '{workflow_id}'. Available workflows: {available}.",
+        ) from error
+    return factory()
+
+
+def get_workflow_agent_specs(workflow_id: str) -> dict[str, AgentSpec]:
+    try:
+        factory = _WORKFLOW_AGENT_SPECS[workflow_id]
     except KeyError as error:
         available = ", ".join(list_workflow_ids()) or "none"
         raise ValueError(
@@ -41,4 +58,12 @@ def _wave0_demo_workflow() -> WorkflowSpec:
     )
 
 
-_WORKFLOWS: dict[str, Callable[[], WorkflowSpec]] = {"wave0.demo": _wave0_demo_workflow}
+_WORKFLOWS: dict[str, Callable[[], WorkflowSpec]] = {
+    H1_LITE_WORKFLOW_ID: build_h1_lite_workflow_spec,
+    "wave0.demo": _wave0_demo_workflow,
+}
+
+_WORKFLOW_AGENT_SPECS: dict[str, Callable[[], dict[str, AgentSpec]]] = {
+    H1_LITE_WORKFLOW_ID: build_h1_lite_agent_pack,
+    "wave0.demo": dict,
+}

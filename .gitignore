@@ -1,7 +1,5 @@
-# Coordination and planning docs
-/ops/*.md
-/docs/**/*.md
-/docs/**/*.docx
+# Private lab repo policy:
+# ops/ and docs/ markdown stay versioned here.
 
 # Local runtime data
 /data/*

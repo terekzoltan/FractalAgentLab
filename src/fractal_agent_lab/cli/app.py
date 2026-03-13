@@ -2,20 +2,33 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from typing import Any
 
 from fractal_agent_lab.adapters import build_step_runner
-from fractal_agent_lab.cli.config_loader import build_runtime_limits, load_run_configs
+from fractal_agent_lab.cli.config_loader import (
+    build_runtime_limits,
+    load_run_configs,
+    resolve_data_dir,
+)
 from fractal_agent_lab.cli.formatting import (
     build_json_output,
     format_run_summary_text,
     format_trace_summary_text,
 )
-from fractal_agent_lab.cli.workflow_registry import get_workflow_spec, list_workflow_ids
+from fractal_agent_lab.cli.workflow_registry import (
+    get_workflow_agent_specs,
+    get_workflow_spec,
+    list_workflow_ids,
+)
 from fractal_agent_lab.core.models import RunStatus
 from fractal_agent_lab.runtime import WorkflowExecutor
 from fractal_agent_lab.state import InMemoryRunStateStore
-from fractal_agent_lab.tracing import InMemoryTraceEmitter
+from fractal_agent_lab.tracing import (
+    InMemoryTraceEmitter,
+    write_run_artifact,
+    write_trace_artifact,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -88,6 +101,7 @@ def main() -> int:
 def _handle_run(args: argparse.Namespace) -> int:
     try:
         workflow = get_workflow_spec(args.workflow_id)
+        workflow_agent_specs = get_workflow_agent_specs(args.workflow_id)
     except ValueError as error:
         print(f"Error: {error}")
         return 2
@@ -114,6 +128,7 @@ def _handle_run(args: argparse.Namespace) -> int:
     state_store = InMemoryRunStateStore()
     executor = WorkflowExecutor(
         step_runner=build_step_runner(
+            agent_specs_by_id=workflow_agent_specs,
             providers_config=providers_config,
             model_policy_config=model_policy_config,
         ),
@@ -123,6 +138,13 @@ def _handle_run(args: argparse.Namespace) -> int:
     )
 
     run_state = executor.execute(workflow=workflow, input_payload=input_payload)
+
+    data_dir = resolve_data_dir(runtime_config)
+    try:
+        write_run_artifact(run_state, data_dir=data_dir)
+        write_trace_artifact(emitter.events, run_id=run_state.run_id, data_dir=data_dir)
+    except OSError as error:
+        print(f"Warning: failed to write run/trace artifacts: {error}", file=sys.stderr)
 
     steps_total = len(workflow.steps)
     include_trace = bool(args.show_trace)

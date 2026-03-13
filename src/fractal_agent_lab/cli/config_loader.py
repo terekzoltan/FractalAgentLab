@@ -29,6 +29,17 @@ def build_runtime_limits(runtime_config: dict[str, Any]) -> RuntimeLimits:
     return RuntimeLimits(timeout_seconds=timeout_seconds, max_retries_per_step=max_retries)
 
 
+def resolve_data_dir(runtime_config: dict[str, Any]) -> Path:
+    paths_block = runtime_config.get("paths", {})
+    if not isinstance(paths_block, dict):
+        return Path("data")
+
+    raw_data_dir = paths_block.get("data_dir", "data")
+    if isinstance(raw_data_dir, str) and raw_data_dir.strip():
+        return Path(raw_data_dir)
+    return Path("data")
+
+
 def load_mapping_file(path_value: str) -> dict[str, Any]:
     path = Path(path_value)
     if not path.exists():
