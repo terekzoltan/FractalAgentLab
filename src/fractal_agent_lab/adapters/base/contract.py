@@ -10,9 +10,15 @@ class AdapterStepRequest:
     workflow_id: str
     step_id: str
     agent_id: str
+    role: str | None = None
     input_payload: dict[str, Any] = field(default_factory=dict)
     context: dict[str, Any] = field(default_factory=dict)
     step_description: str | None = None
+    instructions: str | None = None
+    instruction_ref: str | None = None
+    model_policy_ref: str | None = None
+    prompt_version: str | None = None
+    agent_metadata: dict[str, Any] = field(default_factory=dict)
     model: str | None = None
 
 

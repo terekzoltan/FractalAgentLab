@@ -1,6 +1,10 @@
 # Private lab repo policy:
 # ops/ and docs/ markdown stay versioned here.
 
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+
 # Local runtime data
 /data/*
 !/data/.gitignore

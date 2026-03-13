@@ -54,6 +54,7 @@ class AdapterStepRunner:
             workflow_id=workflow.workflow_id,
             step_id=step.step_id,
             agent_id=step.agent_id,
+            role=agent_spec.role if agent_spec is not None else None,
             input_payload=dict(run_state.input_payload),
             context={
                 **run_state.context,
@@ -61,6 +62,11 @@ class AdapterStepRunner:
                 "model_policy_ref": selection.model_policy_ref,
             },
             step_description=step.description,
+            instructions=agent_spec.instructions if agent_spec is not None else None,
+            instruction_ref=agent_spec.instruction_ref if agent_spec is not None else None,
+            model_policy_ref=selection.model_policy_ref,
+            prompt_version=_prompt_version(agent_spec),
+            agent_metadata=dict(agent_spec.metadata) if agent_spec is not None else {},
             model=selection.model,
         )
 
@@ -103,3 +109,13 @@ def build_step_runner(
         agent_specs_by_id=agent_specs_by_id or {},
         adapters_by_provider=adapters_by_provider or {},
     )
+
+
+def _prompt_version(agent_spec: AgentSpec | None) -> str | None:
+    if agent_spec is None:
+        return None
+
+    prompt_version = agent_spec.metadata.get("prompt_version")
+    if isinstance(prompt_version, str) and prompt_version:
+        return prompt_version
+    return None
