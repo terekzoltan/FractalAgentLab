@@ -525,6 +525,15 @@ Small curated set of recurring test cases.
 
 Use model tiers instead of one-model-for-all:
 
+Current default direction (subject to change as the model market moves):
+- `cheap_worker` -> `gpt-4o-mini`
+- `specialist` -> `gpt-5.4-nano`
+- `finalizer` -> `gpt-5.4-mini`
+
+Note:
+- these are working defaults, not long-term promises
+- revisit when cheaper or better small-model options materially shift the tradeoff
+
 #### Tier T1 — Cheap workers
 Use for:
 - routing

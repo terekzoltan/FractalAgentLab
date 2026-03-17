@@ -25,7 +25,7 @@ class H1LiteStepRunnerTests(unittest.TestCase):
         step_runner = build_step_runner(
             agent_specs_by_id=build_h1_lite_agent_pack(),
             providers_config={"default_provider": "mock"},
-            model_policy_config={"tier_defaults": {"cheap_worker": "gpt-4.1-mini"}},
+            model_policy_config={"tier_defaults": {"cheap_worker": "gpt-4o-mini"}},
             adapters_by_provider={"mock": MockAdapter(scripted_responses={"__default__": capture_request})},
         )
         workflow = build_h1_lite_workflow_spec()
@@ -38,7 +38,7 @@ class H1LiteStepRunnerTests(unittest.TestCase):
         self.assertEqual("cheap_worker", result["output"]["model_policy_ref"])
         self.assertEqual(H1_LITE_PROMPT_VERSION, result["output"]["prompt_version"])
         self.assertIn("Normalize the raw startup idea input", result["output"]["instructions"])
-        self.assertEqual("gpt-4.1-mini", result["model"])
+        self.assertEqual("gpt-4o-mini", result["model"])
 
     def test_h1_lite_mock_execution_produces_structured_outputs_and_model_tiers(self) -> None:
         step_runner = build_step_runner(
@@ -46,9 +46,9 @@ class H1LiteStepRunnerTests(unittest.TestCase):
             providers_config={"default_provider": "mock"},
             model_policy_config={
                 "tier_defaults": {
-                    "cheap_worker": "gpt-4.1-mini",
-                    "specialist": "gpt-4.1",
-                    "finalizer": "gpt-5",
+                    "cheap_worker": "gpt-4o-mini",
+                    "specialist": "gpt-5.4-nano",
+                    "finalizer": "gpt-5.4-mini",
                 },
             },
         )
@@ -65,9 +65,9 @@ class H1LiteStepRunnerTests(unittest.TestCase):
         run_state.step_results["planner"] = planner_result
         synthesizer_result = step_runner(run_state=run_state, workflow=workflow, step=workflow.steps[2])
 
-        self.assertEqual("gpt-4.1-mini", intake_result["model"])
-        self.assertEqual("gpt-4.1", planner_result["model"])
-        self.assertEqual("gpt-5", synthesizer_result["model"])
+        self.assertEqual("gpt-4o-mini", intake_result["model"])
+        self.assertEqual("gpt-5.4-nano", planner_result["model"])
+        self.assertEqual("gpt-5.4-mini", synthesizer_result["model"])
 
         self.assertIn("idea_summary", intake_result["output"])
         self.assertIn("validation_axes", planner_result["output"])

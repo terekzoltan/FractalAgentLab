@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-03-09
+**Last updated:** 2026-03-17
 
 ---
 
@@ -76,6 +76,15 @@ The sequencing rule is:
 - `Execution assignment` = concrete implementation order when multiple tracks are listed
 - If an epic has multiple owners, the sprint must define `Track X -> Track Y` execution order
 - Rule: no multi-owner epic may remain without explicit execution assignment
+
+### Session labels used in execution tables
+- `Meta Coordinator session` = coordination/status/review/planning only
+- `Track A agent session` = UX / CLI / trace viewer implementation session
+- `Track B agent session` = runtime / state / execution implementation session
+- `Track C agent session` = agent logic / prompts / memory / identity implementation session
+- `Track D agent session` = provider / adapter / routing implementation session
+- `Track E agent session` = eval / replay / smoke / benchmark implementation session
+- When multiple epics are listed on one row, the default meaning is: run them as one focused batch in the same session unless the notes say otherwise
 
 ---
 
@@ -267,6 +276,35 @@ Status note:
 **Wave 0 sequencing note:**
 This sprint is the equivalent of pouring the foundation. Everyone else may prepare, but B decides the concrete shape.
 
+### Sprint W0-S1 — Execution Steps
+
+**Step 1 — Meta creates the repo/control surface first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator session | F0-A | none | Repo spine and coordination docs must exist before Track B hardens contracts against real paths |
+
+**Step 2 — Track B establishes the canonical schemas**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent session | F0-B | F0-A ✅ | This is the contract anchor for all downstream tracks |
+
+**Step 3 — Track B finishes the runtime foundation batch**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent session | F0-C, F0-D, F0-E | F0-B ✅ | Treat as one runtime-foundation batch unless a schema issue forces separation |
+
+**Step 4 — Downstream tracks may do prep-only work while B is finishing**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent session | prep-only notes for F0-F/F0-I | F0-A ✅ | No production adapter claim before F0-B/F0-C acceptance |
+| Track A agent session | prep-only notes for F0-G/F0-H | F0-A ✅ | CLI shape drafting only; no trace-shape assumptions beyond published B contracts |
+| Track C agent session | prep-only notes for F0-J/F0-K | F0-A ✅ | Role/prompt drafting only |
+| Track E agent session | prep-only notes for F0-L/F0-M | F0-A ✅ | Rubric/checklist drafting only |
+
 #### Sprint W0-S2 — Minimal runtime boundary and first runnable command
 
 **Owner priority:** Track D + Track A, with B still authoritative
@@ -289,6 +327,33 @@ Epics:
 - Track D = `READY` after `F0-B/F0-C`
 - Track A = `READY` after `F0-C`
 - Track E = still mostly `NOT READY` beyond rubric drafting until a run actually completes
+
+### Sprint W0-S2 — Execution Steps
+
+**Step 1 — adapter boundary and CLI shell start in parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent session | F0-F | F0-B ✅ + F0-C ✅ | Establish the mock/provider boundary first |
+| Track A agent session | F0-G | F0-C ✅ | Start the runnable entrypoint against the Track B executor shape |
+
+**Step 2 — Track A hardens the run output path**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent session | F0-H | F0-G ✅ | Keep this narrowly tied to Wave 0 runnable output, not future UI concerns |
+
+**Step 3 — Track D adds config/provider selection shell**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent session | F0-I | F0-F ✅ | Config loading should match the actual adapter boundary, not invent a separate policy surface |
+
+**Step 4 — Meta checks W0-S2 handoff readiness**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator session | W0-S2 handoff check | F0-F ✅ + F0-G ✅ + F0-H ✅ + F0-I ✅ | Confirms Track C/E can now consume a runnable path rather than drafts |
 
 #### Sprint W0-S3 — First agent pack and first smoke path
 
@@ -326,6 +391,39 @@ Status note:
 - one stored trace exists
 - one minimal workflow returns understandable output
 - manual smoke checklist exists
+
+### Sprint W0-S3 — Execution Steps
+
+**Step 1 — Track C builds the minimal agent pack first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | F0-J | F0-F ✅ + F0-G ✅ + F0-H ✅ | This is the first point where H1-lite agent semantics become implementation work |
+
+**Step 2 — Track C wires the first runnable workflow path**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | F0-K | F0-J ✅ | Wire the pack into the runnable CLI path, not into a separate experimental shell |
+
+**Step 3 — Track E publishes and executes the manual smoke path**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | F0-L | F0-K ✅ | Smoke must stay anti-delusion focused: runnable command, understandable output, visible trace |
+
+**Step 4 — Track B implements the stored artifact path**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent session | F0-M (Track B scope) | F0-K ✅ | Implement canonical run/trace artifact writing before eval validates usability |
+
+**Step 5 — Track E validates artifact usability and closes the wave gate**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | F0-M (Track E scope) | F0-M Track B scope ✅ | Validate both success and failure artifact pairs against replay/smoke expectations |
+| Meta Coordinator session | Wave 0 closeout check | F0-L ✅ + F0-M ✅ | Marks the wave operationally complete and unblocks Wave 1 |
 
 ### Wave 0 optional but allowed parallel prep
 - Track C prompt strategy draft
@@ -383,6 +481,28 @@ This sprint creates the comparison baseline:
 - one simple single-agent path
 - one controlled manager-based multi-agent path
 
+### Sprint W1-S1 — Execution Steps
+
+**Step 1 — Track C and Track B open the H1 schema + orchestration baseline in parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | L1-A | Wave 0 ✅ | Define the H1 workflow contract that later role packs and baselines will consume |
+| Track B agent session | L1-B | Wave 0 ✅ | Stabilize manager orchestration around real H1 needs, not abstract future graph ambitions |
+
+**Step 2 — Track C upgrades the H1 agent pack against the new baseline**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | L1-C | L1-A ✅ + L1-B ✅ | This is the first true H1 pack, not the Wave 0 lite placeholder |
+
+**Step 3 — baseline comparison and output readability consume the stabilized H1 pack**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | L1-D | L1-C ✅ | Build the single-agent reference path so Wave 1 learns something, not just looks busier |
+| Track A agent session | L1-E | L1-C ✅ | Improve summaries only after H1 output structure is real enough to format meaningfully |
+
 #### Sprint W1-S2 — Handoff variant for H1
 
 **Owner priority:** B + C + D
@@ -404,6 +524,27 @@ Epics:
 **Track readiness:**
 - Track A trace viewer is `READY` for basic timeline after `L1-H`
 - Track E replay can begin only after at least two saved variant runs exist
+
+### Sprint W1-S2 — Execution Steps
+
+**Step 1 — Track B stabilizes handoff as a runtime primitive first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent session | L1-F | L1-A ✅ + L1-B ✅ + L1-C ✅ + L1-D ✅ | Keep the primitive understandable; do not jump to parallel fan-out here |
+
+**Step 2 — workflow handoff behavior and trace support consume the primitive in parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | L1-G | L1-F ✅ | Implement the H1 handoff chain variant against the stabilized primitive |
+| Track B agent session | L1-H | L1-F ✅ | Enrich trace events so the handoff path is inspectable rather than theatrical |
+
+**Step 3 — Track E compares baseline vs manager vs handoff**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | L1-I | L1-G ✅ + L1-H ✅ | This is the anti-self-deception checkpoint for Wave 1 orchestration learning |
 
 #### Sprint W1-S3 — First visibility hardening
 
@@ -435,6 +576,34 @@ Reference: `docs/Emergent-Identity-Layer-v01.md`
 - there is a visible trace trail
 - there is at least one explicit comparison to a single-agent baseline
 - H1 output is good enough to use on a real idea, even if imperfect
+
+### Sprint W1-S3 — Execution Steps
+
+**Step 1 — visibility and rubric hardening can begin in parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent session | L1-J | L1-H ✅ | Timeline/trace visibility should consume the now-enriched handoff trace shape |
+| Track E agent session | L1-K | L1-I ✅ | Convert Wave 1 lessons into a repeatable H1 manual smoke rubric |
+| Track C agent session | L1-M | L1-C ✅ | Ensure H1 prompt versioning stays explicit as the pack evolves |
+
+**Step 2 — Track E prepares the baseline comparison record**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | L1-L (evidence prep) | L1-I ✅ + L1-K ✅ | Prepare comparison evidence, tradeoff notes, and recommendation draft |
+
+**Step 3 — Meta closes the Wave 1 decision log**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator session | L1-L (decision log closeout) | L1-L evidence prep ✅ | Finalize the coordination-level decision about what H1 mode becomes the default next baseline |
+
+**Step 4 — optional identity prep runs only if Wave 1 core work is under control**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | L1-N, L1-O | L1-C ✅ | Design only; do not let this steal energy from the required H1 Wave 1 closeout |
 
 ### Wave 1 risk note
 The risk here is theatrical multi-agent behavior that teaches little.
@@ -486,6 +655,20 @@ Epics:
 - Track E replay waits for `H2-D`
 - Track C memory extraction waits for stable trace/run persistence layout
 
+### Sprint W2-S1 — Execution Steps
+
+**Step 1 — Track B hardens the shared contracts first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent session | H2-A, H2-B, H2-C | Wave 1 ✅ | Treat as one contract-hardening batch unless one schema path clearly blocks the others |
+
+**Step 2 — Track B finalizes persistence layout on top of the hardened contracts**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent session | H2-D | H2-A ✅ + H2-B ✅ + H2-C ✅ | Replay and smoke should consume a stable persistence layout, not keep adapting to churn |
+
 #### Sprint W2-S2 — Replay and smoke discipline
 
 **Owner priority:** E + B
@@ -508,6 +691,33 @@ Epics:
 
 **Prerequisites:**
 - `H2-A` through `H2-D` must be `✅`
+
+### Sprint W2-S2 — Execution Steps
+
+**Step 1 — Track E establishes replay capability first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | H2-E | H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ | Replay is the foundation for every later discipline claim in this sprint |
+
+**Step 2 — smoke and baseline tagging consume replay in parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | H2-F | H2-E ✅ | Build the runnable smoke suite once replay exists |
+| Track E agent session | H2-G | H2-E ✅ | Capture baseline/comparison tags while replayed runs are still close to the new persistence layout |
+
+**Step 3 — Track E drafts the regression checklist**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | H2-H (draft) | H2-F ✅ + H2-G ✅ | Draft assertions first from smoke/replay reality |
+
+**Step 4 — Track B confirms schema enforceability**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent session | H2-H (contract confirmation) | H2-H draft ✅ | Validate that the shared-schema checklist can actually be enforced, not just described |
 
 #### Sprint W2-S3 — Early memory and role separation hardening
 
@@ -538,6 +748,40 @@ Reference for H2-M/N/O: `docs/Emergent-Identity-Layer-v01.md`
 - state and trace are stable enough for downstream consumers
 - session memory exists in minimal form, or a documented decision says why it is deferred
 - identity profile model exists and at least one post-run update produces observable output, or a documented decision says why it is deferred
+
+### Sprint W2-S3 — Execution Steps
+
+**Step 1 — Track C opens memory cleanup and identity-model work in parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | H2-I, H2-J | H2-E ✅ + H2-F ✅ + H2-G ✅ + H2-H ✅ | Memory foundation and role-boundary cleanup can advance together |
+| Track C agent session | H2-M | H2-E ✅ + H2-F ✅ + H2-G ✅ + H2-H ✅ | Identity profile model is independent enough to start in parallel with H2-I/H2-J |
+
+**Step 2 — Track C builds the memory extraction policy**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | H2-K | H2-I ✅ | Extraction policy should sit on top of real session-memory behavior |
+
+**Step 3 — Track C implements the identity updater path**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | H2-N | H2-M ✅ | Keep this observational and post-run first; Track B runtime-boundary review is required before acceptance |
+
+**Step 4 — Track E evaluates both memory usefulness and identity drift sanity**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | H2-L | H2-I ✅ + H2-K ✅ | Determine whether session memory helps H1 materially |
+| Track E agent session | H2-O | H2-M ✅ + H2-N ✅ | Identity drift checks should focus on sanity/stability, not mystical interpretation |
+
+**Step 5 — Track B reviews the identity updater boundary**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent session | H2-N boundary review | H2-N implementation candidate | Confirm no unnecessary churn leaks into core Track B contracts |
 
 ### Wave 2 anti-scope-creep rule
 No provider-agnostic abstraction expansion beyond what is needed to keep the core clean.
@@ -583,6 +827,32 @@ Epics:
 **Prerequisites:**
 - Wave 2 complete
 
+### Sprint W3-S1 — Execution Steps
+
+**Step 1 — Track C defines the H2 contract first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | R3-A | Wave 2 ✅ | H2 should start from a clear workflow contract, not ad hoc role output shapes |
+
+**Step 2 — Track C builds the H2 role pack**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | R3-B | R3-A ✅ | Architect/planner/critic separation is the core value of H2 |
+
+**Step 3 — Track C finalizes the H2 output form**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | R3-C | R3-B ✅ | Sequence/risk output template should match how the role pack actually thinks |
+
+**Step 4 — Track E validates the workflow with a dedicated smoke rubric**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | R3-D | R3-C ✅ | Validate usefulness for real project decomposition, not only structural completeness |
+
 #### Sprint W3-S2 — H3 Architecture Review (draft quality)
 
 **Owner priority:** C + E, supported by B/A
@@ -601,6 +871,32 @@ Epics:
 
 **Prerequisites:**
 - `R3-A` through `R3-D` strongly recommended complete first
+
+### Sprint W3-S2 — Execution Steps
+
+**Step 1 — Track C defines the H3 contract first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | R3-E | R3-A ✅ + R3-B ✅ + R3-C ✅ + R3-D ✅ | H3 should start from explicit architecture-review expectations, not reuse H2 loosely |
+
+**Step 2 — Track C builds the H3 role pack**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | R3-F | R3-E ✅ | Focus on systems/critic/synthesizer complementarity |
+
+**Step 3 — Track C hardens the architecture-review output sections**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | R3-G | R3-F ✅ | The output should be reviewer-usable, not just verbose |
+
+**Step 4 — Track E runs the draft smoke review**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | R3-H | R3-G ✅ | H3 only needs draft-quality usefulness here, but it must not be embarrassing |
 
 #### Sprint W3-S3 — Project memory and visibility uplift
 
@@ -626,6 +922,28 @@ Epics:
 - H2 is useful enough to structure a real project
 - H3 can produce a non-embarrassing draft architecture review
 - project memory exists and is not pure noise
+
+### Sprint W3-S3 — Execution Steps
+
+**Step 1 — memory, compare logic, and viewer uplift can start in parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | R3-I | R3-H ✅ | Start project memory only after H2/H3 are concrete enough to produce stable learnings |
+| Track A agent session | R3-J | R3-H ✅ | Viewer improvements should consume the now broader multi-workflow trace reality |
+| Track E agent session | R3-K | R3-D ✅ + R3-H ✅ | Comparison logic should use validated H1/H2 runs, not ad hoc examples |
+
+**Step 2 — Track E curates portfolio-quality evidence first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | R3-L (evidence curation) | R3-I ✅ + R3-J ✅ + R3-K ✅ | Curate the examples worth showing before Track A packages them |
+
+**Step 3 — Track A packages the portfolio-facing presentation layer**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent session | R3-L (presentation packaging) | R3-L evidence curation ✅ | Viewer/narrative packaging should reflect validated examples, not invented showcase material |
 
 ### Wave 3 risk note
 This is the first wave where the system may feel “smart enough” to overtrust.
@@ -661,6 +979,21 @@ Epics:
 1. P4-A first (adapter contract must stabilize before parity work)
 2. P4-B and P4-C can proceed in parallel after P4-A
 
+### Sprint W4-S1 — Execution Steps
+
+**Step 1 — Track D formalizes the adapter contract first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent session | P4-A | Wave 3 ✅ | Stabilize the contract before widening provider support |
+
+**Step 2 — parity work and policy files consume the stabilized boundary in parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent session | P4-B | P4-A ✅ | Bring OpenRouter/OpenAI-compatible behavior closer to parity without polluting core workflow logic |
+| Track D agent session | P4-C | P4-A ✅ | Keep the policy/config surface explicit and inspectable |
+
 #### Sprint W4-S2 — Optional local or secondary provider experiment
 
 Epics:
@@ -677,6 +1010,32 @@ Epics:
 - `P4-F`: **Track D -> Meta**
   - Track D prepares technical routing evidence and model-tier recommendations
   - Meta finalizes policy note and cross-track rollout guidance
+
+### Sprint W4-S2 — Execution Steps
+
+**Step 1 — Track D lands the secondary/local adapter path first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent session | P4-D | P4-A ✅ + P4-B ✅ + P4-C ✅ | This is the experimental widening point; keep it contained |
+
+**Step 2 — Track E runs the cross-adapter smoke comparison**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | P4-E | P4-D ✅ | Compare primary vs secondary adapter behavior using a stable workflow, not toy-only prompts |
+
+**Step 3 — Track D prepares routing guidance**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent session | P4-F (technical routing notes) | P4-E ✅ | Prepare evidence-backed model-tier recommendations |
+
+**Step 4 — Meta finalizes the rollout note**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator session | P4-F (policy closeout) | P4-F technical routing notes ✅ | Convert technical notes into cross-track guidance without reopening adapter design |
 
 ### Wave 4 gate to close the wave:**
 - same workflow can run through at least two adapter routes
@@ -710,6 +1069,21 @@ Epics:
 1. U5-A first (web shell is the foundation)
 2. U5-B and U5-C can proceed in parallel after U5-A
 
+### Sprint W5-S1 — Execution Steps
+
+**Step 1 — Track A builds the web shell first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent session | U5-A | Wave 4 ✅ | Presentation starts only after the system deserves one |
+
+**Step 2 — run browsing and trace browsing consume the shell in parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent session | U5-B | U5-A ✅ | Build run listing/detail on top of the shell |
+| Track A agent session | U5-C | U5-A ✅ | Build the trace timeline page without hiding the underlying trace reality |
+
 #### Sprint W5-S2 — Workbench primitives
 
 Epics:
@@ -725,6 +1099,26 @@ Epics:
 - `U5-E`: **Track E -> Track A**
   - Track E defines comparison metrics and validation expectations
   - Track A implements UX and interaction flow for run comparison
+
+### Sprint W5-S2 — Execution Steps
+
+**Step 1 — Track A lands the workflow launch primitive first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent session | U5-D | U5-A ✅ + U5-B ✅ + U5-C ✅ | Launching workflows through the UI should come after basic browsing already works |
+
+**Step 2 — Track E defines what run comparison must mean**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | U5-E (comparison spec/metrics) | U5-D ✅ | Define comparison semantics before UI implementation guesses |
+
+**Step 3 — Track A implements comparison UX and memory/eval inspection**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent session | U5-E (UX implementation), U5-F | U5-E comparison spec ✅ + U5-D ✅ | Run comparison consumes Track E’s validation semantics; memory/eval inspection can ship alongside it |
 
 ### Wave 5 gate to close the wave:**
 - system is presentable without manually spelunking folders
@@ -790,38 +1184,42 @@ If the workflow is recurring and stable, consider **workflow graph hardening**.
 
 ## 13. Immediate next execution order (short horizon)
 
-This is the recommended near-term order after creating this document.
+This section should always describe the **current frontier**, not the original kickoff history.
 
-### Step 1
-Track B begins:
-- `F0-A`
-- `F0-B`
-- `F0-C`
+### Current frontier
+Wave 0 is complete.
+The next intended active wave is **Wave 1**, starting with **Sprint W1-S1**.
 
-### Step 2
-While B works, parallel prep only:
-- Track D drafts adapter contract note
-- Track A drafts CLI command shape
-- Track C drafts H1 role definitions
-- Track E drafts manual smoke template
+### Wave 1 kickoff — Execution Steps
 
-### Step 3
-Once `F0-B/F0-C` are `✅`:
-- Track D begins minimal adapter
-- Track A begins CLI shell
-- Track C begins minimal H1-lite agent pack
+**Step 1 — open H1 schema and manager baseline in parallel**
 
-### Step 4
-Once first run works:
-- Track E defines and executes the first smoke
-- Track A improves readability
-- Meta Coordinator records first true cross-track handoff state
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | 🔄 L1-A | Wave 0 ✅ | Start the real H1 workflow contract work |
+| Track B agent session | 🔄 L1-B | Wave 0 ✅ | Stabilize manager orchestration against H1 needs |
 
-### Step 5
-Wave 1 begins only after:
-- first run exists
-- first trace exists
-- first smoke exists
+**Step 2 — upgrade the H1 pack once the schema + manager baseline exist**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | 🔄 L1-C | L1-A ✅ + L1-B ✅ | This is the first real H1 pack, beyond Wave 0 lite |
+
+**Step 3 — consume the stabilized H1 pack for baseline and readability**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | 🔄 L1-D | L1-C ✅ | Build the single-agent reference path |
+| Track A agent session | 🔄 L1-E | L1-C ✅ | Improve H1 summary/readability against real output |
+
+### Current operational rule
+If you want to know "which session do I run next?", use this order:
+
+1. `Track C agent session` for `🔄 L1-A`
+2. `Track B agent session` for `🔄 L1-B`
+3. `Track C agent session` for `🔄 L1-C`
+4. `Track E agent session` for `🔄 L1-D`
+5. `Track A agent session` for `🔄 L1-E`
 
 ---
 

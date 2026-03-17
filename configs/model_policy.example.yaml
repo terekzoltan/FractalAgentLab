@@ -1,6 +1,6 @@
 tier_defaults:
-  cheap_worker: gpt-4.1-mini
-  specialist: gpt-4.1
-  finalizer: gpt-5
+  cheap_worker: gpt-4o-mini
+  specialist: gpt-5.4-nano
+  finalizer: gpt-5.4-mini
 
 workflow_overrides: {}
