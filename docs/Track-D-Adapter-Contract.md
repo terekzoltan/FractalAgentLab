@@ -155,3 +155,22 @@ Unknown adapter exceptions are wrapped into `StepExecutionError` inside `Adapter
 - adapter parity smoke comparison
 
 These depend on later sprint/wave goals and additional cross-track hardening.
+
+---
+
+## Wave 1 W1-S1 Stabilization Notes (Track D)
+
+Stabilization fixes implemented for `W1-S1-FIX-D1` and `W1-S1-FIX-D2`:
+
+- `W1-S1-FIX-D1`
+  - `MockAdapter` H1 manager worker path now enforces upstream context requirements.
+  - planner requires intake output context.
+  - critic requires intake and planner output context.
+  - ordering mistakes now fail loudly instead of appearing healthy in mock mode.
+
+- `W1-S1-FIX-D2`
+  - canonical tier defaults restored in `configs/model_policy.example.yaml`:
+    - `cheap_worker`: `gpt-4o-mini`
+    - `specialist`: `gpt-5.4-nano`
+    - `finalizer`: `gpt-5.4-mini`
+  - adapter and CLI tests now align to these defaults.

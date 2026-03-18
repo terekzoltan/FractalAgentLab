@@ -117,6 +117,6 @@ For Track C implementation work:
 
 ## Next Track C Steps
 
-1. support Track E `F0-L` smoke execution with prompt-boundary clarifications if needed
-2. `L1-C`: expand to intake/planner/critic/synthesizer full H1 pack
+1. `L1-C` completed: H1 full role pack v1 now exists for manager workflow path
+2. support `L1-D` baseline track with stable single-agent configuration inputs
 3. `L1-M`: formal prompt version tagging in workflow outputs

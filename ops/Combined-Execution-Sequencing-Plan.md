@@ -461,11 +461,11 @@ Wave 1 is about learning with controlled complexity.
 **Support:** D for provider routing, A for readable output, E for manual+smoke
 
 Epics:
-- ⬜ **L1-A** H1 workflow schema v1 — **Owner: Track C** (Track B reviews schema contract)
-- ⬜ **L1-B** Manager orchestration primitive stabilized — **Owner: Track B**
-- ⬜ **L1-C** H1 agent pack v1: intake / planner / critic / synthesizer — **Owner: Track C**
-- ⬜ **L1-D** H1 baseline single-agent reference path — **Owner: Track E** (Track C provides single-agent config)
-- ⬜ **L1-E** Run summary output improves for H1 — **Owner: Track A**
+- ✅ **L1-A** H1 workflow schema v1 — **Owner: Track C** (Track B reviews schema contract)
+- ✅ **L1-B** Manager orchestration primitive stabilized — **Owner: Track B**
+- ✅ **L1-C** H1 agent pack v1: intake / planner / critic / synthesizer — **Owner: Track C**
+- ✅ **L1-D** H1 baseline single-agent reference path — **Owner: Track E** (Track C provides single-agent config)
+- ✅ **L1-E** Run summary output improves for H1 — **Owner: Track A**
 
 **Sequential ordering:**
 1. L1-A and L1-B can start in parallel (schema design + manager primitive)
@@ -494,7 +494,19 @@ This sprint creates the comparison baseline:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent session | L1-C | L1-A ✅ + L1-B ✅ | This is the first true H1 pack, not the Wave 0 lite placeholder |
+| Track C agent session | ✅ L1-C | L1-A ✅ + L1-B ✅ | First true H1 pack delivered; ready for baseline/readability consumers |
+
+Status note:
+- `L1-A` moved through `🔄` and is now complete: Track C shipped H1 workflow schema v1 in `src/fractal_agent_lab/workflows/h1.py` with explicit `ManagerSpec` contract (`manager_step_id`, worker set, bounded turns), versioned schema refs, and tests in `tests/workflows/test_h1_workflow_spec.py` validating both schema shape and manager-runtime compatibility.
+- `L1-B` moved through `🔄` and is now complete: Track B stabilized a manager orchestration primitive in `src/fractal_agent_lab/runtime/executor.py` with explicit manager contract fields in `WorkflowSpec` (`ManagerSpec`/`ManagerDecision`), bounded manager turn loop controls, and manager/worker agent-level trace emissions without breaking Wave 0 linear workflow execution.
+- `L1-C` moved through `🔄` and is now complete: Track C delivered full H1 role pack v1 under `src/fractal_agent_lab/agents/h1/` (intake/planner/critic/synthesizer), wired registry binding for `h1.manager.v1`, and added manager-path mock/test coverage.
+- `L1-D` moved through `🔄` and is now complete: Track E delivered `h1.single.v1` single-agent baseline workflow wiring, baseline agent pack metadata, mock baseline output shape, and validation tests for contract + end-to-end execution.
+- `L1-E` moved through `🔄` and is now complete: Track A upgraded CLI readability for `h1.manager.v1` with H1 outcome extraction, manager-orchestration summary sections, and lane/turn-aware trace rollups in `src/fractal_agent_lab/cli/formatting.py`.
+
+Post-review stabilization note:
+- W1-S1 implementation is complete, but a small stabilization batch is now the active immediate priority before `L1-F`.
+- Canonical stabilization plan: `docs/Wave1-W1-S1-Stabilization-Plan.md`
+- Execution order: `Track B agent session` -> `Track D agent session` -> `Meta Coordinator session`
 
 **Step 3 — baseline comparison and output readability consume the stabilized H1 pack**
 
@@ -1188,38 +1200,45 @@ This section should always describe the **current frontier**, not the original k
 
 ### Current frontier
 Wave 0 is complete.
-The next intended active wave is **Wave 1**, starting with **Sprint W1-S1**.
+Wave 1 Sprint `W1-S1` is implemented, but the immediate active frontier is a short stabilization batch before `L1-F`.
 
-### Wave 1 kickoff — Execution Steps
+### W1-S1 stabilization batch — Execution Steps
 
-**Step 1 — open H1 schema and manager baseline in parallel**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track C agent session | 🔄 L1-A | Wave 0 ✅ | Start the real H1 workflow contract work |
-| Track B agent session | 🔄 L1-B | Wave 0 ✅ | Stabilize manager orchestration against H1 needs |
-
-**Step 2 — upgrade the H1 pack once the schema + manager baseline exist**
+**Step 1 — Track B closes the runtime/contract findings first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent session | 🔄 L1-C | L1-A ✅ + L1-B ✅ | This is the first real H1 pack, beyond Wave 0 lite |
+| Track B agent session | ✅ W1-S1-FIX-B1, ✅ W1-S1-FIX-B2, ✅ W1-S1-FIX-B3, ✅ W1-S1-FIX-B4 | L1-A ✅ + L1-B ✅ + L1-C ✅ + L1-D ✅ + L1-E ✅ | Runtime/contract truth first: baseline execution-mode fix, manager parser fix, guardrail tests, then execution-mode truth hardening + manager-spec validation |
 
-**Step 3 — consume the stabilized H1 pack for baseline and readability**
+**Step 2 — Track D hardens the mock path and restores default model tiers**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | 🔄 L1-D | L1-C ✅ | Build the single-agent reference path |
-| Track A agent session | 🔄 L1-E | L1-C ✅ | Improve H1 summary/readability against real output |
+| Track D agent session | ✅ W1-S1-FIX-D1, ✅ W1-S1-FIX-D2 | W1-S1-FIX-B1 ✅ + W1-S1-FIX-B2 ✅ | Harden mock honesty after Track B runtime semantics are stable |
+
+Status note:
+- `W1-S1-FIX-B1` completed: `h1.single.v1` execution metadata now matches the actual linear executor path.
+- `W1-S1-FIX-B2` completed: manager control parsing now selects the first valid control envelope instead of the first discovered one.
+- `W1-S1-FIX-B3` completed: dedicated manager guardrail runtime tests were added for invalid delegate target, revisit rejection, max-turn exhaustion, and fallback behavior.
+- `W1-S1-FIX-B4` completed: execution-mode truth is now hardened for `h1.lite` and `wave0.demo` (declared and emitted as linear when manager_spec is absent), runtime reports effective branch mode, and WorkflowSpec now rejects manager worker sets that include the manager step.
+- `W1-S1-FIX-D1` completed: `MockAdapter` H1 manager worker behavior is stricter, and now fails loudly when planner/critic are executed without required upstream context, reducing ordering-regression false positives.
+- `W1-S1-FIX-D2` completed: model-tier defaults were restored to the canonical baseline (`gpt-4o-mini`, `gpt-5.4-nano`, `gpt-5.4-mini`) and adapter/CLI tests were aligned.
+
+**Step 3 — Meta closes the stabilization detour and restores the normal frontier**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator session | 🔄 W1-S1-FIX-META1 | W1-S1-FIX-B1 ✅ + W1-S1-FIX-B2 ✅ + W1-S1-FIX-B3 ✅ + W1-S1-FIX-D1 ✅ + W1-S1-FIX-D2 ✅ | Confirms W1-S1 is hardened enough and returns the active frontier to `L1-F` |
 
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track C agent session` for `🔄 L1-A`
-2. `Track B agent session` for `🔄 L1-B`
-3. `Track C agent session` for `🔄 L1-C`
-4. `Track E agent session` for `🔄 L1-D`
-5. `Track A agent session` for `🔄 L1-E`
+1. `Track D agent session` for `🔄 W1-S1-FIX-D1`, `🔄 W1-S1-FIX-D2`
+2. `Meta Coordinator session` for `🔄 W1-S1-FIX-META1`
+3. return active frontier to `L1-F` once the stabilization closeout is confirmed
+
+Reference:
+- `docs/Wave1-W1-S1-Stabilization-Plan.md`
 
 ---
 
@@ -1319,6 +1338,8 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-03-09][Meta] Track ownership and sequential ordering added to all epics across all waves - every epic now has explicit owner and ordering constraints documented.`
 - `[2026-03-09][Track D] F0-F implemented - StepRunner adapter boundary, MockAdapter path, and provider routing shell are active - next: wire CLI config loading path for F0-I.`
 - `[2026-03-09][Track D] F0-I implemented - CLI now loads runtime/providers/model policy config and applies provider selection shell through adapter step runner - next: coordinate smoke/acceptance with Track A/E.`
+- `[2026-03-18][Track D] W1-S1-FIX-D1 completed (🔄 -> ✅) - H1 manager mock workers now enforce upstream context requirements so ordering regressions fail fast instead of passing silently - next: close W1-S1-FIX-D2 tier realignment.`
+- `[2026-03-18][Track D] W1-S1-FIX-D2 completed (🔄 -> ✅) - canonical model-tier defaults restored to gpt-4o-mini / gpt-5.4-nano / gpt-5.4-mini with adapter+CLI test fixtures aligned - next: Meta runs W1-S1-FIX-META1 closeout.`
 - `[2026-03-09][Track A] F0-G completed - CLI shell now runs Wave 0 demo workflow through runtime executor with list-workflows/run commands and optional trace summary - next: complete F0-H formatting hardening.`
 - `[2026-03-09][Track A] F0-H completed - minimal run summary contract now standardized across text/json output for Wave 0 CLI runs - next: proceed to W0-S3 dependencies with Track C/E.`
 - `[2026-03-11][Track E] F0-L started (⬜ -> 🔄) - manual smoke checklist implementation kicked off against Wave 0 runnable path and Track B runtime contracts - next: publish executable checklist with acceptance labels.`
@@ -1326,6 +1347,10 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-03-13][Track E] Coordination doc visibility note recorded - ops/docs markdown remains locally readable by opencode even when ignored by git, but those changes are not visible in git status or standard commit flow - next: treat documentation auditability separately from local read access.`
 - `[2026-03-13][Track E] F0-M started (Track B scope ✅ -> 🔄 Track E scope) - artifact usability validation began for stored run/trace outputs with explicit replay-smoke invariants - next: validate success and failure artifact pairs.`
 - `[2026-03-13][Track E] F0-M completed (🔄 -> ✅) - Track E acceptance passed for run/trace artifact usability with validator module, script, and validation report - next: move to L1 baseline and smoke rubric layering.`
+- `[2026-03-17][Track E] L1-D started (⬜ -> 🔄) - implementation started for H1 single-agent baseline reference path to anchor Wave 1 orchestration comparisons - next: deliver baseline workflow/agent wiring plus validation tests.`
+- `[2026-03-17][Track E] L1-D completed (🔄 -> ✅) - H1 single-agent baseline path shipped as h1.single.v1 with baseline agent pack wiring, mock output shaping, and test coverage for contract + end-to-end execution - next: feed baseline evidence into L1-I and L1-L comparison work.`
+- `[2026-03-17][Track A] L1-E started (⬜ -> 🔄) - implementation started for H1 manager run readability improvements in CLI summary output against L1-C output contracts - next: add H1-aware text/json summary and orchestration-focused formatting.`
+- `[2026-03-17][Track A] L1-E completed (🔄 -> ✅) - CLI now surfaces H1 final_output and manager_orchestration in readable summary sections with lane/turn trace rollups and coverage in tests/cli/test_l1_e_h1_summary.py - next: support Track E baseline comparison interpretation with clearer manager run evidence.`
 
 ---
 

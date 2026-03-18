@@ -88,6 +88,6 @@ Result:
 
 ## Next Steps
 
-1. Track E executes `F0-L` manual smoke checklist using `h1.lite`
-2. Track B + E complete `F0-M` stored run + trace artifact path
-3. Wave 1 expands H1 pack with critic role and baseline comparison
+1. `L1-A` and `L1-C` are complete: H1 manager schema + full role pack are now implemented
+2. `L1-D` completed: Track E shipped the single-agent baseline reference path (`h1.single.v1`)
+3. Track A proceeds with `L1-E` run summary readability improvements

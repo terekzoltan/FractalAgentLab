@@ -121,7 +121,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - run result is understandable without reading raw JSON
 - trace is explorable enough to debug failures
 
-**Status:** `🔄 in progress` (Wave 0 W0-S2 active: F0-G implemented, F0-H implemented)
+**Status:** `🔄 in progress` (Wave 1 W1-S1: L1-E completed; next Track A milestone is L1-J after L1-H)
 
 ---
 
@@ -154,7 +154,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - run state survives across steps in one run
 - failures are observable and classified
 
-**Status:** `🔄 in progress` (Wave 0 foundation burst active)
+**Status:** `🔄 in progress` (Wave 1 stabilization: W1-S1-FIX-B1/B2/B3/B4 complete; waiting D/Meta closeout before L1-F)
 
 ---
 
@@ -191,7 +191,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 0: F0-J/F0-K complete; waiting F0-L/F0-M wave closure)
+**Status:** `🔄 in progress` (Wave 1: L1-A/L1-C complete; ready to support L1-D/L1-E)
 
 ---
 
@@ -223,7 +223,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - provider swap does not break business logic
 - model selection policy is explicit and inspectable
 
-**Status:** `🔄 in progress` (Wave 0 W0-S2: F0-F/F0-I complete; adapter boundary hardening ongoing)
+**Status:** `🔄 in progress` (Wave 1 stabilization: W1-S1-FIX-D1/D2 complete; waiting Meta closeout before L1-F)
 
 ---
 
@@ -257,7 +257,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - quality regressions are visible early
 - identity profile updates are sanity-checked (no runaway drift)
 
-**Status:** `🔄 in progress` (Wave 0: F0-L/F0-M complete; preparing L1 baseline and rubric work)
+**Status:** `🔄 in progress` (Wave 1: L1-D complete; baseline/rubric comparison layering in progress)
 
 ---
 
@@ -525,14 +525,14 @@ Small curated set of recurring test cases.
 
 Use model tiers instead of one-model-for-all:
 
-Current default direction (subject to change as the model market moves):
+Current default direction (explicitly confirmed, but still revisitable later):
 - `cheap_worker` -> `gpt-4o-mini`
 - `specialist` -> `gpt-5.4-nano`
 - `finalizer` -> `gpt-5.4-mini`
 
 Note:
-- these are working defaults, not long-term promises
-- revisit when cheaper or better small-model options materially shift the tradeoff
+- these are current defaults, not permanent promises
+- revisit when the small/cheap model landscape shifts materially
 
 #### Tier T1 — Cheap workers
 Use for:
@@ -846,6 +846,18 @@ Entries:
 - `[2026-03-13][Track E] Ops/docs gitignore note recorded - opencode can still read local changes in ops/docs directly from filesystem, but ignored markdown will not appear in git status or normal commit flow - next: keep this constraint explicit in coordination and audit expectations.`
 - `[2026-03-13][Track E] F0-M started (Track B scope ✅ -> 🔄 Track E scope) - artifact usability validation kickoff for replay/smoke acceptance using stored run and trace outputs - next: validate success/failure artifacts with explicit invariants.`
 - `[2026-03-13][Track E] F0-M completed (🔄 -> ✅) - Track E validated run/trace artifact usability via src/fractal_agent_lab/evals/artifact_acceptance.py and scripts/validate_f0_m_artifact_pair.py, recorded evidence in docs/Wave0-F0-M-Artifact-Validation.md - next: proceed to L1 baseline/rubric layering.`
+- `[2026-03-17][Track E] L1-D started (⬜ -> 🔄) - H1 single-agent baseline reference path implementation kicked off to create Wave 1 comparison anchor against h1.manager.v1 - next: ship baseline workflow/agent wiring with tests and validation note.`
+- `[2026-03-17][Track E] L1-D completed (🔄 -> ✅) - single-agent H1 baseline shipped as h1.single.v1 with baseline pack/registry wiring, mock comparison-friendly output shape, and workflow+adapter test coverage - next: use this baseline for L1-I/L1-L evidence and rubric tuning.`
+- `[2026-03-17][Track C] L1-A started (⬜ -> 🔄) - Wave 1 H1 workflow schema v1 kickoff started against stabilized manager primitive - next: publish explicit manager/worker schema contract in workflows module.`
+- `[2026-03-17][Track C] L1-A completed (🔄 -> ✅) - H1 manager workflow schema v1 delivered in src/fractal_agent_lab/workflows/h1.py with manager spec fields, schema refs, and workflow tests validating runtime compatibility - next: begin L1-C H1 agent pack v1 against this contract.`
+- `[2026-03-17][Track C] L1-C started (⬜ -> 🔄) - H1 full role pack v1 implementation started against L1-A schema and L1-B manager runtime - next: deliver intake/planner/critic/synthesizer prompts and registry binding.`
+- `[2026-03-17][Track C] L1-C completed (🔄 -> ✅) - H1 pack v1 shipped under src/fractal_agent_lab/agents/h1 with critic role, role-level prompt versions, manager-control synthesizer prompt, h1.manager.v1 registry binding, and mock manager-path tests - next: handoff to Track E (L1-D) and Track A (L1-E).`
+- `[2026-03-17][Track A] L1-E started (⬜ -> 🔄) - H1 manager run summary readability implementation started in Track A CLI formatting layer against stabilized L1-C output shape - next: add H1-focused summary sections in text/json outputs.`
+- `[2026-03-17][Track A] L1-E completed (🔄 -> ✅) - CLI summary now extracts H1 final output and manager orchestration context with lane/turn-aware trace rollups, plus coverage in tests/cli/test_l1_e_h1_summary.py - next: handoff readable manager evidence to Track E while waiting for L1-H before L1-J timeline UI work.`
+- `[2026-03-18][Track B] W1-S1-FIX-B1/B2/B3 completed (🔄 -> ✅) - h1.single.v1 execution-mode mismatch fixed to linear, manager parser now selects first valid control envelope, and dedicated runtime guardrail tests added for invalid target/revisit/max-turn/fallback - next: Track D executes W1-S1-FIX-D1/D2, then Meta closes stabilization batch.`
+- `[2026-03-18][Track B] W1-S1-FIX-B4 completed (🔄 -> ✅) - execution-mode truth hardened end-to-end: h1.lite and wave0.demo now declare linear, runtime emits effective branch mode, and WorkflowSpec rejects manager worker sets containing the manager step - next: Track D continues W1-S1-FIX-D1/D2 with stable runtime contracts.`
+- `[2026-03-18][Track D] W1-S1-FIX-D1 completed (🔄 -> ✅) - MockAdapter manager workers now enforce upstream context requirements so planner/critic ordering regressions fail loudly instead of passing silently - next: complete W1-S1-FIX-D2 model-tier default realignment.`
+- `[2026-03-18][Track D] W1-S1-FIX-D2 completed (🔄 -> ✅) - model-tier defaults restored to gpt-4o-mini / gpt-5.4-nano / gpt-5.4-mini with adapter+CLI fixtures aligned - next: Meta executes W1-S1-FIX-META1 stabilization closeout.`
 
 ---
 
