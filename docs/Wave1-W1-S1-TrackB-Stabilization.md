@@ -152,10 +152,11 @@ All executed checks passed.
 
 ## Current Frontier
 
-Track B stabilization fixes are complete.
+Track B stabilization fixes are complete, and the full W1-S1 stabilization batch is now closed.
 
-The immediate next sessions are:
+The active frontier has returned to normal Wave 1 sequencing:
 
-1. Track D `W1-S1-FIX-D1`, `W1-S1-FIX-D2`
-2. Meta `W1-S1-FIX-META1`
-3. then return to `L1-F`
+1. Track B `L1-F`
+2. Track C `L1-G`
+3. Track B `L1-H`
+4. Track E `L1-I`

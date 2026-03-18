@@ -154,7 +154,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - run state survives across steps in one run
 - failures are observable and classified
 
-**Status:** `🔄 in progress` (Wave 1 stabilization: W1-S1-FIX-B1/B2/B3/B4 complete; waiting D/Meta closeout before L1-F)
+**Status:** `🔄 in progress` (Wave 1 stabilization complete; next Track B milestone is L1-F)
 
 ---
 
@@ -223,7 +223,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - provider swap does not break business logic
 - model selection policy is explicit and inspectable
 
-**Status:** `🔄 in progress` (Wave 1 stabilization: W1-S1-FIX-D1/D2 complete; waiting Meta closeout before L1-F)
+**Status:** `🔄 in progress` (Wave 1 stabilization complete; no immediate Wave 1 blocking Track D epic before later provider/runtime work)
 
 ---
 
@@ -858,6 +858,7 @@ Entries:
 - `[2026-03-18][Track B] W1-S1-FIX-B4 completed (🔄 -> ✅) - execution-mode truth hardened end-to-end: h1.lite and wave0.demo now declare linear, runtime emits effective branch mode, and WorkflowSpec rejects manager worker sets containing the manager step - next: Track D continues W1-S1-FIX-D1/D2 with stable runtime contracts.`
 - `[2026-03-18][Track D] W1-S1-FIX-D1 completed (🔄 -> ✅) - MockAdapter manager workers now enforce upstream context requirements so planner/critic ordering regressions fail loudly instead of passing silently - next: complete W1-S1-FIX-D2 model-tier default realignment.`
 - `[2026-03-18][Track D] W1-S1-FIX-D2 completed (🔄 -> ✅) - model-tier defaults restored to gpt-4o-mini / gpt-5.4-nano / gpt-5.4-mini with adapter+CLI fixtures aligned - next: Meta executes W1-S1-FIX-META1 stabilization closeout.`
+- `[2026-03-18][Meta] W1-S1-FIX-META1 completed (🔄 -> ✅) - W1-S1 stabilization batch is now formally closed, current frontier returns to L1-F/L1-G/L1-H/L1-I sequence - next: Track B begins handoff primitive work.`
 
 ---
 

@@ -1200,7 +1200,8 @@ This section should always describe the **current frontier**, not the original k
 
 ### Current frontier
 Wave 0 is complete.
-Wave 1 Sprint `W1-S1` is implemented, but the immediate active frontier is a short stabilization batch before `L1-F`.
+Wave 1 Sprint `W1-S1` and its stabilization batch are complete.
+The immediate active frontier now returns to **Sprint W1-S2**.
 
 ### W1-S1 stabilization batch — Execution Steps
 
@@ -1228,14 +1229,18 @@ Status note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | 🔄 W1-S1-FIX-META1 | W1-S1-FIX-B1 ✅ + W1-S1-FIX-B2 ✅ + W1-S1-FIX-B3 ✅ + W1-S1-FIX-D1 ✅ + W1-S1-FIX-D2 ✅ | Confirms W1-S1 is hardened enough and returns the active frontier to `L1-F` |
+| Meta Coordinator session | ✅ W1-S1-FIX-META1 | W1-S1-FIX-B1 ✅ + W1-S1-FIX-B2 ✅ + W1-S1-FIX-B3 ✅ + W1-S1-FIX-D1 ✅ + W1-S1-FIX-D2 ✅ | W1-S1 stabilization closeout is complete; active frontier returns to `L1-F` |
+
+Closeout note:
+- `W1-S1-FIX-META1` completed: W1-S1 is now considered hardened enough for downstream use, and the normal Wave 1 sequence resumes at `L1-F`.
 
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track D agent session` for `🔄 W1-S1-FIX-D1`, `🔄 W1-S1-FIX-D2`
-2. `Meta Coordinator session` for `🔄 W1-S1-FIX-META1`
-3. return active frontier to `L1-F` once the stabilization closeout is confirmed
+1. `Track B agent session` for `🔄 L1-F`
+2. `Track C agent session` for `🔄 L1-G`
+3. `Track B agent session` for `🔄 L1-H`
+4. `Track E agent session` for `🔄 L1-I`
 
 Reference:
 - `docs/Wave1-W1-S1-Stabilization-Plan.md`
