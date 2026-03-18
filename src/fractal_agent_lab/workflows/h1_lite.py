@@ -17,7 +17,7 @@ def build_h1_lite_workflow_spec() -> WorkflowSpec:
     return WorkflowSpec(
         workflow_id=H1_LITE_WORKFLOW_ID,
         name="H1 Lite Startup Idea Refinement",
-        execution_mode=WorkflowExecutionMode.MANAGER,
+        execution_mode=WorkflowExecutionMode.LINEAR,
         steps=[
             WorkflowStepSpec(
                 step_id="intake",

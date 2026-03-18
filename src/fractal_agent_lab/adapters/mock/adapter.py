@@ -56,6 +56,10 @@ class MockAdapter:
             return responder(request)
         if candidate is not None:
             return candidate
+        if request.workflow_id == "h1.manager.v1":
+            return self._build_h1_manager_output(request)
+        if request.workflow_id == "h1.single.v1":
+            return self._build_h1_single_output(request)
         if request.workflow_id == "h1.lite":
             return self._build_h1_lite_output(request)
         return {
@@ -159,6 +163,213 @@ class MockAdapter:
             "prompt_version": request.prompt_version,
         }
 
+    def _build_h1_manager_output(self, request: AdapterStepRequest) -> dict[str, Any]:
+        idea = _clean_text(request.input_payload.get("idea"), fallback="Unspecified startup idea")
+        intake_output = _step_output(request, "intake")
+        planner_output = _step_output(request, "planner")
+        critic_output = _step_output(request, "critic")
+
+        if request.step_id == "synthesizer":
+            if not intake_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "intake",
+                        "reason": "missing_intake_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+            if not planner_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "planner",
+                        "reason": "missing_planner_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+            if not critic_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "critic",
+                        "reason": "missing_critic_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+
+            strongest_assumptions = intake_output.get("assumptions")
+            if not isinstance(strongest_assumptions, list) or not strongest_assumptions:
+                strongest_assumptions = [
+                    "Founders value concrete problem framing before broad ideation.",
+                ]
+
+            weak_points = critic_output.get("weak_points")
+            if not isinstance(weak_points, list) or not weak_points:
+                weak_points = ["Differentiation against generic AI assistants remains weak."]
+
+            alternatives = critic_output.get("alternatives")
+            if not isinstance(alternatives, list) or not alternatives:
+                alternatives = ["Narrow scope to founder interview preparation workflow."]
+
+            return {
+                "control": {
+                    "action": "finalize",
+                    "reason": "all_workers_completed",
+                    "output": {
+                        "clarified_idea": (
+                            "AI startup refinement assistant that structures idea framing, "
+                            "validation planning, and critical stress-testing in one guided flow."
+                        ),
+                        "strongest_assumptions": strongest_assumptions,
+                        "weak_points": weak_points,
+                        "alternatives": alternatives,
+                        "recommended_mvp_direction": (
+                            "Ship a constrained H1 workflow that produces structured outputs and "
+                            "validation-first next actions for founders."
+                        ),
+                        "next_3_validation_steps": [
+                            "Interview 3 target founders about early idea validation pain.",
+                            "Run the H1 manager workflow on 5 real ideas and review usefulness.",
+                            "Measure whether structured outputs shorten decision time.",
+                        ],
+                    },
+                },
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "intake":
+            return {
+                "idea_summary": idea,
+                "target_user": "Early-stage founders validating first product direction.",
+                "core_problem": f"The founder needs sharper positioning for: {idea}.",
+                "assumptions": [
+                    "Structured critique is more useful than open brainstorming.",
+                    "Validation planning increases confidence before MVP build.",
+                ],
+                "constraints": [
+                    "Limited time for discovery.",
+                    "Need concrete next actions after each iteration.",
+                ],
+                "open_questions": [
+                    "Which founder segment has the strongest urgency?",
+                    "Which output format drives immediate action?",
+                ],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "planner":
+            _require_manager_context(request=request, required_step_id="intake")
+            normalized_summary = _clean_text(intake_output.get("idea_summary"), fallback=idea)
+            return {
+                "validation_axes": [
+                    "problem urgency",
+                    "solution credibility",
+                    "distribution feasibility",
+                ],
+                "hypothesis_to_test": [
+                    f"Founders will pay for tighter framing of '{normalized_summary}'.",
+                    "A guided manager workflow beats single-shot ideation quality.",
+                ],
+                "riskiest_assumptions": [
+                    "Users prefer structured outputs over conversational free-form answers.",
+                    "The proposed flow can stay narrow enough for MVP scope.",
+                ],
+                "evidence_needed": [
+                    "Interview notes from 3-5 founders",
+                    "Usability feedback from first workflow runs",
+                ],
+                "first_experiments": [
+                    "Run concierge tests with manual synthesis",
+                    "Compare H1 manager output against single-agent output",
+                ],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "critic":
+            _require_manager_context(request=request, required_step_id="intake")
+            _require_manager_context(request=request, required_step_id="planner")
+            return {
+                "weak_points": [
+                    "Value proposition may overlap with broad-purpose assistants.",
+                    "Target segment may still be too broad.",
+                ],
+                "failure_modes": [
+                    "Outputs remain generic and do not change founder decisions.",
+                    "Workflow feels too long relative to perceived value.",
+                ],
+                "hidden_dependencies": [
+                    "Quality depends on user providing sufficiently concrete input.",
+                    "Model quality drift can reduce consistency across runs.",
+                ],
+                "counterarguments": [
+                    "Some founders may prefer direct MVP scoping over idea refinement.",
+                    "General AI tools may be enough for low-complexity ideas.",
+                ],
+                "alternatives": [
+                    "Narrow to one niche: technical founders pre-MVP.",
+                    "Focus on critic-only addon instead of full workflow assistant.",
+                ],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        return {
+            "message": f"No specialized h1.manager.v1 output for step '{request.step_id}'.",
+            "role": request.role,
+            "model": request.model,
+            "model_policy_ref": request.model_policy_ref,
+            "prompt_version": request.prompt_version,
+        }
+
+    def _build_h1_single_output(self, request: AdapterStepRequest) -> dict[str, Any]:
+        idea = _clean_text(request.input_payload.get("idea"), fallback="Unspecified startup idea")
+
+        if request.step_id != "single":
+            return {
+                "message": f"No specialized h1.single.v1 output for step '{request.step_id}'.",
+                "role": request.role,
+                "model": request.model,
+                "model_policy_ref": request.model_policy_ref,
+                "prompt_version": request.prompt_version,
+            }
+
+        return {
+            "clarified_idea": (
+                "Single-agent founder refinement assistant focused on turning rough startup ideas into "
+                "a structured decision package."
+            ),
+            "strongest_assumptions": [
+                f"The idea '{idea}' has enough potential signal to justify an MVP framing pass.",
+                "Founders benefit from concrete next steps over broad brainstorming.",
+            ],
+            "weak_points": [
+                "Single-agent reasoning may miss specialist blind spots.",
+                "Without role separation, critique depth can be inconsistent.",
+            ],
+            "alternatives": [
+                "Use manager-based multi-agent workflow for stronger adversarial critique.",
+                "Narrow scope to one founder segment before broad validation planning.",
+            ],
+            "recommended_mvp_direction": (
+                "Ship a constrained idea-refinement flow with mandatory structured output sections and "
+                "explicit validation tasks."
+            ),
+            "next_3_validation_steps": [
+                "Run the baseline on 5 real ideas and capture where outputs stay generic.",
+                "Compare baseline outputs against h1.manager.v1 on the same inputs.",
+                "Record decision-quality delta before choosing default orchestration.",
+            ],
+            "role": request.role,
+            "prompt_version": request.prompt_version,
+        }
+
 
 def _step_output(request: AdapterStepRequest, step_id: str) -> dict[str, Any]:
     step_results = request.context.get("step_results")
@@ -173,6 +384,25 @@ def _step_output(request: AdapterStepRequest, step_id: str) -> dict[str, Any]:
     if isinstance(output, Mapping):
         return dict(output)
     return {}
+
+
+def _require_manager_context(*, request: AdapterStepRequest, required_step_id: str) -> None:
+    upstream = _step_output(request, required_step_id)
+    if upstream:
+        return
+
+    raise StepExecutionError(
+        (
+            "MockAdapter strict manager context check failed: "
+            f"step '{request.step_id}' requires upstream step '{required_step_id}'."
+        ),
+        details={
+            "workflow_id": request.workflow_id,
+            "step_id": request.step_id,
+            "required_step_id": required_step_id,
+            "reason": "missing_upstream_context",
+        },
+    )
 
 
 def _clean_text(value: Any, *, fallback: str) -> str:

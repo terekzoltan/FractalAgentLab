@@ -1,11 +1,51 @@
+from fractal_agent_lab.workflows.h1 import (
+    H1_CRITIC_AGENT_ID,
+    H1_INPUT_SCHEMA_REF,
+    H1_INTAKE_AGENT_ID,
+    H1_MANAGER_AGENT_ID,
+    H1_MANAGER_STEP_ID,
+    H1_OUTPUT_SCHEMA_REF,
+    H1_PLANNER_AGENT_ID,
+    H1_SCHEMA_CONTRACT,
+    H1_WORKER_STEP_IDS,
+    H1_WORKFLOW_ID,
+    build_h1_manager_workflow_spec,
+)
 from fractal_agent_lab.workflows.h1_lite import (
     H1_LITE_WORKFLOW_ID,
     build_h1_lite_agent_pack,
     build_h1_lite_workflow_spec,
 )
+from fractal_agent_lab.workflows.h1_single import (
+    H1_SINGLE_AGENT_ID,
+    H1_SINGLE_INPUT_SCHEMA_REF,
+    H1_SINGLE_OUTPUT_SCHEMA_REF,
+    H1_SINGLE_SCHEMA_CONTRACT,
+    H1_SINGLE_STEP_ID,
+    H1_SINGLE_WORKFLOW_ID,
+    build_h1_single_workflow_spec,
+)
 
 __all__ = [
+    "H1_CRITIC_AGENT_ID",
+    "H1_INPUT_SCHEMA_REF",
+    "H1_INTAKE_AGENT_ID",
+    "H1_MANAGER_AGENT_ID",
+    "H1_MANAGER_STEP_ID",
+    "H1_OUTPUT_SCHEMA_REF",
+    "H1_PLANNER_AGENT_ID",
+    "H1_SCHEMA_CONTRACT",
+    "H1_SINGLE_AGENT_ID",
+    "H1_SINGLE_INPUT_SCHEMA_REF",
+    "H1_SINGLE_OUTPUT_SCHEMA_REF",
+    "H1_SINGLE_SCHEMA_CONTRACT",
+    "H1_SINGLE_STEP_ID",
+    "H1_SINGLE_WORKFLOW_ID",
+    "H1_WORKER_STEP_IDS",
+    "H1_WORKFLOW_ID",
     "H1_LITE_WORKFLOW_ID",
+    "build_h1_manager_workflow_spec",
     "build_h1_lite_agent_pack",
     "build_h1_lite_workflow_spec",
+    "build_h1_single_workflow_spec",
 ]

@@ -1,5 +1,8 @@
 from fractal_agent_lab.core.contracts import (
     AGENT_SPEC_SCHEMA_VERSION,
+    ManagerAction,
+    ManagerDecision,
+    ManagerSpec,
     WORKFLOW_SPEC_SCHEMA_VERSION,
     AgentKind,
     AgentSpec,
@@ -23,6 +26,9 @@ from fractal_agent_lab.core.models import RUN_STATE_SCHEMA_VERSION, RunState, Ru
 
 __all__ = [
     "AGENT_SPEC_SCHEMA_VERSION",
+    "ManagerAction",
+    "ManagerDecision",
+    "ManagerSpec",
     "RUN_STATE_SCHEMA_VERSION",
     "TRACE_EVENT_SCHEMA_VERSION",
     "WORKFLOW_SPEC_SCHEMA_VERSION",

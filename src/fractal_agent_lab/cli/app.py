@@ -140,9 +140,15 @@ def _handle_run(args: argparse.Namespace) -> int:
     run_state = executor.execute(workflow=workflow, input_payload=input_payload)
 
     data_dir = resolve_data_dir(runtime_config)
+    run_artifact_path = None
+    trace_artifact_path = None
     try:
-        write_run_artifact(run_state, data_dir=data_dir)
-        write_trace_artifact(emitter.events, run_id=run_state.run_id, data_dir=data_dir)
+        run_artifact_path = write_run_artifact(run_state, data_dir=data_dir)
+        trace_artifact_path = write_trace_artifact(
+            emitter.events,
+            run_id=run_state.run_id,
+            data_dir=data_dir,
+        )
     except OSError as error:
         print(f"Warning: failed to write run/trace artifacts: {error}", file=sys.stderr)
 
@@ -162,6 +168,8 @@ def _handle_run(args: argparse.Namespace) -> int:
                 run_state,
                 steps_total=steps_total,
                 trace_events_count=len(emitter.events),
+                run_artifact_path=run_artifact_path,
+                trace_artifact_path=trace_artifact_path,
             ),
         )
         if include_trace:

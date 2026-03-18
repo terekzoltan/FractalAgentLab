@@ -5,7 +5,14 @@ from time import monotonic
 from typing import Any, Protocol
 from uuid import uuid4
 
-from fractal_agent_lab.core.contracts import WorkflowSpec, WorkflowStepSpec
+from fractal_agent_lab.core.contracts import (
+    ManagerAction,
+    ManagerDecision,
+    ManagerSpec,
+    WorkflowExecutionMode,
+    WorkflowSpec,
+    WorkflowStepSpec,
+)
 from fractal_agent_lab.core.errors import (
     FractalRuntimeError,
     RunBudgetError,
@@ -117,18 +124,19 @@ class WorkflowExecutor:
 
         run_state.start()
         self._state_store.save(run_state)
+        runtime_mode = self._runtime_execution_mode(workflow)
         emit(
             TraceEventType.RUN_STARTED,
             payload={
                 "workflow_id": workflow.workflow_id,
                 "workflow_name": workflow.name,
-                "execution_mode": workflow.execution_mode.value,
+                "execution_mode": runtime_mode.value,
             },
         )
 
         if not workflow.steps:
             error = RuntimeBoundaryError(
-                "Workflow has no executable steps in Wave 0 executor.",
+                "Workflow has no executable steps in runtime executor.",
                 details={"workflow_id": workflow.workflow_id},
             )
             run_state.fail(str(error))
@@ -140,69 +148,39 @@ class WorkflowExecutor:
         remaining_budget = self._limits.budget_units
 
         try:
-            for step in workflow.steps:
-                self._enforce_timeout(started_at)
-                remaining_budget = self._consume_budget(
-                    remaining_budget,
-                    step_id=step.step_id,
+            if runtime_mode == WorkflowExecutionMode.LINEAR:
+                output_payload, remaining_budget = self._execute_linear_workflow(
+                    run_state=run_state,
+                    workflow=workflow,
+                    emit=emit,
+                    started_at=started_at,
+                    remaining_budget=remaining_budget,
+                )
+            else:
+                manager_spec = workflow.manager_spec
+                if manager_spec is None:
+                    raise RuntimeBoundaryError(
+                        "Runtime mode 'manager' requires non-null manager_spec.",
+                        details={"workflow_id": workflow.workflow_id},
+                    )
+                output_payload, remaining_budget = self._execute_manager_workflow(
+                    run_state=run_state,
+                    workflow=workflow,
+                    manager_spec=manager_spec,
+                    emit=emit,
+                    started_at=started_at,
+                    remaining_budget=remaining_budget,
                 )
 
-                emit(
-                    TraceEventType.STEP_STARTED,
-                    step_id=step.step_id,
-                    payload={"agent_id": step.agent_id},
-                )
-
-                attempts = 0
-                while True:
-                    attempts += 1
-                    try:
-                        output = self._step_runner(
-                            run_state=run_state,
-                            workflow=workflow,
-                            step=step,
-                        )
-                        break
-                    except (RunTimeoutError, RunBudgetError):
-                        raise
-                    except Exception as error:
-                        emit(
-                            TraceEventType.STEP_FAILED,
-                            step_id=step.step_id,
-                            payload={
-                                "attempt": attempts,
-                                "error_type": type(error).__name__,
-                                "error": str(error),
-                            },
-                        )
-                        if attempts > self._limits.max_retries_per_step:
-                            if isinstance(error, FractalRuntimeError):
-                                raise
-                            raise StepExecutionError(
-                                f"Step '{step.step_id}' failed after {attempts} attempt(s).",
-                                details={
-                                    "step_id": step.step_id,
-                                    "error_type": type(error).__name__,
-                                    "error": str(error),
-                                },
-                            ) from error
-
-                run_state.step_results[step.step_id] = output
-                self._state_store.save(run_state)
-                emit(
-                    TraceEventType.STEP_COMPLETED,
-                    step_id=step.step_id,
-                    payload={
-                        "agent_id": step.agent_id,
-                        "attempts": attempts,
-                    },
-                )
-
-            run_state.succeed(output_payload={"step_results": dict(run_state.step_results)})
+            _ = remaining_budget
+            run_state.succeed(output_payload=output_payload)
             self._state_store.save(run_state)
             emit(
                 TraceEventType.RUN_COMPLETED,
-                payload={"steps_completed": len(run_state.step_results)},
+                payload={
+                    "steps_completed": len(run_state.step_results),
+                    "execution_mode": runtime_mode.value,
+                },
             )
             return run_state
 
@@ -227,6 +205,383 @@ class WorkflowExecutor:
             self._state_store.save(run_state)
             emit(TraceEventType.RUN_FAILED, payload=self._error_payload(wrapped))
             return run_state
+
+    def _execute_linear_workflow(
+        self,
+        *,
+        run_state: RunState,
+        workflow: WorkflowSpec,
+        emit,
+        started_at: float,
+        remaining_budget: int | None,
+    ) -> tuple[dict[str, Any], int | None]:
+        for step in workflow.steps:
+            output, remaining_budget = self._run_step_with_retries(
+                run_state=run_state,
+                workflow=workflow,
+                step=step,
+                emit=emit,
+                started_at=started_at,
+                remaining_budget=remaining_budget,
+                turn_index=None,
+                lane="linear",
+            )
+            run_state.step_results[step.step_id] = output
+            self._state_store.save(run_state)
+
+        return {"step_results": dict(run_state.step_results)}, remaining_budget
+
+    def _execute_manager_workflow(
+        self,
+        *,
+        run_state: RunState,
+        workflow: WorkflowSpec,
+        manager_spec: ManagerSpec,
+        emit,
+        started_at: float,
+        remaining_budget: int | None,
+    ) -> tuple[dict[str, Any], int | None]:
+        steps_by_id = {step.step_id: step for step in workflow.steps}
+        manager_step = steps_by_id.get(manager_spec.manager_step_id)
+        if manager_step is None:
+            raise RuntimeBoundaryError(
+                "manager_spec.manager_step_id does not match any workflow step.",
+                details={
+                    "manager_step_id": manager_spec.manager_step_id,
+                    "workflow_id": workflow.workflow_id,
+                },
+            )
+
+        worker_step_ids = manager_spec.worker_step_ids or [
+            step.step_id for step in workflow.steps if step.step_id != manager_step.step_id
+        ]
+        if not worker_step_ids:
+            raise RuntimeBoundaryError(
+                "Manager workflow requires at least one worker step.",
+                details={"workflow_id": workflow.workflow_id},
+            )
+
+        unknown_workers = sorted(step_id for step_id in worker_step_ids if step_id not in steps_by_id)
+        if unknown_workers:
+            raise RuntimeBoundaryError(
+                "manager_spec.worker_step_ids contains unknown steps.",
+                details={"unknown_worker_step_ids": unknown_workers},
+            )
+
+        completed_workers: set[str] = set()
+        manager_history: list[dict[str, Any]] = []
+        worker_agent_to_step = {steps_by_id[step_id].agent_id: step_id for step_id in worker_step_ids}
+
+        for turn_index in range(1, manager_spec.max_turns + 1):
+            manager_output, remaining_budget = self._run_step_with_retries(
+                run_state=run_state,
+                workflow=workflow,
+                step=manager_step,
+                emit=emit,
+                started_at=started_at,
+                remaining_budget=remaining_budget,
+                turn_index=turn_index,
+                lane="manager",
+            )
+            run_state.step_results[manager_step.step_id] = manager_output
+            self._state_store.save(run_state)
+
+            decision = self._resolve_manager_decision(
+                manager_output=manager_output,
+                worker_step_ids=worker_step_ids,
+                completed_workers=completed_workers,
+            )
+
+            turn_record: dict[str, Any] = {
+                "turn_index": turn_index,
+                "action": decision.action.value,
+                "reason": decision.reason,
+            }
+
+            if decision.action == ManagerAction.FINALIZE:
+                manager_history.append(turn_record)
+                run_state.context["manager_orchestration"] = {
+                    "manager_step_id": manager_step.step_id,
+                    "worker_step_ids": list(worker_step_ids),
+                    "turns": manager_history,
+                }
+                self._state_store.save(run_state)
+                return {
+                    "step_results": dict(run_state.step_results),
+                    "manager_orchestration": run_state.context["manager_orchestration"],
+                    "final_output": decision.output,
+                }, remaining_budget
+
+            if decision.action == ManagerAction.FAIL:
+                raise StepExecutionError(
+                    "Manager requested explicit failure.",
+                    details={
+                        "turn_index": turn_index,
+                        "reason": decision.reason,
+                        "output": decision.output,
+                    },
+                )
+
+            target_step_id = self._resolve_delegate_target_step_id(
+                decision=decision,
+                worker_step_ids=worker_step_ids,
+                worker_agent_to_step=worker_agent_to_step,
+            )
+
+            if not manager_spec.allow_revisit_workers and target_step_id in completed_workers:
+                raise StepExecutionError(
+                    f"Manager selected already completed worker step '{target_step_id}'.",
+                    details={
+                        "turn_index": turn_index,
+                        "target_step_id": target_step_id,
+                    },
+                )
+
+            target_step = steps_by_id[target_step_id]
+            worker_output, remaining_budget = self._run_step_with_retries(
+                run_state=run_state,
+                workflow=workflow,
+                step=target_step,
+                emit=emit,
+                started_at=started_at,
+                remaining_budget=remaining_budget,
+                turn_index=turn_index,
+                lane="worker",
+            )
+            run_state.step_results[target_step.step_id] = worker_output
+            self._state_store.save(run_state)
+            completed_workers.add(target_step.step_id)
+
+            turn_record["target_step_id"] = target_step.step_id
+            turn_record["target_agent_id"] = target_step.agent_id
+            manager_history.append(turn_record)
+
+        raise StepExecutionError(
+            "Manager workflow exceeded max_turns before finalize.",
+            details={
+                "max_turns": manager_spec.max_turns,
+                "completed_workers": sorted(completed_workers),
+                "worker_step_ids": list(worker_step_ids),
+            },
+        )
+
+    def _run_step_with_retries(
+        self,
+        *,
+        run_state: RunState,
+        workflow: WorkflowSpec,
+        step: WorkflowStepSpec,
+        emit,
+        started_at: float,
+        remaining_budget: int | None,
+        turn_index: int | None,
+        lane: str,
+    ) -> tuple[Any, int | None]:
+        self._enforce_timeout(started_at)
+        remaining_budget = self._consume_budget(remaining_budget, step_id=step.step_id)
+
+        emit(
+            TraceEventType.STEP_STARTED,
+            step_id=step.step_id,
+            payload={
+                "agent_id": step.agent_id,
+                "turn_index": turn_index,
+                "lane": lane,
+            },
+        )
+
+        attempts = 0
+        while True:
+            attempts += 1
+            emit(
+                TraceEventType.AGENT_DISPATCHED,
+                step_id=step.step_id,
+                payload={
+                    "agent_id": step.agent_id,
+                    "attempt": attempts,
+                    "turn_index": turn_index,
+                    "lane": lane,
+                },
+            )
+            try:
+                output = self._step_runner(
+                    run_state=run_state,
+                    workflow=workflow,
+                    step=step,
+                )
+                emit(
+                    TraceEventType.AGENT_COMPLETED,
+                    step_id=step.step_id,
+                    payload={
+                        "agent_id": step.agent_id,
+                        "attempt": attempts,
+                        "turn_index": turn_index,
+                        "lane": lane,
+                    },
+                )
+                emit(
+                    TraceEventType.STEP_COMPLETED,
+                    step_id=step.step_id,
+                    payload={
+                        "agent_id": step.agent_id,
+                        "attempts": attempts,
+                        "turn_index": turn_index,
+                        "lane": lane,
+                    },
+                )
+                return output, remaining_budget
+            except (RunTimeoutError, RunBudgetError):
+                raise
+            except Exception as error:
+                emit(
+                    TraceEventType.AGENT_FAILED,
+                    step_id=step.step_id,
+                    payload={
+                        "agent_id": step.agent_id,
+                        "attempt": attempts,
+                        "turn_index": turn_index,
+                        "lane": lane,
+                        "error_type": type(error).__name__,
+                        "error": str(error),
+                    },
+                )
+                emit(
+                    TraceEventType.STEP_FAILED,
+                    step_id=step.step_id,
+                    payload={
+                        "attempt": attempts,
+                        "turn_index": turn_index,
+                        "lane": lane,
+                        "error_type": type(error).__name__,
+                        "error": str(error),
+                    },
+                )
+                if attempts > self._limits.max_retries_per_step:
+                    if isinstance(error, FractalRuntimeError):
+                        raise
+                    raise StepExecutionError(
+                        f"Step '{step.step_id}' failed after {attempts} attempt(s).",
+                        details={
+                            "step_id": step.step_id,
+                            "turn_index": turn_index,
+                            "error_type": type(error).__name__,
+                            "error": str(error),
+                        },
+                    ) from error
+
+    def _resolve_manager_decision(
+        self,
+        *,
+        manager_output: Any,
+        worker_step_ids: list[str],
+        completed_workers: set[str],
+    ) -> ManagerDecision:
+        parsed = self._try_parse_manager_decision(manager_output)
+        if parsed is not None:
+            return parsed
+
+        for step_id in worker_step_ids:
+            if step_id not in completed_workers:
+                return ManagerDecision(
+                    action=ManagerAction.DELEGATE,
+                    target_step_id=step_id,
+                    reason="auto_fallback_next_worker",
+                )
+
+        return ManagerDecision(
+            action=ManagerAction.FINALIZE,
+            reason="auto_fallback_all_workers_completed",
+            output={"manager_output": manager_output},
+        )
+
+    def _try_parse_manager_decision(self, manager_output: Any) -> ManagerDecision | None:
+        if not isinstance(manager_output, dict):
+            return None
+
+        control_candidates: list[dict[str, Any]] = []
+        direct_control = manager_output.get("control")
+        if isinstance(direct_control, dict):
+            control_candidates.append(direct_control)
+
+        nested_output = manager_output.get("output")
+        if isinstance(nested_output, dict):
+            nested_control = nested_output.get("control")
+            if isinstance(nested_control, dict):
+                control_candidates.append(nested_control)
+
+        nested_raw = manager_output.get("raw")
+        if isinstance(nested_raw, dict):
+            raw_control = nested_raw.get("control")
+            if isinstance(raw_control, dict):
+                control_candidates.append(raw_control)
+
+        for control in control_candidates:
+            parsed = self._parse_control_candidate(control)
+            if parsed is not None:
+                return parsed
+
+        return None
+
+    def _parse_control_candidate(self, control: dict[str, Any]) -> ManagerDecision | None:
+        action_value = str(control.get("action", "")).strip().lower()
+        action = _action_from_value(action_value)
+        if action is None:
+            return None
+
+        target_step_id = control.get("target_step_id")
+        if target_step_id is not None and not isinstance(target_step_id, str):
+            target_step_id = None
+
+        target_agent_id = control.get("target_agent_id")
+        if target_agent_id is not None and not isinstance(target_agent_id, str):
+            target_agent_id = None
+
+        reason = control.get("reason")
+        if reason is not None and not isinstance(reason, str):
+            reason = str(reason)
+
+        output = control.get("output")
+        if not isinstance(output, dict):
+            output = {}
+
+        return ManagerDecision(
+            action=action,
+            target_step_id=target_step_id,
+            target_agent_id=target_agent_id,
+            reason=reason,
+            output=output,
+        )
+
+    def _resolve_delegate_target_step_id(
+        self,
+        *,
+        decision: ManagerDecision,
+        worker_step_ids: list[str],
+        worker_agent_to_step: dict[str, str],
+    ) -> str:
+        target_step_id = decision.target_step_id
+        if target_step_id is None and decision.target_agent_id is not None:
+            target_step_id = worker_agent_to_step.get(decision.target_agent_id)
+
+        if target_step_id is None:
+            raise StepExecutionError(
+                "Manager delegate decision missing target step/agent.",
+                details={
+                    "decision_action": decision.action.value,
+                    "decision_reason": decision.reason,
+                },
+            )
+
+        if target_step_id not in worker_step_ids:
+            raise StepExecutionError(
+                f"Manager selected unknown worker step '{target_step_id}'.",
+                details={
+                    "target_step_id": target_step_id,
+                    "allowed_worker_step_ids": list(worker_step_ids),
+                },
+            )
+
+        return target_step_id
 
     def _enforce_timeout(self, started_at: float) -> None:
         timeout = self._limits.timeout_seconds
@@ -263,3 +618,19 @@ class WorkflowExecutor:
                 "details": error.details,
             }
         return {"error": str(error), "error_type": type(error).__name__}
+
+    @staticmethod
+    def _runtime_execution_mode(workflow: WorkflowSpec) -> WorkflowExecutionMode:
+        if workflow.manager_spec is None:
+            return WorkflowExecutionMode.LINEAR
+        return WorkflowExecutionMode.MANAGER
+
+
+def _action_from_value(value: str) -> ManagerAction | None:
+    if value == ManagerAction.DELEGATE.value:
+        return ManagerAction.DELEGATE
+    if value == ManagerAction.FINALIZE.value:
+        return ManagerAction.FINALIZE
+    if value == ManagerAction.FAIL.value:
+        return ManagerAction.FAIL
+    return None

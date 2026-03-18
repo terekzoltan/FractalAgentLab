@@ -9,10 +9,34 @@ WORKFLOW_SPEC_SCHEMA_VERSION = "workflow_spec.v0"
 
 
 class WorkflowExecutionMode(StrEnum):
+    LINEAR = "linear"
     MANAGER = "manager"
     HANDOFF = "handoff"
     PARALLEL = "parallel"
     GRAPH = "graph"
+
+
+class ManagerAction(StrEnum):
+    DELEGATE = "delegate"
+    FINALIZE = "finalize"
+    FAIL = "fail"
+
+
+@dataclass(slots=True)
+class ManagerSpec:
+    manager_step_id: str
+    worker_step_ids: list[str] = field(default_factory=list)
+    max_turns: int = 8
+    allow_revisit_workers: bool = False
+
+
+@dataclass(slots=True)
+class ManagerDecision:
+    action: ManagerAction
+    target_step_id: str | None = None
+    target_agent_id: str | None = None
+    reason: str | None = None
+    output: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -38,12 +62,13 @@ class WorkflowSpec:
     workflow_id: str
     name: str
     version: str = "0.1.0"
-    execution_mode: WorkflowExecutionMode = WorkflowExecutionMode.MANAGER
+    execution_mode: WorkflowExecutionMode = WorkflowExecutionMode.LINEAR
     steps: list[WorkflowStepSpec] = field(default_factory=list)
     entrypoint_step_id: str | None = None
     entrypoint_ref: str | None = None
     input_schema_ref: str | None = None
     output_schema_ref: str | None = None
+    manager_spec: ManagerSpec | None = None
     agent_ids: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     schema_version: str = WORKFLOW_SPEC_SCHEMA_VERSION
@@ -53,3 +78,11 @@ class WorkflowSpec:
             self.agent_ids = _ordered_unique_agent_ids(self.steps)
         if self.entrypoint_step_id is None and self.steps:
             self.entrypoint_step_id = self.steps[0].step_id
+        if self.manager_spec is None and self.execution_mode == WorkflowExecutionMode.MANAGER:
+            raise ValueError("execution_mode 'manager' requires non-null manager_spec.")
+        if self.manager_spec is not None and self.execution_mode != WorkflowExecutionMode.MANAGER:
+            raise ValueError("manager_spec requires execution_mode 'manager'.")
+        if self.manager_spec and self.manager_spec.max_turns <= 0:
+            raise ValueError("manager_spec.max_turns must be positive.")
+        if self.manager_spec and self.manager_spec.manager_step_id in self.manager_spec.worker_step_ids:
+            raise ValueError("manager_spec.worker_step_ids cannot include manager_step_id.")
