@@ -39,6 +39,7 @@ The first real goal is **not** “general agent internet” or “full autonomy�
    - startup idea refinement
    - project decomposition
    - architecture review
+   - later: repo-aware software delivery planning / review / commit governance
 
 ---
 
@@ -90,6 +91,24 @@ Canonical policy document:
 
 ---
 
+## 2B. Provisional coordination hardening
+
+Based on the first two meaningful review cycles, the project now adopts a small **provisional** hardening layer.
+
+This should be treated as a working default, not a permanent constitution.
+
+Current provisional rules:
+- declared orchestration truth should match emitted runtime truth
+- new orchestration/parser semantics need targeted negative-path tests
+- smoke/eval green should mean structural completeness, not just envelope presence
+- runtime/eval semantic expansion should trigger one explicit cross-surface consistency pass before sprint closeout
+
+Canonical references:
+- `ops/Meta-Hardening-Package-v01.md`
+- `ops/Review-Findings-Registry.md`
+
+---
+
 ## 3. Track structure
 
 There are **5 coding tracks** + **1 Meta Coordinator**.
@@ -120,8 +139,9 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - user can start a workflow from CLI
 - run result is understandable without reading raw JSON
 - trace is explorable enough to debug failures
+- CLI/export surfaces stay aligned with current runtime/eval semantics for exposed workflows
 
-**Status:** `🔄 in progress` (Wave 1 W1-S1: L1-E completed; next Track A milestone is L1-J after L1-H)
+**Status:** `🔄 in progress` (Wave 1 W1-S2 stabilization is closed; Track A is now ready for `L1-J` in W1-S3)
 
 ---
 
@@ -153,8 +173,10 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - workflows can execute deterministically enough to debug
 - run state survives across steps in one run
 - failures are observable and classified
+- declared orchestration truth matches emitted runtime truth
+- structural workflow invariants are rejected before runtime when practical
 
-**Status:** `🔄 in progress` (Wave 1 stabilization complete; next Track B milestone is L1-F)
+**Status:** `🔄 in progress` (Wave 1 W1-S2 stabilization is closed; no immediate W1-S3 blocking implementation epic owned by Track B)
 
 ---
 
@@ -191,7 +213,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1: L1-A/L1-C complete; ready to support L1-D/L1-E)
+**Status:** `🔄 in progress` (Wave 1 W1-S2 stabilization is closed; Track C is now ready for `L1-M`, with optional design-only `L1-N/L1-O` later)
 
 ---
 
@@ -222,6 +244,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - same logical workflow can run against adapter boundary cleanly
 - provider swap does not break business logic
 - model selection policy is explicit and inspectable
+- mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
 **Status:** `🔄 in progress` (Wave 1 stabilization complete; no immediate Wave 1 blocking Track D epic before later provider/runtime work)
 
@@ -256,8 +279,9 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - failures can be replayed
 - quality regressions are visible early
 - identity profile updates are sanity-checked (no runaway drift)
+- smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1: L1-D complete; baseline/rubric comparison layering in progress)
+**Status:** `🔄 in progress` (Wave 1 W1-S2 stabilization is closed; Track E is now ready for `L1-K` and later `L1-L` evidence prep)
 
 ---
 
@@ -615,6 +639,28 @@ Likely orchestration:
 
 ---
 
+### Future workflow family H4/H5 — Software Delivery Loop
+**Status:** future vertical; design-first only until Wave 1 closes cleanly
+
+Purpose:
+- turn human software-delivery intent + repo state into governed planning, review, and commit-readiness workflows
+
+Subflows:
+- `H4` — Codebase Context & Planning
+- `H5` — Implementation, Review & Commit Gate
+
+Positioning rule:
+- treat this as workflow governance for software delivery
+- do not frame it as a black-box "ultimate coder"
+- treat it as the formalization of the current human-driven Combined-aware delivery workflow, not a detached coding fantasy
+
+Unlock rule:
+- docs/policy batch may begin only after the active Wave 1 frontier is fully closed
+- thin `H4` pilot waits for Wave 2 contract/replay/smoke hardening to stabilize
+- thin `H5` review/gate slice waits for real `H4` pilot evidence and stable artifact policy
+
+---
+
 ## 13. Canonical repo layout
 
 The canonical repository layout is defined by `docs/Repo-Skeleton-v01.md`.
@@ -774,6 +820,22 @@ Primary track emphasis:
 
 ---
 
+## Future side vertical — Software Delivery Loop
+
+This is a planned side vertical, not a replacement for the main wave spine.
+
+Phase rule:
+- post-Wave-1 closeout: docs-only `CV0` design/policy batch
+- after Wave 2 contract/replay/smoke hardening: thin `CV1` (`H4`) pilot
+- only later: thin `CV2` (`H5`) review/gate slice
+
+Control rule:
+- do not let coding-vertical implementation steal focus from the current main wave
+- treat repo-aware software delivery as an earned extension of the engine, not a reset of project identity
+- treat the coding vertical's strongest review/gate/planning heuristics as private learning-loop assets by default
+
+---
+
 ## 16. Wave turn-gate protocol (all track agents)
 
 Purpose:
@@ -787,6 +849,8 @@ Rules:
 - if prerequisites are complete, agent reports `READY`
 - when implementation begins: `⬜ -> 🔄`
 - after acceptance/smoke gate passes: `🔄 -> ✅`
+- execution-step headings in sequencing docs should also carry explicit status markers (`⬜`, `🔄`, `✅`, `⏸`, `🚫`)
+- if multiple tracks can safely work in parallel, keep them in the same numbered step; use a later step only for real dependency or explicit optional gating
 - one track must **not** mark another track’s work `✅` without explicit confirmation
 - if shared schema/contract changed, uzenofal entry is mandatory
 
@@ -810,6 +874,10 @@ Rules:
 
 #### Wave 2+
 - parallelism increases, but only through declared contracts
+
+#### Post-Wave-1 side-vertical rule
+- docs-only future-vertical planning may start after Wave 1 closes if the main frontier is genuinely clear
+- executable side-vertical work requires explicit sequencing and named prerequisites
 
 ---
 
@@ -859,6 +927,22 @@ Entries:
 - `[2026-03-18][Track D] W1-S1-FIX-D1 completed (🔄 -> ✅) - MockAdapter manager workers now enforce upstream context requirements so planner/critic ordering regressions fail loudly instead of passing silently - next: complete W1-S1-FIX-D2 model-tier default realignment.`
 - `[2026-03-18][Track D] W1-S1-FIX-D2 completed (🔄 -> ✅) - model-tier defaults restored to gpt-4o-mini / gpt-5.4-nano / gpt-5.4-mini with adapter+CLI fixtures aligned - next: Meta executes W1-S1-FIX-META1 stabilization closeout.`
 - `[2026-03-18][Meta] W1-S1-FIX-META1 completed (🔄 -> ✅) - W1-S1 stabilization batch is now formally closed, current frontier returns to L1-F/L1-G/L1-H/L1-I sequence - next: Track B begins handoff primitive work.`
+- `[2026-03-18][Track B] L1-F completed (🔄 -> ✅) - handoff primitive v1 is now implemented in runtime with explicit handoff control parsing, guardrails against self-loop/revisit/unknown target, and handoff-lane traceability; runtime tests added - next: Track C executes L1-G and Track B proceeds with L1-H trace enrichment.`
+- `[2026-03-18][Track C] L1-G started (⬜ -> 🔄) - H1 handoff chain variant implementation started against Track B handoff primitive v1 - next: deliver h1.handoff.v1 workflow, handoff prompt pack, and runnable binding.`
+- `[2026-03-18][Track C] L1-G completed (🔄 -> ✅) - H1 handoff chain shipped as h1.handoff.v1 with handoff-specific prompt/pack wiring, registry integration, and mock/test path coverage - next: Track B closes L1-H and Track E executes L1-I comparison.`
+- `[2026-03-18][Track B] L1-H completed (🔄 -> ✅) - handoff trace enrichment is now active with dedicated handoff_decided/handoff_failed events, parent/correlation linkage across handoff hops, and decision-source context in handoff lane payloads; runtime + CLI trace regressions pass - next: Track E executes L1-I comparison and Track A can proceed to L1-J timeline work on richer handoff traces.`
+- `[2026-03-19][Track E] L1-I started (⬜ -> 🔄) - H1 smoke comparison implementation started for baseline vs manager vs handoff on matched input with artifact validation and normalization - next: ship comparison module, script, tests, and evidence report.`
+- `[2026-03-19][Track E] L1-I completed (🔄 -> ✅) - H1 comparison harness shipped with matched-input baseline/manager/handoff runs, artifact acceptance checks, normalized output extraction, and structural trace report output - next: convert evidence into L1-K rubric gates and L1-L decision notes.`
+- `[2026-03-19][Track B] W1-S2-FIX-B1/B2 completed (🔄 -> ✅) - runtime now rejects unsupported execution modes (`parallel`, `graph`) instead of silently degrading to linear, and WorkflowSpec now blocks duplicate step_id collisions at contract level with dedicated tests - next: Track E executes W1-S2-FIX-E1, then Track A executes W1-S2-FIX-A1/A2.`
+- `[2026-03-19][Track E] W1-S2-FIX-E1 started (⬜ -> 🔄) - stabilization hardening started for L1-I success semantics so envelope-only comparable outputs cannot pass green - next: require full normalized comparable-key completeness and add negative tests.`
+- `[2026-03-19][Track E] W1-S2-FIX-E1 completed (🔄 -> ✅) - L1-I summary/exit gating now requires full comparable-key completeness (`all_comparable_outputs_complete`), with negative tests proving incomplete normalized outputs fail green status - next: Track A completes W1-S2-FIX-A1/A2, then Meta closes W1-S2 stabilization.`
+- `[2026-03-20][Track A] W1-S2-FIX-A1/A2 started (⬜ -> 🔄) - Track A stabilization implementation kicked off to restore H1 variant summary parity and preserve handoff linkage fields in CLI JSON trace export - next: ship formatter/test/doc updates for A1 and A2 acceptance.`
+- `[2026-03-20][Track A] W1-S2-FIX-A1/A2 completed (🔄 -> ✅) - CLI now exposes H1 workflow-summary parity for single/manager/handoff and JSON trace linkage fields (`parent_event_id`, `correlation_id`) with regression coverage in tests/cli/test_l1_e_h1_summary.py - next: Meta executes W1-S2-FIX-META1 stabilization closeout.`
+- `[2026-03-19][Meta] Future coding vertical integrated as a design-first side vertical - H4/H5 and the private learning-loop are now accepted as post-Wave-1 planning work, not immediate runtime scope - next: create private coding-vertical docs and sequencing placeholders.`
+- `[2026-03-20][Meta] Coding vertical canon deepened - private H4/H5/coding-policy doc stack now exists with rollout, artifact, planning, review/gate, and learning-loop docs - next: expand Combined sequencing with explicit CV0/CV1/CV2 execution steps.`
+- `[2026-03-20][Meta] Sequencing step convention tightened - execution steps now require explicit status markers and parallel-safe work should share one numbered step while true dependencies move to later steps - next: keep future sprint edits aligned with this rule.`
+- `[2026-03-20][Meta] Current human workflow canonized for the coding vertical - the current Combined-driven Meta+track loop now has an explicit mapping doc so H4/H5 can automate the real workflow instead of drifting into an abstract coding-agent concept - next: use this mapping as a check during future CV0/CV1/CV2 refinement.`
+- `[2026-03-20][Meta] W1-S2-FIX-META1 completed (🔄 -> ✅) - W1-S2 stabilization is now formally closed after targeted compile/test validation, and the active frontier returns to W1-S3: `L1-J` / `L1-K` / `L1-L` / `L1-M` - next: run the parallel opening step across Track A, Track E, and Track C.`
 
 ---
 
@@ -1088,6 +1172,19 @@ Use when:
 - routing policy may start depending on identity
 - reputation or team-level aggregation is proposed
 
+### Session: Coding Vertical Lab
+Focus:
+- H4/H5 workflow-family design
+- repo-aware planning/review contracts
+- artifact and gate discipline
+- private learning-loop distillation
+
+Use when:
+- software-delivery workflow design needs canonization
+- coding review/gate policies need revision
+- coding-vertical sequencing or ownership is unclear
+- repeated coding-review evidence should feed private heuristics
+
 ---
 
 ## 22. Initial acceptance gates
@@ -1139,11 +1236,21 @@ A strong near-term success state would be:
 
 ---
 
-## 25. Immediate next documents to create
+## 25. Current future/private design set in scope
 
-1. `docs/Workflow-H1-Idea-Refinement-Plan.md`
-2. `docs/Track-D-Adapter-Contract.md`
-3. `docs/Track-E-Smoke-Rubric-v0.md`
+These are not the active implementation frontier, but they are now canonical future-design surfaces for the coding vertical:
+
+1. `docs/private/Coding-Vertical-v01.md`
+2. `docs/private/Coding-Vertical-Human-Workflow-Mapping-v01.md`
+3. `docs/private/Coding-Vertical-H4-H5-Workflow-Family-v01.md`
+4. `docs/private/Coding-Vertical-Rollout-Plan-v01.md`
+5. `docs/private/Coding-Vertical-Artifact-Contract-v01.md`
+6. `docs/private/Coding-Vertical-Repo-Aware-Planning-Policy-v01.md`
+7. `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md`
+8. `docs/private/Coding-Vertical-Learning-Loop-v01.md`
+
+Rule:
+- treat these as post-Wave-1 side-vertical design infrastructure, not as permission to skip the active frontier
 
 ---
 

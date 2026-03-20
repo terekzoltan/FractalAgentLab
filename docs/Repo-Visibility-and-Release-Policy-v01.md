@@ -117,6 +117,73 @@ Use these four visibility classes consistently.
 
 ---
 
+## 3A. Operational gatekeep taxonomy
+
+Use the visibility classes above together with this practical operating taxonomy.
+
+### `local-only`
+- exists only on the local machine
+- usually gitignored
+- not a canonical source of truth
+- good for scratch packs, raw dumps, and high-noise working material
+
+### `private-canonical`
+- versioned in the private repo
+- canonical for internal truth
+- may contain sensitive design, policy, or workflow knowledge
+- should be the default home for durable private project intelligence
+
+### `public-sanitizable`
+- canonical version still begins in the private repo
+- may later be exported in cleaned or reduced form
+- should usually flow through `docs/public/` or another explicit staging surface before public release
+
+### `never-public`
+- should not be mirrored to the public repo
+- may live as `private-canonical`, `local-only`, or both
+- covers the strongest moat, operating heuristics, and sensitive failure evidence
+
+### Recommended mapping
+
+| Operational class | Typical visibility class | Default storage |
+|---|---|---|
+| `local-only` | `private only` | ignored local paths such as `data/` or local scratch folders |
+| `private-canonical` | `private only` | versioned private repo paths such as `ops/` and `docs/private/` |
+| `public-sanitizable` | `conditional / sanitized export only` or `public mirror candidate` | versioned private repo first, then explicit public export |
+| `never-public` | usually `private only` | private repo and/or ignored raw evidence stores |
+
+### Quick decision tree
+
+1. Is this only scratch, noisy raw evidence, or a temporary local working surface?
+   - classify as `local-only`
+2. Is this durable internal truth that the private repo should remember and version?
+   - classify as `private-canonical`
+3. Could a cleaned, reduced, or abstracted version eventually be useful publicly?
+   - classify as `public-sanitizable`
+4. Would public release meaningfully leak moat, heuristics, failure evidence, or sensitive operating knowledge?
+   - classify as `never-public`
+
+---
+
+## 3B. Sensitive moat classes
+
+Treat these as `never-public` by default unless there is an unusually strong, explicit reason to abstract them first:
+
+- tuned prompt packs and prompt-pack refinements
+- failure corpora
+- benchmark gold sets
+- trace-derived heuristics
+- repo-specific planning templates
+- strongest review/gate heuristics
+- Meta Coordinator playbook refinements
+
+These may still exist in two layers:
+
+- raw evidence in `local-only` stores
+- distilled doctrine in `private-canonical` docs
+
+---
+
 ## 4. Artifact classification matrix
 
 | Artifact type | Default class | Private repo handling | Public repo handling | Notes |
@@ -132,6 +199,10 @@ Use these four visibility classes consistently.
 | provider/model policy | conditional / sanitized export only | keep full policy private | export only generalized/safe version | internal routing heuristics may stay private |
 | runtime traces | conditional / sanitized export only | keep raw traces private by default | publish only tiny redacted traces | trace shape may be public, raw histories usually not |
 | local data / sqlite / jsonl artifacts | private only | local only, mostly gitignored | never mirror | operational artifacts, not portfolio docs |
+| prompt packs / tuned prompt variants | private only | keep strongest versions private | export only high-level prompt philosophy if needed | strongest wording is moat |
+| failure corpus | private only | raw failures stay local or private | never mirror raw corpus | may later inform sanitized lessons only |
+| benchmark gold sets | private only | keep full set private | export only summarized benchmark description if useful | benchmark edge cases are moat |
+| private learning heuristics | private only | version distilled policy privately | never mirror raw heuristics | especially important for coding vertical |
 
 ---
 
@@ -139,6 +210,7 @@ Use these four visibility classes consistently.
 
 ### Always private by default
 - `ops/`
+- `docs/private/`
 - raw session notes
 - raw experimental notes
 - raw eval evidence
@@ -146,6 +218,7 @@ Use these four visibility classes consistently.
 - raw runtime traces
 - local `data/` artifacts
 - any real provider config or secret-bearing material
+- strongest prompt packs, failure corpora, and moat heuristics
 
 ### Usually private first, selectively mirror later
 - architecture docs
@@ -193,6 +266,7 @@ repo/
 - public-safe docs drafted and versioned in the canonical private repo first
 - these are the main mirror candidates
 - use for architecture overviews, workflow explainers, polished design docs
+- this is a staging surface, not an automatic export queue
 
 #### `docs/private/`
 - internal design docs
@@ -200,6 +274,7 @@ repo/
 - internal eval notes
 - research reasoning
 - sensitive or unfinished architecture docs
+- default home of `private-canonical` gatekept doctrine
 
 #### `examples/`
 - keep only curated, small, intentional examples
@@ -209,6 +284,13 @@ repo/
 - local operational artifacts only
 - not a documentation layer
 - not a public export source by default
+
+Recommended internal-only subareas:
+- `data/private_learning/`
+- `data/failure_corpus/`
+- `data/benchmark_gold_private/`
+
+These are good homes for `local-only` raw moat evidence.
 
 ### Migration note for the current repo
 
@@ -329,13 +411,23 @@ This is the recommended default for the current project phase.
 ### Recommended export flow
 
 1. Create or update material in the private repo first.
-2. Decide whether the artifact is:
-   - private only
-   - public mirror candidate
-   - conditional export only
-3. If public-facing, polish and sanitize it in the private repo.
-4. Copy the approved version manually into the public repo.
-5. Review the public repo as a standalone portfolio surface.
+2. Classify it operationally as:
+   - `local-only`
+   - `private-canonical`
+   - `public-sanitizable`
+   - `never-public`
+3. If it is not eligible for public release, stop there.
+4. If it may become public-facing, run a Meta `visibility-release-review`.
+5. Decide whether the review result is:
+   - `public allowed`
+   - `public-sanitizable`
+   - `rejected/private-only`
+6. If public-facing, polish and sanitize it in the private repo.
+7. Copy the approved version manually into the public repo.
+8. Review the public repo as a standalone portfolio surface.
+
+Recommended review template:
+- `docs/private/Public-Export-Review-Template-v01.md`
 
 ### Later optional tooling
 
@@ -353,6 +445,16 @@ But this script should only copy from clearly approved source areas such as:
 - submodules for public/private sync
 - publishing directly from `ops/` or `docs/private/`
 
+### Recommended GitHub baseline without `CODEOWNERS`
+
+For the current solo/private phase, the minimum GitHub enforcement stance is:
+
+- keep the lab repo private
+- keep the public repo separate and curated
+- protect `main` with PR/review discipline if you want stronger friction
+- do not enable automatic public mirroring
+- treat public sync as a manual Meta-level action
+
 ---
 
 ## 10. Minimum policy decisions for the current phase
@@ -368,6 +470,8 @@ These are the minimum decisions needed right now.
 7. Only sanitized examples and polished docs are candidates for public mirroring.
 8. Public sync is manual and curated by default.
 9. Public repo sync is a Meta-level release action, not an automatic coding-track obligation.
+10. Use the operational taxonomy `local-only` / `private-canonical` / `public-sanitizable` / `never-public` for day-to-day classification.
+11. Treat moat-heavy assets as `never-public` by default.
 
 ---
 
@@ -461,6 +565,8 @@ Track A handoff becomes more important when the public showcase repo starts gett
 8. Allow public export only for polished docs, sanitized examples, and safe config templates.
 9. Use manual curated export as the default sync mechanism.
 10. Make public sync a Meta-reviewed release action, not an automatic side effect of implementation.
+11. Use `docs/private/` for durable private doctrine and `data/` for raw local-only evidence.
+12. Treat tuned prompt packs, failure corpora, benchmark gold sets, and private heuristics as `never-public` by default.
 
 ---
 

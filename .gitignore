@@ -8,3 +8,6 @@ __pycache__/
 # Local runtime data
 /data/*
 !/data/.gitignore
+
+# Private local planning packs
+/fractalagentlab_coding_vertical_pack/

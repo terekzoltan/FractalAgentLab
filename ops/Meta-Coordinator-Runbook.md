@@ -61,7 +61,18 @@ The Meta Coordinator works primarily with these files:
 - `ops/AGENTS.md`
 - `ops/Combined-Execution-Sequencing-Plan.md`
 - `ops/Meta-Coordinator-Runbook.md`
+- `ops/Review-Findings-Registry.md`
+- `ops/Meta-Hardening-Package-v01.md`
 - `docs/Repo-Visibility-and-Release-Policy-v01.md`
+- `docs/Coding-Vertical-Adopt-Adapt-Defer-v01.md` (when translating local coding-vertical ideas into repo-safe policy)
+- `docs/private/Coding-Vertical-v01.md` (when the coding vertical is in scope)
+- `docs/private/Coding-Vertical-Human-Workflow-Mapping-v01.md` (when validating that H4/H5 still match the current operating pattern)
+- `docs/private/Coding-Vertical-H4-H5-Workflow-Family-v01.md` (when H4/H5 role-family design is in scope)
+- `docs/private/Coding-Vertical-Rollout-Plan-v01.md` (when coding-vertical sequencing is being reviewed)
+- `docs/private/Coding-Vertical-Artifact-Contract-v01.md` (when coding artifacts are being defined)
+- `docs/private/Coding-Vertical-Repo-Aware-Planning-Policy-v01.md` (when H4 planning policy is in scope)
+- `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md` (when H5 review/gate policy is in scope)
+- `docs/private/Coding-Vertical-Learning-Loop-v01.md` (when private coding heuristics are being distilled)
 - future track-specific notes or plans
 - future risk, audit, or benchmark documents
 
@@ -240,6 +251,88 @@ Main output:
 - sanitization requirements
 - public repo sync recommendation
 
+Required checks:
+
+- classify candidate material as `local-only`, `private-canonical`, `public-sanitizable`, or `never-public`
+- reject export if the candidate contains moat-heavy material that should remain private
+- confirm whether the artifact is understandable and honest without private context
+- confirm that no public sync is implied automatically by implementation completion
+
+Recommended template:
+
+- `docs/private/Public-Export-Review-Template-v01.md`
+
+### 11. `review-findings-update`
+
+Use when:
+
+- a substantive implementation review finds one or more real issues
+- repeated patterns seem to be emerging across review cycles
+- sprint stabilization planning needs evidence instead of memory
+- planning docs may need preventive rule updates
+
+Main output:
+
+- updated `ops/Review-Findings-Registry.md`
+- repeated-pattern note
+- suggested prevention candidates for future planning or acceptance gates
+
+### 12. `coding-vertical-design`
+
+Use when:
+
+- the Software Delivery Loop needs canonization as a future workflow family
+- H4/H5 scope or sequencing is unclear
+- private coding-vertical docs must be created or updated
+- a docs-only design batch should be prepared without opening runtime churn prematurely
+
+Main output:
+
+- updated coding-vertical private docs
+- explicit `READY` / `NOT READY` decision for `CV0`, `CV1`, or `CV2`
+- ops doc updates if the side vertical affects project-wide sequencing
+- explicit note on whether the proposed H4/H5 behavior still preserves the current human workflow semantics
+
+Readiness rule:
+
+- if the active Wave 1 frontier is still open, default to `NOT READY` for `CV0` and limit work to parking-lot notes only
+- if the proposed vertical behavior no longer matches the current human workflow semantics, stop and repair the mapping before widening scope
+
+### 13. `coding-learning-loop-review`
+
+Use when:
+
+- multiple coding reviews or commit-gate decisions exist
+- repeated H4/H5 failure patterns seem to be emerging
+- private heuristics should be distilled from real traces/reviews
+- prompt, gate, or planning policies may need evidence-backed refinement
+
+Main output:
+
+- updated `docs/private/Coding-Vertical-Learning-Loop-v01.md`
+- suggested updates to coding planning/gate policy
+- explicit note on what remains private-only vs what could ever be sanitized later
+
+---
+
+## Provisional hardening stance
+
+Because only a small number of review cycles exist so far, the Meta Coordinator should harden process **cautiously**.
+
+Use `ops/Meta-Hardening-Package-v01.md` as a lightweight default, not as a permanent constitution.
+
+During `dod-check`, `arch-audit`, and `review-findings-update`, check these questions when relevant:
+
+- does declared orchestration truth match emitted runtime truth?
+- were targeted negative-path tests added for the new semantic branch/parser/invariant?
+- does green smoke/eval imply structural completeness, not just envelope presence?
+- did runtime/eval semantic expansion receive one explicit cross-surface consistency pass?
+
+If the coding vertical is active, add two more questions cautiously:
+
+- did the planning/review/gate artifact set stay mutually consistent?
+- did the latest meaningful findings teach anything worth adding to the private learning loop without overfitting one cycle?
+
 ---
 
 ## Standard Full-Sweep Order
@@ -255,8 +348,9 @@ When running `full-sweep`, follow this order:
 7. update readiness matrix
 8. update risk notes
 9. update hero workflow progress
-10. decide next wave or sprint actions
-11. write concise summary for the user or project owner
+10. if the coding vertical is active, inspect its private rollout and learning-loop docs
+11. decide next wave or sprint actions
+12. write concise summary for the user or project owner
 
 Do not skip steps unless the session is explicitly scoped smaller.
 
