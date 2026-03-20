@@ -117,6 +117,6 @@ For Track C implementation work:
 
 ## Next Track C Steps
 
-1. `L1-C` completed: H1 full role pack v1 now exists for manager workflow path
-2. support `L1-D` baseline track with stable single-agent configuration inputs
-3. `L1-M`: formal prompt version tagging in workflow outputs
+1. `L1-G` completed: H1 handoff-chain prompt variant now exists as `h1.handoff.prompt.v1`
+2. support Track E `L1-I` with stable cross-variant prompt/version references
+3. `L1-M`: formal prompt version tagging for H1 artifacts and summaries

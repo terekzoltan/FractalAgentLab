@@ -4,8 +4,11 @@
 
 This document records Track A delivery for Wave 1 epic `L1-E`.
 
-`L1-E` improves CLI run summary readability for `h1.manager.v1` so users can
-understand manager-path outcomes without scanning raw payloads.
+`L1-E` improves CLI run summary readability for H1 workflow variants so users can
+understand outcomes without scanning raw payloads.
+
+Scope started as manager-first and was later parity-hardened during
+`W1-S2-FIX-A1/A2`.
 
 ---
 
@@ -39,12 +42,15 @@ Out of scope:
 
 For all workflows, text summary keeps the Wave 0 core run fields.
 
-For `h1.manager.v1`, text summary now adds:
+For H1 variants (`h1.single.v1`, `h1.manager.v1`, `h1.handoff.v1`), text summary adds:
 
 - `workflow_summary` section with key H1 final output fields
   - `clarified_idea`
   - `recommended_mvp_direction`
   - compact lists for assumptions, weak points, alternatives, validation steps
+
+For `h1.manager.v1`, text summary also adds:
+
 - `orchestration_summary` section
   - manager step id
   - worker step ids
@@ -60,7 +66,7 @@ For `h1.manager.v1`, text summary now adds:
 
 Additive fields introduced by `L1-E`:
 
-- `workflow_summary` (H1-specific readable extraction)
+- `workflow_summary` (H1-variant-readable extraction)
 - `orchestration_summary` (manager turns and control context)
 
 `trace_summary` now additionally includes:
@@ -70,6 +76,10 @@ Additive fields introduced by `L1-E`:
 - `max_turn_index`
 
 This keeps backward compatibility while making manager-path runs easier to inspect.
+
+Stabilization update (`W1-S2-FIX-A2`):
+
+- JSON trace events now also include `parent_event_id` and `correlation_id`.
 
 ---
 

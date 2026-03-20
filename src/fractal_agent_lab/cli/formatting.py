@@ -2,13 +2,24 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fractal_agent_lab.core.events import TraceEvent, TraceEventType
 from fractal_agent_lab.core.models import RunState
 
 
 H1_MANAGER_WORKFLOW_ID = "h1.manager.v1"
+H1_SINGLE_WORKFLOW_ID = "h1.single.v1"
+H1_HANDOFF_WORKFLOW_ID = "h1.handoff.v1"
+
+H1_COMPARABLE_SUMMARY_KEYS: tuple[str, ...] = (
+    "clarified_idea",
+    "strongest_assumptions",
+    "weak_points",
+    "alternatives",
+    "recommended_mvp_direction",
+    "next_3_validation_steps",
+)
 
 
 def format_run_summary_text(
@@ -72,6 +83,8 @@ def format_trace_summary_text(events: list[TraceEvent]) -> str:
         TraceEventType.AGENT_DISPATCHED,
         TraceEventType.AGENT_COMPLETED,
         TraceEventType.AGENT_FAILED,
+        TraceEventType.HANDOFF_DECIDED,
+        TraceEventType.HANDOFF_FAILED,
         TraceEventType.RUN_COMPLETED,
         TraceEventType.RUN_FAILED,
         TraceEventType.RUN_TIMED_OUT,
@@ -154,6 +167,8 @@ def build_json_output(
                     "timestamp": _fmt_ts(event.timestamp),
                     "source": event.source,
                     "step_id": event.step_id,
+                    "parent_event_id": event.parent_event_id,
+                    "correlation_id": event.correlation_id,
                     "payload": event.payload,
                     "schema_version": event.schema_version,
                 }
@@ -170,28 +185,48 @@ def _fmt_ts(value: datetime | None) -> str | None:
 
 
 def _build_workflow_summary(run_state: RunState) -> dict[str, Any] | None:
-    if run_state.workflow_id != H1_MANAGER_WORKFLOW_ID:
-        return None
-    if not isinstance(run_state.output_payload, dict):
-        return None
-
-    final_output = run_state.output_payload.get("final_output")
-    if not isinstance(final_output, dict):
+    source = _extract_h1_comparable_source(run_state)
+    if source is None:
         return None
 
     summary: dict[str, Any] = {"workflow_id": run_state.workflow_id}
-    for key in (
-        "clarified_idea",
-        "recommended_mvp_direction",
-        "strongest_assumptions",
-        "weak_points",
-        "alternatives",
-        "next_3_validation_steps",
-    ):
-        value = final_output.get(key)
+    included_fields = 0
+    for key in H1_COMPARABLE_SUMMARY_KEYS:
+        value = source.get(key)
         if value is not None:
             summary[key] = value
+            included_fields += 1
+
+    if included_fields == 0:
+        return None
     return summary
+
+
+def _extract_h1_comparable_source(run_state: RunState) -> dict[str, Any] | None:
+    output_payload = run_state.output_payload
+    if not isinstance(output_payload, dict):
+        return None
+
+    if run_state.workflow_id in {H1_MANAGER_WORKFLOW_ID, H1_HANDOFF_WORKFLOW_ID}:
+        final_output = output_payload.get("final_output")
+        if isinstance(final_output, dict):
+            return final_output
+        return None
+
+    if run_state.workflow_id == H1_SINGLE_WORKFLOW_ID:
+        step_results = output_payload.get("step_results")
+        if not isinstance(step_results, dict):
+            return None
+
+        single_step = step_results.get("single")
+        if not isinstance(single_step, dict):
+            return None
+
+        single_output = single_step.get("output")
+        if isinstance(single_output, dict):
+            return single_output
+
+    return None
 
 
 def _build_orchestration_summary(run_state: RunState) -> dict[str, Any] | None:
@@ -201,7 +236,8 @@ def _build_orchestration_summary(run_state: RunState) -> dict[str, Any] | None:
     if not isinstance(manager, dict):
         return None
 
-    turns = manager.get("turns") if isinstance(manager.get("turns"), list) else []
+    raw_turns = manager.get("turns")
+    turns = cast(list[Any], raw_turns) if isinstance(raw_turns, list) else []
     summary: dict[str, Any] = {
         "manager_step_id": manager.get("manager_step_id"),
         "worker_step_ids": manager.get("worker_step_ids"),

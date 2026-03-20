@@ -30,6 +30,8 @@ class TraceEventType(StrEnum):
     AGENT_DISPATCHED = "agent_dispatched"
     AGENT_COMPLETED = "agent_completed"
     AGENT_FAILED = "agent_failed"
+    HANDOFF_DECIDED = "handoff_decided"
+    HANDOFF_FAILED = "handoff_failed"
 
 
 @dataclass(slots=True)

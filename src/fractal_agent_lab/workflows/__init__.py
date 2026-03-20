@@ -11,6 +11,13 @@ from fractal_agent_lab.workflows.h1 import (
     H1_WORKFLOW_ID,
     build_h1_manager_workflow_spec,
 )
+from fractal_agent_lab.workflows.h1_handoff import (
+    H1_HANDOFF_ENTRYPOINT_STEP_ID,
+    H1_HANDOFF_OUTPUT_SCHEMA_REF,
+    H1_HANDOFF_STEP_IDS,
+    H1_HANDOFF_WORKFLOW_ID,
+    build_h1_handoff_workflow_spec,
+)
 from fractal_agent_lab.workflows.h1_lite import (
     H1_LITE_WORKFLOW_ID,
     build_h1_lite_agent_pack,
@@ -28,6 +35,10 @@ from fractal_agent_lab.workflows.h1_single import (
 
 __all__ = [
     "H1_CRITIC_AGENT_ID",
+    "H1_HANDOFF_ENTRYPOINT_STEP_ID",
+    "H1_HANDOFF_OUTPUT_SCHEMA_REF",
+    "H1_HANDOFF_STEP_IDS",
+    "H1_HANDOFF_WORKFLOW_ID",
     "H1_INPUT_SCHEMA_REF",
     "H1_INTAKE_AGENT_ID",
     "H1_MANAGER_AGENT_ID",
@@ -44,6 +55,7 @@ __all__ = [
     "H1_WORKER_STEP_IDS",
     "H1_WORKFLOW_ID",
     "H1_LITE_WORKFLOW_ID",
+    "build_h1_handoff_workflow_spec",
     "build_h1_manager_workflow_spec",
     "build_h1_lite_agent_pack",
     "build_h1_lite_workflow_spec",

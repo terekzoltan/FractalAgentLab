@@ -205,6 +205,18 @@ class WorkflowExecutorManagerParsingTests(unittest.TestCase):
 
 
 class WorkflowSpecManagerInvariantTests(unittest.TestCase):
+    def test_duplicate_step_ids_are_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "duplicate step_id"):
+            WorkflowSpec(
+                workflow_id="invalid.duplicate.steps",
+                name="Invalid Duplicate Steps",
+                execution_mode=WorkflowExecutionMode.LINEAR,
+                steps=[
+                    WorkflowStepSpec(step_id="s1", agent_id="a1"),
+                    WorkflowStepSpec(step_id="s1", agent_id="a2"),
+                ],
+            )
+
     def test_manager_mode_requires_manager_spec(self) -> None:
         with self.assertRaisesRegex(ValueError, "requires non-null manager_spec"):
             WorkflowSpec(

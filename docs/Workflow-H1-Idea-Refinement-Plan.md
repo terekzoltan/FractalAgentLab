@@ -88,6 +88,6 @@ Result:
 
 ## Next Steps
 
-1. `L1-A` and `L1-C` are complete: H1 manager schema + full role pack are now implemented
-2. `L1-D` completed: Track E shipped the single-agent baseline reference path (`h1.single.v1`)
-3. Track A proceeds with `L1-E` run summary readability improvements
+1. `L1-A`/`L1-C`/`L1-D`/`L1-E` are complete: manager path, baseline path, and summary readability are established
+2. `L1-G` completed: H1 handoff-chain variant is now implemented as `h1.handoff.v1`
+3. Track B/Track E proceed with `L1-H` and `L1-I` for handoff trace enrichment and variant comparison

@@ -4,6 +4,7 @@ from fractal_agent_lab.agents.h1.roles import H1Role
 
 
 H1_PROMPT_VERSION = "h1.prompt.v1"
+H1_HANDOFF_PROMPT_VERSION = "h1.handoff.prompt.v1"
 H1_SINGLE_PROMPT_VERSION = "h1.single.prompt.v1"
 
 
@@ -12,6 +13,14 @@ ROLE_PROMPT_VERSION: dict[H1Role, str] = {
     H1Role.PLANNER: "h1/planner/v1",
     H1Role.CRITIC: "h1/critic/v1",
     H1Role.SYNTHESIZER: "h1/synthesizer/v1",
+}
+
+
+HANDOFF_ROLE_PROMPT_VERSION: dict[H1Role, str] = {
+    H1Role.INTAKE: "h1/handoff/intake/v1",
+    H1Role.PLANNER: "h1/handoff/planner/v1",
+    H1Role.CRITIC: "h1/handoff/critic/v1",
+    H1Role.SYNTHESIZER: "h1/handoff/synthesizer/v1",
 }
 
 
@@ -38,6 +47,30 @@ PROMPTS_BY_ROLE: dict[H1Role, str] = {
         "When all worker outputs exist, return control.action=finalize and include control.output with: "
         "clarified_idea, strongest_assumptions, weak_points, alternatives, recommended_mvp_direction, "
         "next_3_validation_steps. Keep output concise and decision-focused."
+    ),
+}
+
+
+HANDOFF_PROMPTS_BY_ROLE: dict[H1Role, str] = {
+    H1Role.INTAKE: (
+        "You are the H1 Intake handoff agent. Normalize startup idea input into structured brief keys: "
+        "idea_summary, target_user, core_problem, assumptions, constraints, open_questions. "
+        "Then emit control.action=handoff with target_step_id=planner. Do not finalize."
+    ),
+    H1Role.PLANNER: (
+        "You are the H1 Planner handoff agent. Use intake output and return keys: validation_axes, "
+        "hypothesis_to_test, riskiest_assumptions, evidence_needed, first_experiments. "
+        "Then emit control.action=handoff with target_step_id=critic. Do not finalize."
+    ),
+    H1Role.CRITIC: (
+        "You are the H1 Critic handoff agent. Stress-test intake+planner and return keys: weak_points, "
+        "failure_modes, hidden_dependencies, counterarguments, alternatives. "
+        "Then emit control.action=handoff with target_step_id=synthesizer. Do not finalize."
+    ),
+    H1Role.SYNTHESIZER: (
+        "You are the H1 Synthesizer handoff finalizer. Use prior step outputs and emit "
+        "control.action=finalize with control.output keys: clarified_idea, strongest_assumptions, "
+        "weak_points, alternatives, recommended_mvp_direction, next_3_validation_steps."
     ),
 }
 

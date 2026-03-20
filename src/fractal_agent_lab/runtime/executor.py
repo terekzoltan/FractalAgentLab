@@ -6,6 +6,8 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from fractal_agent_lab.core.contracts import (
+    HandoffAction,
+    HandoffDecision,
     ManagerAction,
     ManagerDecision,
     ManagerSpec,
@@ -108,7 +110,9 @@ class WorkflowExecutor:
             *,
             step_id: str | None = None,
             payload: dict[str, Any] | None = None,
-        ) -> None:
+            parent_event_id: str | None = None,
+            correlation_id: str | None = None,
+        ) -> TraceEvent:
             nonlocal sequence
             sequence += 1
             event = TraceEvent(
@@ -117,10 +121,13 @@ class WorkflowExecutor:
                 sequence=sequence,
                 source=self._source,
                 step_id=step_id,
+                parent_event_id=parent_event_id,
+                correlation_id=correlation_id,
                 payload=payload or {},
             )
             run_state.add_trace_event(event.event_id)
             self._emitter.emit(event)
+            return event
 
         run_state.start()
         self._state_store.save(run_state)
@@ -133,6 +140,25 @@ class WorkflowExecutor:
                 "execution_mode": runtime_mode.value,
             },
         )
+
+        supported_modes = {
+            WorkflowExecutionMode.LINEAR,
+            WorkflowExecutionMode.MANAGER,
+            WorkflowExecutionMode.HANDOFF,
+        }
+        if runtime_mode not in supported_modes:
+            error = RuntimeBoundaryError(
+                f"Execution mode '{runtime_mode.value}' is not implemented in the current runtime.",
+                details={
+                    "workflow_id": workflow.workflow_id,
+                    "execution_mode": runtime_mode.value,
+                    "supported_modes": sorted(mode.value for mode in supported_modes),
+                },
+            )
+            run_state.fail(str(error))
+            self._state_store.save(run_state)
+            emit(TraceEventType.RUN_FAILED, payload=self._error_payload(error))
+            return run_state
 
         if not workflow.steps:
             error = RuntimeBoundaryError(
@@ -150,6 +176,14 @@ class WorkflowExecutor:
         try:
             if runtime_mode == WorkflowExecutionMode.LINEAR:
                 output_payload, remaining_budget = self._execute_linear_workflow(
+                    run_state=run_state,
+                    workflow=workflow,
+                    emit=emit,
+                    started_at=started_at,
+                    remaining_budget=remaining_budget,
+                )
+            elif runtime_mode == WorkflowExecutionMode.HANDOFF:
+                output_payload, remaining_budget = self._execute_handoff_workflow(
                     run_state=run_state,
                     workflow=workflow,
                     emit=emit,
@@ -216,7 +250,7 @@ class WorkflowExecutor:
         remaining_budget: int | None,
     ) -> tuple[dict[str, Any], int | None]:
         for step in workflow.steps:
-            output, remaining_budget = self._run_step_with_retries(
+            output, remaining_budget, _ = self._run_step_with_retries(
                 run_state=run_state,
                 workflow=workflow,
                 step=step,
@@ -230,6 +264,269 @@ class WorkflowExecutor:
             self._state_store.save(run_state)
 
         return {"step_results": dict(run_state.step_results)}, remaining_budget
+
+    def _execute_handoff_workflow(
+        self,
+        *,
+        run_state: RunState,
+        workflow: WorkflowSpec,
+        emit,
+        started_at: float,
+        remaining_budget: int | None,
+    ) -> tuple[dict[str, Any], int | None]:
+        steps_by_id = {step.step_id: step for step in workflow.steps}
+        if not steps_by_id:
+            raise RuntimeBoundaryError(
+                "Handoff workflow requires executable steps.",
+                details={"workflow_id": workflow.workflow_id},
+            )
+
+        if workflow.entrypoint_step_id is None:
+            raise RuntimeBoundaryError(
+                "Handoff workflow requires entrypoint_step_id.",
+                details={"workflow_id": workflow.workflow_id},
+            )
+
+        current_step = steps_by_id.get(workflow.entrypoint_step_id)
+        if current_step is None:
+            raise RuntimeBoundaryError(
+                "Handoff workflow entrypoint_step_id does not match any workflow step.",
+                details={
+                    "workflow_id": workflow.workflow_id,
+                    "entrypoint_step_id": workflow.entrypoint_step_id,
+                },
+            )
+
+        step_id_to_agent_id = {step.step_id: step.agent_id for step in workflow.steps}
+        agent_to_step_ids: dict[str, list[str]] = {}
+        for step in workflow.steps:
+            agent_to_step_ids.setdefault(step.agent_id, []).append(step.step_id)
+
+        visited_step_ids: list[str] = []
+        visited_set: set[str] = set()
+        handoff_turns: list[dict[str, Any]] = []
+        current_parent_event_id: str | None = None
+
+        handoff_index = 0
+        while True:
+            if current_step.step_id in visited_set:
+                raise StepExecutionError(
+                    f"Handoff workflow attempted to revisit step '{current_step.step_id}'.",
+                    details={
+                        "step_id": current_step.step_id,
+                        "visited_step_ids": list(visited_step_ids),
+                    },
+                )
+
+            handoff_index += 1
+            handoff_correlation_id = f"handoff:{run_state.run_id}:{handoff_index}"
+            orchestration_payload = {
+                "handoff_index": handoff_index,
+                "from_step_id": current_step.step_id,
+                "from_agent_id": current_step.agent_id,
+            }
+            step_output, remaining_budget, step_completed_event_id = self._run_step_with_retries(
+                run_state=run_state,
+                workflow=workflow,
+                step=current_step,
+                emit=emit,
+                started_at=started_at,
+                remaining_budget=remaining_budget,
+                turn_index=handoff_index,
+                lane="handoff",
+                parent_event_id=current_parent_event_id,
+                correlation_id=handoff_correlation_id,
+                orchestration_payload=orchestration_payload,
+            )
+            run_state.step_results[current_step.step_id] = step_output
+            self._state_store.save(run_state)
+
+            visited_step_ids.append(current_step.step_id)
+            visited_set.add(current_step.step_id)
+
+            try:
+                decision, decision_source = self._resolve_handoff_decision(
+                    step_output=step_output,
+                    current_step_id=current_step.step_id,
+                    current_agent_id=current_step.agent_id,
+                    step_id_to_agent_id=step_id_to_agent_id,
+                    visited_step_ids=visited_set,
+                )
+            except StepExecutionError as error:
+                emit(
+                    TraceEventType.HANDOFF_FAILED,
+                    step_id=current_step.step_id,
+                    payload={
+                        "lane": "handoff",
+                        "handoff_index": handoff_index,
+                        "from_step_id": current_step.step_id,
+                        "from_agent_id": current_step.agent_id,
+                        "error": str(error),
+                        "error_type": type(error).__name__,
+                        "decision_source": "fallback",
+                    },
+                    parent_event_id=step_completed_event_id,
+                    correlation_id=handoff_correlation_id,
+                )
+                raise
+
+            turn_record: dict[str, Any] = {
+                "handoff_index": handoff_index,
+                "from_step_id": current_step.step_id,
+                "from_agent_id": current_step.agent_id,
+                "action": decision.action.value,
+                "decision_source": decision_source,
+                "reason": decision.reason,
+            }
+
+            if decision.action == HandoffAction.FINALIZE:
+                emit(
+                    TraceEventType.HANDOFF_DECIDED,
+                    step_id=current_step.step_id,
+                    payload={
+                        "lane": "handoff",
+                        "handoff_index": handoff_index,
+                        "decision_action": decision.action.value,
+                        "decision_source": decision_source,
+                        "from_step_id": current_step.step_id,
+                        "from_agent_id": current_step.agent_id,
+                        "reason": decision.reason,
+                    },
+                    parent_event_id=step_completed_event_id,
+                    correlation_id=handoff_correlation_id,
+                )
+                handoff_turns.append(turn_record)
+                orchestration = {
+                    "entrypoint_step_id": workflow.entrypoint_step_id,
+                    "path": list(visited_step_ids),
+                    "handoff_count": max(len(visited_step_ids) - 1, 0),
+                    "turns": handoff_turns,
+                    "final_step_id": current_step.step_id,
+                }
+                return {
+                    "step_results": dict(run_state.step_results),
+                    "handoff_orchestration": orchestration,
+                    "final_output": decision.output or {"handoff_output": step_output},
+                }, remaining_budget
+
+            if decision.action == HandoffAction.FAIL:
+                emit(
+                    TraceEventType.HANDOFF_FAILED,
+                    step_id=current_step.step_id,
+                    payload={
+                        "lane": "handoff",
+                        "handoff_index": handoff_index,
+                        "decision_action": decision.action.value,
+                        "decision_source": decision_source,
+                        "from_step_id": current_step.step_id,
+                        "from_agent_id": current_step.agent_id,
+                        "reason": decision.reason,
+                        "error": "Handoff workflow requested explicit failure.",
+                        "error_type": "StepExecutionError",
+                    },
+                    parent_event_id=step_completed_event_id,
+                    correlation_id=handoff_correlation_id,
+                )
+                raise StepExecutionError(
+                    "Handoff workflow requested explicit failure.",
+                    details={
+                        "handoff_index": handoff_index,
+                        "step_id": current_step.step_id,
+                        "reason": decision.reason,
+                        "output": decision.output,
+                    },
+                )
+
+            try:
+                target_step_id = self._resolve_handoff_target_step_id(
+                    decision=decision,
+                    current_step_id=current_step.step_id,
+                    current_agent_id=current_step.agent_id,
+                    step_id_to_agent_id=step_id_to_agent_id,
+                    agent_to_step_ids=agent_to_step_ids,
+                )
+            except StepExecutionError as error:
+                emit(
+                    TraceEventType.HANDOFF_FAILED,
+                    step_id=current_step.step_id,
+                    payload={
+                        "lane": "handoff",
+                        "handoff_index": handoff_index,
+                        "decision_action": decision.action.value,
+                        "decision_source": decision_source,
+                        "from_step_id": current_step.step_id,
+                        "from_agent_id": current_step.agent_id,
+                        "attempted_target_step_id": decision.target_step_id,
+                        "attempted_target_agent_id": decision.target_agent_id,
+                        "reason": decision.reason,
+                        "error": str(error),
+                        "error_type": type(error).__name__,
+                    },
+                    parent_event_id=step_completed_event_id,
+                    correlation_id=handoff_correlation_id,
+                )
+                raise
+
+            if target_step_id in visited_set:
+                revisit_error = StepExecutionError(
+                    f"Handoff workflow attempted to revisit step '{target_step_id}'.",
+                    details={
+                        "handoff_index": handoff_index,
+                        "target_step_id": target_step_id,
+                        "visited_step_ids": list(visited_step_ids),
+                    },
+                )
+                emit(
+                    TraceEventType.HANDOFF_FAILED,
+                    step_id=current_step.step_id,
+                    payload={
+                        "lane": "handoff",
+                        "handoff_index": handoff_index,
+                        "decision_action": decision.action.value,
+                        "decision_source": decision_source,
+                        "from_step_id": current_step.step_id,
+                        "from_agent_id": current_step.agent_id,
+                        "to_step_id": target_step_id,
+                        "reason": decision.reason,
+                        "error": str(revisit_error),
+                        "error_type": type(revisit_error).__name__,
+                    },
+                    parent_event_id=step_completed_event_id,
+                    correlation_id=handoff_correlation_id,
+                )
+                raise StepExecutionError(
+                    f"Handoff workflow attempted to revisit step '{target_step_id}'.",
+                    details={
+                        "handoff_index": handoff_index,
+                        "target_step_id": target_step_id,
+                        "visited_step_ids": list(visited_step_ids),
+                    },
+                )
+
+            target_agent_id = step_id_to_agent_id[target_step_id]
+            handoff_decision_event = emit(
+                TraceEventType.HANDOFF_DECIDED,
+                step_id=current_step.step_id,
+                payload={
+                    "lane": "handoff",
+                    "handoff_index": handoff_index,
+                    "decision_action": decision.action.value,
+                    "decision_source": decision_source,
+                    "from_step_id": current_step.step_id,
+                    "from_agent_id": current_step.agent_id,
+                    "to_step_id": target_step_id,
+                    "to_agent_id": target_agent_id,
+                    "reason": decision.reason,
+                },
+                parent_event_id=step_completed_event_id,
+                correlation_id=handoff_correlation_id,
+            )
+            turn_record["target_step_id"] = target_step_id
+            turn_record["target_agent_id"] = target_agent_id
+            handoff_turns.append(turn_record)
+
+            current_parent_event_id = handoff_decision_event.event_id
+            current_step = steps_by_id[target_step_id]
 
     def _execute_manager_workflow(
         self,
@@ -273,7 +570,7 @@ class WorkflowExecutor:
         worker_agent_to_step = {steps_by_id[step_id].agent_id: step_id for step_id in worker_step_ids}
 
         for turn_index in range(1, manager_spec.max_turns + 1):
-            manager_output, remaining_budget = self._run_step_with_retries(
+            manager_output, remaining_budget, _ = self._run_step_with_retries(
                 run_state=run_state,
                 workflow=workflow,
                 step=manager_step,
@@ -338,7 +635,7 @@ class WorkflowExecutor:
                 )
 
             target_step = steps_by_id[target_step_id]
-            worker_output, remaining_budget = self._run_step_with_retries(
+            worker_output, remaining_budget, _ = self._run_step_with_retries(
                 run_state=run_state,
                 workflow=workflow,
                 step=target_step,
@@ -376,18 +673,25 @@ class WorkflowExecutor:
         remaining_budget: int | None,
         turn_index: int | None,
         lane: str,
-    ) -> tuple[Any, int | None]:
+        parent_event_id: str | None = None,
+        correlation_id: str | None = None,
+        orchestration_payload: dict[str, Any] | None = None,
+    ) -> tuple[Any, int | None, str]:
         self._enforce_timeout(started_at)
         remaining_budget = self._consume_budget(remaining_budget, step_id=step.step_id)
+        trace_payload = dict(orchestration_payload or {})
 
         emit(
             TraceEventType.STEP_STARTED,
             step_id=step.step_id,
             payload={
+                **trace_payload,
                 "agent_id": step.agent_id,
                 "turn_index": turn_index,
                 "lane": lane,
             },
+            parent_event_id=parent_event_id,
+            correlation_id=correlation_id,
         )
 
         attempts = 0
@@ -397,11 +701,14 @@ class WorkflowExecutor:
                 TraceEventType.AGENT_DISPATCHED,
                 step_id=step.step_id,
                 payload={
+                    **trace_payload,
                     "agent_id": step.agent_id,
                     "attempt": attempts,
                     "turn_index": turn_index,
                     "lane": lane,
                 },
+                parent_event_id=parent_event_id,
+                correlation_id=correlation_id,
             )
             try:
                 output = self._step_runner(
@@ -413,23 +720,29 @@ class WorkflowExecutor:
                     TraceEventType.AGENT_COMPLETED,
                     step_id=step.step_id,
                     payload={
+                        **trace_payload,
                         "agent_id": step.agent_id,
                         "attempt": attempts,
                         "turn_index": turn_index,
                         "lane": lane,
                     },
+                    parent_event_id=parent_event_id,
+                    correlation_id=correlation_id,
                 )
-                emit(
+                step_completed_event = emit(
                     TraceEventType.STEP_COMPLETED,
                     step_id=step.step_id,
                     payload={
+                        **trace_payload,
                         "agent_id": step.agent_id,
                         "attempts": attempts,
                         "turn_index": turn_index,
                         "lane": lane,
                     },
+                    parent_event_id=parent_event_id,
+                    correlation_id=correlation_id,
                 )
-                return output, remaining_budget
+                return output, remaining_budget, step_completed_event.event_id
             except (RunTimeoutError, RunBudgetError):
                 raise
             except Exception as error:
@@ -437,6 +750,7 @@ class WorkflowExecutor:
                     TraceEventType.AGENT_FAILED,
                     step_id=step.step_id,
                     payload={
+                        **trace_payload,
                         "agent_id": step.agent_id,
                         "attempt": attempts,
                         "turn_index": turn_index,
@@ -444,17 +758,22 @@ class WorkflowExecutor:
                         "error_type": type(error).__name__,
                         "error": str(error),
                     },
+                    parent_event_id=parent_event_id,
+                    correlation_id=correlation_id,
                 )
                 emit(
                     TraceEventType.STEP_FAILED,
                     step_id=step.step_id,
                     payload={
+                        **trace_payload,
                         "attempt": attempts,
                         "turn_index": turn_index,
                         "lane": lane,
                         "error_type": type(error).__name__,
                         "error": str(error),
                     },
+                    parent_event_id=parent_event_id,
+                    correlation_id=correlation_id,
                 )
                 if attempts > self._limits.max_retries_per_step:
                     if isinstance(error, FractalRuntimeError):
@@ -583,6 +902,166 @@ class WorkflowExecutor:
 
         return target_step_id
 
+    def _resolve_handoff_decision(
+        self,
+        *,
+        step_output: Any,
+        current_step_id: str,
+        current_agent_id: str,
+        step_id_to_agent_id: dict[str, str],
+        visited_step_ids: set[str],
+    ) -> tuple[HandoffDecision, str]:
+        parsed = self._try_parse_handoff_decision(step_output)
+        if parsed is not None:
+            return parsed, "explicit"
+
+        unvisited_step_ids = [
+            step_id for step_id in step_id_to_agent_id if step_id not in visited_step_ids
+        ]
+        fallback_targets = [step_id for step_id in unvisited_step_ids if step_id != current_step_id]
+
+        if len(fallback_targets) == 1:
+            return (
+                HandoffDecision(
+                    action=HandoffAction.HANDOFF,
+                    target_step_id=fallback_targets[0],
+                    reason="auto_fallback_single_remaining_step",
+                ),
+                "fallback",
+            )
+
+        if len(fallback_targets) == 0:
+            return (
+                HandoffDecision(
+                    action=HandoffAction.FINALIZE,
+                    reason="auto_fallback_no_remaining_step",
+                    output={"handoff_output": step_output},
+                ),
+                "fallback",
+            )
+
+        raise StepExecutionError(
+            "Handoff decision is ambiguous: no valid control and multiple remaining targets.",
+            details={
+                "current_step_id": current_step_id,
+                "current_agent_id": current_agent_id,
+                "remaining_step_ids": fallback_targets,
+            },
+        )
+
+    def _try_parse_handoff_decision(self, step_output: Any) -> HandoffDecision | None:
+        if not isinstance(step_output, dict):
+            return None
+
+        control_candidates: list[dict[str, Any]] = []
+        direct_control = step_output.get("control")
+        if isinstance(direct_control, dict):
+            control_candidates.append(direct_control)
+
+        nested_output = step_output.get("output")
+        if isinstance(nested_output, dict):
+            nested_control = nested_output.get("control")
+            if isinstance(nested_control, dict):
+                control_candidates.append(nested_control)
+
+        nested_raw = step_output.get("raw")
+        if isinstance(nested_raw, dict):
+            raw_control = nested_raw.get("control")
+            if isinstance(raw_control, dict):
+                control_candidates.append(raw_control)
+
+        for control in control_candidates:
+            parsed = self._parse_handoff_control_candidate(control)
+            if parsed is not None:
+                return parsed
+
+        return None
+
+    def _parse_handoff_control_candidate(self, control: dict[str, Any]) -> HandoffDecision | None:
+        action_value = str(control.get("action", "")).strip().lower()
+        action = _handoff_action_from_value(action_value)
+        if action is None:
+            return None
+
+        target_step_id = control.get("target_step_id")
+        if target_step_id is not None and not isinstance(target_step_id, str):
+            target_step_id = None
+
+        target_agent_id = control.get("target_agent_id")
+        if target_agent_id is not None and not isinstance(target_agent_id, str):
+            target_agent_id = None
+
+        reason = control.get("reason")
+        if reason is not None and not isinstance(reason, str):
+            reason = str(reason)
+
+        output = control.get("output")
+        if not isinstance(output, dict):
+            output = {}
+
+        return HandoffDecision(
+            action=action,
+            target_step_id=target_step_id,
+            target_agent_id=target_agent_id,
+            reason=reason,
+            output=output,
+        )
+
+    def _resolve_handoff_target_step_id(
+        self,
+        *,
+        decision: HandoffDecision,
+        current_step_id: str,
+        current_agent_id: str,
+        step_id_to_agent_id: dict[str, str],
+        agent_to_step_ids: dict[str, list[str]],
+    ) -> str:
+        target_step_id = decision.target_step_id
+        if target_step_id is None and decision.target_agent_id is not None:
+            candidate_step_ids = agent_to_step_ids.get(decision.target_agent_id, [])
+            if len(candidate_step_ids) == 1:
+                target_step_id = candidate_step_ids[0]
+            elif len(candidate_step_ids) > 1:
+                raise StepExecutionError(
+                    f"Handoff target agent '{decision.target_agent_id}' maps to multiple steps.",
+                    details={
+                        "target_agent_id": decision.target_agent_id,
+                        "candidate_step_ids": list(candidate_step_ids),
+                    },
+                )
+
+        if target_step_id is None:
+            raise StepExecutionError(
+                "Handoff decision missing target step/agent.",
+                details={
+                    "decision_action": decision.action.value,
+                    "decision_reason": decision.reason,
+                },
+            )
+
+        if target_step_id not in step_id_to_agent_id:
+            raise StepExecutionError(
+                f"Handoff selected unknown step '{target_step_id}'.",
+                details={
+                    "target_step_id": target_step_id,
+                    "known_step_ids": list(step_id_to_agent_id),
+                },
+            )
+
+        target_agent_id = step_id_to_agent_id[target_step_id]
+        if target_step_id == current_step_id or target_agent_id == current_agent_id:
+            raise StepExecutionError(
+                "Handoff self-loop is not allowed in v1.",
+                details={
+                    "current_step_id": current_step_id,
+                    "current_agent_id": current_agent_id,
+                    "target_step_id": target_step_id,
+                    "target_agent_id": target_agent_id,
+                },
+            )
+
+        return target_step_id
+
     def _enforce_timeout(self, started_at: float) -> None:
         timeout = self._limits.timeout_seconds
         if timeout is None:
@@ -621,9 +1100,7 @@ class WorkflowExecutor:
 
     @staticmethod
     def _runtime_execution_mode(workflow: WorkflowSpec) -> WorkflowExecutionMode:
-        if workflow.manager_spec is None:
-            return WorkflowExecutionMode.LINEAR
-        return WorkflowExecutionMode.MANAGER
+        return workflow.execution_mode
 
 
 def _action_from_value(value: str) -> ManagerAction | None:
@@ -633,4 +1110,14 @@ def _action_from_value(value: str) -> ManagerAction | None:
         return ManagerAction.FINALIZE
     if value == ManagerAction.FAIL.value:
         return ManagerAction.FAIL
+    return None
+
+
+def _handoff_action_from_value(value: str) -> HandoffAction | None:
+    if value == HandoffAction.HANDOFF.value:
+        return HandoffAction.HANDOFF
+    if value == HandoffAction.FINALIZE.value:
+        return HandoffAction.FINALIZE
+    if value == HandoffAction.FAIL.value:
+        return HandoffAction.FAIL
     return None

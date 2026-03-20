@@ -4,6 +4,8 @@ from fractal_agent_lab.core.contracts.agent_spec import (
     AgentSpec,
 )
 from fractal_agent_lab.core.contracts.workflow_spec import (
+    HandoffAction,
+    HandoffDecision,
     ManagerAction,
     ManagerDecision,
     ManagerSpec,
@@ -18,6 +20,8 @@ __all__ = [
     "WORKFLOW_SPEC_SCHEMA_VERSION",
     "AgentKind",
     "AgentSpec",
+    "HandoffAction",
+    "HandoffDecision",
     "ManagerAction",
     "ManagerDecision",
     "ManagerSpec",

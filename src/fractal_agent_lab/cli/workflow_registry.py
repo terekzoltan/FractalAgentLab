@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fractal_agent_lab.agents import build_h1_agent_pack, build_h1_single_agent_pack
+from fractal_agent_lab.agents import (
+    build_h1_agent_pack,
+    build_h1_handoff_agent_pack,
+    build_h1_single_agent_pack,
+)
 from fractal_agent_lab.core.contracts import AgentSpec
 from fractal_agent_lab.core.contracts import WorkflowExecutionMode, WorkflowSpec, WorkflowStepSpec
 from fractal_agent_lab.workflows import (
+    H1_HANDOFF_WORKFLOW_ID,
     H1_WORKFLOW_ID,
     H1_LITE_WORKFLOW_ID,
     H1_SINGLE_WORKFLOW_ID,
+    build_h1_handoff_workflow_spec,
     build_h1_manager_workflow_spec,
     build_h1_lite_agent_pack,
     build_h1_lite_workflow_spec,
@@ -64,6 +70,7 @@ def _wave0_demo_workflow() -> WorkflowSpec:
 
 
 _WORKFLOWS: dict[str, Callable[[], WorkflowSpec]] = {
+    H1_HANDOFF_WORKFLOW_ID: build_h1_handoff_workflow_spec,
     H1_WORKFLOW_ID: build_h1_manager_workflow_spec,
     H1_SINGLE_WORKFLOW_ID: build_h1_single_workflow_spec,
     H1_LITE_WORKFLOW_ID: build_h1_lite_workflow_spec,
@@ -71,6 +78,7 @@ _WORKFLOWS: dict[str, Callable[[], WorkflowSpec]] = {
 }
 
 _WORKFLOW_AGENT_SPECS: dict[str, Callable[[], dict[str, AgentSpec]]] = {
+    H1_HANDOFF_WORKFLOW_ID: build_h1_handoff_agent_pack,
     H1_WORKFLOW_ID: build_h1_agent_pack,
     H1_SINGLE_WORKFLOW_ID: build_h1_single_agent_pack,
     H1_LITE_WORKFLOW_ID: build_h1_lite_agent_pack,

@@ -56,6 +56,8 @@ class MockAdapter:
             return responder(request)
         if candidate is not None:
             return candidate
+        if request.workflow_id == "h1.handoff.v1":
+            return self._build_h1_handoff_output(request)
         if request.workflow_id == "h1.manager.v1":
             return self._build_h1_manager_output(request)
         if request.workflow_id == "h1.single.v1":
@@ -322,6 +324,159 @@ class MockAdapter:
 
         return {
             "message": f"No specialized h1.manager.v1 output for step '{request.step_id}'.",
+            "role": request.role,
+            "model": request.model,
+            "model_policy_ref": request.model_policy_ref,
+            "prompt_version": request.prompt_version,
+        }
+
+    def _build_h1_handoff_output(self, request: AdapterStepRequest) -> dict[str, Any]:
+        idea = _clean_text(request.input_payload.get("idea"), fallback="Unspecified startup idea")
+        intake_output = _step_output(request, "intake")
+        planner_output = _step_output(request, "planner")
+        critic_output = _step_output(request, "critic")
+
+        if request.step_id == "intake":
+            return {
+                "idea_summary": idea,
+                "target_user": "Early-stage founders validating first product direction.",
+                "core_problem": f"The founder needs sharper positioning for: {idea}.",
+                "assumptions": [
+                    "Structured critique is more useful than open brainstorming.",
+                    "Validation planning increases confidence before MVP build.",
+                ],
+                "constraints": [
+                    "Limited time for discovery.",
+                    "Need concrete next actions after each iteration.",
+                ],
+                "open_questions": [
+                    "Which founder segment has the strongest urgency?",
+                    "Which output format drives immediate action?",
+                ],
+                "control": {
+                    "action": "handoff",
+                    "target_step_id": "planner",
+                    "reason": "intake_complete",
+                },
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "planner":
+            _require_manager_context(request=request, required_step_id="intake")
+            normalized_summary = _clean_text(intake_output.get("idea_summary"), fallback=idea)
+            return {
+                "validation_axes": [
+                    "problem urgency",
+                    "solution credibility",
+                    "distribution feasibility",
+                ],
+                "hypothesis_to_test": [
+                    f"Founders will pay for tighter framing of '{normalized_summary}'.",
+                    "A handoff chain can preserve specialization without manager loops.",
+                ],
+                "riskiest_assumptions": [
+                    "Each step receives enough context to keep quality stable.",
+                    "Sequential handoff will not feel too slow for practical use.",
+                ],
+                "evidence_needed": [
+                    "Interview notes from 3-5 founders",
+                    "A/B feedback across single/manager/handoff variants",
+                ],
+                "first_experiments": [
+                    "Run 5 same-input comparisons against manager variant",
+                    "Measure clarity and actionability of next-step outputs",
+                ],
+                "control": {
+                    "action": "handoff",
+                    "target_step_id": "critic",
+                    "reason": "planning_complete",
+                },
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "critic":
+            _require_manager_context(request=request, required_step_id="intake")
+            _require_manager_context(request=request, required_step_id="planner")
+            return {
+                "weak_points": [
+                    "Value proposition may overlap with broad-purpose assistants.",
+                    "Target segment may still be too broad.",
+                ],
+                "failure_modes": [
+                    "Outputs remain generic and do not change founder decisions.",
+                    "Handoff chain loses nuance between planner and synthesizer.",
+                ],
+                "hidden_dependencies": [
+                    "Quality depends on user providing sufficiently concrete input.",
+                    "Prompt consistency is required across all handoff steps.",
+                ],
+                "counterarguments": [
+                    "A manager loop may outperform rigid chains on complex ideas.",
+                    "Single-agent baseline might be good enough for simple cases.",
+                ],
+                "alternatives": [
+                    "Narrow to one founder segment before broad rollout.",
+                    "Use manager mode when critic identifies severe uncertainty.",
+                ],
+                "control": {
+                    "action": "handoff",
+                    "target_step_id": "synthesizer",
+                    "reason": "critique_complete",
+                },
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "synthesizer":
+            _require_manager_context(request=request, required_step_id="intake")
+            _require_manager_context(request=request, required_step_id="planner")
+            _require_manager_context(request=request, required_step_id="critic")
+
+            strongest_assumptions = intake_output.get("assumptions")
+            if not isinstance(strongest_assumptions, list) or not strongest_assumptions:
+                strongest_assumptions = [
+                    "Founders value concrete problem framing before broad ideation.",
+                ]
+
+            weak_points = critic_output.get("weak_points")
+            if not isinstance(weak_points, list) or not weak_points:
+                weak_points = ["Differentiation against generic AI assistants remains weak."]
+
+            alternatives = critic_output.get("alternatives")
+            if not isinstance(alternatives, list) or not alternatives:
+                alternatives = ["Narrow scope to founder interview preparation workflow."]
+
+            return {
+                "control": {
+                    "action": "finalize",
+                    "reason": "handoff_chain_complete",
+                    "output": {
+                        "clarified_idea": (
+                            "Handoff-chain startup refinement assistant that passes idea context "
+                            "through intake, planner, critic, then synthesis finalization."
+                        ),
+                        "strongest_assumptions": strongest_assumptions,
+                        "weak_points": weak_points,
+                        "alternatives": alternatives,
+                        "recommended_mvp_direction": (
+                            "Ship a constrained handoff chain for structured startup idea refinement "
+                            "and compare decision quality against manager and single baselines."
+                        ),
+                        "next_3_validation_steps": [
+                            "Run 5 matched ideas across single/manager/handoff workflows.",
+                            "Collect per-variant usefulness ratings from founders.",
+                            "Measure actionability of next-step recommendations.",
+                        ],
+                    },
+                },
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        return {
+            "message": f"No specialized h1.handoff.v1 output for step '{request.step_id}'.",
             "role": request.role,
             "model": request.model,
             "model_policy_ref": request.model_policy_ref,

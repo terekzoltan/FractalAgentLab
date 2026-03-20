@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from fractal_agent_lab.agents.h1.prompts import (
+    H1_HANDOFF_PROMPT_VERSION,
     H1_PROMPT_VERSION,
+    HANDOFF_PROMPTS_BY_ROLE,
+    HANDOFF_ROLE_PROMPT_VERSION,
     H1_SINGLE_PROMPT,
     H1_SINGLE_PROMPT_VERSION,
     H1_SINGLE_ROLE,
@@ -80,6 +83,66 @@ def build_h1_agent_pack() -> dict[str, AgentSpec]:
     return specs
 
 
+def build_h1_handoff_agent_specs() -> dict[str, AgentSpec]:
+    specs: list[AgentSpec] = [
+        AgentSpec(
+            agent_id=H1_AGENT_IDS[H1Role.INTAKE],
+            role=H1Role.INTAKE.value,
+            kind=AgentKind.LLM,
+            instructions=HANDOFF_PROMPTS_BY_ROLE[H1Role.INTAKE],
+            model_policy_ref="cheap_worker",
+            handoff_targets=[H1_AGENT_IDS[H1Role.PLANNER]],
+            metadata={
+                "prompt_version": HANDOFF_ROLE_PROMPT_VERSION[H1Role.INTAKE],
+                "pack_prompt_version": H1_HANDOFF_PROMPT_VERSION,
+            },
+        ),
+        AgentSpec(
+            agent_id=H1_AGENT_IDS[H1Role.PLANNER],
+            role=H1Role.PLANNER.value,
+            kind=AgentKind.LLM,
+            instructions=HANDOFF_PROMPTS_BY_ROLE[H1Role.PLANNER],
+            model_policy_ref="specialist",
+            handoff_targets=[H1_AGENT_IDS[H1Role.CRITIC]],
+            metadata={
+                "prompt_version": HANDOFF_ROLE_PROMPT_VERSION[H1Role.PLANNER],
+                "pack_prompt_version": H1_HANDOFF_PROMPT_VERSION,
+            },
+        ),
+        AgentSpec(
+            agent_id=H1_AGENT_IDS[H1Role.CRITIC],
+            role=H1Role.CRITIC.value,
+            kind=AgentKind.LLM,
+            instructions=HANDOFF_PROMPTS_BY_ROLE[H1Role.CRITIC],
+            model_policy_ref="specialist",
+            handoff_targets=[H1_AGENT_IDS[H1Role.SYNTHESIZER]],
+            metadata={
+                "prompt_version": HANDOFF_ROLE_PROMPT_VERSION[H1Role.CRITIC],
+                "pack_prompt_version": H1_HANDOFF_PROMPT_VERSION,
+            },
+        ),
+        AgentSpec(
+            agent_id=H1_AGENT_IDS[H1Role.SYNTHESIZER],
+            role=H1Role.SYNTHESIZER.value,
+            kind=AgentKind.LLM,
+            instructions=HANDOFF_PROMPTS_BY_ROLE[H1Role.SYNTHESIZER],
+            model_policy_ref="finalizer",
+            handoff_targets=[],
+            metadata={
+                "prompt_version": HANDOFF_ROLE_PROMPT_VERSION[H1Role.SYNTHESIZER],
+                "pack_prompt_version": H1_HANDOFF_PROMPT_VERSION,
+            },
+        ),
+    ]
+    return {spec.agent_id: spec for spec in specs}
+
+
+def build_h1_handoff_agent_pack() -> dict[str, AgentSpec]:
+    specs = build_h1_handoff_agent_specs()
+    validate_h1_handoff_agent_specs(specs)
+    return specs
+
+
 def validate_h1_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
     required_ids = {H1_AGENT_IDS[role] for role in ordered_h1_roles()}
     missing = sorted(required_ids.difference(agent_specs_by_id))
@@ -119,6 +182,41 @@ def validate_h1_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
     for role in (H1Role.INTAKE, H1Role.PLANNER, H1Role.CRITIC):
         if agent_specs_by_id[H1_AGENT_IDS[role]].handoff_targets:
             raise ValueError(f"H1 worker '{role.value}' must not declare handoff targets.")
+
+
+def validate_h1_handoff_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
+    required_ids = {H1_AGENT_IDS[role] for role in ordered_h1_roles()}
+    missing = sorted(required_ids.difference(agent_specs_by_id))
+    if missing:
+        raise ValueError(f"Missing required H1 handoff agent specs: {', '.join(missing)}")
+
+    intake_targets = agent_specs_by_id[H1_AGENT_IDS[H1Role.INTAKE]].handoff_targets
+    planner_targets = agent_specs_by_id[H1_AGENT_IDS[H1Role.PLANNER]].handoff_targets
+    critic_targets = agent_specs_by_id[H1_AGENT_IDS[H1Role.CRITIC]].handoff_targets
+    synthesizer_targets = agent_specs_by_id[H1_AGENT_IDS[H1Role.SYNTHESIZER]].handoff_targets
+
+    if intake_targets != [H1_AGENT_IDS[H1Role.PLANNER]]:
+        raise ValueError("H1 handoff intake must target planner only.")
+    if planner_targets != [H1_AGENT_IDS[H1Role.CRITIC]]:
+        raise ValueError("H1 handoff planner must target critic only.")
+    if critic_targets != [H1_AGENT_IDS[H1Role.SYNTHESIZER]]:
+        raise ValueError("H1 handoff critic must target synthesizer only.")
+    if synthesizer_targets:
+        raise ValueError("H1 handoff synthesizer must be terminal.")
+
+    for role in ordered_h1_roles():
+        spec = agent_specs_by_id[H1_AGENT_IDS[role]]
+        prompt_version = spec.metadata.get("prompt_version")
+        if not isinstance(prompt_version, str) or not prompt_version:
+            raise ValueError(f"Agent '{spec.agent_id}' missing non-empty prompt_version metadata.")
+
+        for target in spec.handoff_targets:
+            if target not in agent_specs_by_id:
+                raise ValueError(
+                    f"Agent '{spec.agent_id}' references unknown handoff target '{target}'.",
+                )
+            if target == spec.agent_id:
+                raise ValueError(f"Agent '{spec.agent_id}' cannot hand off to itself.")
 
 
 def build_h1_single_agent_specs() -> dict[str, AgentSpec]:

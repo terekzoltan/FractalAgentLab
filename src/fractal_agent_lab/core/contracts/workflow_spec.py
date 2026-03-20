@@ -39,6 +39,21 @@ class ManagerDecision:
     output: dict[str, Any] = field(default_factory=dict)
 
 
+class HandoffAction(StrEnum):
+    HANDOFF = "handoff"
+    FINALIZE = "finalize"
+    FAIL = "fail"
+
+
+@dataclass(slots=True)
+class HandoffDecision:
+    action: HandoffAction
+    target_step_id: str | None = None
+    target_agent_id: str | None = None
+    reason: str | None = None
+    output: dict[str, Any] = field(default_factory=dict)
+
+
 @dataclass(slots=True)
 class WorkflowStepSpec:
     step_id: str
@@ -74,6 +89,12 @@ class WorkflowSpec:
     schema_version: str = WORKFLOW_SPEC_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        step_ids = [step.step_id for step in self.steps]
+        if len(step_ids) != len(set(step_ids)):
+            duplicates = sorted({step_id for step_id in step_ids if step_ids.count(step_id) > 1})
+            raise ValueError(
+                "WorkflowSpec contains duplicate step_id values: " + ", ".join(duplicates),
+            )
         if not self.agent_ids and self.steps:
             self.agent_ids = _ordered_unique_agent_ids(self.steps)
         if self.entrypoint_step_id is None and self.steps:
@@ -86,3 +107,9 @@ class WorkflowSpec:
             raise ValueError("manager_spec.max_turns must be positive.")
         if self.manager_spec and self.manager_spec.manager_step_id in self.manager_spec.worker_step_ids:
             raise ValueError("manager_spec.worker_step_ids cannot include manager_step_id.")
+        if (
+            self.execution_mode == WorkflowExecutionMode.HANDOFF
+            and self.entrypoint_step_id is not None
+            and self.entrypoint_step_id not in {step.step_id for step in self.steps}
+        ):
+            raise ValueError("handoff workflows require a valid entrypoint_step_id.")
