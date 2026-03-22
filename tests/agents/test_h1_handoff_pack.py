@@ -19,6 +19,9 @@ class H1HandoffPackTests(unittest.TestCase):
         self.assertEqual("h1/handoff/synthesizer/v1", synthesizer.metadata["prompt_version"])
         self.assertEqual(H1_HANDOFF_PROMPT_VERSION, synthesizer.metadata["pack_prompt_version"])
 
+        for spec in pack.values():
+            self.assertEqual(H1_HANDOFF_PROMPT_VERSION, spec.metadata.get("pack_prompt_version"))
+
 
 if __name__ == "__main__":
     unittest.main()

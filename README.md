@@ -271,6 +271,20 @@ PowerShell:
 $env:PYTHONPATH='src'; python -m fractal_agent_lab.cli run h1.lite --input-json '{"idea":"AI founder assistant"}' --format json --show-trace
 ```
 
+### Inspect a stored trace timeline
+
+Git Bash:
+
+```bash
+PYTHONPATH=src python -m fractal_agent_lab.cli trace show --run-id <run_id>
+```
+
+PowerShell:
+
+```powershell
+$env:PYTHONPATH='src'; python -m fractal_agent_lab.cli trace show --run-id <run_id>
+```
+
 ### Run the current tests
 
 Git Bash:

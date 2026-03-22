@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from fractal_agent_lab.agents import extract_prompt_tags_from_output_payload
 from fractal_agent_lab.core.events import TraceEvent, TraceEventType
 from fractal_agent_lab.core.models import RunState
 
@@ -53,6 +54,10 @@ def format_run_summary_text(
     workflow_summary = _build_workflow_summary(run_state)
     if workflow_summary is not None:
         lines.extend(_format_workflow_summary_text(workflow_summary))
+
+    prompt_tags = _build_prompt_tags_summary(run_state)
+    if prompt_tags is not None:
+        lines.extend(_format_prompt_tags_text(prompt_tags))
 
     orchestration_summary = _build_orchestration_summary(run_state)
     if orchestration_summary is not None:
@@ -149,6 +154,10 @@ def build_json_output(
     if workflow_summary is not None:
         payload["workflow_summary"] = workflow_summary
 
+    prompt_tags = _build_prompt_tags_summary(run_state)
+    if prompt_tags is not None:
+        payload["prompt_tags"] = prompt_tags
+
     orchestration_summary = _build_orchestration_summary(run_state)
     if orchestration_summary is not None:
         payload["orchestration_summary"] = orchestration_summary
@@ -176,6 +185,122 @@ def build_json_output(
             ],
         }
     return payload
+
+
+def format_trace_artifact_timeline_text(
+    *,
+    run_id: str,
+    trace_events: list[dict[str, Any]],
+    run_payload: dict[str, Any] | None,
+    run_artifact_path: Path,
+    trace_artifact_path: Path,
+) -> str:
+    lines = ["Trace Viewer", f"- run_id: {run_id}"]
+
+    workflow_id = _str_or_none(run_payload.get("workflow_id")) if isinstance(run_payload, dict) else None
+    status = _str_or_none(run_payload.get("status")) if isinstance(run_payload, dict) else None
+    if workflow_id is not None:
+        lines.append(f"- workflow_id: {workflow_id}")
+    if status is not None:
+        lines.append(f"- status: {status}")
+
+    lines.append(f"- trace_artifact: {trace_artifact_path.as_posix()}")
+    if run_payload is not None:
+        lines.append(f"- run_artifact: {run_artifact_path.as_posix()}")
+    else:
+        lines.append("- run_artifact: unavailable")
+
+    lines.append(f"- total_events: {len(trace_events)}")
+
+    event_counts = _collect_event_counts_from_payload(trace_events)
+    if event_counts:
+        lines.append("- event_counts:")
+        for event_type in sorted(event_counts):
+            lines.append(f"  - {event_type}: {event_counts[event_type]}")
+
+    lane_counts = _collect_lane_counts_from_payload(trace_events)
+    if lane_counts:
+        lines.append("- lane_counts:")
+        for lane in sorted(lane_counts):
+            lines.append(f"  - {lane}: {lane_counts[lane]}")
+
+    max_turn_index = _max_turn_index_from_payload(trace_events)
+    if max_turn_index is not None:
+        lines.append(f"- max_turn_index: {max_turn_index}")
+
+    linked_parent = sum(1 for event in trace_events if _str_or_none(event.get("parent_event_id")) is not None)
+    linked_corr = sum(1 for event in trace_events if _str_or_none(event.get("correlation_id")) is not None)
+    lines.append("- linkage:")
+    lines.append(f"  - with_parent_event_id: {linked_parent}")
+    lines.append(f"  - with_correlation_id: {linked_corr}")
+
+    lines.append("- timeline:")
+    for event in trace_events:
+        sequence = event.get("sequence")
+        event_type = _str_or_none(event.get("event_type")) or "unknown"
+        source = _str_or_none(event.get("source")) or "unknown"
+        step_id = _str_or_none(event.get("step_id"))
+        parent_event_id = _str_or_none(event.get("parent_event_id"))
+        correlation_id = _str_or_none(event.get("correlation_id"))
+        payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+
+        lane = _str_or_none(payload.get("lane"))
+        turn_index = payload.get("turn_index") if isinstance(payload.get("turn_index"), int) else None
+        handoff_index = payload.get("handoff_index") if isinstance(payload.get("handoff_index"), int) else None
+        from_step_id = _str_or_none(payload.get("from_step_id"))
+        to_step_id = _str_or_none(payload.get("to_step_id"))
+
+        parts = [f"  - #{sequence} {event_type} source={source}"]
+        if step_id is not None:
+            parts.append(f"step={step_id}")
+        if lane is not None:
+            parts.append(f"lane={lane}")
+        if turn_index is not None:
+            parts.append(f"turn={turn_index}")
+        if handoff_index is not None:
+            parts.append(f"handoff={handoff_index}")
+        if from_step_id is not None:
+            parts.append(f"from={from_step_id}")
+        if to_step_id is not None:
+            parts.append(f"to={to_step_id}")
+        if parent_event_id is not None:
+            parts.append(f"parent={parent_event_id}")
+        if correlation_id is not None:
+            parts.append(f"corr={correlation_id}")
+        lines.append(" ".join(parts))
+    return "\n".join(lines)
+
+
+def build_trace_artifact_json_output(
+    *,
+    run_id: str,
+    trace_events: list[dict[str, Any]],
+    run_payload: dict[str, Any] | None,
+    run_artifact_path: Path,
+    trace_artifact_path: Path,
+) -> dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "workflow_id": _str_or_none(run_payload.get("workflow_id")) if isinstance(run_payload, dict) else None,
+        "status": _str_or_none(run_payload.get("status")) if isinstance(run_payload, dict) else None,
+        "run_artifact_path": run_artifact_path.as_posix() if run_payload is not None else None,
+        "trace_artifact_path": trace_artifact_path.as_posix(),
+        "summary": {
+            "total_events": len(trace_events),
+            "event_counts": _collect_event_counts_from_payload(trace_events),
+            "lane_counts": _collect_lane_counts_from_payload(trace_events),
+            "max_turn_index": _max_turn_index_from_payload(trace_events),
+            "linked_events": {
+                "with_parent_event_id": sum(
+                    1 for event in trace_events if _str_or_none(event.get("parent_event_id")) is not None
+                ),
+                "with_correlation_id": sum(
+                    1 for event in trace_events if _str_or_none(event.get("correlation_id")) is not None
+                ),
+            },
+        },
+        "events": trace_events,
+    }
 
 
 def _fmt_ts(value: datetime | None) -> str | None:
@@ -250,6 +375,28 @@ def _build_orchestration_summary(run_state: RunState) -> dict[str, Any] | None:
     return summary
 
 
+def _build_prompt_tags_summary(run_state: RunState) -> dict[str, Any] | None:
+    prompt_tags = extract_prompt_tags_from_output_payload(run_state.output_payload)
+    if prompt_tags is None:
+        return None
+
+    variant = prompt_tags.get("variant")
+    pack_prompt_version = prompt_tags.get("pack_prompt_version")
+    role_prompt_versions = prompt_tags.get("role_prompt_versions")
+    executed_step_prompt_versions = prompt_tags.get("executed_step_prompt_versions")
+
+    summary: dict[str, Any] = {
+        "workflow_id": run_state.workflow_id,
+        "variant": variant,
+        "pack_prompt_version": pack_prompt_version,
+    }
+    if isinstance(role_prompt_versions, dict):
+        summary["role_prompt_versions"] = dict(role_prompt_versions)
+    if isinstance(executed_step_prompt_versions, dict):
+        summary["executed_step_prompt_versions"] = dict(executed_step_prompt_versions)
+    return summary
+
+
 def _finalize_reason(turns: list[Any]) -> str | None:
     for turn in turns:
         if not isinstance(turn, dict):
@@ -301,6 +448,36 @@ def _format_orchestration_summary_text(orchestration_summary: dict[str, Any]) ->
     return lines
 
 
+def _format_prompt_tags_text(prompt_tags: dict[str, Any]) -> list[str]:
+    lines = ["- prompt_tags:"]
+
+    variant = prompt_tags.get("variant")
+    if isinstance(variant, str) and variant:
+        lines.append(f"  - variant: {variant}")
+
+    pack_prompt_version = prompt_tags.get("pack_prompt_version")
+    if isinstance(pack_prompt_version, str) and pack_prompt_version:
+        lines.append(f"  - pack_prompt_version: {pack_prompt_version}")
+
+    role_prompt_versions = prompt_tags.get("role_prompt_versions")
+    if isinstance(role_prompt_versions, dict) and role_prompt_versions:
+        lines.append("  - role_prompt_versions:")
+        for role_key in sorted(role_prompt_versions):
+            version = role_prompt_versions.get(role_key)
+            if isinstance(version, str) and version:
+                lines.append(f"    - {role_key}: {version}")
+
+    executed_versions = prompt_tags.get("executed_step_prompt_versions")
+    if isinstance(executed_versions, dict) and executed_versions:
+        lines.append("  - executed_step_prompt_versions:")
+        for role_key in sorted(executed_versions):
+            version = executed_versions.get(role_key)
+            if isinstance(version, str) and version:
+                lines.append(f"    - {role_key}: {version}")
+
+    return lines
+
+
 def _collect_event_counts(events: list[TraceEvent]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for event in events:
@@ -332,3 +509,46 @@ def _max_turn_index(events: list[TraceEvent]) -> int | None:
     if not turn_values:
         return None
     return max(turn_values)
+
+
+def _collect_event_counts_from_payload(events: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for event in events:
+        event_type = _str_or_none(event.get("event_type"))
+        if event_type is None:
+            continue
+        counts[event_type] = counts.get(event_type, 0) + 1
+    return counts
+
+
+def _collect_lane_counts_from_payload(events: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for event in events:
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        lane = _str_or_none(payload.get("lane"))
+        if lane is None:
+            continue
+        counts[lane] = counts.get(lane, 0) + 1
+    return counts
+
+
+def _max_turn_index_from_payload(events: list[dict[str, Any]]) -> int | None:
+    turns: list[int] = []
+    for event in events:
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        turn = payload.get("turn_index")
+        if isinstance(turn, int):
+            turns.append(turn)
+    if not turns:
+        return None
+    return max(turns)
+
+
+def _str_or_none(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    return None

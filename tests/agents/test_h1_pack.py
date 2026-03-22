@@ -30,6 +30,9 @@ class H1PackTests(unittest.TestCase):
         self.assertEqual("h1/synthesizer/v1", synthesizer.metadata["prompt_version"])
         self.assertEqual(H1_PROMPT_VERSION, synthesizer.metadata["pack_prompt_version"])
 
+        for spec in pack.values():
+            self.assertEqual(H1_PROMPT_VERSION, spec.metadata.get("pack_prompt_version"))
+
     def test_h1_single_agent_pack_has_expected_shape(self) -> None:
         pack = build_h1_single_agent_pack()
 

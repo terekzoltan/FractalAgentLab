@@ -117,6 +117,6 @@ For Track C implementation work:
 
 ## Next Track C Steps
 
-1. `L1-G` completed: H1 handoff-chain prompt variant now exists as `h1.handoff.prompt.v1`
-2. support Track E `L1-I` with stable cross-variant prompt/version references
-3. `L1-M`: formal prompt version tagging for H1 artifacts and summaries
+1. `L1-M` completed: H1 prompt tags are now explicit in summaries and run artifacts
+2. support Track E `L1-L` with stable prompt provenance references across variants
+3. prepare optional design-only `L1-N` / `L1-O` identity artifacts if Wave 1 closeout remains controlled

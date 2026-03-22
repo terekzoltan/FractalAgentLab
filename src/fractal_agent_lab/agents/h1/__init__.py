@@ -13,12 +13,18 @@ from fractal_agent_lab.agents.h1.pack import (
     validate_h1_single_agent_specs,
     validate_h1_agent_specs,
 )
+from fractal_agent_lab.agents.h1.prompt_tags import (
+    build_h1_prompt_tags,
+    extract_prompt_tags_from_output_payload,
+)
 
 __all__ = [
     "H1_AGENT_IDS",
     "H1_HANDOFF_PROMPT_VERSION",
     "H1_PROMPT_VERSION",
     "H1_SINGLE_AGENT_ID",
+    "build_h1_prompt_tags",
+    "extract_prompt_tags_from_output_payload",
     "build_h1_handoff_agent_pack",
     "build_h1_handoff_agent_specs",
     "build_h1_single_agent_pack",

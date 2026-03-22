@@ -6,6 +6,7 @@ import sys
 from typing import Any
 
 from fractal_agent_lab.adapters import build_step_runner
+from fractal_agent_lab.agents import build_h1_prompt_tags
 from fractal_agent_lab.cli.config_loader import (
     build_runtime_limits,
     load_run_configs,
@@ -13,9 +14,12 @@ from fractal_agent_lab.cli.config_loader import (
 )
 from fractal_agent_lab.cli.formatting import (
     build_json_output,
+    build_trace_artifact_json_output,
     format_run_summary_text,
+    format_trace_artifact_timeline_text,
     format_trace_summary_text,
 )
+from fractal_agent_lab.cli.trace_reader import load_trace_view_artifacts
 from fractal_agent_lab.cli.workflow_registry import (
     get_workflow_agent_specs,
     get_workflow_spec,
@@ -74,6 +78,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional provider override (e.g. mock, openai, openrouter)",
     )
 
+    trace_parser = subparsers.add_parser("trace", help="Inspect stored run traces")
+    trace_subparsers = trace_parser.add_subparsers(dest="trace_command", required=True)
+    trace_show_parser = trace_subparsers.add_parser("show", help="Show trace timeline for a run")
+    trace_show_parser.add_argument("--run-id", required=True, help="Run identifier")
+    trace_show_parser.add_argument(
+        "--data-dir",
+        default="data",
+        help="Data directory that contains runs/ and traces/",
+    )
+    trace_show_parser.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Trace viewer output format",
+    )
+
     subparsers.add_parser("list-workflows", help="List available workflows")
     return parser
 
@@ -89,6 +109,9 @@ def run_cli(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         return _handle_run(args)
+
+    if args.command == "trace":
+        return _handle_trace(args)
 
     parser.error(f"Unsupported command: {args.command}")
     return 2
@@ -138,6 +161,11 @@ def _handle_run(args: argparse.Namespace) -> int:
     )
 
     run_state = executor.execute(workflow=workflow, input_payload=input_payload)
+    _inject_h1_prompt_tags(
+        run_state=run_state,
+        workflow=workflow,
+        workflow_agent_specs=workflow_agent_specs,
+    )
 
     data_dir = resolve_data_dir(runtime_config)
     run_artifact_path = None
@@ -206,3 +234,59 @@ def _apply_provider_override(providers_config: dict[str, Any], provider: str | N
         provider_block = {}
         providers_block[provider] = provider_block
     provider_block["enabled"] = True
+
+
+def _inject_h1_prompt_tags(
+    *,
+    run_state,
+    workflow,
+    workflow_agent_specs,
+) -> None:
+    prompt_tags = build_h1_prompt_tags(
+        workflow=workflow,
+        agent_specs_by_id=workflow_agent_specs,
+        step_results=run_state.step_results,
+    )
+    if prompt_tags is None:
+        return
+
+    payload = dict(run_state.output_payload or {})
+    payload["prompt_tags"] = prompt_tags
+    run_state.output_payload = payload
+
+
+def _handle_trace(args: argparse.Namespace) -> int:
+    if args.trace_command != "show":
+        print(f"Error: unsupported trace command '{args.trace_command}'.")
+        return 2
+
+    try:
+        run_payload, trace_events, run_artifact_path, trace_artifact_path = load_trace_view_artifacts(
+            run_id=args.run_id,
+            data_dir=args.data_dir,
+        )
+    except ValueError as error:
+        print(f"Error: {error}")
+        return 2
+
+    if args.format == "json":
+        output = build_trace_artifact_json_output(
+            run_id=args.run_id,
+            run_payload=run_payload,
+            trace_events=trace_events,
+            run_artifact_path=run_artifact_path,
+            trace_artifact_path=trace_artifact_path,
+        )
+        print(json.dumps(output, indent=2, ensure_ascii=True))
+        return 0
+
+    print(
+        format_trace_artifact_timeline_text(
+            run_id=args.run_id,
+            run_payload=run_payload,
+            trace_events=trace_events,
+            run_artifact_path=run_artifact_path,
+            trace_artifact_path=trace_artifact_path,
+        ),
+    )
+    return 0

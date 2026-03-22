@@ -150,6 +150,7 @@ def validate_h1_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
         raise ValueError(f"Missing required H1 agent specs: {', '.join(missing)}")
 
     seen_roles: set[str] = set()
+    observed_pack_versions: set[str] = set()
     for role in ordered_h1_roles():
         agent_id = H1_AGENT_IDS[role]
         spec = agent_specs_by_id[agent_id]
@@ -160,6 +161,16 @@ def validate_h1_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
         prompt_version = spec.metadata.get("prompt_version")
         if not isinstance(prompt_version, str) or not prompt_version:
             raise ValueError(f"Agent '{spec.agent_id}' missing non-empty prompt_version metadata.")
+
+        pack_prompt_version = spec.metadata.get("pack_prompt_version")
+        if not isinstance(pack_prompt_version, str) or not pack_prompt_version:
+            raise ValueError(f"Agent '{spec.agent_id}' missing non-empty pack_prompt_version metadata.")
+        observed_pack_versions.add(pack_prompt_version)
+
+    if observed_pack_versions != {H1_PROMPT_VERSION}:
+        raise ValueError(
+            "H1 manager pack must use one consistent pack_prompt_version (h1.prompt.v1).",
+        )
 
     for spec in agent_specs_by_id.values():
         for target in spec.handoff_targets:
@@ -204,11 +215,17 @@ def validate_h1_handoff_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> 
     if synthesizer_targets:
         raise ValueError("H1 handoff synthesizer must be terminal.")
 
+    observed_pack_versions: set[str] = set()
     for role in ordered_h1_roles():
         spec = agent_specs_by_id[H1_AGENT_IDS[role]]
         prompt_version = spec.metadata.get("prompt_version")
         if not isinstance(prompt_version, str) or not prompt_version:
             raise ValueError(f"Agent '{spec.agent_id}' missing non-empty prompt_version metadata.")
+
+        pack_prompt_version = spec.metadata.get("pack_prompt_version")
+        if not isinstance(pack_prompt_version, str) or not pack_prompt_version:
+            raise ValueError(f"Agent '{spec.agent_id}' missing non-empty pack_prompt_version metadata.")
+        observed_pack_versions.add(pack_prompt_version)
 
         for target in spec.handoff_targets:
             if target not in agent_specs_by_id:
@@ -217,6 +234,11 @@ def validate_h1_handoff_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> 
                 )
             if target == spec.agent_id:
                 raise ValueError(f"Agent '{spec.agent_id}' cannot hand off to itself.")
+
+    if observed_pack_versions != {H1_HANDOFF_PROMPT_VERSION}:
+        raise ValueError(
+            "H1 handoff pack must use one consistent pack_prompt_version (h1.handoff.prompt.v1).",
+        )
 
 
 def build_h1_single_agent_specs() -> dict[str, AgentSpec]:
@@ -255,3 +277,7 @@ def validate_h1_single_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> N
     prompt_version = spec.metadata.get("prompt_version")
     if prompt_version != H1_SINGLE_ROLE_PROMPT_VERSION:
         raise ValueError("H1 single-agent prompt_version metadata is invalid.")
+
+    pack_prompt_version = spec.metadata.get("pack_prompt_version")
+    if pack_prompt_version != H1_SINGLE_PROMPT_VERSION:
+        raise ValueError("H1 single-agent pack_prompt_version metadata is invalid.")

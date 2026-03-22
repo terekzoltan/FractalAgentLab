@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from fractal_agent_lab.adapters import build_step_runner
+from fractal_agent_lab.agents import build_h1_prompt_tags, extract_prompt_tags_from_output_payload
 from fractal_agent_lab.cli.config_loader import build_runtime_limits, load_run_configs, resolve_data_dir
 from fractal_agent_lab.cli.workflow_registry import get_workflow_agent_specs, get_workflow_spec
+from fractal_agent_lab.core.contracts import AgentSpec, WorkflowSpec
 from fractal_agent_lab.core.events import TraceEvent
 from fractal_agent_lab.core.models import RunState, RunStatus
 from fractal_agent_lab.evals.artifact_acceptance import ArtifactValidationResult, validate_run_trace_by_run_id
@@ -67,6 +69,11 @@ def run_h1_smoke_comparison(
             limits=limits,
         )
         run_state = executor.execute(workflow=workflow, input_payload=dict(input_payload))
+        _inject_h1_prompt_tags(
+            run_state=run_state,
+            workflow=workflow,
+            workflow_agent_specs=agent_specs,
+        )
 
         run_artifact_path = write_run_artifact(run_state, data_dir=target_data_dir)
         trace_artifact_path = write_trace_artifact(
@@ -149,6 +156,7 @@ def _build_variant_report(
         },
         "orchestration": _extract_orchestration_summary(run_state),
         "comparable_output": _extract_comparable_output(run_state),
+        "prompt_tags": _extract_prompt_tags(run_state),
     }
 
 
@@ -241,3 +249,29 @@ def _apply_provider_override(providers_config: dict[str, Any], provider: str) ->
         provider_block = {}
         providers[provider] = provider_block
     provider_block["enabled"] = True
+
+
+def _inject_h1_prompt_tags(
+    *,
+    run_state: RunState,
+    workflow: WorkflowSpec,
+    workflow_agent_specs: dict[str, AgentSpec],
+) -> None:
+    prompt_tags = build_h1_prompt_tags(
+        workflow=workflow,
+        agent_specs_by_id=workflow_agent_specs,
+        step_results=run_state.step_results,
+    )
+    if prompt_tags is None:
+        return
+
+    payload = dict(run_state.output_payload or {})
+    payload["prompt_tags"] = prompt_tags
+    run_state.output_payload = payload
+
+
+def _extract_prompt_tags(run_state: RunState) -> dict[str, Any] | None:
+    prompt_tags = extract_prompt_tags_from_output_payload(run_state.output_payload)
+    if prompt_tags is None:
+        return None
+    return prompt_tags

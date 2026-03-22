@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from fractal_agent_lab.adapters import build_step_runner
+from fractal_agent_lab.agents import build_h1_prompt_tags
 from fractal_agent_lab.cli.workflow_registry import get_workflow_agent_specs, get_workflow_spec
 from fractal_agent_lab.cli.formatting import build_json_output, format_run_summary_text
 from fractal_agent_lab.core.contracts import WorkflowSpec
@@ -122,6 +123,35 @@ class L1EH1SummaryTests(unittest.TestCase):
         self.assertTrue(any(event.get("parent_event_id") for event in trace_events))
         self.assertTrue(any(event.get("correlation_id") for event in trace_events))
 
+    def test_text_summary_includes_prompt_tags_when_present(self) -> None:
+        run_state, events, workflow = _run_h1_workflow("h1.manager.v1")
+        _inject_prompt_tags(run_state=run_state, workflow=workflow)
+
+        summary = format_run_summary_text(
+            run_state,
+            steps_total=len(workflow.steps),
+            trace_events_count=len(events),
+        )
+
+        self.assertIn("- prompt_tags:", summary)
+        self.assertIn("pack_prompt_version", summary)
+        self.assertIn("executed_step_prompt_versions", summary)
+
+    def test_json_summary_includes_prompt_tags_when_present(self) -> None:
+        run_state, events, workflow = _run_h1_workflow("h1.handoff.v1")
+        _inject_prompt_tags(run_state=run_state, workflow=workflow)
+
+        payload = build_json_output(
+            run_state,
+            events,
+            steps_total=len(workflow.steps),
+            include_trace=False,
+        )
+
+        self.assertIn("prompt_tags", payload)
+        self.assertEqual("handoff", payload["prompt_tags"]["variant"])
+        self.assertEqual("h1.handoff.prompt.v1", payload["prompt_tags"]["pack_prompt_version"])
+
 
 def _run_h1_workflow(workflow_id: str) -> tuple[RunState, list[TraceEvent], WorkflowSpec]:
     emitter = InMemoryTraceEmitter()
@@ -145,6 +175,20 @@ def _run_h1_workflow(workflow_id: str) -> tuple[RunState, list[TraceEvent], Work
         input_payload={"idea": "AI founder copilot for idea refinement"},
     )
     return run_state, emitter.events, workflow
+
+
+def _inject_prompt_tags(*, run_state: RunState, workflow: WorkflowSpec) -> None:
+    tags = build_h1_prompt_tags(
+        workflow=workflow,
+        agent_specs_by_id=get_workflow_agent_specs(workflow.workflow_id),
+        step_results=run_state.step_results,
+    )
+    if tags is None:
+        return
+
+    output_payload = dict(run_state.output_payload or {})
+    output_payload["prompt_tags"] = tags
+    run_state.output_payload = output_payload
 
 
 if __name__ == "__main__":

@@ -88,6 +88,6 @@ Result:
 
 ## Next Steps
 
-1. `L1-A`/`L1-C`/`L1-D`/`L1-E` are complete: manager path, baseline path, and summary readability are established
-2. `L1-G` completed: H1 handoff-chain variant is now implemented as `h1.handoff.v1`
-3. Track B/Track E proceed with `L1-H` and `L1-I` for handoff trace enrichment and variant comparison
+1. `L1-A`/`L1-C`/`L1-D`/`L1-E`/`L1-G`/`L1-H`/`L1-I` are complete: all three Wave 1 H1 variants and handoff trace visibility are in place
+2. `L1-M` completed: prompt provenance is now explicit for H1 variants in summaries and artifacts
+3. Wave 1 closeout work proceeds via `L1-L` decision logging and optional design-only `L1-N`/`L1-O`
