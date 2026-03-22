@@ -599,10 +599,10 @@ Status note:
 **Owner priority:** A + E, with B/C patching as needed
 
 Epics:
-- ⬜ **L1-J** Basic trace viewer / timeline summary — **Owner: Track A**
-- ⬜ **L1-K** H1 manual smoke rubric v1 — **Owner: Track E**
-- ⬜ **L1-L** H1 baseline comparison notes and decision log — **Owner: Track E + Meta**
-- ⬜ **L1-M** prompt version tagging for H1 agent pack — **Owner: Track C**
+- ✅ **L1-J** Basic trace viewer / timeline summary — **Owner: Track A**
+- ✅ **L1-K** H1 manual smoke rubric v1 — **Owner: Track E**
+- ✅ **L1-L** H1 baseline comparison notes and decision log — **Owner: Track E + Meta**
+- ✅ **L1-M** prompt version tagging for H1 agent pack — **Owner: Track C**
 
 All four epics can proceed in parallel (no inter-dependencies within this sprint).
 
@@ -627,25 +627,36 @@ Reference: `docs/Emergent-Identity-Layer-v01.md`
 
 ### Sprint W1-S3 — Execution Steps
 
-**⬜ Step 1 — visibility and rubric hardening can begin in parallel**
+**✅ Step 1 — visibility and rubric hardening can begin in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track A agent session | L1-J | L1-H ✅ | Timeline/trace visibility should consume the now-enriched handoff trace shape |
-| Track E agent session | L1-K | L1-I ✅ | Convert Wave 1 lessons into a repeatable H1 manual smoke rubric |
-| Track C agent session | L1-M | L1-C ✅ | Ensure H1 prompt versioning stays explicit as the pack evolves |
+| Track A agent session | ✅ L1-J | L1-H ✅ | Timeline/trace visibility should consume the now-enriched handoff trace shape |
+| Track E agent session | ✅ L1-K | L1-I ✅ | Convert Wave 1 lessons into a repeatable H1 manual smoke rubric |
+| Track C agent session | ✅ L1-M | L1-C ✅ | H1 prompt provenance is now explicit in summaries and artifacts |
 
-**⬜ Step 2 — Track E prepares the baseline comparison record**
+Status note:
+- `L1-J` moved through `🔄` and is now complete: Track A delivered a CLI-first trace viewer command (`trace show`) that reads stored trace artifacts and renders linkage-aware timeline summaries with `parent_event_id` / `correlation_id` preserved for handoff-chain inspection.
+- `L1-K` moved through `🔄` and is now complete: Track E published `docs/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md` with matched-input multi-variant smoke procedure, structural completeness gates, variant-specific checks, and explicit `PASS/PARTIAL/FAIL/BLOCKED` outcomes.
+- `L1-M` moved through `🔄` and is now complete: Track C shipped formal H1 prompt tagging (`prompt_tags`) across manager/single/handoff with stricter pack-version metadata validation and additive summary/artifact visibility.
+
+**✅ Step 2 — Track E prepares the baseline comparison record**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | L1-L (evidence prep) | L1-I ✅ + L1-K ✅ | Prepare comparison evidence, tradeoff notes, and recommendation draft |
+| Track E agent session | ✅ L1-L (evidence prep) | L1-I ✅ + L1-K ✅ | Prepare comparison evidence, tradeoff notes, and recommendation draft |
 
-**⬜ Step 3 — Meta closes the Wave 1 decision log**
+Status note:
+- `L1-L` evidence prep moved through `🔄` and is now complete on Track E scope: evidence package is published with structural comparison summary, prompt provenance context, trace-viewer guidance, tradeoff notes, and recommendation draft in `docs/Wave1-L1-L-H1-Evidence-Prep.md`.
+
+**✅ Step 3 — Meta closes the Wave 1 decision log**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | L1-L (decision log closeout) | L1-L evidence prep ✅ | Finalize the coordination-level decision about what H1 mode becomes the default next baseline |
+| Meta Coordinator session | ✅ L1-L (decision log closeout) | L1-L evidence prep ✅ | Finalize the coordination-level decision about what H1 mode becomes the default next baseline |
+
+Status note:
+- `L1-L` moved through `🔄` and is now complete: Meta accepted the Wave 1 evidence package and set `h1.manager.v1` as the default next multi-agent reference path, while preserving `h1.single.v1` as baseline anchor and `h1.handoff.v1` as a reference/learning variant in `docs/Wave1-L1-L-H1-Decision-Log.md`.
 
 **⬜ Step 4 — optional identity prep runs only if Wave 1 core work is under control**
 
@@ -1253,8 +1264,9 @@ This section should always describe the **current frontier**, not the original k
 
 ### Current frontier
 Wave 0 is complete.
-Wave 1 Sprint `W1-S1`, Wave 1 Sprint `W1-S2`, and the `W1-S2` stabilization batch are complete.
-The immediate active frontier is now Wave 1 Sprint `W1-S3`: `L1-J` / `L1-K` / `L1-L` / `L1-M`.
+Wave 1 core closeout is complete through `L1-J` / `L1-K` / `L1-L` / `L1-M`.
+The immediate mainline frontier now moves to Wave 2 Sprint `W2-S1`: `H2-A` / `H2-B` / `H2-C`, then `H2-D`.
+Optional Wave 1 identity-prep docs (`L1-N` / `L1-O`) and docs-only `CV0` side-vertical planning are now allowed, but they do not replace the mainline frontier.
 
 ### W1-S2 stabilization batch — Execution Steps
 
@@ -1294,20 +1306,23 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track A agent session` for `⬜ L1-J`, `Track E agent session` for `⬜ L1-K`, and `Track C agent session` for `⬜ L1-M` in parallel
-2. `Track E agent session` for `⬜ L1-L (evidence prep)` after `L1-K`
-3. `Meta Coordinator session` for `⬜ L1-L (decision log closeout)` after Track E evidence prep
-4. optional `Track C agent session` for `⬜ L1-N`, `⬜ L1-O` only if Wave 1 closeout remains under control
+1. `Track B agent session` for `⬜ H2-A`, `⬜ H2-B`, `⬜ H2-C`
+2. `Track B agent session` for `⬜ H2-D` after `H2-A` / `H2-B` / `H2-C`
+3. optional docs-only `CV0` work if it does not slow Wave 2 mainline progress
+4. optional `Track C agent session` for `⬜ L1-N`, `⬜ L1-O` only if the design-only prep remains genuinely lightweight
 
 Reference:
-- `docs/Wave1-W1-S2-Stabilization-Plan.md`
+- `docs/Wave1-L1-L-H1-Decision-Log.md`
 - `ops/Review-Findings-Registry.md`
 
 ### Future coding vertical insertion note (not active frontier yet)
 
-This is a planned side-vertical sequence, not the current queue.
+This is a planned side-vertical sequence, not the mainline queue.
 
-Use this only after the active Wave 1 frontier is fully closed:
+Wave 1 core closeout is now complete, so docs-only `CV0` planning is allowed.
+`CV1` and `CV2` remain blocked.
+
+Use this in the following order:
 
 1. Meta-led `CV0` design/policy batch after `W1-S2-FIX-META1` and `L1-J` / `L1-K` / `L1-L` / `L1-M`
 2. thin `CV1` (`H4`) pilot only after `H2-A` through `H2-H`
@@ -1323,11 +1338,11 @@ References:
 ### Post-Wave-1 side vertical — Software Delivery Loop (`CV0` / `CV1` / `CV2`)
 
 This is a future side-vertical sequence.
-It remains **blocked** until the live Wave 1 frontier is fully closed.
+It no longer blocks on Wave 1 core closeout, but it still does not replace the mainline Wave 2 queue.
 
 #### `CV0` — Design and policy canonization
 
-**Status:** `🚫 blocked until Wave 1 closeout`  
+**Status:** `⬜ ready after Wave 1 core closeout`  
 **Owner priority:** Meta Coordinator, then Track C, with Track B/E review where needed
 
 Epics:
@@ -1352,10 +1367,10 @@ Epics:
 - `W1-S2-FIX-A1` ✅
 - `W1-S2-FIX-A2` ✅
 - `W1-S2-FIX-META1` ✅
-- `L1-J` ⬜
-- `L1-K` ⬜
-- `L1-L` ⬜
-- `L1-M` ⬜
+- `L1-J` ✅
+- `L1-K` ✅
+- `L1-L` ✅
+- `L1-M` ✅
 
 **Execution assignment for multi-owner policy chain:**
 - `CV0-C`: **Meta -> Track B / Track E**
@@ -1642,10 +1657,17 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-03-19][Track E] L1-I completed (🔄 -> ✅) - comparison harness delivered with per-variant run+trace artifact validation, normalized H1 output fields, and structural trace evidence for baseline/manager/handoff runs - next: feed evidence into L1-K rubric and L1-L decision prep.`
 - `[2026-03-19][Track E] W1-S2-FIX-E1 started (⬜ -> 🔄) - stabilization hardening started for L1-I false-green risk so envelope-only comparable outputs cannot pass comparison readiness - next: tighten completeness gating and add negative tests.`
 - `[2026-03-19][Track E] W1-S2-FIX-E1 completed (🔄 -> ✅) - L1-I now gates success on full comparable-key completeness with strict script exit semantics and negative-path test coverage for missing normalized keys - next: Track A completes W1-S2-FIX-A1/A2 before Meta stabilization closeout.`
+- `[2026-03-21][Track E] L1-K started (⬜ -> 🔄) - Wave 1 H1 manual smoke rubric v1 implementation started from stabilized L1-I comparison and W1-S2 parity fixes - next: publish operator-facing rubric with explicit completeness gates and outcomes.`
+- `[2026-03-21][Track E] L1-K completed (🔄 -> ✅) - H1 manual smoke rubric v1 published in docs/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md with matched-input procedure, variant-specific sanity checks, and PASS/PARTIAL/FAIL/BLOCKED taxonomy - next: proceed to L1-L evidence prep.`
+- `[2026-03-22][Track E] L1-L evidence prep started (⬜ -> 🔄) - Track E began Wave 1 comparison evidence packaging from L1-I + L1-K outputs with explicit trace-viewer guidance and prompt provenance context - next: publish evidence-prep report and recommendation draft for Meta closeout.`
+- `[2026-03-22][Track E] L1-L evidence prep completed (🔄 -> ✅ Track E scope) - evidence package shipped via eval module/script and docs/Wave1-L1-L-H1-Evidence-Prep.md, including structural summary, tradeoff notes, and provenance-only prompt tag reporting - next: Meta executes L1-L decision-log closeout.`
+- `[2026-03-22][Meta] L1-L decision log closeout completed (🔄 -> ✅) - Meta accepted the Wave 1 evidence package, chose `h1.manager.v1` as the default next multi-agent reference path, preserved `h1.single.v1` as baseline anchor and `h1.handoff.v1` as a learning/reference variant, and moved the mainline frontier to W2-S1 - next: Track B starts H2-A/H2-B/H2-C while docs-only CV0 becomes allowed side work.`
 - `[2026-03-20][Track A] W1-S2-FIX-A1/A2 started (⬜ -> 🔄) - Track A stabilization implementation started to restore H1 variant summary parity and include handoff linkage fields in JSON trace output - next: complete formatter + regression tests and close A1/A2.`
 - `[2026-03-20][Track A] W1-S2-FIX-A1/A2 completed (🔄 -> ✅) - CLI summary now gives H1 variant parity across single/manager/handoff and JSON trace events preserve parent/correlation linkage fields, with regression coverage in tests/cli/test_l1_e_h1_summary.py - next: Meta executes W1-S2-FIX-META1 closeout.`
 - `[2026-03-17][Track A] L1-E started (⬜ -> 🔄) - implementation started for H1 manager run readability improvements in CLI summary output against L1-C output contracts - next: add H1-aware text/json summary and orchestration-focused formatting.`
 - `[2026-03-17][Track A] L1-E completed (🔄 -> ✅) - CLI now surfaces H1 final_output and manager_orchestration in readable summary sections with lane/turn trace rollups and coverage in tests/cli/test_l1_e_h1_summary.py - next: support Track E baseline comparison interpretation with clearer manager run evidence.`
+- `[2026-03-20][Track A] L1-J started (⬜ -> 🔄) - basic trace viewer/timeline summary implementation started from persisted trace artifacts so handoff-linked runs can be inspected without raw JSON spelunking - next: land `fal trace show --run-id` and linkage-aware timeline rendering.`
+- `[2026-03-20][Track A] L1-J completed (🔄 -> ✅) - CLI now supports `trace show --run-id` for stored trace artifacts with text/json timeline output, event/lane rollups, and preserved parent/correlation linkage fields, plus regression coverage in tests/cli/test_l1_j_trace_viewer.py - next: proceed with remaining W1-S3 epics (`L1-L`, `L1-M`) toward Wave 1 closeout.`
 
 ---
 

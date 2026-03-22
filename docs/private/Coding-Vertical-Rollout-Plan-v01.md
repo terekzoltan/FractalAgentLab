@@ -69,6 +69,8 @@ Meaning:
 
 Make the coding vertical canonically real without opening implementation churn.
 
+This batch should also explicitly preserve the current OpenCode-anchored execution reality instead of pretending the lab already owns a full native coding shell.
+
 ### Scope
 
 #### `CV0-A` Positioning and boundary canonization
@@ -92,6 +94,7 @@ Outputs:
 - prompt-policy notes
 - family naming recommendation aligned with repo style
 - role behavior consistent with the current human-driven workflow pattern
+- explicit note that the near-term execution model is OpenCode-anchored, with hybrid wrapper work only as a later option
 
 #### `CV0-C` Artifact and gate policy sketch
 Owner:
@@ -184,6 +187,10 @@ Owner:
 Outputs:
 - only the smallest tool wrapper set needed for the H4 pilot
 - no broad tool garden
+
+Clarification:
+- wrapper work here means thin standard helpers around repeated repo operations
+- it does not mean replacing OpenCode as the main execution shell
 
 #### `CV1-D` Thin baseline/eval check
 Owner:

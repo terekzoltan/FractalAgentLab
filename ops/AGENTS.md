@@ -141,7 +141,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - trace is explorable enough to debug failures
 - CLI/export surfaces stay aligned with current runtime/eval semantics for exposed workflows
 
-**Status:** `🔄 in progress` (Wave 1 W1-S2 stabilization is closed; Track A is now ready for `L1-J` in W1-S3)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track A has no immediate W2-S1 blocking epic and waits for later trace-viewer/workbench work)
 
 ---
 
@@ -176,7 +176,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - declared orchestration truth matches emitted runtime truth
 - structural workflow invariants are rejected before runtime when practical
 
-**Status:** `🔄 in progress` (Wave 1 W1-S2 stabilization is closed; no immediate W1-S3 blocking implementation epic owned by Track B)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track B now owns the active mainline frontier in W2-S1: `H2-A` / `H2-B` / `H2-C`, then `H2-D`)
 
 ---
 
@@ -213,7 +213,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 W1-S2 stabilization is closed; Track C is now ready for `L1-M`, with optional design-only `L1-N/L1-O` later)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; optional design-only `L1-N/L1-O` or `CV0-B` may run, but no mainline W2-S1 implementation epic is owned by Track C)
 
 ---
 
@@ -246,7 +246,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 1 stabilization complete; no immediate Wave 1 blocking Track D epic before later provider/runtime work)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; no immediate W2-S1 blocking epic is owned by Track D, aside from later docs-only `CV0` review or future tool-wrapper work)
 
 ---
 
@@ -281,7 +281,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 W1-S2 stabilization is closed; Track E is now ready for `L1-K` and later `L1-L` evidence prep)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E now waits for the Wave 2 replay/smoke frontier and may later support docs-only `CV0-C3` review)
 
 ---
 
@@ -936,6 +936,11 @@ Entries:
 - `[2026-03-19][Track B] W1-S2-FIX-B1/B2 completed (🔄 -> ✅) - runtime now rejects unsupported execution modes (`parallel`, `graph`) instead of silently degrading to linear, and WorkflowSpec now blocks duplicate step_id collisions at contract level with dedicated tests - next: Track E executes W1-S2-FIX-E1, then Track A executes W1-S2-FIX-A1/A2.`
 - `[2026-03-19][Track E] W1-S2-FIX-E1 started (⬜ -> 🔄) - stabilization hardening started for L1-I success semantics so envelope-only comparable outputs cannot pass green - next: require full normalized comparable-key completeness and add negative tests.`
 - `[2026-03-19][Track E] W1-S2-FIX-E1 completed (🔄 -> ✅) - L1-I summary/exit gating now requires full comparable-key completeness (`all_comparable_outputs_complete`), with negative tests proving incomplete normalized outputs fail green status - next: Track A completes W1-S2-FIX-A1/A2, then Meta closes W1-S2 stabilization.`
+- `[2026-03-21][Track E] L1-K started (⬜ -> 🔄) - H1 manual smoke rubric v1 implementation started using stabilized L1-I structural comparison outputs and W1-S2 parity fixes - next: publish repeatable operator rubric with explicit completeness gates.`
+- `[2026-03-21][Track E] L1-K completed (🔄 -> ✅) - docs/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md published with matched-input multi-variant checks, structural completeness requirements, and PASS/PARTIAL/FAIL/BLOCKED outcomes - next: proceed to L1-L evidence prep and recommendation notes.`
+- `[2026-03-22][Track E] L1-L evidence prep started (⬜ -> 🔄) - Track E started baseline comparison evidence packaging with structural summary, trace-view guidance references, and prompt provenance context - next: publish L1-L evidence-prep artifact for Meta decision closeout.`
+- `[2026-03-22][Track E] L1-L evidence prep completed (🔄 -> ✅ Track E scope) - Track E delivered docs/Wave1-L1-L-H1-Evidence-Prep.md plus eval/script/test support for comparison evidence, tradeoff notes, and recommendation draft; prompt tags are captured as provenance evidence only - next: Meta finalizes L1-L decision log.`
+- `[2026-03-22][Meta] L1-L completed (🔄 -> ✅) - Meta accepted the Wave 1 evidence package, set `h1.manager.v1` as the default next multi-agent reference path, preserved `h1.single.v1` as baseline anchor and `h1.handoff.v1` as a learning/reference variant, and moved the mainline frontier to W2-S1 - next: Track B starts `H2-A` / `H2-B` / `H2-C`; docs-only `CV0` is now allowed as optional side work.`
 - `[2026-03-20][Track A] W1-S2-FIX-A1/A2 started (⬜ -> 🔄) - Track A stabilization implementation kicked off to restore H1 variant summary parity and preserve handoff linkage fields in CLI JSON trace export - next: ship formatter/test/doc updates for A1 and A2 acceptance.`
 - `[2026-03-20][Track A] W1-S2-FIX-A1/A2 completed (🔄 -> ✅) - CLI now exposes H1 workflow-summary parity for single/manager/handoff and JSON trace linkage fields (`parent_event_id`, `correlation_id`) with regression coverage in tests/cli/test_l1_e_h1_summary.py - next: Meta executes W1-S2-FIX-META1 stabilization closeout.`
 - `[2026-03-19][Meta] Future coding vertical integrated as a design-first side vertical - H4/H5 and the private learning-loop are now accepted as post-Wave-1 planning work, not immediate runtime scope - next: create private coding-vertical docs and sequencing placeholders.`
@@ -943,6 +948,10 @@ Entries:
 - `[2026-03-20][Meta] Sequencing step convention tightened - execution steps now require explicit status markers and parallel-safe work should share one numbered step while true dependencies move to later steps - next: keep future sprint edits aligned with this rule.`
 - `[2026-03-20][Meta] Current human workflow canonized for the coding vertical - the current Combined-driven Meta+track loop now has an explicit mapping doc so H4/H5 can automate the real workflow instead of drifting into an abstract coding-agent concept - next: use this mapping as a check during future CV0/CV1/CV2 refinement.`
 - `[2026-03-20][Meta] W1-S2-FIX-META1 completed (🔄 -> ✅) - W1-S2 stabilization is now formally closed after targeted compile/test validation, and the active frontier returns to W1-S3: `L1-J` / `L1-K` / `L1-L` / `L1-M` - next: run the parallel opening step across Track A, Track E, and Track C.`
+- `[2026-03-20][Track A] L1-J started (⬜ -> 🔄) - basic trace viewer/timeline summary implementation started from persisted trace artifacts so handoff-linked traces can be inspected without raw JSON spelunking - next: land `fal trace show --run-id` with linkage-aware timeline output and regression tests.`
+- `[2026-03-22][Track C] L1-M started (⬜ -> 🔄) - formal H1 prompt-version tagging implementation started to surface variant/pack/role prompt provenance in summaries and artifacts - next: add prompt-tag manifest helper, pack metadata validation hardening, and additive CLI visibility.`
+- `[2026-03-22][Track C] L1-M completed (🔄 -> ✅) - H1 prompt tagging is now explicit via `prompt_tags` for manager/single/handoff variants, with stronger pack metadata validation and additive summary/artifact exposure - next: Track E continues L1-L evidence prep with stable prompt provenance context.`
+- `[2026-03-20][Track A] L1-J completed (🔄 -> ✅) - Track A delivered CLI-first trace viewer support via `trace show --run-id` with linkage-aware timeline rendering from stored artifacts (`parent_event_id`/`correlation_id` preserved), plus regression tests in tests/cli/test_l1_j_trace_viewer.py - next: proceed with remaining W1-S3 epics before Wave 1 closeout.`
 
 ---
 

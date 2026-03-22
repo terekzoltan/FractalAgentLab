@@ -123,6 +123,30 @@ It must not create a rival canonical runtime or artifact regime.
 
 ## Integration boundaries
 
+### Current execution model
+
+Short- and medium-term, the coding vertical should be treated as **OpenCode-anchored**.
+
+That means:
+
+- OpenCode remains the main execution shell for repo access, file edits, search, git, test runs, and multi-session usage
+- Fractal Agent Lab adds the workflow-intelligence layer on top of that shell
+- `H4/H5` should improve the current workflow, not try to replace the execution environment immediately
+
+This is the preferred current direction.
+
+### Later optional evolution
+
+A more hybrid model may be explored later.
+
+In that model:
+
+- OpenCode still remains in use
+- but Fractal Agent Lab gradually adds small standardized wrappers for repeated repo operations
+- those wrappers may later reduce dependence on raw tool calls without requiring a full custom IDE/runtime first
+
+This is a later option, not the primary near-term target.
+
 ### What this vertical may do later
 
 - add repo-aware planning workflows

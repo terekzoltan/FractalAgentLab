@@ -122,6 +122,78 @@ That means:
 
 ---
 
+## Current execution-shell reality
+
+The current workflow is productive partly because it runs inside a tool-enabled shell environment.
+
+Right now, that shell is OpenCode.
+
+OpenCode currently provides the practical execution surface for:
+
+- repository access
+- file reads and edits
+- search
+- git operations
+- test execution
+- multi-session practical usage
+
+Fractal Agent Lab should therefore treat the current coding-vertical direction as **OpenCode-anchored** in the near term.
+
+Meaning:
+
+- the lab provides workflow logic, artifacts, sequencing, review/gate policy, and learning-loop discipline
+- OpenCode remains the main execution substrate that actually touches the repo
+
+This is valid.
+The coding vertical does not need to replace the shell immediately in order to be useful.
+
+---
+
+## OpenCode-anchored vs hybrid
+
+### OpenCode-anchored model
+
+This is the preferred current model.
+
+Meaning:
+
+- OpenCode remains the main execution environment
+- Fractal Agent Lab improves how work is planned, reviewed, gated, and recorded
+- the main value is workflow intelligence, not shell replacement
+
+Helpful shorthand:
+
+- OpenCode = the hands
+- Fractal Agent Lab = the method
+
+### Hybrid model
+
+This is a possible later direction, not the current default.
+
+Meaning:
+
+- OpenCode still remains in use
+- Fractal Agent Lab gradually adds small standardized wrappers around repeated repo operations
+
+In this context, a wrapper means a thin helper layer around an existing operation.
+
+Example:
+
+- instead of every workflow using raw repo/test/git calls in a different way
+- a small standard helper can run the operation in one expected format and return a more consistent result
+
+The hybrid model is therefore called hybrid because:
+
+- OpenCode still provides the shell and tool substrate
+- Fractal Agent Lab starts adding its own standardized work surface on top of it
+
+Current stance:
+
+- OpenCode-anchored = preferred now
+- hybrid = valid later if repeated repo operations are worth standardizing
+
+---
+
 ## Human-in-the-loop boundaries
 
 The coding vertical should preserve explicit human control at important points, especially early on.
