@@ -383,7 +383,7 @@ Once Track B finishes this prep burst, the next highest-value docs are:
 
 1. `docs/Workflow-H1-Idea-Refinement-Plan.md`
 2. `docs/Track-C-Prompt-Strategy.md`
-3. `docs/Wave0-Manual-Smoke-Checklist.md`
+3. `docs/wave0/Wave0-Manual-Smoke-Checklist.md`
 
 ---
 
@@ -398,7 +398,7 @@ Current implementation status for this roadmap:
 
 Implementation report:
 
-- `docs/Wave0-TrackB-Implementation-Report.md`
+- `docs/wave0/Wave0-TrackB-Implementation-Report.md`
 
 ---
 

@@ -59,4 +59,4 @@ No changes were made to:
 
 - `src/fractal_agent_lab/cli/formatting.py`
 - `src/fractal_agent_lab/cli/app.py`
-- `docs/Track-A-Wave0-F0-H-Run-Summary.md`
+- `docs/wave0/Track-A-Wave0-F0-H-Run-Summary.md`

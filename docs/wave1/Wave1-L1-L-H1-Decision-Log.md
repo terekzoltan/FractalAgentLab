@@ -27,14 +27,14 @@ The supporting stance is:
 
 Primary evidence:
 
-- `docs/Wave1-L1-I-H1-Smoke-Comparison.md`
-- `docs/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md`
-- `docs/Wave1-L1-L-H1-Evidence-Prep.md`
+- `docs/wave1/Wave1-L1-I-H1-Smoke-Comparison.md`
+- `docs/wave1/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md`
+- `docs/wave1/Wave1-L1-L-H1-Evidence-Prep.md`
 
 Supporting visibility/provenance surfaces:
 
-- `docs/Wave1-L1-J-Trace-Viewer.md`
-- `docs/Wave1-L1-M-H1-Prompt-Version-Tagging.md`
+- `docs/wave1/Wave1-L1-J-Trace-Viewer.md`
+- `docs/wave1/Wave1-L1-M-H1-Prompt-Version-Tagging.md`
 
 Meta validation check at closeout time:
 

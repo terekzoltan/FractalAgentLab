@@ -39,9 +39,9 @@ Out of scope:
 
 Key references:
 
-- `docs/Wave1-L1-I-H1-Smoke-Comparison.md`
-- `docs/Wave1-L1-E-H1-Run-Summary.md`
-- `docs/Wave1-W1-S2-Stabilization-Plan.md`
+- `docs/wave1/Wave1-L1-I-H1-Smoke-Comparison.md`
+- `docs/wave1/Wave1-L1-E-H1-Run-Summary.md`
+- `docs/wave1/Wave1-W1-S2-Stabilization-Plan.md`
 
 ---
 

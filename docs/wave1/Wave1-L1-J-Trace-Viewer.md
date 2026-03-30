@@ -32,7 +32,7 @@ Out of scope:
 - `src/fractal_agent_lab/cli/trace_reader.py`
 - `src/fractal_agent_lab/cli/formatting.py`
 - `tests/cli/test_l1_j_trace_viewer.py`
-- `docs/Wave1-L1-J-Trace-Viewer.md`
+- `docs/wave1/Wave1-L1-J-Trace-Viewer.md`
 
 ---
 

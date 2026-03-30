@@ -213,4 +213,4 @@ Track B scope is complete:
 
 Track B implementation report:
 
-- `docs/Wave1-W1-S1-TrackB-Stabilization.md`
+- `docs/wave1/Wave1-W1-S1-TrackB-Stabilization.md`

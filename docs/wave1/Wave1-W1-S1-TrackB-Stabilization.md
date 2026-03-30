@@ -9,7 +9,7 @@ This document records Track B implementation for the Wave 1 stabilization mini-b
 - `W1-S1-FIX-B3`
 - `W1-S1-FIX-B4`
 
-Reference plan: `docs/Wave1-W1-S1-Stabilization-Plan.md`.
+Reference plan: `docs/wave1/Wave1-W1-S1-Stabilization-Plan.md`.
 
 ---
 

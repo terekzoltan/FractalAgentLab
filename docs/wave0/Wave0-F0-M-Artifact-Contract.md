@@ -126,4 +126,4 @@ Track E should next record:
 
 Track E validation handoff document:
 
-- `docs/Wave0-F0-M-Artifact-Validation.md`
+- `docs/wave0/Wave0-F0-M-Artifact-Validation.md`

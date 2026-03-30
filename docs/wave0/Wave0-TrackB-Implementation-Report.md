@@ -46,7 +46,7 @@ Out of scope intentionally:
 ### Artifact storage foundation (`F0-M` Track B side)
 
 - `src/fractal_agent_lab/tracing/artifact_writer.py`
-- `docs/Wave0-F0-M-Artifact-Contract.md`
+- `docs/wave0/Wave0-F0-M-Artifact-Contract.md`
 
 ### Export surfaces
 

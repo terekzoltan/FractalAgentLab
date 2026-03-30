@@ -34,7 +34,7 @@ Out of scope:
 - `src/fractal_agent_lab/cli/formatting.py`
 - `src/fractal_agent_lab/cli/app.py`
 - `tests/cli/test_l1_e_h1_summary.py`
-- `docs/Wave1-L1-E-H1-Run-Summary.md`
+- `docs/wave1/Wave1-L1-E-H1-Run-Summary.md`
 
 ---
 

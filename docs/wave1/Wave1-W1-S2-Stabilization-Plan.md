@@ -206,7 +206,7 @@ Track A scope is complete:
 
 Track B implementation report:
 
-- `docs/Wave1-W1-S2-TrackB-Stabilization.md`
+- `docs/wave1/Wave1-W1-S2-TrackB-Stabilization.md`
 
 Track E implementation references:
 
@@ -218,7 +218,7 @@ Track A implementation references:
 
 - `src/fractal_agent_lab/cli/formatting.py`
 - `tests/cli/test_l1_e_h1_summary.py`
-- `docs/Wave1-W1-S2-TrackA-Stabilization.md`
+- `docs/wave1/Wave1-W1-S2-TrackA-Stabilization.md`
 
 Meta closeout is complete:
 

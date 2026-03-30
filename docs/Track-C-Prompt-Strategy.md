@@ -117,6 +117,6 @@ For Track C implementation work:
 
 ## Next Track C Steps
 
-1. `L1-M` completed: H1 prompt tags are now explicit in summaries and run artifacts
-2. support Track E `L1-L` with stable prompt provenance references across variants
-3. prepare optional design-only `L1-N` / `L1-O` identity artifacts if Wave 1 closeout remains controlled
+1. `L1-M` completed: H1 prompt tags are explicit in summaries and run artifacts
+2. `L1-N` / `L1-O` completed: design-only identity profile and signal-carrier drafts are now published
+3. wait for Wave 2 identity implementation entry points before any runtime or schema-touching execution

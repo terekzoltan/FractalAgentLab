@@ -83,4 +83,4 @@ It intentionally does not implement:
 - `src/fractal_agent_lab/cli/formatting.py`
 - `src/fractal_agent_lab/cli/mock_runner.py`
 - `src/fractal_agent_lab/cli/workflow_registry.py`
-- `docs/Track-A-Wave0-F0-G-CLI-Shell.md`
+- `docs/wave0/Track-A-Wave0-F0-G-CLI-Shell.md`
