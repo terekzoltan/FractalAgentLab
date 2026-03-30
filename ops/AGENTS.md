@@ -213,7 +213,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; optional design-only `L1-N/L1-O` or `CV0-B` may run, but no mainline W2-S1 implementation epic is owned by Track C)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; design-only `L1-N/L1-O` delivered; no mainline W2-S1 implementation epic is owned by Track C)
 
 ---
 
@@ -246,7 +246,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; no immediate W2-S1 blocking epic is owned by Track D, aside from later docs-only `CV0` review or future tool-wrapper work)
+**Status:** `🔄 in progress` (Wave 2 mainline is not blocked by Track D; real-provider work stays prep-only in Wave 2, first real-provider MVP is targeted as a non-blocking Wave 3 side batch, and broader provider parity/routing hardening belongs to Wave 4)
 
 ---
 
@@ -664,7 +664,7 @@ Unlock rule:
 ## 13. Canonical repo layout
 
 The canonical repository layout is defined by `docs/Repo-Skeleton-v01.md`.
-It overrides older layout sketches, including the earlier layout in `docs/fractal_agent_lab_terv_v01.md`.
+It overrides older layout sketches, including the earlier layout in `docs/legacy/fractal_agent_lab_terv_v01.md`.
 
 ```text
 repo/
@@ -775,9 +775,11 @@ Target outcomes:
 - traces are structured
 - replay works for at least one workflow
 - eval smoke exists
+- provider/runtime boundaries are hard enough to support a later real-provider MVP without claiming it yet
 
 Primary track emphasis:
 - B + E
+- D prep only
 
 ---
 
@@ -788,9 +790,11 @@ Target outcomes:
 - H1, H2 stable enough
 - H3 usable in draft form
 - project memory begins
+- one real-provider H1 path exists in MVP form without displacing the main H2/H3 usefulness work
 
 Primary track emphasis:
 - C + E + A
+- D late-wave MVP side batch only
 
 ---
 
@@ -798,12 +802,13 @@ Primary track emphasis:
 **Goal:** widen runtime options without breaking the core.
 
 Target outcomes:
-- multiple provider adapters
-- model routing policy improved
-- optional local model experiments
+- OpenRouter and OpenAI-compatible paths are both explicit and inspectable
+- model routing policy is improved and evidence-backed
+- rate-limit/backoff and failure behavior are documented and hardened
+- optional local model experiments remain contained
 
 Primary track emphasis:
-- D
+- D + E
 
 ---
 
@@ -874,6 +879,7 @@ Rules:
 
 #### Wave 2+
 - parallelism increases, but only through declared contracts
+- Track D may prepare real-provider work during Wave 2, but the first canonical real-provider MVP belongs to a non-blocking Wave 3 side batch, not the Wave 2 mainline
 
 #### Post-Wave-1 side-vertical rule
 - docs-only future-vertical planning may start after Wave 1 closes if the main frontier is genuinely clear
@@ -909,11 +915,11 @@ Entries:
 - `[2026-03-11][Track C] F0-K started (⬜ -> 🔄) - H1-lite workflow runnable path kickoff against F0-J pack and existing CLI/adapter boundary - next: wire workflow registry and agent-spec binding into CLI execution path.`
 - `[2026-03-11][Track C] F0-K completed (🔄 -> ✅) - runnable h1.lite workflow path implemented with workflow module, registry mapping, and CLI step-runner agent-pack binding - next: Track E executes F0-L and Track B/E finalize F0-M artifacts.`
 - `[2026-03-11][Track E] F0-L started (⬜ -> 🔄) - Wave 0 manual smoke checklist implementation started against runnable h1.lite path and Track B contracts - next: publish checklist with explicit PASS/PARTIAL/FAIL/BLOCKED outcomes.`
-- `[2026-03-11][Track E] F0-L completed (🔄 -> ✅) - docs/Wave0-Manual-Smoke-Checklist.md published with command baseline, run/trace/output checks, and gate mapping for Wave 0 anti-delusion validation - next: execute checklist outputs to support F0-M artifact/replay acceptance.`
+- `[2026-03-11][Track E] F0-L completed (🔄 -> ✅) - docs/wave0/Wave0-Manual-Smoke-Checklist.md published with command baseline, run/trace/output checks, and gate mapping for Wave 0 anti-delusion validation - next: execute checklist outputs to support F0-M artifact/replay acceptance.`
 - `[2026-03-11][Track B] F0-M Track B scope completed (🔄 -> ✅) - canonical run/trace artifact write path implemented under data/runs and data/traces with CLI integration and artifact contract doc - next: Track E validates artifact usability and finalizes F0-M acceptance gate.`
 - `[2026-03-13][Track E] Ops/docs gitignore note recorded - opencode can still read local changes in ops/docs directly from filesystem, but ignored markdown will not appear in git status or normal commit flow - next: keep this constraint explicit in coordination and audit expectations.`
 - `[2026-03-13][Track E] F0-M started (Track B scope ✅ -> 🔄 Track E scope) - artifact usability validation kickoff for replay/smoke acceptance using stored run and trace outputs - next: validate success/failure artifacts with explicit invariants.`
-- `[2026-03-13][Track E] F0-M completed (🔄 -> ✅) - Track E validated run/trace artifact usability via src/fractal_agent_lab/evals/artifact_acceptance.py and scripts/validate_f0_m_artifact_pair.py, recorded evidence in docs/Wave0-F0-M-Artifact-Validation.md - next: proceed to L1 baseline/rubric layering.`
+- `[2026-03-13][Track E] F0-M completed (🔄 -> ✅) - Track E validated run/trace artifact usability via src/fractal_agent_lab/evals/artifact_acceptance.py and scripts/validate_f0_m_artifact_pair.py, recorded evidence in docs/wave0/Wave0-F0-M-Artifact-Validation.md - next: proceed to L1 baseline/rubric layering.`
 - `[2026-03-17][Track E] L1-D started (⬜ -> 🔄) - H1 single-agent baseline reference path implementation kicked off to create Wave 1 comparison anchor against h1.manager.v1 - next: ship baseline workflow/agent wiring with tests and validation note.`
 - `[2026-03-17][Track E] L1-D completed (🔄 -> ✅) - single-agent H1 baseline shipped as h1.single.v1 with baseline pack/registry wiring, mock comparison-friendly output shape, and workflow+adapter test coverage - next: use this baseline for L1-I/L1-L evidence and rubric tuning.`
 - `[2026-03-17][Track C] L1-A started (⬜ -> 🔄) - Wave 1 H1 workflow schema v1 kickoff started against stabilized manager primitive - next: publish explicit manager/worker schema contract in workflows module.`
@@ -937,9 +943,9 @@ Entries:
 - `[2026-03-19][Track E] W1-S2-FIX-E1 started (⬜ -> 🔄) - stabilization hardening started for L1-I success semantics so envelope-only comparable outputs cannot pass green - next: require full normalized comparable-key completeness and add negative tests.`
 - `[2026-03-19][Track E] W1-S2-FIX-E1 completed (🔄 -> ✅) - L1-I summary/exit gating now requires full comparable-key completeness (`all_comparable_outputs_complete`), with negative tests proving incomplete normalized outputs fail green status - next: Track A completes W1-S2-FIX-A1/A2, then Meta closes W1-S2 stabilization.`
 - `[2026-03-21][Track E] L1-K started (⬜ -> 🔄) - H1 manual smoke rubric v1 implementation started using stabilized L1-I structural comparison outputs and W1-S2 parity fixes - next: publish repeatable operator rubric with explicit completeness gates.`
-- `[2026-03-21][Track E] L1-K completed (🔄 -> ✅) - docs/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md published with matched-input multi-variant checks, structural completeness requirements, and PASS/PARTIAL/FAIL/BLOCKED outcomes - next: proceed to L1-L evidence prep and recommendation notes.`
+- `[2026-03-21][Track E] L1-K completed (🔄 -> ✅) - docs/wave1/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md published with matched-input multi-variant checks, structural completeness requirements, and PASS/PARTIAL/FAIL/BLOCKED outcomes - next: proceed to L1-L evidence prep and recommendation notes.`
 - `[2026-03-22][Track E] L1-L evidence prep started (⬜ -> 🔄) - Track E started baseline comparison evidence packaging with structural summary, trace-view guidance references, and prompt provenance context - next: publish L1-L evidence-prep artifact for Meta decision closeout.`
-- `[2026-03-22][Track E] L1-L evidence prep completed (🔄 -> ✅ Track E scope) - Track E delivered docs/Wave1-L1-L-H1-Evidence-Prep.md plus eval/script/test support for comparison evidence, tradeoff notes, and recommendation draft; prompt tags are captured as provenance evidence only - next: Meta finalizes L1-L decision log.`
+- `[2026-03-22][Track E] L1-L evidence prep completed (🔄 -> ✅ Track E scope) - Track E delivered docs/wave1/Wave1-L1-L-H1-Evidence-Prep.md plus eval/script/test support for comparison evidence, tradeoff notes, and recommendation draft; prompt tags are captured as provenance evidence only - next: Meta finalizes L1-L decision log.`
 - `[2026-03-22][Meta] L1-L completed (🔄 -> ✅) - Meta accepted the Wave 1 evidence package, set `h1.manager.v1` as the default next multi-agent reference path, preserved `h1.single.v1` as baseline anchor and `h1.handoff.v1` as a learning/reference variant, and moved the mainline frontier to W2-S1 - next: Track B starts `H2-A` / `H2-B` / `H2-C`; docs-only `CV0` is now allowed as optional side work.`
 - `[2026-03-20][Track A] W1-S2-FIX-A1/A2 started (⬜ -> 🔄) - Track A stabilization implementation kicked off to restore H1 variant summary parity and preserve handoff linkage fields in CLI JSON trace export - next: ship formatter/test/doc updates for A1 and A2 acceptance.`
 - `[2026-03-20][Track A] W1-S2-FIX-A1/A2 completed (🔄 -> ✅) - CLI now exposes H1 workflow-summary parity for single/manager/handoff and JSON trace linkage fields (`parent_event_id`, `correlation_id`) with regression coverage in tests/cli/test_l1_e_h1_summary.py - next: Meta executes W1-S2-FIX-META1 stabilization closeout.`
@@ -952,6 +958,9 @@ Entries:
 - `[2026-03-22][Track C] L1-M started (⬜ -> 🔄) - formal H1 prompt-version tagging implementation started to surface variant/pack/role prompt provenance in summaries and artifacts - next: add prompt-tag manifest helper, pack metadata validation hardening, and additive CLI visibility.`
 - `[2026-03-22][Track C] L1-M completed (🔄 -> ✅) - H1 prompt tagging is now explicit via `prompt_tags` for manager/single/handoff variants, with stronger pack metadata validation and additive summary/artifact exposure - next: Track E continues L1-L evidence prep with stable prompt provenance context.`
 - `[2026-03-20][Track A] L1-J completed (🔄 -> ✅) - Track A delivered CLI-first trace viewer support via `trace show --run-id` with linkage-aware timeline rendering from stored artifacts (`parent_event_id`/`correlation_id` preserved), plus regression tests in tests/cli/test_l1_j_trace_viewer.py - next: proceed with remaining W1-S3 epics before Wave 1 closeout.`
+- `[2026-03-22][Track C] L1-N/L1-O started (⬜ -> 🔄) - optional Wave 1 identity prep docs started as design-only artifacts (no code/schema/runtime changes) - next: publish profile schema draft and signal-carrier convention draft with explicit Track B compatibility boundaries.`
+- `[2026-03-22][Track C] L1-N/L1-O completed (🔄 -> ✅) - design-only identity prep delivered via docs/wave1/Wave1-L1-N-Identity-Profile-Schema-Draft.md and docs/wave1/Wave1-L1-O-Identity-Signal-Carrier-Convention.md, keeping runtime contracts unchanged and preparing Wave 2 observational identity MVP semantics.`
+- `[2026-03-30][Meta] Track D real-provider roadmap canonized - Wave 2 stays prep-only, Wave 3 gets the first non-blocking real-provider MVP side batch, and Wave 4 now owns provider parity/routing hardening - next: implement the documented placement in future Track D execution without displacing the mainline.`
 
 ---
 

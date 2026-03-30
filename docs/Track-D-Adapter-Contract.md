@@ -146,15 +146,37 @@ Unknown adapter exceptions are wrapped into `StepExecutionError` inside `Adapter
 
 ---
 
-## What Waits for Later Waves
+## Canonical evolution path
 
-- real OpenAI/OpenRouter HTTP integration
-- local model bridge implementation
-- expanded tool wrapper runtime
-- handoff bridge implementation details
-- adapter parity smoke comparison
+### Wave 0
 
-These depend on later sprint/wave goals and additional cross-track hardening.
+- `MockAdapter` is the only active execution path.
+- `OpenAICompatibleAdapter` and `OpenRouterAdapter` are placeholders only.
+- provider selection shell exists, but no real-provider execution claim is made.
+
+### Wave 2
+
+- Track D may prepare config, boundary assumptions, and smoke-design notes against hardened Track B contracts.
+- this wave is still prep only for real-provider work
+- no canonical claim of real-provider readiness should be made here
+
+### Wave 3
+
+- first real-provider MVP arrives as a non-blocking side batch
+- `OpenRouterAdapter` is the preferred first real-provider path
+- scope stays intentionally narrow:
+  - one real-provider H1 path
+  - explicit provider selection
+  - explicit failure/fallback behavior
+  - narrow smoke/evidence validation
+
+### Wave 4
+
+- provider expansion and hardening
+- `OpenAICompatibleAdapter` joins as the second meaningful path
+- routing policy becomes stronger and evidence-backed
+- rate-limit/backoff behavior is hardened
+- optional local-model experimentation remains contained
 
 ---
 
@@ -174,3 +196,37 @@ Stabilization fixes implemented for `W1-S1-FIX-D1` and `W1-S1-FIX-D2`:
     - `specialist`: `gpt-5.4-nano`
     - `finalizer`: `gpt-5.4-mini`
   - adapter and CLI tests now align to these defaults.
+
+---
+
+## First real-provider MVP definition
+
+The first real-provider MVP is considered complete if:
+
+- one real provider can run at least one H1 workflow end-to-end
+- auth/config selection is explicit and inspectable
+- provider failure modes are surfaced clearly
+- `mock` remains the stable offline/default-safe path
+- Track E can produce a narrow smoke/evidence note for the real-provider path
+
+This MVP should not attempt full provider parity, advanced routing intelligence, or local-model breadth.
+
+---
+
+## Canonical later-wave units
+
+### Wave 3 MVP units
+
+- `R3-M` OpenRouter adapter MVP
+- `R3-N` routing policy v1
+- `R3-O` failure envelope + conservative fallback v1
+- `R3-P` H1 real-provider smoke/evidence path
+
+### Wave 4 expansion units
+
+- `P4-A` OpenAI-compatible adapter MVP / parity pass
+- `P4-B` cross-provider smoke comparison
+- `P4-C` routing policy hardening v2
+- `P4-D` rate-limit/backoff handling v1
+- `P4-E` optional local/secondary adapter experiment
+- `P4-F` routing notes and rollout policy closeout

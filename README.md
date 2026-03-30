@@ -338,3 +338,9 @@ The project officially supports a dual-repo model:
 - and a curated public portfolio repo
 
 See `docs/Repo-Visibility-and-Release-Policy-v01.md` for the current visibility and release policy.
+
+Current runtime note:
+
+- the mainline system is still mock-backed today
+- the first real-provider MVP is planned for Wave 3
+- broader provider parity and routing hardening are planned for Wave 4
