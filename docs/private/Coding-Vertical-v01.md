@@ -175,8 +175,8 @@ Its first job is to formalize and gradually automate that loop.
 
 Current intended unlock order:
 
-1. finish the active Wave 1 frontier cleanly
-2. run a docs-only `CV0` design/policy batch
+1. Wave 1 core closeout is complete, so docs-only `CV0` is now allowed
+2. keep `CV0` optional and non-blocking relative to the Wave 2 mainline
 3. allow a thin `CV1` (`H4`) pilot only after Wave 2 run/trace/replay/smoke hardening is in place
 4. allow a thin `CV2` (`H5`) review/gate slice only after `CV1` exists and evidence is good enough to support honest gating
 

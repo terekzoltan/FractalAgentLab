@@ -37,7 +37,8 @@ Required:
 - `L1-M` complete
 
 Meaning:
-- Wave 1 must close cleanly before the coding vertical becomes an active design track
+- this requirement is now satisfied
+- docs-only `CV0` may begin as optional side work while Wave 2 mainline remains primary
 
 ### Before `CV1`
 

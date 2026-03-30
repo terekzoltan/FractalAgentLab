@@ -142,16 +142,15 @@ This is a future-facing direction, but it is being grounded as an engineering pr
 
 ## Current Focus
 
-The project is currently in an early structured build phase.
+The project has finished Wave 1 core closeout and is entering Wave 2 engine hardening.
 
 The immediate focus is on:
 
-- establishing a clean repository spine
-- building a stable runtime shell
-- defining core contracts
-- setting up workflow structure
-- creating a useful trace foundation
-- preparing the system for replay and eval hardening
+- hardening state, trace, and replay contracts
+- making smoke/eval claims more trustworthy
+- preparing H2 project decomposition on top of the stabilized H1 family
+- introducing the first observational identity-layer implementation carefully
+- keeping the coding vertical and real-provider work in scoped, non-blocking lanes
 
 An emergent identity subsystem has also been designed, but implementation is intentionally phased in later so the core runtime does not destabilize too early.
 
@@ -237,7 +236,7 @@ not as vague "AI personality" theater.
 
 ## Quickstart
 
-The project is still evolving, but Wave 0 already has a runnable CLI path.
+The project is still evolving, but the current repo already has multiple runnable CLI workflow paths and stored artifact/trace support.
 
 ### Requirements
 

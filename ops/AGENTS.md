@@ -4,11 +4,14 @@
 > 
 > This document is the shared source of truth for:
 > - track ownership
-> - dependency ordering
 > - cross-track coordination
 > - Meta Coordinator workflows
 > - initial execution waves
-> - current status and risk notes
+> - current status snapshots and risk notes
+>
+> Execution-order rule:
+> - `ops/Combined-Execution-Sequencing-Plan.md` is the canonical source for active frontier, exact sprint ordering, and step-by-step execution sequencing
+> - `ops/AGENTS.md` remains the canonical source for ownership, guardrails, and project-operating policy
 >
 > Project identity: **A1 + A2 + A3 hybrid**
 > - **A1** = Agent Lab (experimentation)
