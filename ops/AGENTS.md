@@ -640,7 +640,7 @@ Likely orchestration:
 ---
 
 ### Future workflow family H4/H5 — Software Delivery Loop
-**Status:** future vertical; design-first only until Wave 1 closes cleanly
+**Status:** future vertical; docs-only `CV0` is now allowed after Wave 1 core closeout, but executable work remains gated
 
 Purpose:
 - turn human software-delivery intent + repo state into governed planning, review, and commit-readiness workflows
@@ -655,7 +655,7 @@ Positioning rule:
 - treat it as the formalization of the current human-driven Combined-aware delivery workflow, not a detached coding fantasy
 
 Unlock rule:
-- docs/policy batch may begin only after the active Wave 1 frontier is fully closed
+- docs/policy batch is now allowed because Wave 1 core closeout is complete
 - thin `H4` pilot waits for Wave 2 contract/replay/smoke hardening to stabilize
 - thin `H5` review/gate slice waits for real `H4` pilot evidence and stable artifact policy
 

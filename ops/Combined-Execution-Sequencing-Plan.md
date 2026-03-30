@@ -1684,7 +1684,7 @@ The Meta Coordinator must use this document to:
 2. `docs/Track-B-Prep-Roadmap.md`
 3. `docs/Workflow-H1-Idea-Refinement-Plan.md`
 4. `docs/Track-C-Prompt-Strategy.md`
-5. `docs/Track-E-Smoke-Rubric-v0.md`
+5. `docs/wave1/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md`
 
 Post-Wave-1 side-vertical references:
 - `docs/Coding-Vertical-Adopt-Adapt-Defer-v01.md`

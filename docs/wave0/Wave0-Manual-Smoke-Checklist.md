@@ -152,4 +152,4 @@ Stored trace/run artifact hardening remains tied to `F0-M`.
 
 1. Execute this checklist against each new runnable variant (`h1.lite`, then others).
 2. Feed findings into `F0-M` artifact usability and replay assumptions.
-3. Draft `docs/Track-E-Smoke-Rubric-v0.md` once first manual runs are logged.
+3. Consolidate later operator-smoke learnings into a canonical rubric doc when the workflow family is rich enough (fulfilled later by `docs/wave1/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md`).

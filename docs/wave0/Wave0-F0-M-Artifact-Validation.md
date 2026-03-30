@@ -118,5 +118,5 @@ These are later-wave concerns and should not be implied by `F0-M` completion.
 ## Next Step
 
 1. Use validator output as input to `L1-D` baseline reference path checks.
-2. Create `docs/Track-E-Smoke-Rubric-v0.md` using this artifact acceptance layer.
+2. Use this artifact acceptance layer as an input to later canonical smoke-rubric work (fulfilled by `docs/wave1/Wave1-L1-K-H1-Manual-Smoke-Rubric-v1.md`).
 3. Keep acceptance rules version-aligned with schema changes from Track B.

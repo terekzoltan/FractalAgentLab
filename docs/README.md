@@ -4,11 +4,13 @@ This directory is organized by document role.
 
 ## Core root docs
 
-Keep only higher-level cross-wave documents at the root, for example:
+Prefer to keep higher-level cross-wave documents at the root, for example:
 
 - repo structure and visibility policy
 - cross-wave design docs
 - long-lived track strategy notes
+
+A small number of durable root-level track/contract docs may also remain here when they are still active across multiple waves.
 
 ## Wave docs
 
@@ -29,6 +31,7 @@ Keep only higher-level cross-wave documents at the root, for example:
 When adding a new markdown file:
 
 - put wave-scoped delivery/evidence docs into the matching `wave*/` folder
+- keep durable cross-wave strategy/contract notes at the root only when they are still actively canonical
 - keep private doctrine in `docs/private/`
 - keep public-safe staging material in `docs/public/`
-- leave only cross-wave/root-level references in `docs/`
+- archive superseded working material under `docs/legacy/`
