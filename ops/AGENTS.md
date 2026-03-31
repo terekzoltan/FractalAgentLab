@@ -778,11 +778,21 @@ Target outcomes:
 - traces are structured
 - replay works for at least one workflow
 - eval smoke exists
+- session memory and identity profile foundation exist
 - provider/runtime boundaries are hard enough to support a later real-provider MVP without claiming it yet
 
 Primary track emphasis:
-- B + E
+- B + E + C parallel (contract-dependent vs execution-dependent separation)
 - D prep only
+
+Cross-track parallelism note:
+- W2-S2 runs Track E (replay/smoke) and Track C (memory/identity) foundations in parallel
+- Track C work is contract-dependent (needs stable schemas), not execution-dependent (does not need replay)
+- W2-S3 focuses on cross-track validation and review
+
+CV0 side batch:
+- docs-only coding vertical design runs alongside W2 mainline
+- does not block or compete with W2 execution
 
 ---
 
@@ -1270,8 +1280,12 @@ These are not the active implementation frontier, but they are now canonical fut
 7. `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md`
 8. `docs/private/Coding-Vertical-Learning-Loop-v01.md`
 
+**CV0 execution status:** unblocked; explicit side batch now defined in Combined with 4-step sequencing (CV0-A through CV0-D)
+
 Rule:
-- treat these as post-Wave-1 side-vertical design infrastructure, not as permission to skip the active frontier
+- CV0 runs alongside Wave 2 mainline as docs-only design work
+- CV0 may start CV0-1 in parallel with W2-S1, but Track C/E involvement waits for mainline bandwidth availability
+- treat these docs as the input/output surface for CV0, not as permission to skip W2 mainline priorities
 
 ---
 

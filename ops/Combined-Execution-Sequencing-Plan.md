@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-03-20
+**Last updated:** 2026-03-31
 
 ---
 
@@ -732,78 +732,86 @@ Epics:
 |---------|---------|--------|-------|
 | Track B agent session | H2-D | H2-A ✅ + H2-B ✅ + H2-C ✅ | Replay and smoke should consume a stable persistence layout, not keep adapting to churn |
 
-#### Sprint W2-S2 — Replay and smoke discipline
+#### Sprint W2-S2 — Replay and Memory/Identity Foundation
 
-**Owner priority:** E + B
+**Owner priority:** E + C parallel
 
-Epics:
+**Rationale for parallelism:**
+Track C memory/identity work is **contract-dependent** (needs stable `RunState`/`TraceEvent`/persistence from Track B), not **execution-dependent** (does not need Track E replay implementation to start). This allows Track E replay foundation and Track C memory/identity foundation to proceed in parallel after W2-S1 contracts are stable.
+
+Epics (Track E — replay/smoke foundation):
 - ⬜ **H2-E** Replay capability for at least H1 — **Owner: Track E** (Track B provides persistence hooks)
 - ⬜ **H2-F** Smoke suite v1 for H1 — **Owner: Track E**
 - ⬜ **H2-G** baseline run capture and comparison tags — **Owner: Track E**
-- ⬜ **H2-H** simple regression checklist for shared schemas — **Owner: Track E + Track B**
+
+Epics (Track C — memory/identity foundation):
+- ⬜ **H2-I** Session memory v1 (M1 only) — **Owner: Track C**
+- ⬜ **H2-J** agent role boundary cleanup for H1 — **Owner: Track C**
+- ⬜ **H2-K** memory candidate extraction policy v1 — **Owner: Track C** (Track E evaluates later)
+- ⬜ **H2-M** Identity profile model v0 (`IdentityProfile` + `IdentitySnapshot` + JSON store) — **Owner: Track C**
+- ⬜ **H2-N** Identity signal convention + post-run updater v0 — **Owner: Track C** (Track B reviews later)
+
+Reference for H2-M/N: `docs/Emergent-Identity-Layer-v01.md`
 
 **Sequential ordering:**
-1. H2-E first (replay capability is foundational for the rest)
-2. H2-F and H2-G can proceed in parallel after H2-E
-3. H2-H after H2-F and H2-G (regression checklist needs smoke + baselines defined)
-
-**Execution assignment for co-owned epic:**
-- `H2-H`: **Track E -> Track B**
-  - Track E drafts regression checklist and replay assertions
-  - Track B confirms schema-level enforceability and contract alignment
+1. H2-E and H2-I/H2-J/H2-M can start in parallel (contract-dependent, not cross-dependent)
+2. H2-F/H2-G after H2-E; H2-K after H2-I; H2-N after H2-M
+3. H2-H draft after H2-F and H2-G
 
 **Prerequisites:**
 - `H2-A` through `H2-D` must be `✅`
 
 ### Sprint W2-S2 — Execution Steps
 
-**⬜ Step 1 — Track E establishes replay capability first**
+**⬜ Step 1 — Track E and Track C open foundation work in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | H2-E | H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ | Replay is the foundation for every later discipline claim in this sprint |
+| Track E agent session | H2-E | H2-D ✅ | Replay foundation for Track E discipline claims |
+| Track C agent session | H2-I, H2-J | H2-D ✅ | Memory foundation + role cleanup need stable contracts, not replay |
+| Track C agent session | H2-M | H2-D ✅ | Identity profile model is contract-dependent only |
 
-**⬜ Step 2 — smoke and baseline tagging consume replay in parallel**
+**⬜ Step 2 — smoke/baseline and memory/identity policies in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | H2-F | H2-E ✅ | Build the runnable smoke suite once replay exists |
-| Track E agent session | H2-G | H2-E ✅ | Capture baseline/comparison tags while replayed runs are still close to the new persistence layout |
+| Track E agent session | H2-F, H2-G | H2-E ✅ | Smoke suite + baseline tagging on top of replay |
+| Track C agent session | H2-K | H2-I ✅ | Memory extraction policy builds on memory foundation |
+| Track C agent session | H2-N | H2-M ✅ | Identity updater builds on profile model |
 
 **⬜ Step 3 — Track E drafts the regression checklist**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | H2-H (draft) | H2-F ✅ + H2-G ✅ | Draft assertions first from smoke/replay reality |
+| Track E agent session | H2-H (draft) | H2-F ✅ + H2-G ✅ | Draft assertions from smoke/replay reality |
 
-**⬜ Step 4 — Track B confirms schema enforceability**
+#### Sprint W2-S3 — Cross-track Validation and Hardening
 
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track B agent session | H2-H (contract confirmation) | H2-H draft ✅ | Validate that the shared-schema checklist can actually be enforced, not just described |
+**Owner priority:** B + E (validation-focused)
 
-#### Sprint W2-S3 — Early memory and role separation hardening
-
-**Owner priority:** C, with B and E support
+**Rationale:**
+This sprint focuses on cross-track reviews and validation-coupled evals that genuinely need the implementations from W2-S2 to exist.
 
 Epics:
-- ⬜ **H2-I** Session memory v1 (M1 only) — **Owner: Track C**
-- ⬜ **H2-J** agent role boundary cleanup for H1 — **Owner: Track C**
-- ⬜ **H2-K** memory candidate extraction policy v1 — **Owner: Track C** (Track E evaluates)
+- ⬜ **H2-H** (contract confirmation scope) — **Owner: Track B**
 - ⬜ **H2-L** evaluate whether session memory helps H1 materially — **Owner: Track E**
-- ⬜ **H2-M** Identity profile model v0 (`IdentityProfile` + `IdentitySnapshot` + JSON store) — **Owner: Track C**
-- ⬜ **H2-N** Identity signal convention + post-run updater v0 — **Owner: Track C** (Track B reviews runtime boundary)
+- ⬜ **H2-N** (boundary review scope) — **Owner: Track B**
 - ⬜ **H2-O** Identity drift smoke checks v0 — **Owner: Track E**
 
-**Sequential ordering:**
-1. H2-I and H2-J can start in parallel (session memory + role cleanup are independent)
-2. H2-M can start in parallel with H2-I/H2-J (identity model is independent of memory)
-3. H2-K after H2-I (extraction policy depends on memory foundation)
-4. H2-N after H2-M (updater needs identity model)
-5. H2-L and H2-N boundary review can proceed in parallel after H2-K and H2-N are ready
-6. H2-O after H2-M, H2-N, and boundary review (drift checks should consume the reviewed updater path)
+**Execution assignment for co-owned epics:**
+- `H2-H`: **Track E -> Track B**
+  - Track E drafts regression checklist (in W2-S2 Step 3)
+  - Track B confirms schema-level enforceability
+- `H2-N`: **Track C -> Track B**
+  - Track C implements identity updater (in W2-S2 Step 2)
+  - Track B reviews runtime boundary
 
-Reference for H2-M/N/O: `docs/Emergent-Identity-Layer-v01.md`
+**Sequential ordering:**
+1. H2-H confirmation and H2-N boundary review can proceed in parallel
+2. H2-L and H2-O after their respective dependencies
+
+**Prerequisites:**
+- W2-S2 must be `✅`
 
 **Wave 2 gate to close the wave:**
 - H1 can be replayed
@@ -814,46 +822,87 @@ Reference for H2-M/N/O: `docs/Emergent-Identity-Layer-v01.md`
 
 ### Sprint W2-S3 — Execution Steps
 
-**⬜ Step 1 — Track C opens memory cleanup and identity-model work in parallel**
+**⬜ Step 1 — Track B confirms contracts and reviews boundaries in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent session | H2-I, H2-J | H2-E ✅ + H2-F ✅ + H2-G ✅ + H2-H ✅ | Memory foundation and role-boundary cleanup can advance together |
-| Track C agent session | H2-M | H2-E ✅ + H2-F ✅ + H2-G ✅ + H2-H ✅ | Identity profile model is independent enough to start in parallel with H2-I/H2-J |
+| Track B agent session | H2-H (contract confirmation) | H2-H draft ✅ | Validate schema-level enforceability |
+| Track B agent session | H2-N (boundary review) | H2-N implementation ✅ | Confirm identity updater does not leak into core contracts |
 
-**⬜ Step 2 — Track C builds the memory extraction policy**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track C agent session | H2-K | H2-I ✅ | Extraction policy should sit on top of real session-memory behavior |
-
-**⬜ Step 3 — Track C implements the identity updater path**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track C agent session | H2-N | H2-M ✅ | Keep this observational and post-run first; Track B runtime-boundary review is required before acceptance |
-
-**⬜ Step 4 — Track E evaluates memory usefulness while Track B reviews the identity updater boundary in parallel**
+**⬜ Step 2 — Track E runs validation-focused evals**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track E agent session | H2-L | H2-I ✅ + H2-K ✅ | Determine whether session memory helps H1 materially |
-| Track B agent session | H2-N boundary review | H2-N implementation candidate ✅ | Confirm no unnecessary churn leaks into core Track B contracts before drift checks consume the updater |
-
-**⬜ Step 5 — Track E runs identity drift sanity after the reviewed updater path is available**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track E agent session | H2-O | H2-M ✅ + H2-N ✅ + H2-N boundary review ✅ | Identity drift checks should focus on sanity/stability, not mystical interpretation |
+| Track E agent session | H2-O | H2-M ✅ + H2-N boundary review ✅ | Identity drift sanity checks |
 
 ### Wave 2 anti-scope-creep rule
 No provider-agnostic abstraction expansion beyond what is needed to keep the core clean.
 Wave 2 is about trustworthiness, not ecosystem breadth.
 
-Coding-vertical exception rule:
-- docs-only `CV0` planning work may be prepared after Wave 1 closeout
-- executable `H4/H5` coding-vertical work remains blocked until the named Wave 2 prerequisites are actually complete
+Coding-vertical side batch rule:
+- `CV0` is an explicit side batch running alongside Wave 2 mainline (see below)
+- CV0 executes as a docs-only design batch with its own sequencing
+- executable `H4/H5` coding-vertical work remains blocked until CV0 is closed AND named Wave 2 prerequisites are complete
 - real-provider implementation remains prep-only in Wave 2; the first canonical real-provider MVP belongs to the Wave 3 side batch
+
+---
+
+## Wave 2 Side Batch — CV0 Docs-only Coding Vertical Design
+
+**Status:** unblocked (Wave 1 ✅)  
+**Constraint:** runs alongside Wave 2 mainline; does not block or depend on W2-S1/S2/S3  
+**Execution model:** Meta primary coordination with Track C/B/E design input sessions  
+**Reference docs:** `docs/private/Coding-Vertical-*.md`
+
+### CV0 purpose
+
+Canonize the H4/H5 workflow family design and policy layer **without writing production code**.
+
+CV0 delivers:
+- artifact shape contracts for H4/H5
+- H4 planning prompt/policy draft
+- H5 review/gate policy draft
+- CV1 unlock criteria note
+
+### CV0 execution rule
+
+- W2-S1 (Track B contract hardening) = mainline priority
+- CV0-1 (Meta artifact work) may start in parallel with W2-S1
+- CV0-2/CV0-3 (Track C/E design review) only when not competing with W2 mainline bandwidth
+
+### CV0 Execution Steps
+
+**⬜ Step CV0-1 — Meta canonizes artifact shapes and workflow family contracts**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator session | CV0-A: H4/H5 artifact contract finalization | Wave 1 ✅ | Finalize `Coding-Vertical-Artifact-Contract-v01.md` into canonical state |
+
+**⬜ Step CV0-2 — Track C reviews H4 planning prompt draft**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent session | CV0-B: H4 planning prompt/policy review | CV0-A ✅ | Design-only review of repo-aware planning semantics |
+
+**⬜ Step CV0-3 — Track E reviews H5 review/gate policy draft**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | CV0-C: H5 review/gate policy review | CV0-A ✅ | Design-only review of commit-gate and review semantics |
+
+**⬜ Step CV0-4 — Meta finalizes CV0 closeout**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator session | CV0-D: CV0 closeout + CV1 prereq note | CV0-B ✅ + CV0-C ✅ | Document CV1 unlock criteria and any design pivots |
+
+### CV0 gate to close the batch
+- H4/H5 artifact shapes are canonized
+- H4 planning policy draft exists and is Track C reviewed
+- H5 review/gate policy draft exists and is Track E reviewed
+- CV1 unlock criteria are explicit
+- No production code was written (docs/policy only)
 
 ---
 
