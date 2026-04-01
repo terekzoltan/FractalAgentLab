@@ -939,9 +939,9 @@ Epics:
 
 **Sequential ordering:**
 1. R3-A first (schema must exist before roles wire to it)
-2. R3-B after R3-A
-3. R3-C after R3-B (output template uses the role pack)
-4. R3-D after R3-C (smoke rubric needs complete workflow to check)
+2. R3-A review and R3-B can proceed in parallel (Track B reviews schema while Track C builds role pack)
+3. R3-C and R3-D prep can proceed in parallel (output template and smoke rubric skeleton)
+4. R3-D finalize after R3-C (final smoke validation needs complete workflow)
 
 **Prerequisites:**
 - Wave 2 complete
@@ -954,23 +954,25 @@ Epics:
 |---------|---------|--------|-------|
 | Track C agent session | R3-A | Wave 2 ✅ | H2 should start from a clear workflow contract, not ad hoc role output shapes |
 
-**⬜ Step 2 — Track C builds the H2 role pack**
+**⬜ Step 2 — Track B reviews schema while Track C builds role pack in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
+| Track B agent session | R3-A (schema review) | R3-A ✅ | Confirm H2 schema fits runtime contract expectations |
 | Track C agent session | R3-B | R3-A ✅ | Architect/planner/critic separation is the core value of H2 |
 
-**⬜ Step 3 — Track C finalizes the H2 output form**
+**⬜ Step 3 — Track C finalizes output form while Track E prepares smoke rubric skeleton in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track C agent session | R3-C | R3-B ✅ | Sequence/risk output template should match how the role pack actually thinks |
+| Track E agent session | R3-D (skeleton prep) | R3-A ✅ + R3-B ✅ | Draft smoke rubric structure early; final validation after R3-C |
 
-**⬜ Step 4 — Track E validates the workflow with a dedicated smoke rubric**
+**⬜ Step 4 — Track E finalizes the smoke rubric with complete workflow**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | R3-D | R3-C ✅ | Validate usefulness for real project decomposition, not only structural completeness |
+| Track E agent session | R3-D (finalize) | R3-C ✅ | Validate usefulness for real project decomposition, not only structural completeness |
 
 #### Sprint W3-S2 — H3 Architecture Review (draft quality)
 
@@ -984,9 +986,9 @@ Epics:
 
 **Sequential ordering:**
 1. R3-E first (schema)
-2. R3-F after R3-E (role pack binds to schema)
-3. R3-G after R3-F (output sections use role pack)
-4. R3-H after R3-G (smoke review needs complete workflow)
+2. R3-E review and R3-F can proceed in parallel (Track B reviews schema while Track C builds role pack)
+3. R3-G and R3-H prep can proceed in parallel (output sections and smoke prep skeleton)
+4. R3-H finalize after R3-G (final smoke review needs complete workflow)
 
 **Prerequisites:**
 - `R3-A` through `R3-D` strongly recommended complete first
@@ -999,23 +1001,25 @@ Epics:
 |---------|---------|--------|-------|
 | Track C agent session | R3-E | R3-A ✅ + R3-B ✅ + R3-C ✅ + R3-D ✅ | H3 should start from explicit architecture-review expectations, not reuse H2 loosely |
 
-**⬜ Step 2 — Track C builds the H3 role pack**
+**⬜ Step 2 — Track B reviews schema while Track C builds role pack in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
+| Track B agent session | R3-E (schema review) | R3-E ✅ | Confirm H3 schema fits runtime contract expectations |
 | Track C agent session | R3-F | R3-E ✅ | Focus on systems/critic/synthesizer complementarity |
 
-**⬜ Step 3 — Track C hardens the architecture-review output sections**
+**⬜ Step 3 — Track C hardens output sections while Track E prepares smoke review skeleton in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track C agent session | R3-G | R3-F ✅ | The output should be reviewer-usable, not just verbose |
+| Track E agent session | R3-H (skeleton prep) | R3-E ✅ + R3-F ✅ | Draft smoke review structure early; final validation after R3-G |
 
-**⬜ Step 4 — Track E runs the draft smoke review**
+**⬜ Step 4 — Track E finalizes the smoke review with complete workflow**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | R3-H | R3-G ✅ | H3 only needs draft-quality usefulness here, but it must not be embarrassing |
+| Track E agent session | R3-H (finalize) | R3-G ✅ | H3 only needs draft-quality usefulness here, but it must not be embarrassing |
 
 #### Sprint W3-S3 — Project memory and visibility uplift
 
@@ -1102,6 +1106,13 @@ Epics:
 Meaning:
 - the side batch may start once core runtime contracts and persistence are stable enough
 - replay/smoke discipline should ideally already exist, but it should enrich this MVP rather than block it completely
+
+**Mainline parallelism rule:**
+- Side batch may start after W3-S1 is complete (H2 workflow family is stable)
+- Side batch runs parallel with W3-S2 and W3-S3
+- Side batch should not consume Track C bandwidth (C is H2/H3 focused in mainline)
+- Track D is primary owner; Track E may split time between mainline smoke work and side batch validation
+- If bandwidth conflict arises, mainline W3-S2/W3-S3 takes priority over side batch
 
 **Acceptance gate:**
 - at least one real provider can run an H1 path end-to-end
@@ -1194,9 +1205,15 @@ Epics:
 - ⬜ **P4-F** routing notes: which tasks deserve which model tier — **Owner: Track D + Meta**
 
 **Sequential ordering:**
-1. P4-D first (pressure-handling should harden before optional widening)
-2. P4-E after P4-D
-3. P4-F after P4-D and, if present, P4-E
+1. P4-D is the mainline hardening unit
+2. P4-E is an optional side lane (may overlap with P4-D if separate session capacity exists and no shared-surface conflict)
+3. P4-F after P4-D (and optionally incorporating P4-E evidence if that experiment ran)
+
+**P4-E execution rule:**
+- P4-E is explicitly optional and non-blocking for Wave 4 closure
+- If separate session capacity exists: P4-E may run as a side lane alongside P4-D
+- If no separate capacity: P4-E runs after P4-D completes
+- P4-E must stay isolated from mainline provider paths regardless of timing
 
 **Execution assignment for co-owned epic:**
 - `P4-F`: **Track D -> Meta**
@@ -1205,25 +1222,20 @@ Epics:
 
 ### Sprint W4-S2 — Execution Steps
 
-**⬜ Step 1 — Track D hardens rate-limit/backoff behavior first**
+**⬜ Step 1 — Track D hardens rate-limit/backoff behavior (P4-E may run as side lane if capacity exists)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent session | P4-D | P4-A ✅ + P4-B ✅ + P4-C ✅ | Harden provider pressure-handling before optional widening |
+| Track D agent session | P4-D | P4-A ✅ + P4-B ✅ + P4-C ✅ | Mainline hardening: provider pressure-handling |
+| Track D agent session (optional side lane) | P4-E | P4-A ✅ + P4-B ✅ + P4-C ✅ | Only if separate capacity; keep isolated from mainline paths |
 
-**⬜ Step 2 — optional local or secondary widening remains contained**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track D agent session | P4-E | P4-D ✅ | Keep local or other secondary experiments isolated from the main provider paths |
-
-**⬜ Step 3 — Track D prepares routing guidance**
+**⬜ Step 2 — Track D prepares routing guidance**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track D agent session | P4-F (technical routing notes) | P4-D ✅ | Prepare evidence-backed model-tier recommendations, incorporating `P4-E` only if that experiment actually ran |
 
-**⬜ Step 4 — Meta finalizes the rollout note**
+**⬜ Step 3 — Meta finalizes the rollout note**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
