@@ -53,6 +53,11 @@ Behavior:
 - reads `data/runs/<run_id>.json` (optional)
 - renders timeline summary with event/lane/linkage context
 
+Wave 2 (`H2-D`) note:
+
+- path resolution now routes through the shared persistence-layout module
+- canonical run/trace file locations remain unchanged for trace-viewer compatibility
+
 ---
 
 ## Timeline Output Fields

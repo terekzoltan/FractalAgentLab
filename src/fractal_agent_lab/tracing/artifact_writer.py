@@ -9,25 +9,20 @@ from typing import Any
 
 from fractal_agent_lab.core.events import TraceEvent
 from fractal_agent_lab.core.models import RunState
+from fractal_agent_lab.tracing.artifact_layout import run_artifact_path, trace_artifact_path
 
 
 def write_run_artifact(run_state: RunState, *, data_dir: str | Path) -> Path:
-    base_dir = Path(data_dir)
-    runs_dir = base_dir / "runs"
-    runs_dir.mkdir(parents=True, exist_ok=True)
-
-    path = runs_dir / f"{run_state.run_id}.json"
+    path = run_artifact_path(run_id=run_state.run_id, data_dir=data_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
     payload = _normalize(asdict(run_state))
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8")
     return path
 
 
 def write_trace_artifact(events: list[TraceEvent], *, run_id: str, data_dir: str | Path) -> Path:
-    base_dir = Path(data_dir)
-    traces_dir = base_dir / "traces"
-    traces_dir.mkdir(parents=True, exist_ok=True)
-
-    path = traces_dir / f"{run_id}.jsonl"
+    path = trace_artifact_path(run_id=run_id, data_dir=data_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
     lines = [json.dumps(_normalize(asdict(event)), ensure_ascii=True) for event in events]
     content = "\n".join(lines)
     if lines:

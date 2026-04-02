@@ -208,7 +208,7 @@ Recommended coding-vertical approach:
 
 Possible later shape:
 
-- `data/coding/<run_id>/...`
+- `data/artifacts/<run_id>/...`
 - or coding artifact references embedded inside the run artifact
 
 ### B4. Docs placement

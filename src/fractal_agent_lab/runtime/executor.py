@@ -21,6 +21,7 @@ from fractal_agent_lab.core.errors import (
     RunTimeoutError,
     RuntimeBoundaryError,
     StepExecutionError,
+    error_envelope_from_exception,
 )
 from fractal_agent_lab.core.events import TraceEvent, TraceEventType
 from fractal_agent_lab.core.models import RunState
@@ -155,7 +156,8 @@ class WorkflowExecutor:
                     "supported_modes": sorted(mode.value for mode in supported_modes),
                 },
             )
-            run_state.fail(str(error))
+            envelope = error_envelope_from_exception(error).to_dict()
+            run_state.fail(str(error), failure_envelope=envelope)
             self._state_store.save(run_state)
             emit(TraceEventType.RUN_FAILED, payload=self._error_payload(error))
             return run_state
@@ -165,7 +167,8 @@ class WorkflowExecutor:
                 "Workflow has no executable steps in runtime executor.",
                 details={"workflow_id": workflow.workflow_id},
             )
-            run_state.fail(str(error))
+            envelope = error_envelope_from_exception(error).to_dict()
+            run_state.fail(str(error), failure_envelope=envelope)
             self._state_store.save(run_state)
             emit(TraceEventType.RUN_FAILED, payload=self._error_payload(error))
             return run_state
@@ -219,13 +222,15 @@ class WorkflowExecutor:
             return run_state
 
         except RunTimeoutError as error:
-            run_state.timeout(str(error))
+            envelope = error_envelope_from_exception(error).to_dict()
+            run_state.timeout(str(error), failure_envelope=envelope)
             self._state_store.save(run_state)
             emit(TraceEventType.RUN_TIMED_OUT, payload=self._error_payload(error))
             return run_state
 
         except FractalRuntimeError as error:
-            run_state.fail(str(error))
+            envelope = error_envelope_from_exception(error).to_dict()
+            run_state.fail(str(error), failure_envelope=envelope)
             self._state_store.save(run_state)
             emit(TraceEventType.RUN_FAILED, payload=self._error_payload(error))
             return run_state
@@ -235,7 +240,8 @@ class WorkflowExecutor:
                 "Unhandled runtime exception.",
                 details={"error_type": type(error).__name__, "error": str(error)},
             )
-            run_state.fail(str(error))
+            envelope = error_envelope_from_exception(wrapped).to_dict()
+            run_state.fail(str(wrapped), failure_envelope=envelope)
             self._state_store.save(run_state)
             emit(TraceEventType.RUN_FAILED, payload=self._error_payload(wrapped))
             return run_state
@@ -746,6 +752,7 @@ class WorkflowExecutor:
             except (RunTimeoutError, RunBudgetError):
                 raise
             except Exception as error:
+                failure_envelope = error_envelope_from_exception(error).to_dict()
                 emit(
                     TraceEventType.AGENT_FAILED,
                     step_id=step.step_id,
@@ -757,6 +764,9 @@ class WorkflowExecutor:
                         "lane": lane,
                         "error_type": type(error).__name__,
                         "error": str(error),
+                        "failure_category": failure_envelope.get("category"),
+                        "error_code": failure_envelope.get("code"),
+                        "failure_envelope": failure_envelope,
                     },
                     parent_event_id=parent_event_id,
                     correlation_id=correlation_id,
@@ -771,6 +781,9 @@ class WorkflowExecutor:
                         "lane": lane,
                         "error_type": type(error).__name__,
                         "error": str(error),
+                        "failure_category": failure_envelope.get("category"),
+                        "error_code": failure_envelope.get("code"),
+                        "failure_envelope": failure_envelope,
                     },
                     parent_event_id=parent_event_id,
                     correlation_id=correlation_id,
@@ -1090,13 +1103,13 @@ class WorkflowExecutor:
 
     @staticmethod
     def _error_payload(error: Exception) -> dict[str, Any]:
-        if isinstance(error, FractalRuntimeError):
-            return {
-                "code": error.code,
-                "error": str(error),
-                "details": error.details,
-            }
-        return {"error": str(error), "error_type": type(error).__name__}
+        envelope = error_envelope_from_exception(error).to_dict()
+        return {
+            "code": envelope["code"],
+            "error": envelope["message"],
+            "details": envelope.get("details", {}),
+            "failure_envelope": envelope,
+        }
 
     @staticmethod
     def _runtime_execution_mode(workflow: WorkflowSpec) -> WorkflowExecutionMode:

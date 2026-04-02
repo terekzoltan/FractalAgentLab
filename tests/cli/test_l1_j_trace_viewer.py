@@ -89,6 +89,94 @@ class L1JTraceViewerTests(unittest.TestCase):
             self.assertEqual(2, code)
             self.assertIn("Trace artifact not found", out.getvalue())
 
+    def test_trace_show_returns_error_for_non_monotonic_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            run_id = "bad-sequence-run"
+
+            runs_dir = data_dir / "runs"
+            traces_dir = data_dir / "traces"
+            runs_dir.mkdir(parents=True, exist_ok=True)
+            traces_dir.mkdir(parents=True, exist_ok=True)
+
+            (runs_dir / f"{run_id}.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": run_id,
+                        "workflow_id": "h1.lite",
+                        "status": "failed",
+                        "input_payload": {},
+                        "output_payload": None,
+                        "step_results": {},
+                        "errors": ["broken trace ordering"],
+                        "context": {},
+                        "trace_event_ids": ["e1", "e2"],
+                        "created_at": "2026-03-13T16:35:14.075384+00:00",
+                        "started_at": "2026-03-13T16:35:14.075384+00:00",
+                        "completed_at": "2026-03-13T16:35:16.075384+00:00",
+                        "schema_version": "run_state.v0",
+                    },
+                    ensure_ascii=True,
+                ),
+                encoding="utf-8",
+            )
+            (traces_dir / f"{run_id}.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "event_id": "e1",
+                                "run_id": run_id,
+                                "sequence": 2,
+                                "event_type": "run_failed",
+                                "timestamp": "2026-03-13T16:35:16.075384+00:00",
+                                "source": "runtime.executor",
+                                "step_id": None,
+                                "parent_event_id": None,
+                                "correlation_id": None,
+                                "payload": {},
+                                "schema_version": "trace_event.v0",
+                            },
+                            ensure_ascii=True,
+                        ),
+                        json.dumps(
+                            {
+                                "event_id": "e2",
+                                "run_id": run_id,
+                                "sequence": 1,
+                                "event_type": "run_started",
+                                "timestamp": "2026-03-13T16:35:14.075384+00:00",
+                                "source": "runtime.executor",
+                                "step_id": None,
+                                "parent_event_id": None,
+                                "correlation_id": None,
+                                "payload": {},
+                                "schema_version": "trace_event.v0",
+                            },
+                            ensure_ascii=True,
+                        ),
+                    ],
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            out = io.StringIO()
+            with redirect_stdout(out):
+                code = run_cli(
+                    [
+                        "trace",
+                        "show",
+                        "--run-id",
+                        run_id,
+                        "--data-dir",
+                        data_dir.as_posix(),
+                    ],
+                )
+
+            self.assertEqual(2, code)
+            self.assertIn("not strictly increasing", out.getvalue())
+
 
 def _generate_handoff_artifacts(data_dir: Path) -> str:
     workflow_id = "h1.handoff.v1"

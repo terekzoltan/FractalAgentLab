@@ -7,7 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 
-TRACE_EVENT_SCHEMA_VERSION = "trace_event.v0"
+TRACE_EVENT_SCHEMA_VERSION = "trace_event.v1"
 
 
 def _utc_now() -> datetime:

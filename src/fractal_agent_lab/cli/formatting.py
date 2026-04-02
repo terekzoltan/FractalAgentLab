@@ -92,6 +92,7 @@ def format_trace_summary_text(events: list[TraceEvent]) -> str:
         TraceEventType.HANDOFF_FAILED,
         TraceEventType.RUN_COMPLETED,
         TraceEventType.RUN_FAILED,
+        TraceEventType.RUN_CANCELLED,
         TraceEventType.RUN_TIMED_OUT,
     ]
     lines.append("- event_counts:")

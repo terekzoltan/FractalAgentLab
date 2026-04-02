@@ -18,11 +18,15 @@ from fractal_agent_lab.core.events import (
     TraceEventType,
 )
 from fractal_agent_lab.core.errors import (
+    FailureCategory,
     FractalRuntimeError,
+    RUNTIME_ERROR_ENVELOPE_SCHEMA_VERSION,
     RunBudgetError,
     RunTimeoutError,
+    RuntimeErrorEnvelope,
     RuntimeBoundaryError,
     StepExecutionError,
+    error_envelope_from_exception,
 )
 from fractal_agent_lab.core.models import RUN_STATE_SCHEMA_VERSION, RunState, RunStatus
 
@@ -38,11 +42,14 @@ __all__ = [
     "WORKFLOW_SPEC_SCHEMA_VERSION",
     "AgentKind",
     "AgentSpec",
+    "FailureCategory",
     "FractalRuntimeError",
+    "RUNTIME_ERROR_ENVELOPE_SCHEMA_VERSION",
     "RunBudgetError",
     "RunState",
     "RunStatus",
     "RunTimeoutError",
+    "RuntimeErrorEnvelope",
     "RuntimeBoundaryError",
     "StepExecutionError",
     "TraceEvent",
@@ -50,4 +57,5 @@ __all__ = [
     "WorkflowExecutionMode",
     "WorkflowSpec",
     "WorkflowStepSpec",
+    "error_envelope_from_exception",
 ]

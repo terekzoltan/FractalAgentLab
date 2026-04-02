@@ -169,6 +169,15 @@ data/       local runtime artifacts (gitignored)
 ui/         early trace viewer / future workbench
 ```
 
+Canonical runtime artifact paths:
+
+- `data/runs/<run_id>.json`
+- `data/traces/<run_id>.jsonl`
+
+Additive sidecar-ready path:
+
+- `data/artifacts/<run_id>/`
+
 ---
 
 ## Design Documents

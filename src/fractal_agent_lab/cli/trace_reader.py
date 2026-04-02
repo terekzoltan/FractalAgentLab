@@ -4,15 +4,16 @@ import json
 from pathlib import Path
 from typing import Any
 
+from fractal_agent_lab.tracing.artifact_layout import run_artifact_path, trace_artifact_path
+
 
 def load_trace_view_artifacts(*, run_id: str, data_dir: str | Path) -> tuple[dict[str, Any] | None, list[dict[str, Any]], Path, Path]:
-    base_dir = Path(data_dir)
-    trace_artifact_path = base_dir / "traces" / f"{run_id}.jsonl"
-    run_artifact_path = base_dir / "runs" / f"{run_id}.json"
+    resolved_trace_artifact_path = trace_artifact_path(run_id=run_id, data_dir=data_dir)
+    resolved_run_artifact_path = run_artifact_path(run_id=run_id, data_dir=data_dir)
 
-    trace_events = _load_trace_jsonl(trace_artifact_path)
-    run_payload = _load_optional_run_payload(run_artifact_path)
-    return run_payload, trace_events, run_artifact_path, trace_artifact_path
+    trace_events = _load_trace_jsonl(resolved_trace_artifact_path)
+    run_payload = _load_optional_run_payload(resolved_run_artifact_path)
+    return run_payload, trace_events, resolved_run_artifact_path, resolved_trace_artifact_path
 
 
 def _load_trace_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -42,7 +43,24 @@ def _load_trace_jsonl(path: Path) -> list[dict[str, Any]]:
     if not events:
         raise ValueError(f"Trace artifact has no events: {path.as_posix()}")
 
-    return sorted(events, key=_event_sequence_key)
+    _validate_trace_event_sequence(events, path)
+    return events
+
+
+def _validate_trace_event_sequence(events: list[dict[str, Any]], path: Path) -> None:
+    previous_sequence: int | None = None
+    for index, event in enumerate(events, start=1):
+        sequence = event.get("sequence")
+        if not isinstance(sequence, int):
+            raise ValueError(
+                f"Trace artifact event #{index} has non-integer sequence: {path.as_posix()}",
+            )
+        if previous_sequence is not None and sequence <= previous_sequence:
+            raise ValueError(
+                "Trace artifact sequence is not strictly increasing at event "
+                f"#{index}: {sequence} <= {previous_sequence}",
+            )
+        previous_sequence = sequence
 
 
 def _load_optional_run_payload(path: Path) -> dict[str, Any] | None:
@@ -56,9 +74,3 @@ def _load_optional_run_payload(path: Path) -> dict[str, Any] | None:
         return value
     return None
 
-
-def _event_sequence_key(event: dict[str, Any]) -> tuple[int, str]:
-    sequence = event.get("sequence")
-    if isinstance(sequence, int):
-        return (sequence, str(event.get("event_id", "")))
-    return (10**9, str(event.get("event_id", "")))

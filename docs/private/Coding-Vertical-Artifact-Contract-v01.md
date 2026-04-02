@@ -1,8 +1,10 @@
 # Coding-Vertical-Artifact-Contract-v01.md
 
+**Contract status:** canonical (finalized 2026-04-01 via CV0-A)
+
 ## Purpose
 
-This document defines the intended artifact contract for the Software Delivery Loop.
+This document defines the canonical artifact contract for the Software Delivery Loop.
 
 The central rule is:
 
@@ -19,13 +21,51 @@ Canonical repo truth remains:
 - `data/runs/<run_id>.json`
 - `data/traces/<run_id>.jsonl`
 
-Coding artifacts should extend that truth as sidecars or referenced attachments, not as a rival system.
+Coding artifacts extend that truth as sidecars, not as a rival system.
 
-Recommended local sidecar path later:
+### Canonical sidecar path
 
-- `data/coding/<run_id>/...`
+```
+data/artifacts/<run_id>/
+├── context_report.json       # H4
+├── implementation_plan.md    # H4
+├── risk_register.json        # H4
+├── acceptance_checks.json    # H4
+├── implementation_report.md  # H5
+├── review_findings.json      # H5
+├── test_evidence.json        # H5
+├── commit_gate.json          # H5
+└── commit_manifest.json      # H5 (optional)
+```
 
-This stays compatible with the existing ignored `data/` policy.
+This path is canonical and stays compatible with the existing ignored `data/` policy.
+Coding-vertical artifacts reserve filenames inside the shared per-run sidecar directory instead of defining a parallel root.
+
+### Run/trace correlation rule
+
+Every coding-vertical artifact set must be traceable to a canonical run:
+
+1. The sidecar directory name **must** match a valid `run_id` from `data/runs/`
+2. Every structured JSON artifact **must** include the `run_id` field in its envelope
+3. If the canonical run artifact (`data/runs/<run_id>.json`) does not exist, the coding artifacts are orphaned and invalid
+4. Coding artifacts may reference trace events via `correlation_id` or `event_id` when linking to specific execution moments
+
+### Artifact envelope rule
+
+Every structured coding artifact (JSON) must include this envelope:
+
+```json
+{
+  "artifact_type": "<artifact_name>",
+  "artifact_version": "1.0",
+  "run_id": "<run_id>",
+  "workflow_id": "<h4|h5>",
+  "generated_at": "<ISO8601 timestamp>",
+  ...artifact-specific fields...
+}
+```
+
+Markdown artifacts (`implementation_plan.md`, `implementation_report.md`) should include a YAML frontmatter block with the same fields when practical.
 
 ---
 
@@ -145,12 +185,16 @@ Minimum fields:
 
 ## Versioning fields
 
-Every structured coding artifact should later include when practical:
+Every structured coding artifact must include in its envelope:
 
-- `artifact_version`
-- `generated_at`
-- `workflow_id`
-- `run_id`
+- `artifact_type` — the artifact name (e.g., `context_report`, `commit_gate`)
+- `artifact_version` — semantic version of the artifact schema (start with `1.0`)
+- `run_id` — the canonical run this artifact belongs to
+- `workflow_id` — `h4` or `h5`
+- `generated_at` — ISO8601 timestamp
+
+These fields are mandatory for all JSON artifacts.
+For markdown artifacts, include them in YAML frontmatter when practical.
 
 ---
 
@@ -164,6 +208,8 @@ A coding-vertical run should be considered invalid if:
 - code changed and no test evidence or explicit reason exists
 - coding artifacts materially contradict the canonical run/trace truth
 - the artifact set hides uncertainty that the trace or review evidence clearly shows
+- the `run_id` in the artifact envelope does not match a valid canonical run
+- required envelope fields are missing from JSON artifacts
 
 ---
 
@@ -176,7 +222,9 @@ Realistic artifacts with strong heuristics, real repo structure, or sensitive fa
 
 ## Current stance
 
-This contract is design-first.
-It becomes executable later through `CV1` and `CV2`.
+This contract is **canonical** as of CV0-A (2026-04-01).
 
-Until then, it serves as the intended memory surface for the future coding vertical.
+It becomes executable through `CV1` and `CV2`.
+Until then, it serves as the binding specification for the future coding vertical.
+
+Changes to this contract require Meta Coordinator review and explicit versioning.

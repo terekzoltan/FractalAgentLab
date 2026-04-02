@@ -122,6 +122,9 @@ class ExecutionModeTruthTests(unittest.TestCase):
         self.assertEqual(RunStatus.FAILED, run_state.status)
         self.assertTrue(run_state.errors)
         self.assertIn("not implemented", run_state.errors[0].lower())
+        self.assertIsInstance(run_state.failure, dict)
+        self.assertEqual("runtime_boundary", run_state.failure.get("category"))
+        self.assertEqual("runtime_error_envelope.v1", run_state.failure.get("schema_version"))
 
         run_started = [
             event for event in emitter.events if event.event_type == TraceEventType.RUN_STARTED
@@ -133,6 +136,14 @@ class ExecutionModeTruthTests(unittest.TestCase):
             event for event in emitter.events if event.event_type == TraceEventType.STEP_STARTED
         ]
         self.assertEqual([], step_started)
+
+        run_failed = [
+            event for event in emitter.events if event.event_type == TraceEventType.RUN_FAILED
+        ]
+        self.assertEqual(1, len(run_failed))
+        failure_envelope = run_failed[0].payload.get("failure_envelope")
+        self.assertIsInstance(failure_envelope, dict)
+        self.assertEqual("runtime_boundary", failure_envelope.get("category"))
 
     def test_runtime_rejects_graph_mode_without_silent_linear_fallback(self) -> None:
         workflow = WorkflowSpec(
@@ -151,6 +162,9 @@ class ExecutionModeTruthTests(unittest.TestCase):
         self.assertEqual(RunStatus.FAILED, run_state.status)
         self.assertTrue(run_state.errors)
         self.assertIn("not implemented", run_state.errors[0].lower())
+        self.assertIsInstance(run_state.failure, dict)
+        self.assertEqual("runtime_boundary", run_state.failure.get("category"))
+        self.assertEqual("runtime_error_envelope.v1", run_state.failure.get("schema_version"))
 
         run_started = [
             event for event in emitter.events if event.event_type == TraceEventType.RUN_STARTED
@@ -162,6 +176,14 @@ class ExecutionModeTruthTests(unittest.TestCase):
             event for event in emitter.events if event.event_type == TraceEventType.STEP_STARTED
         ]
         self.assertEqual([], step_started)
+
+        run_failed = [
+            event for event in emitter.events if event.event_type == TraceEventType.RUN_FAILED
+        ]
+        self.assertEqual(1, len(run_failed))
+        failure_envelope = run_failed[0].payload.get("failure_envelope")
+        self.assertIsInstance(failure_envelope, dict)
+        self.assertEqual("runtime_boundary", failure_envelope.get("category"))
 
 
 if __name__ == "__main__":

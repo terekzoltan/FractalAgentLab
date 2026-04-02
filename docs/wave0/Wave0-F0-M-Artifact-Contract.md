@@ -25,6 +25,12 @@ Wave 0 artifact paths:
 - run artifact: `data/runs/<run_id>.json`
 - trace artifact: `data/traces/<run_id>.jsonl`
 
+Wave 2 (`H2-D`) additive layout extension:
+
+- artifact sidecar directory: `data/artifacts/<run_id>/`
+
+Canonical run/trace truth remains the two Wave 0 paths above.
+
 Implemented writer module:
 
 - `src/fractal_agent_lab/tracing/artifact_writer.py`

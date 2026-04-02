@@ -179,7 +179,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - declared orchestration truth matches emitted runtime truth
 - structural workflow invariants are rejected before runtime when practical
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track B now owns the active mainline frontier in W2-S1: `H2-A` / `H2-B` / `H2-C`, then `H2-D`)
+**Status:** `🔄 in progress` (Track B completed W2-S1 `H2-A` / `H2-B` / `H2-C` / `H2-D`; active mainline implementation ownership now shifts to W2-S2 Track E/Track C foundations, with Track B returning as primary reviewer/validator in W2-S3)
 
 ---
 
@@ -974,6 +974,9 @@ Entries:
 - `[2026-03-22][Track C] L1-N/L1-O started (⬜ -> 🔄) - optional Wave 1 identity prep docs started as design-only artifacts (no code/schema/runtime changes) - next: publish profile schema draft and signal-carrier convention draft with explicit Track B compatibility boundaries.`
 - `[2026-03-22][Track C] L1-N/L1-O completed (🔄 -> ✅) - design-only identity prep delivered via docs/wave1/Wave1-L1-N-Identity-Profile-Schema-Draft.md and docs/wave1/Wave1-L1-O-Identity-Signal-Carrier-Convention.md, keeping runtime contracts unchanged and preparing Wave 2 observational identity MVP semantics.`
 - `[2026-03-30][Meta] Track D real-provider roadmap canonized - Wave 2 stays prep-only, Wave 3 gets the first non-blocking real-provider MVP side batch, and Wave 4 now owns provider parity/routing hardening - next: implement the documented placement in future Track D execution without displacing the mainline.`
+- `[2026-04-01][Meta] CV0-A completed (⬜ -> ✅) - H4/H5 artifact contract finalized with canonical sidecar path, run/trace correlation rules, and mandatory envelope fields - next: CV0-B (Track C H4 planning prompt review) when mainline bandwidth allows.`
+- `[2026-04-01][Track B] W2-S1 H2-A/H2-B/H2-C completed (🔄 -> ✅) - RunState hardened to v1 with additive lifecycle/failure fields, TraceEvent contract moved to v1, and runtime failure classification/error-envelope v1 now emits consistently to run artifacts and terminal trace payloads; artifact validation tightened (schema support, event-id uniqueness, timestamp validity, trace-id ordering) with negative-path + cross-surface tests - next: execute H2-D persistence layout hardening on top of the stabilized contracts.`
+- `[2026-04-01][Track B] W2-S1 H2-D completed (🔄 -> ✅) - persistence layout hardened with centralized artifact path resolution (`runs`/`traces` canonical truth preserved), additive `artifacts/<run_id>/` sidecar-ready surface, and cross-surface writer/reader/eval alignment with new tracing layout tests - next: W2-S2 starts in parallel on Track E (`H2-E`) and Track C (`H2-I/H2-J/H2-M`) atop the stabilized contracts.`
 
 ---
 

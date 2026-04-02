@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from fractal_agent_lab.tracing.artifact_layout import run_artifact_path, trace_artifact_path
+
 
 TERMINAL_RUN_STATUSES = {"succeeded", "failed", "timed_out", "cancelled"}
+SUPPORTED_RUN_SCHEMA_VERSIONS = {"run_state.v0", "run_state.v1"}
+SUPPORTED_TRACE_SCHEMA_VERSIONS = {"trace_event.v0", "trace_event.v1"}
 
 REQUIRED_RUN_FIELDS = {
     "run_id",
@@ -59,9 +64,8 @@ def validate_run_trace_by_run_id(
     *,
     data_dir: str | Path = "data",
 ) -> ArtifactValidationResult:
-    base_dir = Path(data_dir)
-    run_path = base_dir / "runs" / f"{run_id}.json"
-    trace_path = base_dir / "traces" / f"{run_id}.jsonl"
+    run_path = run_artifact_path(run_id=run_id, data_dir=data_dir)
+    trace_path = trace_artifact_path(run_id=run_id, data_dir=data_dir)
     return validate_run_trace_artifacts(run_path=run_path, trace_path=trace_path)
 
 
@@ -185,6 +189,22 @@ def _check_run_envelope(run_payload: dict[str, Any], result: ArtifactValidationR
     schema_version = _as_non_empty_str(run_payload.get("schema_version"))
     if schema_version is None:
         result.errors.append("Run artifact missing non-empty 'schema_version'.")
+    elif schema_version not in SUPPORTED_RUN_SCHEMA_VERSIONS:
+        result.errors.append(
+            "Run artifact has unsupported 'schema_version': "
+            f"{schema_version} (supported: {', '.join(sorted(SUPPORTED_RUN_SCHEMA_VERSIONS))}).",
+        )
+
+    if schema_version == "run_state.v1":
+        failure = run_payload.get("failure")
+        if status in {"failed", "timed_out"} and not isinstance(failure, dict):
+            result.errors.append("Run artifact v1 failure status requires object 'failure'.")
+        if status == "succeeded" and failure is not None:
+            result.errors.append("Run artifact v1 succeeded status must not carry 'failure'.")
+
+        status_transitions = run_payload.get("status_transitions")
+        if not isinstance(status_transitions, list) or not status_transitions:
+            result.errors.append("Run artifact v1 missing non-empty 'status_transitions'.")
 
     if status == "succeeded":
         output_payload = run_payload.get("output_payload")
@@ -200,6 +220,7 @@ def _check_run_envelope(run_payload: dict[str, Any], result: ArtifactValidationR
 def _check_trace_events(events: list[dict[str, Any]], result: ArtifactValidationResult) -> None:
     previous_sequence: int | None = None
     event_types: list[str] = []
+    seen_event_ids: set[str] = set()
 
     for index, event in enumerate(events, start=1):
         _check_required_fields(
@@ -224,14 +245,34 @@ def _check_trace_events(events: list[dict[str, Any]], result: ArtifactValidation
         if event_type is not None:
             event_types.append(event_type)
 
-        if _as_non_empty_str(event.get("schema_version")) is None:
+        schema_version = _as_non_empty_str(event.get("schema_version"))
+        if schema_version is None:
             result.errors.append(f"Trace event #{index} missing non-empty 'schema_version'.")
+        elif schema_version not in SUPPORTED_TRACE_SCHEMA_VERSIONS:
+            result.errors.append(
+                f"Trace event #{index} has unsupported schema_version '{schema_version}'.",
+            )
+
+        event_id = _as_non_empty_str(event.get("event_id"))
+        if event_id is None:
+            result.errors.append(f"Trace event #{index} missing non-empty 'event_id'.")
+        elif event_id in seen_event_ids:
+            result.errors.append(f"Trace event #{index} duplicates event_id '{event_id}'.")
+        else:
+            seen_event_ids.add(event_id)
+
+        timestamp = _as_non_empty_str(event.get("timestamp"))
+        if timestamp is None:
+            result.errors.append(f"Trace event #{index} missing non-empty 'timestamp'.")
+        elif not _is_iso8601_timestamp(timestamp):
+            result.errors.append(f"Trace event #{index} has invalid ISO timestamp '{timestamp}'.")
+
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            result.errors.append(f"Trace event #{index} payload must be an object.")
 
     if event_types and event_types[0] != "run_started":
         result.errors.append("Trace first event must be 'run_started'.")
-
-    if "step_started" not in event_types:
-        result.errors.append("Trace must include at least one 'step_started' event.")
 
     run_payload = result.run_payload or {}
     status = _as_non_empty_str(run_payload.get("status"))
@@ -248,10 +289,13 @@ def _check_trace_events(events: list[dict[str, Any]], result: ArtifactValidation
             f"'{expected_terminal_event}' for run status '{status}'.",
         )
 
-    if status == "succeeded" and "step_completed" not in event_types:
-        result.errors.append("Succeeded run trace must include at least one 'step_completed' event.")
+    if status == "succeeded":
+        if "step_started" not in event_types:
+            result.errors.append("Succeeded run trace must include at least one 'step_started' event.")
+        if "step_completed" not in event_types:
+            result.errors.append("Succeeded run trace must include at least one 'step_completed' event.")
 
-    if status == "failed" and "step_failed" not in event_types:
+    if status == "failed" and "step_started" in event_types and "step_failed" not in event_types:
         result.warnings.append("Failed run trace has no 'step_failed' event.")
 
 
@@ -278,9 +322,21 @@ def _check_cross_artifact_consistency(
                 "Trace event count mismatch between run artifact and trace artifact: "
                 f"run.trace_event_ids={len(trace_event_ids)}, trace_events={len(trace_events)}.",
             )
+        trace_event_id_values = [event.get("event_id") for event in trace_events]
+        if trace_event_ids != trace_event_id_values:
+            result.errors.append("Run trace_event_ids do not match trace artifact event_id ordering.")
 
 
 def _as_non_empty_str(value: Any) -> str | None:
     if isinstance(value, str) and value.strip():
         return value
     return None
+
+
+def _is_iso8601_timestamp(value: str) -> bool:
+    normalized = value.replace("Z", "+00:00") if value.endswith("Z") else value
+    try:
+        datetime.fromisoformat(normalized)
+    except ValueError:
+        return False
+    return True

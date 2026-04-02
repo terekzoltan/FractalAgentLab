@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-03-31
+**Last updated:** 2026-04-01
 
 ---
 
@@ -701,10 +701,10 @@ Track B and Track E are the spine of this wave.
 **Owner priority:** Track B
 
 Epics:
-- ⬜ **H2-A** `RunState` hardening v1 — **Owner: Track B**
-- ⬜ **H2-B** `TraceEvent` versioned contract v1 — **Owner: Track B**
-- ⬜ **H2-C** failure classification and error envelope v1 — **Owner: Track B**
-- ⬜ **H2-D** run persistence layout for runs/traces/artifacts — **Owner: Track B**
+- ✅ **H2-A** `RunState` hardening v1 — **Owner: Track B**
+- ✅ **H2-B** `TraceEvent` versioned contract v1 — **Owner: Track B**
+- ✅ **H2-C** failure classification and error envelope v1 — **Owner: Track B**
+- ✅ **H2-D** run persistence layout for runs/traces/artifacts — **Owner: Track B**
 
 **Sequential ordering:**
 1. H2-A, H2-B, H2-C can proceed in parallel (independent schema work)
@@ -720,17 +720,17 @@ Epics:
 
 ### Sprint W2-S1 — Execution Steps
 
-**⬜ Step 1 — Track B hardens the shared contracts first**
+**✅ Step 1 — Track B hardens the shared contracts first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent session | H2-A, H2-B, H2-C | Wave 1 ✅ | Treat as one contract-hardening batch unless one schema path clearly blocks the others |
+| Track B agent session | ✅ H2-A, ✅ H2-B, ✅ H2-C | Wave 1 ✅ | Additive v1 hardening shipped with cross-surface updates and negative-path coverage |
 
-**⬜ Step 2 — Track B finalizes persistence layout on top of the hardened contracts**
+**✅ Step 2 — Track B finalizes persistence layout on top of the hardened contracts**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent session | H2-D | H2-A ✅ + H2-B ✅ + H2-C ✅ | Replay and smoke should consume a stable persistence layout, not keep adapting to churn |
+| Track B agent session | ✅ H2-D | H2-A ✅ + H2-B ✅ + H2-C ✅ | Shared persistence layout is centralized and additive-compatible for replay/smoke/memory consumers |
 
 #### Sprint W2-S2 — Replay and Memory/Identity Foundation
 
@@ -873,11 +873,11 @@ CV0 delivers:
 
 ### CV0 Execution Steps
 
-**⬜ Step CV0-1 — Meta canonizes artifact shapes and workflow family contracts**
+**✅ Step CV0-1 — Meta canonizes artifact shapes and workflow family contracts**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | CV0-A: H4/H5 artifact contract finalization | Wave 1 ✅ | Finalize `Coding-Vertical-Artifact-Contract-v01.md` into canonical state |
+| Meta Coordinator session | ✅ CV0-A: H4/H5 artifact contract finalization | Wave 1 ✅ | Finalized `Coding-Vertical-Artifact-Contract-v01.md` into canonical state |
 
 **⬜ Step CV0-2 — Track C reviews H4 planning prompt draft**
 
@@ -1407,7 +1407,12 @@ This section should always describe the **current frontier**, not the original k
 ### Current frontier
 Wave 0 is complete.
 Wave 1 core closeout is complete through `L1-J` / `L1-K` / `L1-L` / `L1-M`.
-The immediate mainline frontier now moves to Wave 2 Sprint `W2-S1`: `H2-A` / `H2-B` / `H2-C`, then `H2-D`.
+Wave 2 Sprint `W2-S1` is complete (`H2-A` / `H2-B` / `H2-C` / `H2-D` ✅).
+The immediate mainline frontier now moves to Wave 2 Sprint `W2-S2` Step 1:
+
+- Track E `H2-E`
+- Track C `H2-I` / `H2-J`
+- Track C `H2-M`
 Optional Wave 1 identity-prep docs (`L1-N` / `L1-O`) and docs-only `CV0` side-vertical planning are now allowed, but they do not replace the mainline frontier.
 
 ### W1-S2 stabilization batch — Execution Steps
@@ -1448,10 +1453,10 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track B agent session` for `⬜ H2-A`, `⬜ H2-B`, `⬜ H2-C`
-2. `Track B agent session` for `⬜ H2-D` after `H2-A` / `H2-B` / `H2-C`
-3. optional docs-only `CV0` work if it does not slow Wave 2 mainline progress
-4. optional `Track C agent session` for `✅ L1-N`, `✅ L1-O` (design-only prep completed)
+1. `Track E agent session` for `⬜ H2-E`
+2. `Track C agent session` for `⬜ H2-I`, `⬜ H2-J`
+3. `Track C agent session` for `⬜ H2-M`
+4. optional docs-only `CV0` work if it does not slow Wave 2 mainline progress
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`
@@ -1583,10 +1588,10 @@ Epics:
 
 **Prerequisites:**
 - `CV0-META1` ⬜
-- `H2-A` ⬜
-- `H2-B` ⬜
-- `H2-C` ⬜
-- `H2-D` ⬜
+- `H2-A` ✅
+- `H2-B` ✅
+- `H2-C` ✅
+- `H2-D` ✅
 - `H2-E` ⬜
 - `H2-F` ⬜
 - `H2-G` ⬜
