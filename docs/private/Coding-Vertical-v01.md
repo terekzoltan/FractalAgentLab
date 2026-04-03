@@ -135,6 +135,37 @@ That means:
 
 This is the preferred current direction.
 
+### Target operating model
+
+The intended end-state is:
+
+- OpenCode remains the main operator surface and execution shell
+- Fractal Agent Lab provides the workflow engine, artifact contracts, replay/eval discipline, and later H4/H5 delivery logic
+- meaningful coding-vertical runs are invoked from that shell through explicit Fractal Agent Lab entrypoints instead of relying on prompt magic alone
+
+Helpful shorthand:
+
+- OpenCode = control surface
+- Fractal Agent Lab = workflow engine
+
+This means the coding vertical should feel like a governed workflow layer running through OpenCode, not like an attempt to replace OpenCode with a separate IDE or opaque swarm.
+
+### Target topology
+
+The default future topology is expected to be:
+
+```text
+workspace/
+├── fractal-agent-lab/
+└── target-project/
+```
+
+Interpretation:
+
+- `fractal-agent-lab/` is the reusable workflow system
+- `target-project/` is the repo being planned, reviewed, or implemented against
+- Fractal Agent Lab is generally intended to operate on target repositories, not be copied wholesale into each one as a starter template
+
 ### Later optional evolution
 
 A more hybrid model may be explored later.

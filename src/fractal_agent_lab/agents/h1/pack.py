@@ -63,11 +63,7 @@ def build_h1_agent_specs() -> dict[str, AgentSpec]:
             kind=AgentKind.LLM,
             instructions=PROMPTS_BY_ROLE[H1Role.SYNTHESIZER],
             model_policy_ref="finalizer",
-            handoff_targets=[
-                H1_AGENT_IDS[H1Role.INTAKE],
-                H1_AGENT_IDS[H1Role.PLANNER],
-                H1_AGENT_IDS[H1Role.CRITIC],
-            ],
+            handoff_targets=[],
             metadata={
                 "prompt_version": ROLE_PROMPT_VERSION[H1Role.SYNTHESIZER],
                 "pack_prompt_version": H1_PROMPT_VERSION,
@@ -181,18 +177,12 @@ def validate_h1_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
             if target == spec.agent_id:
                 raise ValueError(f"Agent '{spec.agent_id}' cannot hand off to itself.")
 
-    worker_agent_ids = {
-        H1_AGENT_IDS[H1Role.INTAKE],
-        H1_AGENT_IDS[H1Role.PLANNER],
-        H1_AGENT_IDS[H1Role.CRITIC],
-    }
-    synthesizer_targets = set(agent_specs_by_id[H1_AGENT_IDS[H1Role.SYNTHESIZER]].handoff_targets)
-    if synthesizer_targets != worker_agent_ids:
-        raise ValueError("H1 synthesizer must target intake/planner/critic workers only.")
-
-    for role in (H1Role.INTAKE, H1Role.PLANNER, H1Role.CRITIC):
+    for role in ordered_h1_roles():
         if agent_specs_by_id[H1_AGENT_IDS[role]].handoff_targets:
-            raise ValueError(f"H1 worker '{role.value}' must not declare handoff targets.")
+            raise ValueError(
+                "H1 manager pack agents must not declare handoff targets. "
+                "Manager orchestration authority comes from workflow.manager_spec and manager control output.",
+            )
 
 
 def validate_h1_handoff_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:

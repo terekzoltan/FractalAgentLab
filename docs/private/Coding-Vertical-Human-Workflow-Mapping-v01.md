@@ -194,6 +194,42 @@ Current stance:
 
 ---
 
+## Operational invocation model
+
+The intended future model is explicit:
+
+- the user works from an OpenCode session attached to the target repo
+- the OpenCode session acts as the operator/control surface
+- the session invokes Fractal Agent Lab workflows through explicit entrypoints
+- Fractal Agent Lab performs the underlying workflow run, agent/model coordination, trace emission, and artifact generation
+- the OpenCode session then reads those outputs back and presents them in a useful form
+
+Example shape:
+
+```text
+User intent in OpenCode:
+- "H4 this feature"
+
+Practical invocation shape:
+- `fal run h4.plan --repo . --goal "implement this feature"`
+
+Result:
+- Fractal Agent Lab runs the H4 workflow
+- planning artifacts are written
+- run/trace outputs are available for replay and audit
+- OpenCode summarizes the result and continues the delivery loop
+```
+
+Important distinction:
+
+- OpenCode session agents are not the same thing as Fractal Agent Lab workflow agents
+- OpenCode session agents operate the repo/session/tool surface
+- Fractal Agent Lab workflow agents are the internal H4/H5 roles that perform the structured workflow itself
+
+This distinction matters because the near-term proto workflow may still rely on OpenCode directly performing some planning/review work from policy docs, while the intended later model is explicit workflow invocation through Fractal Agent Lab.
+
+---
+
 ## Human-in-the-loop boundaries
 
 The coding vertical should preserve explicit human control at important points, especially early on.

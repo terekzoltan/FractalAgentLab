@@ -119,4 +119,5 @@ For Track C implementation work:
 
 1. `L1-M` completed: H1 prompt tags are explicit in summaries and run artifacts
 2. `L1-N` / `L1-O` completed: design-only identity profile and signal-carrier drafts are now published
-3. wait for Wave 2 identity implementation entry points before any runtime or schema-touching execution
+3. `H2-M` completed: identity profile model/store foundation is now implemented (`IdentityProfile` + `IdentitySnapshot` + JSON store) without runtime/schema churn
+4. `H2-N` completed: post-run identity updater v0 is implemented with explicit signal normalization, documented fallback, bounded profile updates, snapshot append, and non-fatal CLI integration behind identity config

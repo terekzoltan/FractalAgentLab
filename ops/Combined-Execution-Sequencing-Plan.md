@@ -740,16 +740,16 @@ Epics:
 Track C memory/identity work is **contract-dependent** (needs stable `RunState`/`TraceEvent`/persistence from Track B), not **execution-dependent** (does not need Track E replay implementation to start). This allows Track E replay foundation and Track C memory/identity foundation to proceed in parallel after W2-S1 contracts are stable.
 
 Epics (Track E — replay/smoke foundation):
-- ⬜ **H2-E** Replay capability for at least H1 — **Owner: Track E** (Track B provides persistence hooks)
-- ⬜ **H2-F** Smoke suite v1 for H1 — **Owner: Track E**
-- ⬜ **H2-G** baseline run capture and comparison tags — **Owner: Track E**
+- ✅ **H2-E** Replay capability for at least H1 — **Owner: Track E** (Track B provides persistence hooks)
+- ✅ **H2-F** Smoke suite v1 for H1 — **Owner: Track E**
+- ✅ **H2-G** baseline run capture and comparison tags — **Owner: Track E**
 
 Epics (Track C — memory/identity foundation):
-- ⬜ **H2-I** Session memory v1 (M1 only) — **Owner: Track C**
-- ⬜ **H2-J** agent role boundary cleanup for H1 — **Owner: Track C**
-- ⬜ **H2-K** memory candidate extraction policy v1 — **Owner: Track C** (Track E evaluates later)
-- ⬜ **H2-M** Identity profile model v0 (`IdentityProfile` + `IdentitySnapshot` + JSON store) — **Owner: Track C**
-- ⬜ **H2-N** Identity signal convention + post-run updater v0 — **Owner: Track C** (Track B reviews later)
+- ✅ **H2-I** Session memory v1 (M1 only) — **Owner: Track C**
+- ✅ **H2-J** agent role boundary cleanup for H1 — **Owner: Track C**
+- ✅ **H2-K** memory candidate extraction policy v1 — **Owner: Track C** (Track E evaluates later)
+- ✅ **H2-M** Identity profile model v0 (`IdentityProfile` + `IdentitySnapshot` + JSON store) — **Owner: Track C**
+- ✅ **H2-N** Identity signal convention + post-run updater v0 — **Owner: Track C** (Track B reviews later)
 
 Reference for H2-M/N: `docs/Emergent-Identity-Layer-v01.md`
 
@@ -763,27 +763,27 @@ Reference for H2-M/N: `docs/Emergent-Identity-Layer-v01.md`
 
 ### Sprint W2-S2 — Execution Steps
 
-**⬜ Step 1 — Track E and Track C open foundation work in parallel**
+**✅ Step 1 — Track E and Track C foundation work in parallel (completed)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | H2-E | H2-D ✅ | Replay foundation for Track E discipline claims |
-| Track C agent session | H2-I, H2-J | H2-D ✅ | Memory foundation + role cleanup need stable contracts, not replay |
-| Track C agent session | H2-M | H2-D ✅ | Identity profile model is contract-dependent only |
+| Track E agent session | ✅ H2-E | H2-D ✅ | Artifact-backed replay/read/reconstruction foundation delivered with mandatory preflight validation |
+| Track C agent session | ✅ H2-I, ✅ H2-J | H2-D ✅ | Session-memory v1 foundation and manager-boundary cleanup completed |
+| Track C agent session | ✅ H2-M | H2-D ✅ | Identity profile model completed |
 
-**⬜ Step 2 — smoke/baseline and memory/identity policies in parallel**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track E agent session | H2-F, H2-G | H2-E ✅ | Smoke suite + baseline tagging on top of replay |
-| Track C agent session | H2-K | H2-I ✅ | Memory extraction policy builds on memory foundation |
-| Track C agent session | H2-N | H2-M ✅ | Identity updater builds on profile model |
-
-**⬜ Step 3 — Track E drafts the regression checklist**
+**✅ Step 2 — smoke/baseline and memory/identity policies in parallel (completed)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | H2-H (draft) | H2-F ✅ + H2-G ✅ | Draft assertions from smoke/replay reality |
+| Track E agent session | ✅ H2-F, ✅ H2-G | H2-E ✅ | Replay-backed stored-artifact smoke suite and additive baseline/provenance tagging delivered |
+| Track C agent session | ✅ H2-K | H2-I ✅ | Memory extraction policy builds on memory foundation |
+| Track C agent session | ✅ H2-N | H2-M ✅ | Identity updater delivered with config-gated, non-fatal post-run integration |
+
+**✅ Step 3 — Track E drafts the regression checklist**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track E agent session | ✅ H2-H (draft) | H2-F ✅ + H2-G ✅ | Draft regression checklist delivered from replay/smoke/tag reality with explicit Track B confirmation handoff |
 
 #### Sprint W2-S3 — Cross-track Validation and Hardening
 
@@ -1408,11 +1408,10 @@ This section should always describe the **current frontier**, not the original k
 Wave 0 is complete.
 Wave 1 core closeout is complete through `L1-J` / `L1-K` / `L1-L` / `L1-M`.
 Wave 2 Sprint `W2-S1` is complete (`H2-A` / `H2-B` / `H2-C` / `H2-D` ✅).
-The immediate mainline frontier now moves to Wave 2 Sprint `W2-S2` Step 1:
+Wave 2 Sprint `W2-S2` is complete through Step 3 (`H2-E` / `H2-F` / `H2-G` + `H2-H` draft).
+The immediate mainline frontier is now:
 
-- Track E `H2-E`
-- Track C `H2-I` / `H2-J`
-- Track C `H2-M`
+- W2-S3 Step 1 Track B confirmation/review kickoff (`H2-H` contract confirmation + `H2-N` boundary review)
 Optional Wave 1 identity-prep docs (`L1-N` / `L1-O`) and docs-only `CV0` side-vertical planning are now allowed, but they do not replace the mainline frontier.
 
 ### W1-S2 stabilization batch — Execution Steps
@@ -1453,9 +1452,9 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track E agent session` for `⬜ H2-E`
-2. `Track C agent session` for `⬜ H2-I`, `⬜ H2-J`
-3. `Track C agent session` for `⬜ H2-M`
+1. `Track B agent session` for `⬜ H2-H` contract confirmation (`H2-H` draft ✅)
+2. `Track B agent session` for `⬜ H2-N` boundary review (`H2-N` implementation ✅)
+3. `Track E agent session` for `⬜ H2-L` (after `H2-K` + `H2-H` confirmation context is available)
 4. optional docs-only `CV0` work if it does not slow Wave 2 mainline progress
 
 Reference:
@@ -1592,9 +1591,9 @@ Epics:
 - `H2-B` ✅
 - `H2-C` ✅
 - `H2-D` ✅
-- `H2-E` ⬜
-- `H2-F` ⬜
-- `H2-G` ⬜
+- `H2-E` ✅
+- `H2-F` ✅
+- `H2-G` ✅
 - `H2-H` ⬜
 
 **Acceptance gate:**
@@ -1815,6 +1814,15 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-03-17][Track A] L1-E completed (🔄 -> ✅) - CLI now surfaces H1 final_output and manager_orchestration in readable summary sections with lane/turn trace rollups and coverage in tests/cli/test_l1_e_h1_summary.py - next: support Track E baseline comparison interpretation with clearer manager run evidence.`
 - `[2026-03-20][Track A] L1-J started (⬜ -> 🔄) - basic trace viewer/timeline summary implementation started from persisted trace artifacts so handoff-linked runs can be inspected without raw JSON spelunking - next: land `fal trace show --run-id` and linkage-aware timeline rendering.`
 - `[2026-03-20][Track A] L1-J completed (🔄 -> ✅) - CLI now supports `trace show --run-id` for stored trace artifacts with text/json timeline output, event/lane rollups, and preserved parent/correlation linkage fields, plus regression coverage in tests/cli/test_l1_j_trace_viewer.py - next: proceed with remaining W1-S3 epics (`L1-L`, `L1-M`) toward Wave 1 closeout.`
+- `[2026-04-02][Track E] H2-E started (⬜ -> 🔄) - Wave 2 replay foundation implementation opened with artifact-backed scope only (`run_id + data_dir`, shared path resolver, mandatory artifact_acceptance preflight) - next: deliver reconstruction report + script + tests for H1 family artifacts.`
+- `[2026-04-02][Track E] H2-E completed (🔄 -> ✅) - artifact-backed replay/read/reconstruction shipped via src/fractal_agent_lab/evals/artifact_replay.py and scripts/run_h2_e_artifact_replay.py with v0/v1 compatibility, linkage-aware timeline/orchestration/failure summaries, and negative-path preflight blocking tests - next: proceed to H2-F/H2-G while Track C closes H2-I/H2-J/H2-M.`
+- `[2026-04-03][Track C] H2-I/H2-J completed (🔄 -> ✅) - H2-J removed misleading manager-pack handoff topology and aligned manager-pack validation/tests to `manager_spec` + manager control authority; H2-I delivered M1 session-memory foundation using `input_payload.session_id` lookup, JSON store under data/memory/sessions, run-context injection, and optional per-run sidecar snapshot (non-canonical) with negative-path/context pass-through tests - next: proceed to H2-K/H2-N and Track E H2-F/H2-G.`
+- `[2026-04-03][Track E] H2-F/H2-G started (⬜ -> 🔄) - Track E started W2-S2 Step 2 replay-backed smoke and additive baseline-tagging work on top of H2-E with strict no-rerun/no-scoring guardrails - next: deliver stored-artifact smoke suite, baseline/provenance tags, scripts, tests, and Wave 2 doc.`
+- `[2026-04-03][Track E] H2-F/H2-G completed (🔄 -> ✅) - H2-F shipped as stored-artifact H1 smoke suite and H2-G shipped as additive baseline/provenance tagging, both replay-backed via artifact_acceptance + artifact_replay with completeness discipline preserved and no run/trace schema mutation - next: proceed to H2-H draft while Track C closes H2-K/H2-N.`
+- `[2026-04-03][Track C] H2-K completed (🔄 -> ✅) - memory candidate extraction policy v1 delivered with deterministic success-only/session-tagged H1 extraction and optional non-canonical `memory_candidates.json` sidecar artifact under `data/artifacts/<run_id>/`, including tests for no-session/failure gates and canonical session-store non-mutation - next: continue H2-N and hand off H2-K outputs to Track E H2-L.`
+- `[2026-04-03][Track C] H2-N completed (🔄 -> ✅) - identity updater v0 delivered with `identity.signal.v0` envelope normalization, documented derived fallback, bounded post-run profile updates, profile save + snapshot append, and non-canonical `identity_update.json` sidecar artifact; CLI integration is config-gated and explicitly non-fatal on updater errors, with no core runtime/schema churn - next: hand off to Track B H2-N boundary review and Track E H2-O dependency chain.`
+- `[2026-04-03][Track E] H2-H draft started (⬜ -> 🔄) - Track E opened W2-S2 Step 3 as doc-only regression checklist drafting from H2-E/H2-F/H2-G evidence with strict bucket semantics and no hidden contract enforcement - next: publish draft checklist and hand off Track B confirmation candidates for W2-S3.`
+- `[2026-04-03][Track E] H2-H draft completed (🔄 -> ✅ Track E draft scope) - regression checklist draft published in docs/wave2/Wave2-W2-S2-TrackE-H2-H-Draft-Regression-Checklist.md with explicit buckets (enforced now vs observed expectations vs Track B confirmation candidates), RF-2026-03-19-02 false-green anchor preserved, and Track C compatibility watchpoints kept non-gating - next: Track B executes W2-S3 H2-H contract confirmation scope (still open).`
 
 ---
 

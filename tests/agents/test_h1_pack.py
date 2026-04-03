@@ -23,14 +23,12 @@ class H1PackTests(unittest.TestCase):
 
         synthesizer = pack["h1_synthesizer_agent"]
         self.assertEqual("finalizer", synthesizer.model_policy_ref)
-        self.assertEqual(
-            {"h1_intake_agent", "h1_planner_agent", "h1_critic_agent"},
-            set(synthesizer.handoff_targets),
-        )
+        self.assertEqual([], synthesizer.handoff_targets)
         self.assertEqual("h1/synthesizer/v1", synthesizer.metadata["prompt_version"])
         self.assertEqual(H1_PROMPT_VERSION, synthesizer.metadata["pack_prompt_version"])
 
         for spec in pack.values():
+            self.assertEqual([], spec.handoff_targets)
             self.assertEqual(H1_PROMPT_VERSION, spec.metadata.get("pack_prompt_version"))
 
     def test_h1_single_agent_pack_has_expected_shape(self) -> None:

@@ -12,25 +12,16 @@ from fractal_agent_lab.core.contracts import AgentSpec, WorkflowSpec
 from fractal_agent_lab.core.events import TraceEvent
 from fractal_agent_lab.core.models import RunState, RunStatus
 from fractal_agent_lab.evals.artifact_acceptance import ArtifactValidationResult, validate_run_trace_by_run_id
+from fractal_agent_lab.evals.h1_eval_contracts import H1_COMPARABLE_OUTPUT_KEYS, H1_VARIANT_WORKFLOW_IDS
+from fractal_agent_lab.evals.h1_eval_projections import extract_h1_comparable_output_for_keys
 from fractal_agent_lab.runtime import WorkflowExecutor
 from fractal_agent_lab.state import InMemoryRunStateStore
 from fractal_agent_lab.tracing import InMemoryTraceEmitter, write_run_artifact, write_trace_artifact
 
 
-H1_SMOKE_VARIANTS: tuple[str, ...] = (
-    "h1.single.v1",
-    "h1.manager.v1",
-    "h1.handoff.v1",
-)
+H1_SMOKE_VARIANTS: tuple[str, ...] = H1_VARIANT_WORKFLOW_IDS
 
-COMPARABLE_OUTPUT_KEYS: tuple[str, ...] = (
-    "clarified_idea",
-    "strongest_assumptions",
-    "weak_points",
-    "alternatives",
-    "recommended_mvp_direction",
-    "next_3_validation_steps",
-)
+COMPARABLE_OUTPUT_KEYS: tuple[str, ...] = H1_COMPARABLE_OUTPUT_KEYS
 
 
 def run_h1_smoke_comparison(
@@ -193,30 +184,11 @@ def _extract_orchestration_summary(run_state: RunState) -> dict[str, Any]:
 
 
 def _extract_comparable_output(run_state: RunState) -> dict[str, Any]:
-    output_payload = run_state.output_payload if isinstance(run_state.output_payload, dict) else {}
-
-    source: dict[str, Any] | None = None
-    if run_state.workflow_id == "h1.single.v1":
-        step_results = output_payload.get("step_results")
-        if isinstance(step_results, dict):
-            single_step = step_results.get("single")
-            if isinstance(single_step, dict):
-                single_output = single_step.get("output")
-                if isinstance(single_output, dict):
-                    source = single_output
-    else:
-        final_output = output_payload.get("final_output")
-        if isinstance(final_output, dict):
-            source = final_output
-
-    fields = {key: source.get(key) if source is not None else None for key in COMPARABLE_OUTPUT_KEYS}
-    missing_keys = sorted(key for key, value in fields.items() if value is None)
-    return {
-        "present": source is not None,
-        "complete": source is not None and not missing_keys,
-        "fields": fields,
-        "missing_keys": missing_keys,
-    }
+    return extract_h1_comparable_output_for_keys(
+        workflow_id=run_state.workflow_id,
+        output_payload=run_state.output_payload,
+        comparable_keys=COMPARABLE_OUTPUT_KEYS,
+    )
 
 
 def _collect_event_counts(events: list[TraceEvent]) -> dict[str, int]:

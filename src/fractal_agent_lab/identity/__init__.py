@@ -1,3 +1,5 @@
-# Emergent Identity Layer
-# Primary owner: Track C | Shared deps: Track B (runtime/state), Track E (drift/eval)
-# Design reference: docs/Emergent-Identity-Layer-v01.md
+from fractal_agent_lab.identity.models import IdentityProfile, IdentitySnapshot
+from fractal_agent_lab.identity.store import JSONIdentityStore
+from fractal_agent_lab.identity.updater import run_post_run_identity_update
+
+__all__ = ["IdentityProfile", "IdentitySnapshot", "JSONIdentityStore", "run_post_run_identity_update"]

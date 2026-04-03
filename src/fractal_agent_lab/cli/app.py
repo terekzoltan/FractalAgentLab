@@ -26,6 +26,12 @@ from fractal_agent_lab.cli.workflow_registry import (
     list_workflow_ids,
 )
 from fractal_agent_lab.core.models import RunStatus
+from fractal_agent_lab.identity import run_post_run_identity_update
+from fractal_agent_lab.memory import (
+    load_session_memory_context,
+    write_memory_candidates_artifact,
+    write_session_memory_snapshot_artifact,
+)
 from fractal_agent_lab.runtime import WorkflowExecutor
 from fractal_agent_lab.state import InMemoryRunStateStore
 from fractal_agent_lab.tracing import (
@@ -147,6 +153,9 @@ def _handle_run(args: argparse.Namespace) -> int:
         print(f"Error: {error}")
         return 2
 
+    data_dir = resolve_data_dir(runtime_config)
+    run_context = load_session_memory_context(input_payload=input_payload, data_dir=data_dir)
+
     emitter = InMemoryTraceEmitter()
     state_store = InMemoryRunStateStore()
     executor = WorkflowExecutor(
@@ -160,14 +169,17 @@ def _handle_run(args: argparse.Namespace) -> int:
         limits=limits,
     )
 
-    run_state = executor.execute(workflow=workflow, input_payload=input_payload)
+    run_state = executor.execute(
+        workflow=workflow,
+        input_payload=input_payload,
+        context=run_context,
+    )
     _inject_h1_prompt_tags(
         run_state=run_state,
         workflow=workflow,
         workflow_agent_specs=workflow_agent_specs,
     )
 
-    data_dir = resolve_data_dir(runtime_config)
     run_artifact_path = None
     trace_artifact_path = None
     try:
@@ -177,8 +189,28 @@ def _handle_run(args: argparse.Namespace) -> int:
             run_id=run_state.run_id,
             data_dir=data_dir,
         )
+        _ = write_session_memory_snapshot_artifact(
+            run_id=run_state.run_id,
+            workflow_id=run_state.workflow_id,
+            run_context=run_state.context,
+            data_dir=data_dir,
+        )
+        _ = write_memory_candidates_artifact(
+            run_state=run_state,
+            data_dir=data_dir,
+        )
     except OSError as error:
         print(f"Warning: failed to write run/trace artifacts: {error}", file=sys.stderr)
+
+    try:
+        _ = run_post_run_identity_update(
+            run_state=run_state,
+            trace_events=emitter.events,
+            runtime_config=runtime_config,
+            data_dir=data_dir,
+        )
+    except Exception as error:
+        print(f"Warning: identity updater failed (non-fatal): {error}", file=sys.stderr)
 
     steps_total = len(workflow.steps)
     include_trace = bool(args.show_trace)

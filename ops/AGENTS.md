@@ -25,6 +25,9 @@
 > - keep provider-agnostic expansion possible, but not required in v1
 >
 > Meta Coordinator rule: **does not write production code**. Only coordination, planning, audits, reports, doc maintenance.
+>
+> Conversation convention:
+> - when the user writes `ÉN`, it refers to the user/project owner speaking in first person
 
 ---
 
@@ -216,7 +219,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; design-only `L1-N/L1-O` delivered; no mainline W2-S1 implementation epic is owned by Track C)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; next Track C checkpoint is W2-S3 boundary/review sequencing)
 
 ---
 
@@ -284,7 +287,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E now waits for the Wave 2 replay/smoke frontier and may later support docs-only `CV0-C3` review)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft, and now waits for Track B `H2-H` contract confirmation while preparing later W2-S3 eval ownership `H2-L`/`H2-O`)
 
 ---
 
@@ -977,6 +980,20 @@ Entries:
 - `[2026-04-01][Meta] CV0-A completed (⬜ -> ✅) - H4/H5 artifact contract finalized with canonical sidecar path, run/trace correlation rules, and mandatory envelope fields - next: CV0-B (Track C H4 planning prompt review) when mainline bandwidth allows.`
 - `[2026-04-01][Track B] W2-S1 H2-A/H2-B/H2-C completed (🔄 -> ✅) - RunState hardened to v1 with additive lifecycle/failure fields, TraceEvent contract moved to v1, and runtime failure classification/error-envelope v1 now emits consistently to run artifacts and terminal trace payloads; artifact validation tightened (schema support, event-id uniqueness, timestamp validity, trace-id ordering) with negative-path + cross-surface tests - next: execute H2-D persistence layout hardening on top of the stabilized contracts.`
 - `[2026-04-01][Track B] W2-S1 H2-D completed (🔄 -> ✅) - persistence layout hardened with centralized artifact path resolution (`runs`/`traces` canonical truth preserved), additive `artifacts/<run_id>/` sidecar-ready surface, and cross-surface writer/reader/eval alignment with new tracing layout tests - next: W2-S2 starts in parallel on Track E (`H2-E`) and Track C (`H2-I/H2-J/H2-M`) atop the stabilized contracts.`
+- `[2026-04-02][Track E] H2-E started (⬜ -> 🔄) - replay foundation implementation started with strict artifact-backed scope (`run_id + data_dir`, shared path resolver, artifact_acceptance preflight) and no rerun/smoke overreach - next: deliver reconstruction module, script, tests, and Wave 2 implementation note.`
+- `[2026-04-02][Track E] H2-E completed (🔄 -> ✅) - Track E shipped artifact-backed replay/read/reconstruction via src/fractal_agent_lab/evals/artifact_replay.py and scripts/run_h2_e_artifact_replay.py, with v0/v1 compatibility, linkage-aware timeline/orchestration/failure summaries, and preflight-blocking negative-path tests - next: proceed to H2-F/H2-G while Track C closes H2-I/H2-J/H2-M.`
+- `[2026-04-03][Track C] H2-M started (⬜ -> 🔄) - Identity profile foundation implementation started with strict scope (`IdentityProfile` + `IdentitySnapshot` + JSON store) and no updater/drift/routing/runtime-schema expansion - next: deliver identity models/store code, tests, and Wave 2 implementation note.`
+- `[2026-04-03][Track C] H2-M completed (🔄 -> ✅) - Identity profile model v0 delivered via `IdentityProfile`/`IdentitySnapshot` models and `JSONIdentityStore` under src/fractal_agent_lab/identity/, with roundtrip + negative-path tests and no updater/drift/routing/runtime-schema spillover - next: continue W2-S2 Step 1 closeout on H2-I/H2-J in parallel Track C sessions.`
+- `[2026-04-03][Track C] H2-I/H2-J started (⬜ -> 🔄) - Track C opened W2-S2 Step 1 closeout batch: H2-I session-memory v1 foundation (`input_payload.session_id` lookup, no new CLI surface) and H2-J H1 manager role-boundary cleanup - next: align pack validation/tests and land memory store/context load surfaces.`
+- `[2026-04-03][Track C] H2-I/H2-J completed (🔄 -> ✅) - H2-J removed misleading manager-pack handoff topology and aligned validation/tests to manager authority (`manager_spec` + manager control); H2-I delivered M1 session-memory foundation via JSON store + context injection from `input_payload.session_id` + optional sidecar snapshot, with negative-path/context-pass-through tests and no H2-K/H2-N spillover - next: proceed to H2-K/H2-N and Track E H2-F/H2-G progression.`
+- `[2026-04-03][Track E] H2-F/H2-G started (⬜ -> 🔄) - Track E opened W2-S2 Step 2 with strict scope guardrails: H2-F replay-backed stored-artifact smoke only, H2-G additive baseline/provenance tags only, no rerun-default and no scoring/schema churn - next: deliver eval modules/scripts/tests and Wave 2 doc.`
+- `[2026-04-03][Track E] H2-F/H2-G completed (🔄 -> ✅) - H2-F shipped via h1_smoke_suite over replay artifacts with completeness + linkage-aware gates, H2-G shipped via h1_baseline_tags with policy-aligned baseline roles and provenance-only prompt tags, plus scripts/tests/docs and no canonical artifact schema mutations - next: proceed to H2-H draft while Track C advances H2-K/H2-N.`
+- `[2026-04-03][Track C] H2-N started (⬜ -> 🔄) - post-run identity updater implementation started with strict scope: signal-envelope normalizer + derived fallback + bounded profile update + snapshot append + per-run sidecar, config-gated and non-fatal from CLI post-run path - next: deliver updater module, tests, and Wave 2 implementation note without runtime/schema churn.`
+- `[2026-04-03][Track C] H2-K started (⬜ -> 🔄) - memory candidate extraction policy v1 implementation started with strict guardrails: success-only + session-tagged-only + H1-first deterministic extraction, optional non-canonical sidecar artifact output, and no canonical session-store mutation - next: deliver extractor module, tests, and Wave 2 implementation note.`
+- `[2026-04-03][Track C] H2-K completed (🔄 -> ✅) - memory candidate extraction policy v1 shipped with deterministic success-only/session-tagged H1 extraction, non-canonical `memory_candidates.json` sidecar output under `data/artifacts/<run_id>/`, and test coverage proving failed/no-session gating plus canonical session-store non-mutation - next: continue H2-N updater work and hand off H2-K outputs to Track E H2-L evaluation.`
+- `[2026-04-03][Track C] H2-N completed (🔄 -> ✅) - identity updater v0 delivered with `identity.signal.v0` normalization, explicit-over-fallback merge, bounded profile updates, profile save + snapshot append, and non-canonical `identity_update.json` sidecar output; CLI integration is config-gated and wrapped by dedicated non-fatal error handling - next: hand off to Track B H2-N boundary review and Track E H2-O dependency chain.`
+- `[2026-04-03][Track E] H2-H draft started (⬜ -> 🔄) - Track E opened W2-S2 Step 3 as a doc-only regression-checklist draft from H2-E/H2-F/H2-G evidence, with strict bucket semantics and no hidden contract enforcement - next: publish the checklist and hand off Track B confirmation candidates for W2-S3.`
+- `[2026-04-03][Track E] H2-H draft completed (🔄 -> ✅ Track E draft scope) - docs/wave2/Wave2-W2-S2-TrackE-H2-H-Draft-Regression-Checklist.md published with explicit three-bucket separation (enforced now / observed expectations / Track B confirmation candidates), RF-2026-03-19-02 false-green anchor retained, and Track C references kept as compatibility watchpoints only - next: Track B executes W2-S3 H2-H contract confirmation scope (still open).`
 
 ---
 
