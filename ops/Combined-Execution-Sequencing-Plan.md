@@ -879,29 +879,29 @@ CV0 delivers:
 |---------|---------|--------|-------|
 | Meta Coordinator session | ✅ CV0-A: H4/H5 artifact contract finalization | Wave 1 ✅ | Finalized `Coding-Vertical-Artifact-Contract-v01.md` into canonical state |
 
-**⬜ Step CV0-2 — Track C reviews H4 planning prompt draft**
+**✅ Step CV0-2 — Track C reviews H4 planning prompt draft**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent session | CV0-B: H4 planning prompt/policy review | CV0-A ✅ | Design-only review of repo-aware planning semantics |
+| Track C agent session | ✅ CV0-B: H4 planning prompt/policy review | CV0-A ✅ | Design-only review delivered with scope normalization, Combined-authoritative readiness clarification, and cross-doc H4 policy alignment |
 
-**⬜ Step CV0-3 — Track E reviews H5 review/gate policy draft**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track E agent session | CV0-C: H5 review/gate policy review | CV0-A ✅ | Design-only review of commit-gate and review semantics |
-
-**⬜ Step CV0-4 — Meta finalizes CV0 closeout**
+**✅ Step CV0-3 — Track E reviews H5 review/gate policy draft**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | CV0-D: CV0 closeout + CV1 prereq note | CV0-B ✅ + CV0-C ✅ | Document CV1 unlock criteria and any design pivots |
+| Track E agent session | ✅ CV0-C: H5 review/gate policy review | CV0-A ✅ | Design-only review delivered with false-green guardrail alignment, control-surface clarity, and explicit CV0-vs-CV2 boundary wording |
+
+**✅ Step CV0-4 — Meta finalizes CV0 closeout**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator session | ✅ CV0-D: CV0 closeout + CV1 prereq note | CV0-B ✅ + CV0-C ✅ | CV0 is now closed as docs-only policy work; `CV1` is ready by named prerequisites but remains a side-vertical option, not the active mainline frontier |
 
 ### CV0 gate to close the batch
 - H4/H5 artifact shapes are canonized
 - H4 planning policy draft exists and is Track C reviewed
 - H5 review/gate policy draft exists and is Track E reviewed
-- CV1 unlock criteria are explicit
+- CV1/CV2 unlock stance is explicit and does not replace the active mainline frontier
 - No production code was written (docs/policy only)
 
 ---
@@ -1465,8 +1465,8 @@ Reference:
 
 This is a planned side-vertical sequence, not the mainline queue.
 
-Wave 1 core closeout is now complete, so docs-only `CV0` planning is allowed.
-`CV1` and `CV2` remain blocked.
+Wave 1 core closeout is complete and `CV0` is now closed.
+`CV1` is ready by named prerequisites but remains optional side-vertical work; `CV2` remains blocked until `CV1` evidence exists.
 
 Use this in the following order:
 
@@ -1488,25 +1488,25 @@ It no longer blocks on Wave 1 core closeout, but it still does not replace the m
 
 #### `CV0` — Design and policy canonization
 
-**Status:** `⬜ ready after Wave 1 core closeout`  
-**Owner priority:** Meta Coordinator, then Track C, with Track B/E review where needed
+**Status:** `✅ complete`  
+**Owner priority:** Meta Coordinator, then Track C, with Track E review where needed
+
+Scope normalization note:
+- CV0-B is the narrow Track C `H4` planning prompt/policy review scope
+- CV0-B is not a broad H4/H5 redesign step
+- artifact contract finalization is already complete via CV0-A
 
 Epics:
-- ⬜ **CV0-A** coding-vertical positioning and boundary canonization — **Owner: Meta Coordinator**
-- ⬜ **CV0-B** H4/H5 workflow-family and role sketch — **Owner: Track C**
-- ⬜ **CV0-C1** coding artifact contract draft — **Owner: Meta Coordinator**
-- ⬜ **CV0-C2** coding artifact boundary review against canonical run/trace truth — **Owner: Track B**
-- ⬜ **CV0-C3** coding review/gate policy review — **Owner: Track E**
-- ⬜ **CV0-D** private learning-loop policy — **Owner: Meta Coordinator**
-- ⬜ **CV0-E** sequencing insertion and blocked-state rules — **Owner: Meta Coordinator**
-- ⬜ **CV0-META1** coding-vertical design closeout and `CV1` readiness decision — **Owner: Meta Coordinator**
+- ✅ **CV0-A** H4/H5 artifact contract finalization — **Owner: Meta Coordinator**
+- ✅ **CV0-B** H4 planning prompt/policy review — **Owner: Track C**
+- ✅ **CV0-C** H5 review/gate policy review — **Owner: Track E**
+- ✅ **CV0-D** CV0 closeout + CV1 prereq note — **Owner: Meta Coordinator**
 
 **Sequential ordering:**
-1. `CV0-A` first (positioning and boundary canonization must exist before detailed vertical policy hardens)
-2. `CV0-B`, `CV0-D`, and `CV0-E` can proceed in parallel after `CV0-A`
-3. `CV0-C1` after `CV0-A` and `CV0-B` (artifact contract should consume the agreed workflow-family shape)
-4. `CV0-C2` and `CV0-C3` can proceed in parallel after `CV0-C1`
-5. `CV0-META1` after `CV0-B`, `CV0-C1`, `CV0-C2`, `CV0-C3`, `CV0-D`, and `CV0-E`
+1. `CV0-A` first (artifact contract baseline must exist before review alignment)
+2. `CV0-B` after `CV0-A` (Track C H4 planning review)
+3. `CV0-C` after `CV0-A` (Track E H5 review/gate review)
+4. `CV0-D` after `CV0-B` and `CV0-C`
 
 **Prerequisites:**
 - `W1-S2-FIX-E1` ✅
@@ -1518,58 +1518,46 @@ Epics:
 - `L1-L` ✅
 - `L1-M` ✅
 
-**Execution assignment for multi-owner policy chain:**
-- `CV0-C`: **Meta -> Track B / Track E**
-  - Meta drafts the artifact contract and initial policy surface
-  - Track B confirms compatibility with canonical run/trace truth
-  - Track E reviews whether the gate policy is evaluable and honest
+**Execution assignment for policy closeout chain:**
+- `CV0-D`: Meta closeout after Track C/Track E reviews reconcile policy alignment and record the resulting CV1 prereq stance without changing the active mainline frontier
 
 **Acceptance gate:**
 - coding vertical has canonical private docs
 - H4/H5 positioning and non-goals are explicit
 - artifact/gate/privacy boundaries are explicit
-- `CV1` and `CV2` remain clearly blocked behind named prerequisites
+- `CV1`/`CV2` unlock stance is explicit and sequencing-safe relative to the active mainline frontier
 - no production-code churn was required
 - the current human-driven Combined-aware workflow has an explicit canonical mapping
 
 ### `CV0` — Execution Steps
 
-**⬜ Step 1 — Meta canonizes the coding-vertical position and boundaries first**
+**✅ Step 1 — Meta canonizes the coding-vertical position and boundaries first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | CV0-A | Wave 1 closeout ✅ | Establish purpose, scope, non-goals, and the canonical human-workflow mapping before track-specific vertical design expands |
+| Meta Coordinator session | ✅ CV0-A | Wave 1 closeout ✅ | Establish purpose, scope, non-goals, canonical human-workflow mapping, and artifact-contract baseline |
 
-**⬜ Step 2 — Track C sketching and Meta policy scaffolding proceed in parallel**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track C agent session | CV0-B | CV0-A ✅ | H4/H5 role-family design should consume the canonized boundary instead of inventing one |
-| Meta Coordinator session | CV0-D | CV0-A ✅ | Define the private learning-loop categories and storage stance early |
-| Meta Coordinator session | CV0-E | CV0-A ✅ | Insert explicit blocked/unblocked rules into sequencing without opening runtime work |
-
-**⬜ Step 3 — Meta drafts the coding artifact contract**
+**✅ Step 2 — Track C executes narrow H4 planning prompt/policy review**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | CV0-C1 | CV0-A ✅ + CV0-B ✅ | The contract should reflect the workflow-family shape, not float above it |
+| Track C agent session | ✅ CV0-B | CV0-A ✅ | H4 review delivered as docs-only decision package with scope normalization and cross-doc alignment |
 
-**⬜ Step 4 — Track B and Track E review the draft policy surface in parallel**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| Track B agent session | CV0-C2 | CV0-C1 ✅ | Check that coding artifacts extend canonical run/trace truth instead of creating a rival source of truth |
-| Track E agent session | CV0-C3 | CV0-C1 ✅ | Check that findings/gate semantics are evaluable and resistant to false-green behavior |
-
-**⬜ Step 5 — Meta closes the design batch and keeps `CV1` blocked unless prerequisites are truly met**
+**✅ Step 3 — Track E reviews H5 review/gate policy draft**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | CV0-META1 | CV0-B ✅ + CV0-C1 ✅ + CV0-C2 ✅ + CV0-C3 ✅ + CV0-D ✅ + CV0-E ✅ | Close the batch, reconcile docs, and explicitly declare `CV1` still blocked or ready-by-prereq only |
+| Track E agent session | ✅ CV0-C | CV0-A ✅ | Design-only review completed with H5 policy boundary tightening and cross-doc consistency alignment |
+
+**✅ Step 4 — Meta closes CV0 and records CV1 prereq stance**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator session | ✅ CV0-D | CV0-B ✅ + CV0-C ✅ | Reconcile docs, close CV0, and record that `CV1` is ready by named prerequisites but remains a side-vertical option rather than the active mainline frontier |
 
 #### `CV1` — Thin `H4` pilot
 
-**Status:** `🚫 blocked until Wave 2 hardening prerequisites are complete`  
+**Status:** `⏸ ready by named prerequisites; remains optional side-vertical work and does not replace the active Wave 2 mainline frontier`  
 **Owner priority:** Track C, with Track D support and Track E evaluation
 
 Epics:
@@ -1586,7 +1574,7 @@ Epics:
 4. `CV1-META1` after `CV1-D`
 
 **Prerequisites:**
-- `CV0-META1` ⬜
+- `CV0-D` ✅
 - `H2-A` ✅
 - `H2-B` ✅
 - `H2-C` ✅
@@ -1594,7 +1582,7 @@ Epics:
 - `H2-E` ✅
 - `H2-F` ✅
 - `H2-G` ✅
-- `H2-H` ⬜
+- `H2-H` ✅
 
 **Acceptance gate:**
 - H4 can produce grounded planning artifacts from real repo context
@@ -1609,7 +1597,7 @@ Epics:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent session | CV1-A | CV0-META1 ✅ + H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ + H2-E ✅ + H2-F ✅ + H2-G ✅ + H2-H ✅ | Start from actual repo intake and current Combined frontier, not only the user request |
+| Track C agent session | CV1-A | CV0-D ✅ + H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ + H2-E ✅ + H2-F ✅ + H2-G ✅ + H2-H ✅ | Start from actual repo intake and current Combined frontier, not only the user request |
 
 **⬜ Step 2 — planning artifacts and the minimal tool surface advance in parallel**
 

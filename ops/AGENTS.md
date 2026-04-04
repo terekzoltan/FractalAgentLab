@@ -978,6 +978,10 @@ Entries:
 - `[2026-03-22][Track C] L1-N/L1-O completed (🔄 -> ✅) - design-only identity prep delivered via docs/wave1/Wave1-L1-N-Identity-Profile-Schema-Draft.md and docs/wave1/Wave1-L1-O-Identity-Signal-Carrier-Convention.md, keeping runtime contracts unchanged and preparing Wave 2 observational identity MVP semantics.`
 - `[2026-03-30][Meta] Track D real-provider roadmap canonized - Wave 2 stays prep-only, Wave 3 gets the first non-blocking real-provider MVP side batch, and Wave 4 now owns provider parity/routing hardening - next: implement the documented placement in future Track D execution without displacing the mainline.`
 - `[2026-04-01][Meta] CV0-A completed (⬜ -> ✅) - H4/H5 artifact contract finalized with canonical sidecar path, run/trace correlation rules, and mandatory envelope fields - next: CV0-B (Track C H4 planning prompt review) when mainline bandwidth allows.`
+- `[2026-04-04][Track C] CV0-B completed (⬜ -> ✅) - docs-only H4 planning prompt/policy review delivered as a decision package with narrow-scope normalization (H4-focused), Combined-authoritative readiness/order clarification, OpenCode-anchored reaffirmation, and targeted cross-doc alignment updates without H5 gate-policy rewrite or runtime/schema/tooling claims - next: Track E executes CV0-C and Meta closes CV0 with CV1 prerequisite note.`
+- `[2026-04-04][Track E] CV0-C started (⬜ -> 🔄) - docs-only H5 review/gate policy review started with strict scope boundary (policy review only, no CV2 execution claims), control-surface/OpenCode alignment checks, and false-green guardrail preservation goals - next: publish H5 review outcome package and apply targeted policy wording alignment.`
+- `[2026-04-04][Track E] CV0-C completed (🔄 -> ✅) - H5 review/gate policy review delivered via docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md with explicit CV0-vs-CV2 boundary language, strengthened anti-false-green and artifact-contract-consumption wording, and cross-doc consistency updates without runtime/eval/schema/tooling changes - next: Meta executes CV0-D closeout and records CV1 prerequisite stance.`
+- `[2026-04-04][Meta] CV0-D completed (⬜ -> ✅) - CV0 is now closed as a docs-only coding-vertical batch after reconciling Track C H4 and Track E H5 review outcomes; `CV1` is ready by named prerequisites but remains a side-vertical option that does not replace the active Wave 2 mainline frontier - next: continue the active mainline queue unless `CV1` is explicitly chosen.`
 - `[2026-04-01][Track B] W2-S1 H2-A/H2-B/H2-C completed (🔄 -> ✅) - RunState hardened to v1 with additive lifecycle/failure fields, TraceEvent contract moved to v1, and runtime failure classification/error-envelope v1 now emits consistently to run artifacts and terminal trace payloads; artifact validation tightened (schema support, event-id uniqueness, timestamp validity, trace-id ordering) with negative-path + cross-surface tests - next: execute H2-D persistence layout hardening on top of the stabilized contracts.`
 - `[2026-04-01][Track B] W2-S1 H2-D completed (🔄 -> ✅) - persistence layout hardened with centralized artifact path resolution (`runs`/`traces` canonical truth preserved), additive `artifacts/<run_id>/` sidecar-ready surface, and cross-surface writer/reader/eval alignment with new tracing layout tests - next: W2-S2 starts in parallel on Track E (`H2-E`) and Track C (`H2-I/H2-J/H2-M`) atop the stabilized contracts.`
 - `[2026-04-02][Track E] H2-E started (⬜ -> 🔄) - replay foundation implementation started with strict artifact-backed scope (`run_id + data_dir`, shared path resolver, artifact_acceptance preflight) and no rerun/smoke overreach - next: deliver reconstruction module, script, tests, and Wave 2 implementation note.`
@@ -1299,8 +1303,10 @@ These are not the active implementation frontier, but they are now canonical fut
 6. `docs/private/Coding-Vertical-Repo-Aware-Planning-Policy-v01.md`
 7. `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md`
 8. `docs/private/Coding-Vertical-Learning-Loop-v01.md`
+9. `docs/private/Coding-Vertical-H4-Planning-Prompt-Review-v01.md`
+10. `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md`
 
-**CV0 execution status:** unblocked; explicit side batch now defined in Combined with 4-step sequencing (CV0-A through CV0-D)
+**CV0 execution status:** complete; `CV0-A`/`CV0-B`/`CV0-C`/`CV0-D` are now closed, and `CV1` is ready by named prerequisites but remains subordinate to the active mainline frontier in Combined.
 
 Rule:
 - CV0 runs alongside Wave 2 mainline as docs-only design work

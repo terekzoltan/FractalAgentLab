@@ -85,48 +85,40 @@ Outputs:
 - future session definitions in `ops/`
 - current human-workflow mapping canonization
 
-#### `CV0-B` H4/H5 workflow-family sketch
+#### `CV0-B` H4 planning prompt/policy review
 Owner:
 - Track C
 
 Outputs:
-- H4 role sketch
-- H5 role sketch
-- prompt-policy notes
+- H4 role sketch (primary)
+- H4 prompt-policy notes (primary)
+- H5 family alignment note only (no gate-policy rewrite)
 - family naming recommendation aligned with repo style
 - role behavior consistent with the current human-driven workflow pattern
 - explicit note that the near-term execution model is OpenCode-anchored, with hybrid wrapper work only as a later option
 
-#### `CV0-C` Artifact and gate policy sketch
+#### `CV0-C` H5 review/gate policy review
 Owner:
 - Meta Coordinator -> Track E review later
 
+Current status note:
+- artifact contract finalization has already been completed in current sequencing (`CV0-A` closeout)
+- any remaining `CV0-C` activity is review/consistency work, not a net-new contract redesign
+- `CV0-C` is explicitly docs-only and does not imply executable `CV2` semantics
+
 Outputs:
-- artifact contract draft
-- review/gate policy draft
-- plan-adherence expectations
+- review/gate policy review outcome package
+- targeted policy wording and consistency alignment notes
+- explicit `CV0-C` -> `CV0-D` handoff note (no `CV2` unlock implied)
 
-Recommended split:
-- `CV0-C1` Meta drafts the coding artifact contract
-- `CV0-C2` Track B reviews artifact-boundary compatibility with canonical run/trace truth
-- `CV0-C3` Track E reviews findings/gate semantics for evaluability and anti-false-green discipline
-
-#### `CV0-D` Private learning-loop policy
+#### `CV0-D` CV0 closeout + `CV1` prerequisite note
 Owner:
 - Meta Coordinator
 
 Outputs:
-- private learning categories
-- storage guidance for raw vs distilled evidence
-- release-boundary guidance
-
-#### `CV0-E` Sequencing insertion
-Owner:
-- Meta Coordinator
-
-Outputs:
-- explicit placement inside `ops/Combined-Execution-Sequencing-Plan.md`
-- blocked/unblocked rules for `CV1` and `CV2`
+- reconcile `CV0-B` and `CV0-C` review outcomes
+- explicit `CV1` blocked/ready-by-prereq statement
+- cross-doc consistency confirmation for coding-vertical policy surfaces
 
 ### Acceptance
 
@@ -140,12 +132,18 @@ Outputs:
 
 ### Recommended session order
 
-1. Meta Coordinator session -> `CV0-A`, `CV0-D`, `CV0-E`
+1. Meta Coordinator session -> `CV0-A`
 2. Track C design session -> `CV0-B`
-3. Meta Coordinator session -> `CV0-C1`
-4. Track B review session -> `CV0-C2`
-5. Track E review session -> `CV0-C3`
-6. Meta Coordinator closeout session -> reconcile docs, declare `CV1` blocked or ready-by-prereq only
+3. Track E review session -> `CV0-C`
+4. Meta Coordinator closeout session -> `CV0-D`, reconcile docs, declare `CV1` ready-by-prereq or still blocked, and keep mainline priority explicit
+
+`CV0-B` reference artifact:
+
+- `docs/private/Coding-Vertical-H4-Planning-Prompt-Review-v01.md`
+
+`CV0-C` reference artifact:
+
+- `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md`
 
 ---
 

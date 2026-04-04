@@ -37,6 +37,31 @@ It should preserve these expectations:
 Reference:
 - `docs/private/Coding-Vertical-Human-Workflow-Mapping-v01.md`
 
+Control-surface clarification:
+
+- repository reality is the factual base
+- `ops/Combined-Execution-Sequencing-Plan.md` is authoritative for readiness/order/frontier
+- `ops/AGENTS.md` is authoritative for ownership/guardrails
+
+Execution model clarification:
+
+- near-term coding-vertical operation remains OpenCode-anchored
+- this policy governs review/gate semantics; it does not imply native autonomous execution
+
+---
+
+## CV0-C design-only boundary
+
+This policy is reviewed in `CV0-C` as a docs-only consistency step.
+
+Meaning:
+
+- no runtime/eval/schema/tooling changes are implied by this review
+- no net-new artifact-contract redesign is implied by this review
+- no commit-authority expansion is implied by this review
+
+`CV2` remains the first thin executable review/gate slice after its own prerequisites.
+
 ---
 
 ## Severity model
@@ -95,7 +120,7 @@ Use only if:
 - no critical/high blockers remain
 - required tests passed or are explicitly not applicable
 - plan deviations are explained
-- artifact set is complete enough to trust
+- artifact evidence is structurally complete enough to trust (not envelope-presence only)
 
 ### `pass_with_warnings`
 
@@ -113,6 +138,7 @@ Use if any of the following is true:
 - plan adherence is badly broken without explanation
 - coding artifacts are materially incomplete or contradictory
 - shared-zone changes lack enough rationale
+- evidence appears green only by envelope presence while required fields are materially incomplete
 
 ---
 
@@ -150,6 +176,35 @@ Not acceptable:
 
 ---
 
+## False-green prevention rule
+
+Review/gate outcomes should preserve the anti-false-green discipline already hardened in the mainline.
+
+Minimum expectation:
+
+- green-like gate language should require structurally complete evidence
+- artifact envelope existence alone is not sufficient
+- missing required review/test/evidence fields should surface explicitly
+
+Reference anchors:
+
+- `ops/Review-Findings-Registry.md` (`RF-2026-03-19-02`)
+- `ops/Meta-Hardening-Package-v01.md` (H4/H6)
+
+---
+
+## Cross-surface consistency rule
+
+When review/gate semantics expand, run one explicit consistency pass across:
+
+- review/gate policy wording
+- artifact-contract wording
+- sequencing/readiness wording
+
+This is a lightweight consistency check, not a heavy governance process.
+
+---
+
 ## Shared-zone caution
 
 Extra caution is required for:
@@ -166,6 +221,22 @@ These zones may require:
 - stronger rationale
 - stronger testing expectations
 - stronger gate conservatism
+
+---
+
+## Artifact-contract consumption rule
+
+This policy consumes the canonical coding-vertical artifact contract.
+It does not redefine canonicality here.
+
+Reference:
+
+- `docs/private/Coding-Vertical-Artifact-Contract-v01.md`
+
+Boundary reminder:
+
+- optional/non-canonical sidecar behavior elsewhere in the repo is not by itself H5 validity law
+- canonical run/trace correlation and artifact-envelope requirements come from the artifact-contract document
 
 ---
 
@@ -200,3 +271,10 @@ Do not overfit one isolated cycle.
 
 Reference:
 - `docs/private/Coding-Vertical-Learning-Loop-v01.md`
+
+---
+
+## Prompt provenance boundary
+
+If prompt/version/provenance tags are included in review/gate artifacts, treat them as provenance context.
+Do not treat prompt provenance as quality scoring or gate authority by itself.

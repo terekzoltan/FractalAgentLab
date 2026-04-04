@@ -46,6 +46,15 @@ Reference:
 
 Turn software-delivery intent + repo state into an execution-ready plan artifact.
 
+`CV0-B` note:
+
+- current Track C review scope is `H4` planning prompt/policy refinement
+- `H5` gate-policy redesign remains out of scope for this step
+
+`CV0-B` review outcome reference:
+
+- `docs/private/Coding-Vertical-H4-Planning-Prompt-Review-v01.md`
+
 ### Recommended early roles
 
 #### `repo_intake`
@@ -95,16 +104,42 @@ Owns:
 Must not:
 - hide unresolved uncertainty to make the plan look cleaner
 
+### Recommended role-to-artifact mapping (`H4`)
+
+- `repo_intake` -> `context_report.json`
+- `planner` -> `implementation_plan.md`
+- `architect_critic` -> `risk_register.json`
+- `synthesizer` -> `acceptance_checks.json` and final plan normalization
+
+Reference contract:
+- `docs/private/Coding-Vertical-Artifact-Contract-v01.md`
+
 ### Early orchestration recommendation
 
 Start simple:
 
-1. single-agent baseline or narrow manager path
-2. only later add richer handoff/parallel behavior if evidence says it helps
+1. narrow manager path first
+2. optional single-agent baseline for comparison
+3. only later add richer handoff/parallel behavior if evidence says it helps
+
+Boundary reminder:
+
+- orchestration authority belongs to workflow/control semantics
+- do not encode manager authority through pack-level handoff topology shortcuts
 
 ---
 
 ## `H5` — Implementation, Review & Commit Gate
+
+`CV0-B` scope reminder:
+
+- this section is retained as family context
+- detailed review/gate policy remains canonical in `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md`
+- `CV0-C` performs docs-only policy review and alignment; it does not imply executable `CV2` gate behavior
+
+`CV0-C` review outcome reference:
+
+- `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md`
 
 ### Purpose
 

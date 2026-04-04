@@ -44,13 +44,19 @@ Output style:
 When generating a repo-aware plan, trust inputs in this order:
 
 1. actual repository state
-2. `ops/AGENTS.md`
-3. `ops/Combined-Execution-Sequencing-Plan.md`
+2. `ops/Combined-Execution-Sequencing-Plan.md` for active readiness/order/frontier truth
+3. `ops/AGENTS.md` for ownership/guardrail truth
 4. relevant specialized docs
 5. recent commit/review context
 6. user prompt wording
 
-If the higher-priority inputs contradict the prompt, the contradiction must be named explicitly.
+If higher-priority inputs contradict the prompt, the contradiction must be named explicitly.
+
+Clarification:
+
+- repo state is first for factual grounding
+- Combined is decisive for sequencing/readiness/blocking decisions
+- AGENTS remains canonical for ownership and operating policy
 
 ---
 
@@ -97,6 +103,8 @@ If the request already names a track or session, preserve that execution framing
 
 If the request assumes a task is ready but the current frontier says otherwise, the planning artifact should say so explicitly instead of silently replanning the queue.
 
+If AGENTS and Combined differ on active sequencing interpretation, use Combined for active frontier/readiness and call out the mismatch explicitly.
+
 ---
 
 ## Planning rules
@@ -134,6 +142,16 @@ If implementation is later expected, the plan should already say what tests, smo
 
 Future plans should align with current repo style unless there is a strong reason to change it.
 
+### 7. Keep prompt provenance explicit and non-magical
+
+If prompt/version/provenance tags are included in planning artifacts, treat them as provenance context.
+Do not treat prompt provenance as quality scoring or gate authority by itself.
+
+### 8. Consume artifact contract, do not rewrite it
+
+`H4` planning should map to the existing coding-vertical artifact contract.
+It must not redefine artifact validity/canonicality rules inside a planning response.
+
 ---
 
 ## Anti-patterns
@@ -146,6 +164,7 @@ Reject these planning behaviors:
 - overscoping a small request into a platform rewrite
 - omitting tests/docs from a plan that clearly needs them
 - turning planning into pure prompt theater
+- importing non-canonical runtime sidecar failure semantics as if they were coding-vertical artifact law
 
 ---
 
