@@ -1410,10 +1410,17 @@ Wave 1 core closeout is complete through `L1-J` / `L1-K` / `L1-L` / `L1-M`.
 Wave 2 Sprint `W2-S1` is complete (`H2-A` / `H2-B` / `H2-C` / `H2-D` ✅).
 Wave 2 Sprint `W2-S2` is complete through Step 3 (`H2-E` / `H2-F` / `H2-G` + `H2-H` draft).
 Wave 2 Sprint `W2-S3` is complete through Step 2 (`H2-H` confirmation + `H2-N` boundary review + `H2-L` + `H2-O` ✅).
+Wave 2 closeout is now accepted.
 The immediate mainline frontier is now:
 
-- Meta wave-closeout sequencing (Wave 2 gate confirmation and next-wave activation)
-Wave 1 identity-prep docs (`L1-N` / `L1-O`) are already complete, and side-vertical `CV1` work may now be considered by explicit choice after `CV0` closeout; it still does not replace the mainline frontier.
+- Wave 3 `W3-S1` Step 1 kickoff: Track C `R3-A` (H2 workflow schema v1)
+- `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
+- Wave 3 real-provider side batch remains gated until `W3-S1` is complete
+
+Wave 2 closeout consistency note:
+- runtime truth checked: W2-S3 semantics remain bounded at runtime/CLI boundaries (`load_session_memory_context`, post-run identity updater gating)
+- eval/report truth checked: `H2-L` and `H2-O` docs and exported eval surfaces match the accepted boundaries and warning/failure semantics
+- CLI/export truth checked: no new closeout blocker found; current CLI/export surfaces remain consistent enough for Wave 3 activation
 
 ### W1-S2 stabilization batch — Execution Steps
 
@@ -1453,8 +1460,9 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Meta Coordinator session` for Wave 2 closeout + next-frontier declaration
-2. optional side-vertical `CV1` work only if explicitly chosen and it does not slow mainline progress
+1. `Track C agent session` for `W3-S1` Step 1 / `R3-A` (H2 workflow schema v1)
+2. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
+3. Wave 3 real-provider side batch only after `W3-S1` is complete
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`

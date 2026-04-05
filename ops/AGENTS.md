@@ -183,7 +183,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - declared orchestration truth matches emitted runtime truth
 - structural workflow invariants are rejected before runtime when practical
 
-**Status:** `🔄 in progress` (Track B completed W2-S1 `H2-A` / `H2-B` / `H2-C` / `H2-D` and W2-S3 Step 1 `H2-H` / `H2-N` review scope; current mainline frontier has moved to Meta Wave 2 closeout sequencing after Track E Step 2 completion)
+**Status:** `🔄 in progress` (Track B completed W2-S1 `H2-A` / `H2-B` / `H2-C` / `H2-D` and W2-S3 Step 1 `H2-H` / `H2-N` review scope; after Meta Wave 2 closeout the next likely Track B checkpoint is Wave 3 `R3-A`/`R3-E` schema review support)
 
 ---
 
@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`, and Track C now waits for Meta Wave 2 closeout / later sequencing after W2-S3 validation completion)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`, and the active mainline kickoff after Wave 2 closeout is Wave 3 `W3-S1` Step 1 / `R3-A` H2 workflow schema work)
 
 ---
 
@@ -253,7 +253,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 2 mainline is not blocked by Track D; real-provider work stays prep-only in Wave 2, first real-provider MVP is targeted as a non-blocking Wave 3 side batch, and broader provider parity/routing hardening belongs to Wave 4)
+**Status:** `🔄 in progress` (Wave 2 mainline is no longer active; Track D real-provider work remains a non-blocking Wave 3 side batch that can start only after `W3-S1` completes, while broader provider parity/routing hardening still belongs to Wave 4)
 
 ---
 
@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O` with state-safe memory eval + evidence-gated drift smoke semantics; next mainline handoff is Meta Wave 2 closeout sequencing)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O` with state-safe memory eval + evidence-gated drift smoke semantics; after Meta Wave 2 closeout the next mainline Track E checkpoint is Wave 3 `R3-D` H2 smoke rubric work)
 
 ---
 
@@ -1002,6 +1002,7 @@ Entries:
 - `[2026-04-04][Track B] W2-S3 Step 1 H2-H/H2-N completed (🔄 -> ✅) - Track B confirmed shared contract boundaries for H2-H (including draft doc/code consistency corrections) and completed H2-N runtime-boundary review with explicit additive-sidecar decisions (orphan-tolerant updater behavior, provenance simplification acceptance, and supported wrapper/orchestration dependency surfaces), plus targeted negative-path tests - next: Track E executes W2-S3 Step 2 (`H2-L` / `H2-O`).`
 - `[2026-04-04][Track E] H2-L/H2-O started (⬜ -> 🔄) - Track E opened W2-S3 Step 2 with manager-first H2-L session-memory materiality eval and run-id-first H2-O identity drift smoke, preserving no-schema-churn/no-routing/no-prompt-rewrite boundaries - next: deliver eval modules/scripts/tests and Wave 2 implementation note.`
 - `[2026-04-05][Track E] H2-L/H2-O completed (🔄 -> ✅) - H2-L now validates canonical session-memory load-path usage without mutating persistent store state across paired branches, and H2-O now requires real updater evidence, honors configured identity-store subdirs, validates present canonical artifacts, and still keeps orphan sidecars warning-grade only; scripts/tests/docs updated accordingly - next: Meta executes Wave 2 closeout sequencing.`
+- `[2026-04-05][Meta] Wave 2 closeout completed (🔄 -> ✅) - lightweight runtime/eval/CLI consistency pass found no new closeout blocker, Wave 3 mainline is now activated at W3-S1 Step 1 (`R3-A` H2 workflow schema v1), `CV1` remains optional side-vertical work only by explicit activation, and the Wave 3 real-provider side batch remains gated until W3-S1 completion.`
 
 ---
 
