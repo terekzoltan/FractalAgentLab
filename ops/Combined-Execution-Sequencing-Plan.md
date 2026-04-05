@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-04-01
+**Last updated:** 2026-04-05
 
 ---
 
@@ -793,10 +793,10 @@ Reference for H2-M/N: `docs/Emergent-Identity-Layer-v01.md`
 This sprint focuses on cross-track reviews and validation-coupled evals that genuinely need the implementations from W2-S2 to exist.
 
 Epics:
-- ⬜ **H2-H** (contract confirmation scope) — **Owner: Track B**
-- ⬜ **H2-L** evaluate whether session memory helps H1 materially — **Owner: Track E**
-- ⬜ **H2-N** (boundary review scope) — **Owner: Track B**
-- ⬜ **H2-O** Identity drift smoke checks v0 — **Owner: Track E**
+- ✅ **H2-H** (contract confirmation scope) — **Owner: Track B**
+- ✅ **H2-L** evaluate whether session memory helps H1 materially — **Owner: Track E**
+- ✅ **H2-N** (boundary review scope) — **Owner: Track B**
+- ✅ **H2-O** Identity drift smoke checks v0 — **Owner: Track E**
 
 **Execution assignment for co-owned epics:**
 - `H2-H`: **Track E -> Track B**
@@ -822,19 +822,19 @@ Epics:
 
 ### Sprint W2-S3 — Execution Steps
 
-**⬜ Step 1 — Track B confirms contracts and reviews boundaries in parallel**
+**✅ Step 1 — Track B confirms contracts and reviews boundaries in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent session | H2-H (contract confirmation) | H2-H draft ✅ | Validate schema-level enforceability |
-| Track B agent session | H2-N (boundary review) | H2-N implementation ✅ | Confirm identity updater does not leak into core contracts |
+| Track B agent session | ✅ H2-H (contract confirmation) | H2-H draft ✅ | Contract boundary confirmed; shared invariants separated from eval-local policy |
+| Track B agent session | ✅ H2-N (boundary review) | H2-N implementation ✅ | Updater boundary confirmed as additive non-canonical sidecar behavior |
 
-**⬜ Step 2 — Track E runs validation-focused evals**
+**✅ Step 2 — Track E runs validation-focused evals**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | H2-L | H2-I ✅ + H2-K ✅ | Determine whether session memory helps H1 materially |
-| Track E agent session | H2-O | H2-M ✅ + H2-N boundary review ✅ | Identity drift sanity checks |
+| Track E agent session | ✅ H2-L | H2-I ✅ + H2-K ✅ | Session-memory materiality eval completed with canonical session-load-path validation, session-store state restoration, and structural/materiality split |
+| Track E agent session | ✅ H2-O | H2-M ✅ + H2-N boundary review ✅ | Identity drift smoke v0 completed with bounded classification, required updater evidence, configured identity-store lookup, and warning-grade orphan handling |
 
 ### Wave 2 anti-scope-creep rule
 No provider-agnostic abstraction expansion beyond what is needed to keep the core clean.
@@ -850,7 +850,7 @@ Coding-vertical side batch rule:
 
 ## Wave 2 Side Batch — CV0 Docs-only Coding Vertical Design
 
-**Status:** unblocked (Wave 1 ✅)  
+**Status:** complete (CV0-D ✅; docs-only batch closed)  
 **Constraint:** runs alongside Wave 2 mainline; does not block or depend on W2-S1/S2/S3  
 **Execution model:** Meta primary coordination with Track C/B/E design input sessions  
 **Reference docs:** `docs/private/Coding-Vertical-*.md`
@@ -1409,10 +1409,11 @@ Wave 0 is complete.
 Wave 1 core closeout is complete through `L1-J` / `L1-K` / `L1-L` / `L1-M`.
 Wave 2 Sprint `W2-S1` is complete (`H2-A` / `H2-B` / `H2-C` / `H2-D` ✅).
 Wave 2 Sprint `W2-S2` is complete through Step 3 (`H2-E` / `H2-F` / `H2-G` + `H2-H` draft).
+Wave 2 Sprint `W2-S3` is complete through Step 2 (`H2-H` confirmation + `H2-N` boundary review + `H2-L` + `H2-O` ✅).
 The immediate mainline frontier is now:
 
-- W2-S3 Step 1 Track B confirmation/review kickoff (`H2-H` contract confirmation + `H2-N` boundary review)
-Optional Wave 1 identity-prep docs (`L1-N` / `L1-O`) and docs-only `CV0` side-vertical planning are now allowed, but they do not replace the mainline frontier.
+- Meta wave-closeout sequencing (Wave 2 gate confirmation and next-wave activation)
+Wave 1 identity-prep docs (`L1-N` / `L1-O`) are already complete, and side-vertical `CV1` work may now be considered by explicit choice after `CV0` closeout; it still does not replace the mainline frontier.
 
 ### W1-S2 stabilization batch — Execution Steps
 
@@ -1452,10 +1453,8 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track B agent session` for `⬜ H2-H` contract confirmation (`H2-H` draft ✅)
-2. `Track B agent session` for `⬜ H2-N` boundary review (`H2-N` implementation ✅)
-3. `Track E agent session` for `⬜ H2-L` (after `H2-K` + `H2-H` confirmation context is available)
-4. optional docs-only `CV0` work if it does not slow Wave 2 mainline progress
+1. `Meta Coordinator session` for Wave 2 closeout + next-frontier declaration
+2. optional side-vertical `CV1` work only if explicitly chosen and it does not slow mainline progress
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`
@@ -1811,6 +1810,11 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-03][Track C] H2-N completed (🔄 -> ✅) - identity updater v0 delivered with `identity.signal.v0` envelope normalization, documented derived fallback, bounded post-run profile updates, profile save + snapshot append, and non-canonical `identity_update.json` sidecar artifact; CLI integration is config-gated and explicitly non-fatal on updater errors, with no core runtime/schema churn - next: hand off to Track B H2-N boundary review and Track E H2-O dependency chain.`
 - `[2026-04-03][Track E] H2-H draft started (⬜ -> 🔄) - Track E opened W2-S2 Step 3 as doc-only regression checklist drafting from H2-E/H2-F/H2-G evidence with strict bucket semantics and no hidden contract enforcement - next: publish draft checklist and hand off Track B confirmation candidates for W2-S3.`
 - `[2026-04-03][Track E] H2-H draft completed (🔄 -> ✅ Track E draft scope) - regression checklist draft published in docs/wave2/Wave2-W2-S2-TrackE-H2-H-Draft-Regression-Checklist.md with explicit buckets (enforced now vs observed expectations vs Track B confirmation candidates), RF-2026-03-19-02 false-green anchor preserved, and Track C compatibility watchpoints kept non-gating - next: Track B executes W2-S3 H2-H contract confirmation scope (still open).`
+- `[2026-04-04][Track B] W2-S3 Step 1 H2-H/H2-N completed (🔄 -> ✅) - H2-H contract confirmation finalized shared invariants vs eval-local policy and corrected checklist doc/code drift; H2-N boundary review confirmed additive sidecar boundaries with explicit orphan-tolerant updater behavior and accepted provenance simplification for current scope, backed by targeted negative-path tests - next: Track E executes W2-S3 Step 2 (`H2-L`/`H2-O`).`
+- `[2026-04-04][Track E] H2-L/H2-O started (⬜ -> 🔄) - Track E opened W2-S3 Step 2 with manager-first H2-L memory-materiality eval and run-id-first H2-O drift smoke, preserving strict no-schema-churn/no-routing/no-prompt-rewrite boundaries - next: deliver eval modules, scripts, tests, and Wave 2 implementation note.`
+- `[2026-04-05][Track E] H2-L/H2-O completed (🔄 -> ✅) - H2-L shipped with canonical session-memory load-path validation plus pair-level session-store restoration and conservative materiality labeling, while H2-O now requires real updater evidence, respects configured identity-store subdirs, validates present canonical artifacts, and still keeps orphan sidecars warning-grade only - next: Meta executes Wave 2 closeout sequencing.`
+- `[2026-04-04][Track E] CV0-C started (⬜ -> 🔄) - docs-only H5 review/gate policy review started with explicit scope boundary (CV0 policy review, not CV2 execution), control-surface alignment checks, and false-green guardrail preservation - next: publish H5 review outcome package and apply targeted cross-doc wording alignment.`
+- `[2026-04-04][Track E] CV0-C completed (🔄 -> ✅) - Track E delivered docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md and tightened canonical H5 policy wording for OpenCode-anchored control-surface alignment, anti-false-green evidence language, artifact-contract consumption boundaries, and explicit CV0-vs-CV2 separation without runtime/schema/tooling changes - next: Meta executes CV0-D closeout and CV1 prereq note.`
 
 ---
 

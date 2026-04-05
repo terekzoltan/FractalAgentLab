@@ -227,6 +227,76 @@ class IdentityUpdaterTests(unittest.TestCase):
         )
         self.assertIsNone(result)
 
+    def test_wrapper_fields_missing_identity_signal_is_ignored(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="fal-identity-updater-") as tmp_dir:
+            run_state = RunState(run_id="run-5", workflow_id="h1.single.v1")
+            run_state.status = RunStatus.SUCCEEDED
+            run_state.step_results = {
+                "single": {
+                    "output": {
+                        "identity_signals": {
+                            "schema_version": "identity.signal.v0",
+                            "signals": {"coherence_score": 0.9},
+                        },
+                    },
+                },
+            }
+            run_state.output_payload = {"step_results": {"single": {"output": {}}}}
+
+            result = run_post_run_identity_update(
+                run_state=run_state,
+                trace_events=[],
+                runtime_config={"identity": {"enabled": True, "store_backend": "json"}},
+                data_dir=tmp_dir,
+            )
+
+            self.assertIsNotNone(result)
+            assert result is not None
+            self.assertEqual([], result.updated_agent_ids)
+            store = JSONIdentityStore(data_dir=tmp_dir)
+            self.assertEqual([], store.list_agent_ids())
+
+    def test_manager_delegation_fallback_requires_manager_step_mapping(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="fal-identity-updater-") as tmp_dir:
+            run_state = RunState(run_id="run-6", workflow_id="h1.manager.v1")
+            run_state.status = RunStatus.SUCCEEDED
+            run_state.step_results = {
+                "synthesizer": {
+                    "agent_id": "h1_synthesizer_agent",
+                    "step_id": "synthesizer",
+                    "output": {"ok": True},
+                },
+                "planner": {
+                    "agent_id": "h1_planner_agent",
+                    "step_id": "planner",
+                    "output": {"ok": True},
+                },
+            }
+            run_state.output_payload = {
+                "manager_orchestration": {
+                    "turns": [
+                        {
+                            "action": "delegate",
+                            "target_step_id": "planner",
+                            "target_agent_id": "h1_planner_agent",
+                        },
+                    ],
+                },
+            }
+
+            result = run_post_run_identity_update(
+                run_state=run_state,
+                trace_events=[],
+                runtime_config={"identity": {"enabled": True, "store_backend": "json"}},
+                data_dir=tmp_dir,
+            )
+
+            self.assertIsNotNone(result)
+            assert result is not None
+            self.assertEqual([], result.updated_agent_ids)
+            store = JSONIdentityStore(data_dir=tmp_dir)
+            self.assertEqual([], store.list_agent_ids())
+
 
 class IdentityUpdaterCliSafetyTests(unittest.TestCase):
     def test_cli_continues_successfully_when_identity_updater_raises(self) -> None:
@@ -273,6 +343,54 @@ class IdentityUpdaterCliSafetyTests(unittest.TestCase):
                     )
 
             self.assertEqual(0, code)
+            self.assertTrue(mock_stderr.write.called)
+
+    def test_cli_artifact_write_failure_keeps_identity_updater_nonfatal(self) -> None:
+        from fractal_agent_lab.cli.app import run_cli
+
+        with tempfile.TemporaryDirectory(prefix="fal-identity-updater-cli-") as tmp_dir:
+            runtime_config = Path(tmp_dir) / "runtime.yaml"
+            runtime_config.write_text(
+                "\n".join(
+                    [
+                        "runtime:",
+                        "  default_timeout_seconds: 60",
+                        "  max_retries: 2",
+                        "identity:",
+                        "  enabled: true",
+                        "  store_backend: json",
+                        "  data_subdir: identity",
+                        "paths:",
+                        f"  data_dir: {tmp_dir.replace('\\', '/')}",
+                    ],
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "fractal_agent_lab.cli.app.write_run_artifact",
+                side_effect=OSError("disk full"),
+            ):
+                with patch("fractal_agent_lab.cli.app.run_post_run_identity_update") as mock_updater:
+                    with patch("sys.stderr") as mock_stderr:
+                        code = run_cli(
+                            [
+                                "run",
+                                "h1.single.v1",
+                                "--input-json",
+                                '{"idea": "identity updater artifact-write failure"}',
+                                "--runtime-config",
+                                runtime_config.as_posix(),
+                                "--providers-config",
+                                "configs/providers.example.yaml",
+                                "--model-policy-config",
+                                "configs/model_policy.example.yaml",
+                            ],
+                        )
+
+            self.assertEqual(0, code)
+            self.assertEqual(1, mock_updater.call_count)
             self.assertTrue(mock_stderr.write.called)
 
 

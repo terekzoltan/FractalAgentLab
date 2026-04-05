@@ -182,7 +182,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - declared orchestration truth matches emitted runtime truth
 - structural workflow invariants are rejected before runtime when practical
 
-**Status:** `🔄 in progress` (Track B completed W2-S1 `H2-A` / `H2-B` / `H2-C` / `H2-D`; active mainline implementation ownership now shifts to W2-S2 Track E/Track C foundations, with Track B returning as primary reviewer/validator in W2-S3)
+**Status:** `🔄 in progress` (Track B completed W2-S1 `H2-A` / `H2-B` / `H2-C` / `H2-D` and W2-S3 Step 1 `H2-H` / `H2-N` review scope; current mainline frontier has moved to Meta Wave 2 closeout sequencing after Track E Step 2 completion)
 
 ---
 
@@ -219,7 +219,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; next Track C checkpoint is W2-S3 boundary/review sequencing)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`, and Track C now waits for Meta Wave 2 closeout / later sequencing after W2-S3 validation completion)
 
 ---
 
@@ -287,7 +287,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft, and now waits for Track B `H2-H` contract confirmation while preparing later W2-S3 eval ownership `H2-L`/`H2-O`)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O` with state-safe memory eval + evidence-gated drift smoke semantics; next mainline handoff is Meta Wave 2 closeout sequencing)
 
 ---
 
@@ -998,6 +998,9 @@ Entries:
 - `[2026-04-03][Track C] H2-N completed (🔄 -> ✅) - identity updater v0 delivered with `identity.signal.v0` normalization, explicit-over-fallback merge, bounded profile updates, profile save + snapshot append, and non-canonical `identity_update.json` sidecar output; CLI integration is config-gated and wrapped by dedicated non-fatal error handling - next: hand off to Track B H2-N boundary review and Track E H2-O dependency chain.`
 - `[2026-04-03][Track E] H2-H draft started (⬜ -> 🔄) - Track E opened W2-S2 Step 3 as a doc-only regression-checklist draft from H2-E/H2-F/H2-G evidence, with strict bucket semantics and no hidden contract enforcement - next: publish the checklist and hand off Track B confirmation candidates for W2-S3.`
 - `[2026-04-03][Track E] H2-H draft completed (🔄 -> ✅ Track E draft scope) - docs/wave2/Wave2-W2-S2-TrackE-H2-H-Draft-Regression-Checklist.md published with explicit three-bucket separation (enforced now / observed expectations / Track B confirmation candidates), RF-2026-03-19-02 false-green anchor retained, and Track C references kept as compatibility watchpoints only - next: Track B executes W2-S3 H2-H contract confirmation scope (still open).`
+- `[2026-04-04][Track B] W2-S3 Step 1 H2-H/H2-N completed (🔄 -> ✅) - Track B confirmed shared contract boundaries for H2-H (including draft doc/code consistency corrections) and completed H2-N runtime-boundary review with explicit additive-sidecar decisions (orphan-tolerant updater behavior, provenance simplification acceptance, and supported wrapper/orchestration dependency surfaces), plus targeted negative-path tests - next: Track E executes W2-S3 Step 2 (`H2-L` / `H2-O`).`
+- `[2026-04-04][Track E] H2-L/H2-O started (⬜ -> 🔄) - Track E opened W2-S3 Step 2 with manager-first H2-L session-memory materiality eval and run-id-first H2-O identity drift smoke, preserving no-schema-churn/no-routing/no-prompt-rewrite boundaries - next: deliver eval modules/scripts/tests and Wave 2 implementation note.`
+- `[2026-04-05][Track E] H2-L/H2-O completed (🔄 -> ✅) - H2-L now validates canonical session-memory load-path usage without mutating persistent store state across paired branches, and H2-O now requires real updater evidence, honors configured identity-store subdirs, validates present canonical artifacts, and still keeps orphan sidecars warning-grade only; scripts/tests/docs updated accordingly - next: Meta executes Wave 2 closeout sequencing.`
 
 ---
 

@@ -66,6 +66,11 @@ Compatibility watchpoint references (non-gating in this draft):
 3. **Track B Confirmation Candidates**
    - candidates for Track B enforceability review in `W2-S3`; not active obligations from this draft
 
+Note:
+
+- some items in bucket 2 are currently enforced as shared eval invariants in `H2-F`/`H2-G`
+- this still does not make them core runtime/schema law by default
+
 ---
 
 ## 1) Already Enforced Now
@@ -106,6 +111,7 @@ Evidence:
 - `H2-G` tag capture ready requires all of:
   - `all_required_variants_present`
   - `all_replay_ready`
+  - `all_workflow_matches_expected`
   - `all_roles_assigned`
 
 Evidence:
@@ -143,11 +149,14 @@ Comparable keys currently used:
 - `recommended_mvp_direction`
 - `next_3_validation_steps`
 
-### C. Variant-specific structural shape expectations
+### C. Variant-specific structural shape expectations (shared eval invariants)
 
 - single variant: no manager/handoff reconstruction requirement
 - manager variant: manager structure with positive turn count
 - handoff variant: handoff structure with positive turn count and non-zero linkage signals
+
+These are currently enforced by `H2-F` smoke logic as shared eval invariants.
+They are not declared as core runtime/schema contract law in this draft.
 
 ### D. Baseline posture and prompt provenance expectations
 

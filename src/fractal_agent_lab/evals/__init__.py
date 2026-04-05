@@ -19,6 +19,8 @@ from fractal_agent_lab.evals.h1_evidence_prep import (
     TRACE_VIEWER_FIELDS,
     prepare_h1_evidence_prep,
 )
+from fractal_agent_lab.evals.h1_memory_materiality import run_h2_l_h1_memory_materiality
+from fractal_agent_lab.evals.identity_drift_smoke import run_h2_o_identity_drift_smoke
 from fractal_agent_lab.evals.h1_smoke_suite import run_h1_smoke_suite_by_run_ids
 
 __all__ = [
@@ -31,6 +33,8 @@ __all__ = [
     "TRACE_VIEWER_FIELDS",
     "capture_h1_baseline_tags_by_run_ids",
     "prepare_h1_evidence_prep",
+    "run_h2_l_h1_memory_materiality",
+    "run_h2_o_identity_drift_smoke",
     "replay_run_artifacts_by_id",
     "run_h1_smoke_comparison",
     "run_h1_smoke_suite_by_run_ids",

@@ -45,8 +45,8 @@ The Meta Coordinator is not responsible for:
 When running coordination, use the following order of trust:
 
 1. actual repository file contents
-2. `ops/AGENTS.md`
-3. `ops/Combined-Execution-Sequencing-Plan.md`
+2. `ops/Combined-Execution-Sequencing-Plan.md` for active frontier, exact sequencing, and current step status
+3. `ops/AGENTS.md` for ownership, guardrails, and project-operating policy
 4. specialized planning docs or track notes
 5. chat summaries or assumptions
 
@@ -72,6 +72,7 @@ The Meta Coordinator works primarily with these files:
 - `docs/private/Coding-Vertical-Artifact-Contract-v01.md` (when coding artifacts are being defined)
 - `docs/private/Coding-Vertical-Repo-Aware-Planning-Policy-v01.md` (when H4 planning policy is in scope)
 - `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md` (when H5 review/gate policy is in scope)
+- `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md` (when CV0-C review decisions must be reconciled before CV0-D closeout)
 - `docs/private/Coding-Vertical-Learning-Loop-v01.md` (when private coding heuristics are being distilled)
 - future track-specific notes or plans
 - future risk, audit, or benchmark documents
@@ -292,11 +293,13 @@ Main output:
 - explicit `READY` / `NOT READY` decision for `CV0`, `CV1`, or `CV2`
 - ops doc updates if the side vertical affects project-wide sequencing
 - explicit note on whether the proposed H4/H5 behavior still preserves the current human workflow semantics
+- explicit note on whether work is docs-only `CV0` policy review vs executable `CV1/CV2` behavior
 
 Readiness rule:
 
 - if the active Wave 1 frontier is still open, default to `NOT READY` for `CV0` and limit work to parking-lot notes only
 - if the proposed vertical behavior no longer matches the current human workflow semantics, stop and repair the mapping before widening scope
+- during `CV0-C`, keep scope docs-only; do not imply `CV2` unlock or executable gate semantics
 
 ### 13. `coding-learning-loop-review`
 
@@ -391,6 +394,96 @@ A track may still do prep work when `NOT READY`, such as:
 - audit preparation
 
 But it should not claim implementation completion.
+
+---
+
+## Standard Implementation Plan Review Format
+
+When a track submits a detailed implementation plan for an epic or sprint step, the Meta Coordinator should use one standard review shape unless there is a strong reason not to.
+
+Purpose:
+
+- keep readiness decisions consistent
+- prevent scope creep from chat drift
+- preserve a reusable handoff format for track sessions
+- make later H4/H5 planning and review automation easier
+
+### Review workflow
+
+1. verify the active frontier in `ops/Combined-Execution-Sequencing-Plan.md`
+2. verify ownership and guardrails in `ops/AGENTS.md`
+3. inspect the referenced code/doc surfaces in the actual repo state
+4. decide whether the plan is truly `READY`, `NOT READY`, or `READY with guardrails`
+5. identify scope, sequencing, or contract risks
+6. answer any explicit open questions from the track
+7. produce a short track-facing summary message that can be sent back directly
+
+Important:
+
+- prefer actual file contents over plan claims
+- treat dirty-worktree reality as valid current state, but call that out explicitly when it matters
+- do not silently broaden a track's scope during review
+- keep co-owned epics split cleanly by saying which part belongs to Track E draft work, Track B confirmation work, Track C implementation work, etc.
+
+### Default response structure
+
+The preferred Meta response shape is:
+
+1. `Review Findings`
+2. `Verdict`
+3. direct answers to any open tradeoff questions
+4. `Meta guidance` / guardrails
+5. `Track summary message`
+
+### Default content expectations
+
+`Review Findings`
+
+- findings first, ordered by severity when meaningful
+- cite concrete file paths and line references when possible
+- focus on blockers, false-green risk, scope creep, contract drift, ownership drift, and sequencing mistakes
+- if there are no meaningful findings, say so explicitly
+
+`Verdict`
+
+- one of:
+  - `READY`
+  - `NOT READY`
+  - `READY with guardrails`
+- if relevant, name the approved execution order
+
+`Open question answers`
+
+- answer the track's explicit choices directly
+- default to the smallest honest scope that preserves current sequencing
+- avoid introducing new surfaces unless required
+
+`Meta guidance`
+
+- restate the important non-goals
+- call out required tests or negative-path checks
+- call out any boundary that must remain non-canonical or additive
+
+`Track summary message`
+
+- provide a short, copy-pasteable message addressed to the submitting track
+- include:
+  - verdict
+  - approved scope
+  - approved order
+  - guardrails
+  - test expectations
+
+### Response style rule
+
+When doing this review, Meta should be concise but decisive:
+
+- do not rewrite the whole track plan unless necessary
+- validate what is good
+- correct only what must change
+- make the return message easy to forward without re-editing
+
+This format is the current canonical Meta review pattern for Track B/C/E implementation-plan reviews.
 
 ---
 
