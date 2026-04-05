@@ -40,8 +40,8 @@ It already depends on:
 When the current human workflow is operating correctly, it follows this order:
 
 1. actual repository state
-2. `ops/AGENTS.md`
-3. `ops/Combined-Execution-Sequencing-Plan.md`
+2. `ops/Combined-Execution-Sequencing-Plan.md`
+3. `ops/AGENTS.md`
 4. specialized docs and stabilization plans
 5. recent review/evidence context
 6. the immediate user prompt
@@ -106,6 +106,194 @@ Current meaning:
 Future system mapping:
 - `H5` explicit commit-gate artifact
 - `pass` / `pass_with_warnings` / `hold`
+
+---
+
+## Required workflow disclosures
+
+The current human workflow should already act as if future H4/H5 truthfulness rules exist.
+
+That means substantial planning, review, and gate outputs should declare:
+
+### 1. Execution mode
+
+Use one of:
+
+- `manual_policy_driven`
+- `opencode_assisted`
+- `actual_fal_workflow_run`
+
+Purpose:
+
+- prevent automation theater
+- make it obvious whether the result came from policy-guided human/tool work or an actual Fractal workflow invocation
+
+### 2. Visibility / audit state
+
+State explicitly:
+
+- whether the conclusion relied only on git-visible files
+- whether ignored/local-only docs or `data/` artifacts were consulted
+- whether any decision depends on evidence that will not appear in normal git review flow
+
+Purpose:
+
+- prevent audit blind spots
+- keep review and gate decisions honest when important evidence exists outside normal git visibility
+
+---
+
+## Minimal turn packets
+
+The recurring human loop should emit a minimal structured packet even before H4/H5 are executable.
+
+### `WAVE START`
+
+Minimum packet:
+
+- current frontier
+- completed previous step(s)
+- blockers / holds
+- next recommended action
+
+### `SEQ NEXT`
+
+Minimum packet:
+
+- `READY` / `NOT READY` / `READY with guardrails`
+- prerequisites checked
+- touched surfaces
+- expected tests/docs
+- key risks or non-goals
+
+### `IMPLEMENT`
+
+Minimum packet:
+
+- accepted scope
+- touched files
+- deviations from plan
+- validations run
+- open risks
+
+### `REVIEW`
+
+Minimum packet:
+
+- findings first
+- residual risks
+- testing gaps
+- gate decision
+- brief explanation of what landed and what the changed pieces do
+- practical operator testing note for real/sim usage when meaningful
+- extra risk/readiness summary only if it adds signal; do not force summary theater
+
+### commit decision
+
+Minimum packet:
+
+- `pass` / `pass_with_warnings` / `hold`
+- reason
+- staged scope summary
+- anything intentionally excluded
+
+These packets reduce repeated cognitive overhead and make the current workflow easier to formalize later.
+
+---
+
+## Practical shorthand variants
+
+The current human loop also uses short operator shorthands that should be treated as structured variants, not freeform chat noise.
+
+### `REVIEW` deep variant
+
+Typical intent:
+
+- do a deep review
+- use subagents if helpful
+- explain what was implemented and how it works
+- mention useful real/sim test paths for the operator
+- commit only if no major findings remain
+- otherwise hold and explain
+
+This means the packet should additionally include:
+
+- implementation surface summary
+- practical test/use instructions when meaningful
+- explicit `commit` / `hold` outcome
+- explicit note that no code changes should be made during the review except the eventual commit
+
+### `REVIEW JAVIT`
+
+Typical intent:
+
+- only fix the review findings from the previous round
+- rerun validation
+- rerun a lighter review/gate check
+- then commit if clean
+
+Required packet additions:
+
+- narrowed fix scope
+- list of findings being fixed
+- validation rerun summary
+- post-fix residual risk note
+
+### `REMINDER`
+
+Typical intent:
+
+- refresh role discipline
+- reload the relevant coordination docs
+- continue in the correct track/meta role
+
+Required packet additions:
+
+- role being assumed
+- docs/surfaces refreshed
+- any role-specific constraints that now matter
+
+### `FORK MERGE`
+
+Typical intent:
+
+- produce a concise merge-back brief from a forked coordination thread
+
+Required packet additions:
+
+- what context was forked from
+- what happened in the fork since the split point
+- what the original coordinator/context should absorb
+- any status, findings, or sequencing implications
+
+### `COMPACT`
+
+Typical intent:
+
+- restore enough context after compaction to continue safely in-role
+
+Required packet additions:
+
+- current role
+- current frontier
+- critical files reread
+- open risks / pending decisions
+
+These shorthand variants are useful because they already reflect the real operator workflow and can later be mapped directly into H4/H5-style structured runs.
+
+---
+
+## Continuous optimization rule
+
+The project should treat workflow optimization as live work, not only future design work.
+
+Meaning:
+
+- if a recurring coordination or review pattern is clearly improvable, call it out
+- if a durable pattern emerges, write it into policy
+- if the human loop itself becomes more truthful, lower-friction, or easier to audit, that counts as real project progress
+
+This matters because the project is partly building a workflow engine by improving the real workflow in flight.
 
 ---
 

@@ -29,6 +29,7 @@ The Meta Coordinator is responsible for:
 - deciding whether a track is `READY` or `NOT READY`
 - preparing the next wave or sprint transition
 - escalating issues to specialized coordination sessions when needed
+- proactively surfacing workflow/process optimization opportunities when recurring friction, ambiguity, or audit blind spots appear
 
 The Meta Coordinator is not responsible for:
 
@@ -51,6 +52,39 @@ When running coordination, use the following order of trust:
 5. chat summaries or assumptions
 
 If a higher-priority source conflicts with a lower-priority one, prefer the higher-priority source and log the mismatch.
+
+---
+
+## Continuous Workflow Optimization
+
+Workflow optimization is a standing priority.
+
+The project is not only building workflows as a product surface.
+It is also improving the real operating workflow used right now by the user and the Meta/track loop.
+
+This means the Meta Coordinator should:
+
+- mention repeated workflow friction, omission patterns, and avoidable review/coordination churn when they become visible
+- turn durable workflow lessons into written policy instead of leaving them as chat-only memory
+- prefer small recurring process improvements over ad hoc heroics
+
+Standing disclosure rules for substantial planning/review/gate outputs:
+
+- include an explicit `execution mode` note:
+  - `manual_policy_driven`
+  - `opencode_assisted`
+  - `actual_fal_workflow_run`
+- include an explicit `visibility/audit state` note:
+  - whether the decision relied only on git-visible state
+  - whether ignored/local-only docs or `data/` artifacts were consulted
+  - whether any conclusion depends on non-git-visible evidence
+
+Standing side-vertical activation rule:
+
+- if `CV1` or later side-vertical work is chosen while the mainline is still active, record:
+  - why now
+  - what mainline opportunity cost is being accepted
+  - what condition returns focus to mainline work
 
 ---
 

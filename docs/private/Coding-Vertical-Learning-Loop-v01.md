@@ -76,6 +76,14 @@ Questions:
 - when did a design-only batch prevent premature implementation?
 - which policy updates were actually worth making?
 
+### 9. Operator workflow optimization
+
+Questions:
+- which recurring output packets reduced follow-up clarification?
+- where did execution-mode ambiguity create automation theater risk?
+- where did git-visible vs local-only evidence create audit blind spots?
+- which workflow tweaks improved truthfulness, speed, or handoff quality for the real human loop?
+
 ---
 
 ## Raw vs distilled storage
@@ -115,6 +123,7 @@ Review the learning loop when:
 - a prompt/template change appears to materially help or hurt
 
 Do not update the policy after every tiny anecdote.
+But when a workflow improvement is clearly durable and repeatedly useful, promote it quickly instead of waiting for a large retrospective.
 
 ---
 

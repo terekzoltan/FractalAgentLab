@@ -23,6 +23,7 @@
 > - start with **Swarm-style orchestration** for learning and fast prototyping
 > - build stronger **trace / eval / state** from the beginning
 > - keep provider-agnostic expansion possible, but not required in v1
+> - treat workflow optimization as a standing priority; the project should improve its own operating loop in real time when repeated friction or truthfulness gaps become visible
 >
 > Meta Coordinator rule: **does not write production code**. Only coordination, planning, audits, reports, doc maintenance.
 >
