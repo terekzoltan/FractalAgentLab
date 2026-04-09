@@ -117,6 +117,18 @@ Minimum fields:
 - `non_goals[]`
 - `blocking_conditions[]`
 
+### Thin-pilot compatibility note (`CV1`)
+
+For the first thin executable `CV1` slice:
+
+- `context_report.json`
+- `implementation_plan.md`
+- `acceptance_checks.json`
+
+are the minimum required artifact set.
+
+`risk_register.json` may remain embedded as a named section inside `implementation_plan.md` until later evidence justifies splitting it into a separate artifact.
+
 ---
 
 ## H5 artifact set
@@ -170,6 +182,15 @@ Minimum fields:
 - `artifact_completeness`
 - `review_confidence`
 
+### Thin-pilot compatibility note (`CV2`)
+
+For the first thin executable `CV2` slice:
+
+- `review_findings.json` remains the primary required artifact
+- evaluator-style evidence sufficiency and test evidence may remain embedded inside the early review/evaluator output
+- `test_evidence.json` may remain optional until evidence shows the separate artifact is worth the overhead
+- `commit_gate.json` is required only if that specific run explicitly claims gate output; when present in the thin slice, it should be treated as advisory rather than autonomous authority
+
 ### `commit_manifest.json` (optional)
 
 Allowed only when the gate is not `hold`.
@@ -204,7 +225,7 @@ A coding-vertical run should be considered invalid if:
 
 - `H4` claims planning but `implementation_plan.md` is missing
 - `H5` claims review/gating but `review_findings.json` is missing
-- `H5` claims review/gating but `commit_gate.json` is missing
+- `H5` claims explicit gate output but `commit_gate.json` is missing
 - code changed and no test evidence or explicit reason exists
 - coding artifacts materially contradict the canonical run/trace truth
 - the artifact set hides uncertainty that the trace or review evidence clearly shows

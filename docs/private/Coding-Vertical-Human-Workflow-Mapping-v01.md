@@ -239,6 +239,54 @@ Required packet additions:
 - validation rerun summary
 - post-fix residual risk note
 
+### `TERV REVIEW`
+
+Typical intent:
+
+- do a structured implementation-plan review
+- treat it as Meta-style plan critique, not implementation review
+- check readiness, sequencing, scope honesty, touched surfaces, test/docs obligations, and guardrails
+
+Required packet additions:
+
+- findings first
+- verdict (`READY` / `NOT READY` / `READY with guardrails`)
+- open questions or assumptions
+- Meta guidance
+- track-facing summary or handoff message
+
+### `TERV REVIEW UTAN`
+
+Typical intent:
+
+- hand the reviewed plan back to the owning track for correction or confirmation before build mode
+
+Required packet additions:
+
+- reviewed plan outcome
+- required changes
+- blockers
+- build-mode readiness note
+
+### `IMPLEMENT`
+
+Typical intent:
+
+- execute against an accepted plan in the repo
+
+Required packet additions:
+
+- accepted scope reference
+- touched files
+- deviations from plan
+- validations run
+- open risks
+
+Near-term boundary:
+
+- actual repo implementation remains primarily OpenCode-session work
+- Fractal Agent Lab may later support artifact/review/eval structure around this loop, but it does not replace the main implementation shell early
+
 ### `REMINDER`
 
 Typical intent:
@@ -416,6 +464,27 @@ Important distinction:
 
 This distinction matters because the near-term proto workflow may still rely on OpenCode directly performing some planning/review work from policy docs, while the intended later model is explicit workflow invocation through Fractal Agent Lab.
 
+### Role-aware invocation note
+
+The future coding vertical should remain compatible with the real operating pattern:
+
+- one Meta Coordinator loop
+- multiple track-specific implementation loops
+
+That means future `fal` invocations may reasonably support role stances such as the current personal/operator workflow when that helps:
+
+- Meta-style planning/review support
+- track-style planning/review support
+
+Illustrative shapes only:
+
+- `fal run h4.wave_start --role track-c --repo . --goal "..."`
+- `fal run h4.seq_next --role track-c --repo . --goal "..."`
+- `fal run h4.plan_review --role meta --repo . --input artifacts/...`
+- `fal run h5.review --role track-e --repo . --input artifacts/...`
+
+These are personal-workflow-compatible examples of the intended shape, not current executable promises and not universal architectural requirements.
+
 ---
 
 ## Human-in-the-loop boundaries
@@ -450,13 +519,24 @@ The human and Meta Coordinator actively inspect the repo, check sequencing, plan
 - sequencing-aware planning
 - risk and acceptance-check artifact creation
 
+Preferred near-term interpretation:
+
+- `WAVE START` = partially automated context refresh and frontier grounding
+- `SEQ NEXT` = stronger automated readiness + planning companion
+- later `TERV REVIEW` = H4-adjacent structured plan critique mode
+
 ### Stage C — Assisted review and gating
 
 `H5` begins to automate:
 
 - findings-first review output
-- test-evidence capture
-- explicit commit-gate decisions
+- evaluator-style evidence/readiness assessment
+- later advisory commit-gate output when evidence is good enough
+
+Important boundary:
+
+- implementation itself still remains primarily OpenCode-session work
+- early H5 supports review/evaluator/gate structure around that work rather than replacing the implementer
 
 ### Stage D — Later constrained delivery chaining
 

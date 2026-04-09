@@ -158,38 +158,81 @@ Prove that repo-aware planning can become a first-class artifact workflow withou
 
 This is the first thin automation slice of the current `WAVE START` / `SEQ NEXT` style loop.
 
+Success should not mean "the plan sounds nicer".
+Success should mean:
+
+- the plan is more grounded in repo reality
+- false-ready outputs decrease
+- touched surfaces are clearer
+- test/docs obligations are more explicit
+- the result is easier to review and audit afterward
+
 ### Scope
 
-#### `CV1-A` Request normalization + repo intake
+#### `CV1-A` `WAVE START` context refresh + repo intake
 Owner:
 - Track C
 
 Outputs:
 - normalized task brief
+- `context_report.json`
+- current frontier refresh
 - repo-intake summary
 - affected surfaces
 - likely touched files
+- unknowns and assumptions
 
-#### `CV1-B` Implementation-plan artifact
+Automation stance:
+
+- partially automated companion step
+- should refresh context and reduce stale assumptions
+- should still allow manual OpenCode judgment when repo reality needs deeper checking
+
+#### `CV1-B` `SEQ NEXT` planning artifact
 Owner:
 - Track C
 
 Outputs:
 - explicit `implementation_plan.md`
-- risk register
-- acceptance checks
+- explicit `acceptance_checks.json`
+- embedded risk section inside the plan for the first executable slice
+
+Automation stance:
+
+- stronger automation than `CV1-A`
+- should act as the main readiness + detailed-plan companion workflow
+
+#### `CV1-B2` H4-adjacent plan review mode (`TERV REVIEW`)
+Owner:
+- Meta Coordinator or planning/review role using H4 surfaces
+
+Outputs:
+- plan critique / readiness critique / sequencing critique
+- findings-first review of the plan itself
+- required changes
+- blockers
+- build-mode readiness note
+
+Boundary:
+- this is not code review
+- this is not implementation review
+- this is H4-adjacent structured plan critique
 
 #### `CV1-C` Minimal repo-tool wrapper surface
 Owner:
 - Track D
 
 Outputs:
-- only the smallest tool wrapper set needed for the H4 pilot
-- no broad tool garden
+- only the smallest helper set needed for the H4 pilot
+- repo snapshot helper
+- changed-surface helper
+- touched-files / touched-zones helper
+- artifact-writing helper
 
 Clarification:
 - wrapper work here means thin standard helpers around repeated repo operations
 - it does not mean replacing OpenCode as the main execution shell
+- it must not become a broad repo tool garden or shell replacement
 
 #### `CV1-D` Thin baseline/eval check
 Owner:
@@ -197,6 +240,15 @@ Owner:
 
 Outputs:
 - simple baseline or rubric showing whether H4 artifacts are materially better than an unstructured one-shot plan
+- reviewability / anti-false-ready / touched-surface usefulness checks where practical
+
+#### Role boundary note
+
+In near-term execution:
+
+- OpenCode sessions remain the main implementation operators
+- `CV1` is a planning companion layer, not a repo-writing replacement
+- future `fal` commands may support the current personal Meta-style / track-style operating pattern where useful, but they remain explicit helper workflows rather than universal autonomous shells
 
 ### Acceptance
 
@@ -207,6 +259,9 @@ Outputs:
 - the artifact set is more inspectable than a freeform planning answer
 - the required tool surface remains small and honest
 - the pilot still feels like the current Combined-driven planning loop, not a detached planner fantasy
+- touched-surface mapping is materially clearer than ad hoc planning
+- test/docs obligations are more explicit and easier to review
+- false-ready planning behavior is reduced
 
 ### Anti-scope rule
 
@@ -237,6 +292,11 @@ Prove that findings-first review and explicit commit gating can be artifactized 
 
 This is the first thin automation slice of the current `REVIEW` -> commit-decision loop.
 
+Near-term interpretation:
+
+- implementation itself remains primarily OpenCode-session work
+- `CV2` should first prove review usefulness and evidence legibility before any stronger gate authority is considered
+
 ### Scope
 
 #### `CV2-A` Findings-first review artifact
@@ -249,15 +309,19 @@ Outputs:
 - residual risks
 - testing gaps
 
-#### `CV2-B` Test evidence capture
+#### `CV2-B` Evaluator artifact + embedded test evidence
 Owner:
-- Track D + Track E
+- Track E, with Track D support for evidence/tool boundary questions
 
 Outputs:
-- explicit test-evidence artifact
+- plan-adherence / evidence-sufficiency assessment
+- embedded structured test-evidence section
 - reasoned note when tests are not run
 
-#### `CV2-C` Commit-gate artifact
+Boundary:
+- do not require a separate `test_evidence.json` in the first executable slice unless evidence later shows it is worth the overhead
+
+#### `CV2-C` Advisory commit-gate output (optional first slice)
 Owner:
 - Track E
 
@@ -266,6 +330,11 @@ Outputs:
 - blockers
 - warnings
 - required actions
+
+Boundary:
+- advisory only
+- no automatic commit authority
+- acceptable to delay or keep minimal in the very first executable slice if review/evaluator usefulness still needs proving
 
 #### `CV2-D` Policy feedback loop
 Owner:
@@ -280,7 +349,8 @@ Outputs:
 `CV2` is complete if:
 
 - the review output is findings-first and severity-legible
-- the gate decision is explicit and evidence-backed
+- the evaluator output makes evidence sufficiency legible
+- any gate output is explicit, evidence-backed, and clearly advisory
 - the system can say `hold` honestly without pretending progress is green
 - at least one cycle feeds back into private learning without overfitting a single run
 - the slice preserves the current human expectation that review precedes commit and may refuse commit cleanly
@@ -290,40 +360,55 @@ Outputs:
 `CV2` must not imply:
 
 - automatic commit authority by default
+- FAL becoming the primary implementer
 - production-ready unattended coding
 - full enterprise governance productization
 
 ### Recommended session order
 
 1. Track E session -> `CV2-A`
-2. Track D + Track E session -> `CV2-B`
-3. Track E session -> `CV2-C`
+2. Track E session -> `CV2-B`
+3. optional Track E session -> `CV2-C`
 4. Meta Coordinator session -> `CV2-D` and policy feedback
 
 ---
 
-## `CV3` — Later integrated delivery loop
+## `CV3` — Later orchestration expansion and harder delivery chaining
 
 **Type:** later vertical expansion  
 **Primary owners:** mixed by scope
 
 ### Goal
 
-Chain planning, implementation, review, and gating into a real but still inspectable software delivery loop.
+Extend the coding vertical beyond the first thin slices without turning it into an opaque delivery fantasy.
+
+Practical focus:
+
+- keep `CV1` and `CV2` useful and inspectable
+- only then explore richer orchestration shapes where evidence says they help
 
 ### Possible later scope
 
 - H4 -> H5 chaining
-- constrained implementer path
 - coding-specific benchmarks
-- limited handoff or parallel variants only after a stable simple path exists
+- selected orchestration expansion tied to the project-wide orchestration ladder:
+  - `O1` manager-first remains the safe default
+  - `O2` handoff can be added for narrow specialist transfer where it improves clarity
+  - `O3` parallel fan-out / fan-in becomes the likely first real `CV3` expansion for critique-heavy planning/review
+  - `O4` workflow graph remains the later hardening path, not the early default
 - later workbench/report surfaces
+
+Important current bias:
+
+- no assumption that FAL should become the primary implementer
+- OpenCode remains the main implementation shell unless strong future evidence argues otherwise
 
 ### Blockers before entry
 
 - H4/H5 artifacts must already be trustworthy
 - the private learning loop must contain real evidence, not only speculation
 - the project must still remain legible as a layered engine/research-OS system
+- richer orchestration should be justified by measured usefulness, not by agent-count aesthetics
 
 ---
 

@@ -1,6 +1,6 @@
 tier_defaults:
-  cheap_worker: gpt-4o-mini
-  specialist: gpt-5.4-nano
+  cheap_worker: mistral-small-3.2-24b-instruct
+  specialist: gpt-5.4-mini
   finalizer: gpt-5.4-mini
 
 workflow_overrides: {}

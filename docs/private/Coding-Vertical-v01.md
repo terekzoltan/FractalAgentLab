@@ -150,6 +150,12 @@ Helpful shorthand:
 
 This means the coding vertical should feel like a governed workflow layer running through OpenCode, not like an attempt to replace OpenCode with a separate IDE or opaque swarm.
 
+Personal-workflow compatibility note:
+
+- the current operator workflow in this repo often uses one Meta Coordinator loop and multiple track-specific implementation loops
+- future H4/H5 runs may remain compatible with that pattern where useful
+- treat this as workflow-compatibility guidance for the current operating style, not as a universal architectural requirement for Fractal Agent Lab
+
 ### Target topology
 
 The default future topology is expected to be:

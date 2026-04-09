@@ -62,6 +62,13 @@ Meaning:
 
 `CV2` remains the first thin executable review/gate slice after its own prerequisites.
 
+Thin executable-slice clarification:
+
+- the first `CV2` slice may remain review + evaluator centered
+- advisory gate output is acceptable
+- `implementer` remains outside the early executable slice and stays primarily OpenCode-session work
+- a separate `test_evidence.json` is not mandatory in the first thin slice if structured evidence remains explicit and reviewable
+
 ---
 
 ## Severity model

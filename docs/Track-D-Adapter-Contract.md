@@ -192,9 +192,10 @@ Stabilization fixes implemented for `W1-S1-FIX-D1` and `W1-S1-FIX-D2`:
 
 - `W1-S1-FIX-D2`
   - canonical tier defaults restored in `configs/model_policy.example.yaml`:
-    - `cheap_worker`: `gpt-4o-mini`
-    - `specialist`: `gpt-5.4-nano`
+    - `cheap_worker`: `mistral-small-3.2-24b-instruct`
+    - `specialist`: `gpt-5.4-mini`
     - `finalizer`: `gpt-5.4-mini`
+    - rare arbitration / gate-conflict escalation: `gpt-5.4`
   - adapter and CLI tests now align to these defaults.
 
 ---

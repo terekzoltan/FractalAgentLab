@@ -57,6 +57,17 @@ Turn software-delivery intent + repo state into an execution-ready plan artifact
 
 ### Recommended early roles
 
+Recommended early modes:
+
+- `wave_start` -> context refresh / frontier grounding
+- `seq_next` -> readiness + detailed plan generation
+- later `plan_review` -> plan critique / readiness critique / sequencing critique
+
+Near-term execution model:
+
+- `H4` is a planning companion for OpenCode sessions
+- it should improve the current human loop, not replace the main shell or repo operator
+
 #### `repo_intake`
 
 Owns:
@@ -111,6 +122,14 @@ Must not:
 - `architect_critic` -> `risk_register.json`
 - `synthesizer` -> `acceptance_checks.json` and final plan normalization
 
+Early pilot note:
+
+- first executable `CV1` may keep `risk_register` embedded as a section inside `implementation_plan.md`
+- the minimum useful early artifact set is therefore:
+  - `context_report.json`
+  - `implementation_plan.md`
+  - `acceptance_checks.json`
+
 Reference contract:
 - `docs/private/Coding-Vertical-Artifact-Contract-v01.md`
 
@@ -118,9 +137,26 @@ Reference contract:
 
 Start simple:
 
-1. narrow manager path first
-2. optional single-agent baseline for comparison
-3. only later add richer handoff/parallel behavior if evidence says it helps
+1. `WAVE START` + `SEQ NEXT` first
+2. narrow 2/3-stage manager path first
+3. optional single-agent baseline for comparison
+4. only later add richer handoff/parallel behavior if evidence says it helps
+
+Automation stance:
+
+- `WAVE START` should stay partially automated because manual judgment still matters for drift/context recovery
+- `SEQ NEXT` can be much more strongly automated as a planning/readiness companion
+- `plan_review` should remain H4-adjacent and findings-first, not become implementation review or code review
+
+Helper-layer note:
+
+- any early `CV1-C` helper layer should stay very thin
+- good examples:
+  - repo snapshot helper
+  - changed-surface helper
+  - touched-files / touched-zones helper
+  - artifact-writing helper
+- avoid broad repo tool platformization or shell replacement
 
 Boundary reminder:
 
@@ -145,6 +181,11 @@ Boundary reminder:
 
 Turn implementation reality into an honest review and commit-readiness decision.
 
+Near-term boundary:
+
+- actual implementation remains primarily OpenCode-session work
+- early executable `CV2` should review and evaluate implementation reality, not replace the implementer
+
 ### Recommended early roles
 
 #### `implementer`
@@ -157,6 +198,11 @@ Owns:
 
 Must not:
 - self-certify quality as if review already happened
+
+Executable-scope note:
+
+- keep `implementer` as family context for now
+- do not make it part of the first thin executable `CV2` slice
 
 #### `reviewer`
 
@@ -193,16 +239,25 @@ Owns:
 Must not:
 - blur the decision into vague confidence language
 
+Authority note:
+
+- early `commit_gate` output should remain advisory only
+- do not imply autonomous commit authority by default
+
 ### Early orchestration recommendation
 
 Start with explicit separation:
 
-1. implementation report
-2. findings-first review
-3. evaluator check
-4. gate decision
+1. findings-first review
+2. evaluator check
+3. optional advisory gate output only after evidence is strong enough
 
 Do not collapse these into one opaque role early.
+
+Early evidence note:
+
+- the first executable slice may keep test evidence embedded inside review/evaluator artifacts
+- a separate `test_evidence.json` should remain optional until there is evidence that the extra artifact is worth the overhead
 
 ---
 

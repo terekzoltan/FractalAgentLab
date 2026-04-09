@@ -557,9 +557,10 @@ Small curated set of recurring test cases.
 Use model tiers instead of one-model-for-all:
 
 Current default direction (explicitly confirmed, but still revisitable later):
-- `cheap_worker` -> `gpt-4o-mini`
-- `specialist` -> `gpt-5.4-nano`
+- `cheap_worker` -> `mistral-small-3.2-24b-instruct`
+- `specialist` -> `gpt-5.4-mini`
 - `finalizer` -> `gpt-5.4-mini`
+- rare arbitration / gate-conflict escalation -> `gpt-5.4`
 
 Note:
 - these are current defaults, not permanent promises
@@ -573,6 +574,15 @@ Use for:
 - simple criticism
 - structure normalization
 
+Role intent:
+- low-cost, high-frequency worker for bounded tasks
+- best when the output is structural, easy to inspect, or easy to correct downstream
+
+Should not be the default for:
+- final planning authority
+- high-stakes critique
+- final gate or arbitration
+
 #### Tier T2 — Mid-tier specialists
 Use for:
 - planner
@@ -580,12 +590,36 @@ Use for:
 - research synthesis
 - strategy drafts
 
+Role intent:
+- main reasoning tier for workflow-specific planning and critique
+- should carry most repo-aware planning, decomposition, and systems-thinking work
+
+Typical role fit:
+- `planner`
+- `architect`
+- `architect_critic`
+- `systems`
+- `critic`
+- `evaluator`
+
 #### Tier T3 — Expensive finalizers
 Use for:
 - final synthesis
 - high-stakes critique
 - architecture review final pass
 - difficult arbitration
+
+Role intent:
+- final synthesis / final decision tier, not the default worker tier
+- use when the workflow needs a clean bottom line, conflict resolution, or high-confidence final pass
+
+Typical role fit:
+- `synthesizer`
+- `commit_gate`
+- final-pass reviewer/evaluator on high-stakes workflows
+
+Escalation note:
+- if `finalizer` output still leaves unresolved gate conflict or hard arbitration ambiguity, escalate that narrow decision to `gpt-5.4` rather than upgrading the whole workflow by default
 
 **Rule:** avoid all-premium-by-default architecture.
 
@@ -1310,6 +1344,7 @@ These are not the active implementation frontier, but they are now canonical fut
 8. `docs/private/Coding-Vertical-Learning-Loop-v01.md`
 9. `docs/private/Coding-Vertical-H4-Planning-Prompt-Review-v01.md`
 10. `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md`
+11. `docs/private/Model-Reasoning-Effort-Policy-Note-v01.md`
 
 **CV0 execution status:** complete; `CV0-A`/`CV0-B`/`CV0-C`/`CV0-D` are now closed, and `CV1` is ready by named prerequisites but remains subordinate to the active mainline frontier in Combined.
 
