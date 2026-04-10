@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+from fractal_agent_lab.agents.h2.prompts import H2_PROMPT_VERSION, PROMPTS_BY_ROLE, ROLE_PROMPT_VERSION
+from fractal_agent_lab.agents.h2.roles import H2Role, H2_AGENT_IDS, ordered_h2_roles
+from fractal_agent_lab.core.contracts import AgentKind, AgentSpec
+
+
+def build_h2_agent_specs() -> dict[str, AgentSpec]:
+    specs: list[AgentSpec] = [
+        AgentSpec(
+            agent_id=H2_AGENT_IDS[H2Role.INTAKE],
+            role=H2Role.INTAKE.value,
+            kind=AgentKind.LLM,
+            instructions=PROMPTS_BY_ROLE[H2Role.INTAKE],
+            model_policy_ref="cheap_worker",
+            handoff_targets=[],
+            metadata={
+                "prompt_version": ROLE_PROMPT_VERSION[H2Role.INTAKE],
+                "pack_prompt_version": H2_PROMPT_VERSION,
+            },
+        ),
+        AgentSpec(
+            agent_id=H2_AGENT_IDS[H2Role.PLANNER],
+            role=H2Role.PLANNER.value,
+            kind=AgentKind.LLM,
+            instructions=PROMPTS_BY_ROLE[H2Role.PLANNER],
+            model_policy_ref="specialist",
+            handoff_targets=[],
+            metadata={
+                "prompt_version": ROLE_PROMPT_VERSION[H2Role.PLANNER],
+                "pack_prompt_version": H2_PROMPT_VERSION,
+            },
+        ),
+        AgentSpec(
+            agent_id=H2_AGENT_IDS[H2Role.ARCHITECT],
+            role=H2Role.ARCHITECT.value,
+            kind=AgentKind.LLM,
+            instructions=PROMPTS_BY_ROLE[H2Role.ARCHITECT],
+            model_policy_ref="specialist",
+            handoff_targets=[],
+            metadata={
+                "prompt_version": ROLE_PROMPT_VERSION[H2Role.ARCHITECT],
+                "pack_prompt_version": H2_PROMPT_VERSION,
+            },
+        ),
+        AgentSpec(
+            agent_id=H2_AGENT_IDS[H2Role.CRITIC],
+            role=H2Role.CRITIC.value,
+            kind=AgentKind.LLM,
+            instructions=PROMPTS_BY_ROLE[H2Role.CRITIC],
+            model_policy_ref="specialist",
+            handoff_targets=[],
+            metadata={
+                "prompt_version": ROLE_PROMPT_VERSION[H2Role.CRITIC],
+                "pack_prompt_version": H2_PROMPT_VERSION,
+            },
+        ),
+        AgentSpec(
+            agent_id=H2_AGENT_IDS[H2Role.SYNTHESIZER],
+            role=H2Role.SYNTHESIZER.value,
+            kind=AgentKind.LLM,
+            instructions=PROMPTS_BY_ROLE[H2Role.SYNTHESIZER],
+            model_policy_ref="finalizer",
+            handoff_targets=[],
+            metadata={
+                "prompt_version": ROLE_PROMPT_VERSION[H2Role.SYNTHESIZER],
+                "pack_prompt_version": H2_PROMPT_VERSION,
+            },
+        ),
+    ]
+    return {spec.agent_id: spec for spec in specs}
+
+
+def build_h2_agent_pack() -> dict[str, AgentSpec]:
+    specs = build_h2_agent_specs()
+    validate_h2_agent_specs(specs)
+    return specs
+
+
+def validate_h2_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
+    required_ids = {H2_AGENT_IDS[role] for role in ordered_h2_roles()}
+    missing = sorted(required_ids.difference(agent_specs_by_id))
+    if missing:
+        raise ValueError(f"Missing required H2 agent specs: {', '.join(missing)}")
+
+    unexpected = sorted(set(agent_specs_by_id).difference(required_ids))
+    if unexpected:
+        raise ValueError(f"Unexpected H2 agent specs: {', '.join(unexpected)}")
+
+    seen_roles: set[str] = set()
+    observed_pack_versions: set[str] = set()
+    for agent_id, spec in agent_specs_by_id.items():
+        if spec.role in seen_roles:
+            raise ValueError(f"Duplicate role in H2 pack: {spec.role}")
+        seen_roles.add(spec.role)
+
+    for role in ordered_h2_roles():
+        agent_id = H2_AGENT_IDS[role]
+        spec = agent_specs_by_id[agent_id]
+
+        prompt_version = spec.metadata.get("prompt_version")
+        if not isinstance(prompt_version, str) or not prompt_version:
+            raise ValueError(f"Agent '{spec.agent_id}' missing non-empty prompt_version metadata.")
+
+        pack_prompt_version = spec.metadata.get("pack_prompt_version")
+        if not isinstance(pack_prompt_version, str) or not pack_prompt_version:
+            raise ValueError(f"Agent '{spec.agent_id}' missing non-empty pack_prompt_version metadata.")
+        observed_pack_versions.add(pack_prompt_version)
+
+    if observed_pack_versions != {H2_PROMPT_VERSION}:
+        raise ValueError(
+            "H2 manager pack must use one consistent pack_prompt_version (h2.prompt.v1).",
+        )
+
+    for spec in agent_specs_by_id.values():
+        for target in spec.handoff_targets:
+            if target not in agent_specs_by_id:
+                raise ValueError(
+                    f"Agent '{spec.agent_id}' references unknown handoff target '{target}'.",
+                )
+            if target == spec.agent_id:
+                raise ValueError(f"Agent '{spec.agent_id}' cannot hand off to itself.")
+
+    for role in ordered_h2_roles():
+        if agent_specs_by_id[H2_AGENT_IDS[role]].handoff_targets:
+            raise ValueError(
+                "H2 manager pack agents must not declare handoff targets. "
+                "Manager orchestration authority comes from workflow.manager_spec and manager control output.",
+            )

@@ -60,6 +60,8 @@ class MockAdapter:
             return self._build_h1_handoff_output(request)
         if request.workflow_id == "h1.manager.v1":
             return self._build_h1_manager_output(request)
+        if request.workflow_id == "h2.manager.v1":
+            return self._build_h2_manager_output(request)
         if request.workflow_id == "h1.single.v1":
             return self._build_h1_single_output(request)
         if request.workflow_id == "h1.lite":
@@ -330,6 +332,228 @@ class MockAdapter:
             "prompt_version": request.prompt_version,
         }
 
+    def _build_h2_manager_output(self, request: AdapterStepRequest) -> dict[str, Any]:
+        goal = _clean_text(request.input_payload.get("goal"), fallback="Unspecified project goal")
+        intake_output = _step_output(request, "intake")
+        planner_output = _step_output(request, "planner")
+        architect_output = _step_output(request, "architect")
+        critic_output = _step_output(request, "critic")
+
+        if request.step_id == "synthesizer":
+            if not intake_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "intake",
+                        "reason": "missing_intake_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+            if not planner_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "planner",
+                        "reason": "missing_planner_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+            if not architect_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "architect",
+                        "reason": "missing_architect_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+            if not critic_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "critic",
+                        "reason": "missing_critic_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+
+            project_summary = _require_mock_text_field(
+                request=request,
+                step_id="intake",
+                output=intake_output,
+                field_name="project_summary",
+            )
+            tracks = _require_mock_list_field(
+                request=request,
+                step_id="architect",
+                output=architect_output,
+                field_name="tracks",
+            )
+            modules = _require_mock_list_field(
+                request=request,
+                step_id="architect",
+                output=architect_output,
+                field_name="modules",
+            )
+            phases = _require_mock_list_field(
+                request=request,
+                step_id="architect",
+                output=architect_output,
+                field_name="phases",
+            )
+            dependency_order = _require_mock_list_field(
+                request=request,
+                step_id="planner",
+                output=planner_output,
+                field_name="dependency_order",
+            )
+            implementation_waves = _require_mock_list_field(
+                request=request,
+                step_id="planner",
+                output=planner_output,
+                field_name="implementation_waves",
+            )
+            risk_zones = _require_mock_list_field(
+                request=request,
+                step_id="critic",
+                output=critic_output,
+                field_name="risk_zones",
+            )
+            open_questions = _require_mock_list_field(
+                request=request,
+                step_id="critic",
+                output=critic_output,
+                field_name="open_questions",
+            )
+
+            return {
+                "control": {
+                    "action": "finalize",
+                    "reason": "all_workers_completed",
+                    "output": {
+                        "project_summary": project_summary,
+                        "tracks": tracks,
+                        "modules": modules,
+                        "phases": phases,
+                        "dependency_order": dependency_order,
+                        "implementation_waves": implementation_waves,
+                        "risk_zones": risk_zones,
+                        "open_questions": open_questions,
+                        "recommended_starting_slice": "contracts_and_schema_alignment",
+                    },
+                },
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "intake":
+            return {
+                "project_summary": goal,
+                "primary_goal": "Turn broad idea into implementable decomposition plan.",
+                "constraints": [
+                    "Keep scope bounded to current wave sequencing.",
+                    "Avoid runtime-contract churn unless justified by evidence.",
+                ],
+                "assumptions": [
+                    "Manager workflow remains the lowest-risk orchestration baseline.",
+                    "Role separation should improve decomposition clarity.",
+                ],
+                "unknowns": [
+                    "Which decomposition slice should be first productionized path?",
+                    "Where should stricter acceptance gates be introduced later?",
+                ],
+                "success_criteria": [
+                    "Clear track/module/phase boundaries.",
+                    "Dependency-aware implementation order.",
+                ],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "planner":
+            _require_manager_context(request=request, required_step_id="intake")
+            return {
+                "decomposition_strategy": ["contracts_first", "runnable_surface_second", "quality_gates_last"],
+                "dependency_order": [
+                    "workflow_schema",
+                    "role_pack",
+                    "output_template",
+                    "smoke_rubric",
+                ],
+                "implementation_waves": [
+                    {"wave": "W3-S1", "focus": ["R3-A", "R3-B", "R3-C", "R3-D"]},
+                    {"wave": "W3-S2", "focus": ["R3-E", "R3-F", "R3-G", "R3-H"]},
+                ],
+                "phase_plan": ["definition", "integration", "validation"],
+                "blocking_dependencies": ["schema_contract_alignment", "registry_binding"],
+                "sequencing_rationale": "Stabilize contracts and roles before template polish and smoke finalization.",
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "architect":
+            _require_manager_context(request=request, required_step_id="intake")
+            _require_manager_context(request=request, required_step_id="planner")
+            return {
+                "tracks": ["core", "workflow", "quality"],
+                "modules": ["workflows", "agents", "adapters", "tests", "docs"],
+                "phases": ["contract", "pack", "template", "smoke"],
+                "interface_boundaries": [
+                    "workflow_spec_to_agent_pack",
+                    "registry_to_executor",
+                    "mock_adapter_to_runtime",
+                ],
+                "ownership_notes": [
+                    "Track C owns workflow/agent role semantics.",
+                    "Track B owns runtime/core contracts.",
+                    "Track E owns smoke and acceptance quality gates.",
+                ],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "critic":
+            _require_manager_context(request=request, required_step_id="intake")
+            _require_manager_context(request=request, required_step_id="planner")
+            _require_manager_context(request=request, required_step_id="architect")
+            return {
+                "risk_zones": [
+                    "scope_sprawl_between_r3_b_and_r3_c",
+                    "registry_pack_drift",
+                    "false_green_from_fallback_paths",
+                ],
+                "failure_modes": [
+                    "Role overlap dilutes planner vs architect responsibility.",
+                    "Manager finalization hides unresolved unknowns.",
+                ],
+                "merge_risks": [
+                    "Cross-track status misalignment in coordination docs.",
+                    "Implicit assumptions leaking into runtime contracts.",
+                ],
+                "overbuild_warnings": [
+                    "Avoid H2 prompt tags before evaluation needs demand them.",
+                    "Avoid CLI formatting polish before output template is frozen.",
+                ],
+                "open_questions": [
+                    "Which final output ordering should become R3-C canonical template?",
+                    "What minimum smoke rubric should block false-green in R3-D?",
+                ],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        return {
+            "message": f"No specialized h2.manager.v1 output for step '{request.step_id}'.",
+            "role": request.role,
+            "model": request.model,
+            "model_policy_ref": request.model_policy_ref,
+            "prompt_version": request.prompt_version,
+        }
+
     def _build_h1_handoff_output(self, request: AdapterStepRequest) -> dict[str, Any]:
         idea = _clean_text(request.input_payload.get("idea"), fallback="Unspecified startup idea")
         intake_output = _step_output(request, "intake")
@@ -556,6 +780,60 @@ def _require_manager_context(*, request: AdapterStepRequest, required_step_id: s
             "step_id": request.step_id,
             "required_step_id": required_step_id,
             "reason": "missing_upstream_context",
+        },
+    )
+
+
+def _require_mock_list_field(
+    *,
+    request: AdapterStepRequest,
+    step_id: str,
+    output: Mapping[str, Any],
+    field_name: str,
+) -> list[Any]:
+    value = output.get(field_name)
+    if isinstance(value, list) and value:
+        return list(value)
+
+    raise StepExecutionError(
+        (
+            "MockAdapter strict structured-output check failed: "
+            f"step '{request.step_id}' requires non-empty list field '{field_name}' from upstream step '{step_id}'."
+        ),
+        details={
+            "workflow_id": request.workflow_id,
+            "step_id": request.step_id,
+            "required_step_id": step_id,
+            "required_field": field_name,
+            "reason": "malformed_upstream_output",
+        },
+    )
+
+
+def _require_mock_text_field(
+    *,
+    request: AdapterStepRequest,
+    step_id: str,
+    output: Mapping[str, Any],
+    field_name: str,
+) -> str:
+    value = output.get(field_name)
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned:
+            return cleaned
+
+    raise StepExecutionError(
+        (
+            "MockAdapter strict structured-output check failed: "
+            f"step '{request.step_id}' requires non-empty text field '{field_name}' from upstream step '{step_id}'."
+        ),
+        details={
+            "workflow_id": request.workflow_id,
+            "step_id": request.step_id,
+            "required_step_id": step_id,
+            "required_field": field_name,
+            "reason": "malformed_upstream_output",
         },
     )
 

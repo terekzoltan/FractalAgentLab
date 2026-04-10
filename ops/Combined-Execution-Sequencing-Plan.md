@@ -933,7 +933,7 @@ Track D may add a late-wave real-provider MVP side batch, but that work should n
 
 Epics:
 - ✅ **R3-A** H2 workflow schema v1 — **Owner: Track C** (Track B reviews schema contract)
-- ⬜ **R3-B** H2 architect / planner / critic role pack — **Owner: Track C**
+- ✅ **R3-B** H2 architect / planner / critic role pack — **Owner: Track C**
 - ⬜ **R3-C** H2 sequencing and risk-zone output template — **Owner: Track C**
 - ⬜ **R3-D** H2 smoke rubric — **Owner: Track E**
 
@@ -954,12 +954,12 @@ Epics:
 |---------|---------|--------|-------|
 | Track C agent session | R3-A | Wave 2 ✅ | H2 should start from a clear workflow contract, not ad hoc role output shapes |
 
-**⬜ Step 2 — Track B reviews schema while Track C builds role pack in parallel**
+**✅ Step 2 — Track B reviews schema while Track C builds role pack in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent session | R3-A (schema review) | R3-A ✅ | Confirm H2 schema fits runtime contract expectations |
-| Track C agent session | R3-B | R3-A ✅ | Architect/planner/critic separation is the core value of H2 |
+| Track B agent session | ✅ R3-A (schema review) | R3-A ✅ | Confirmed manager-schema/runtime compatibility invariants and pre-runtime guardrail coverage |
+| Track C agent session | ✅ R3-B | R3-A ✅ | Architect/planner/critic separation delivered with runnable manager-pack wiring and explicit anti-fallback mock evidence |
 
 **⬜ Step 3 — Track C finalizes output form while Track E prepares smoke rubric skeleton in parallel**
 
@@ -1413,7 +1413,8 @@ Wave 2 Sprint `W2-S3` is complete through Step 2 (`H2-H` confirmation + `H2-N` b
 Wave 2 closeout is now accepted.
 The immediate mainline frontier is now:
 
-- Wave 3 `W3-S1` Step 1 kickoff: Track C `R3-A` (H2 workflow schema v1)
+- Wave 3 `W3-S1` Step 2 is complete (`R3-A` schema review ✅ + `R3-B` role pack ✅)
+- The immediate coding mainline frontier is now Wave 3 `W3-S1` Step 3 (`R3-C` next; `R3-D` skeleton prep can open in parallel after `R3-B`)
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch remains gated until `W3-S1` is complete
 
@@ -1460,9 +1461,10 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track C agent session` for `W3-S1` Step 1 / `R3-A` (H2 workflow schema v1)
-2. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
-3. Wave 3 real-provider side batch only after `W3-S1` is complete
+1. `Track C agent session` for `W3-S1` Step 3 / `⬜ R3-C` (H2 output template)
+2. `Track E agent session` for `W3-S1` Step 3/4 `⬜ R3-D` skeleton/finalize after `R3-B`
+3. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
+4. Wave 3 real-provider side batch only after `W3-S1` is complete
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`
@@ -1823,6 +1825,7 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-05][Track E] H2-L/H2-O completed (🔄 -> ✅) - H2-L shipped with canonical session-memory load-path validation plus pair-level session-store restoration and conservative materiality labeling, while H2-O now requires real updater evidence, respects configured identity-store subdirs, validates present canonical artifacts, and still keeps orphan sidecars warning-grade only - next: Meta executes Wave 2 closeout sequencing.`
 - `[2026-04-04][Track E] CV0-C started (⬜ -> 🔄) - docs-only H5 review/gate policy review started with explicit scope boundary (CV0 policy review, not CV2 execution), control-surface alignment checks, and false-green guardrail preservation - next: publish H5 review outcome package and apply targeted cross-doc wording alignment.`
 - `[2026-04-04][Track E] CV0-C completed (🔄 -> ✅) - Track E delivered docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md and tightened canonical H5 policy wording for OpenCode-anchored control-surface alignment, anti-false-green evidence language, artifact-contract consumption boundaries, and explicit CV0-vs-CV2 separation without runtime/schema/tooling changes - next: Meta executes CV0-D closeout and CV1 prereq note.`
+- `[2026-04-10][Track B] W3-S1 Step 2 R3-A schema review completed (🔄 -> ✅ Track B scope) - Track B confirmed H2 manager-schema/runtime boundary compatibility, hardened WorkflowSpec manager invariants to reject missing/unknown/duplicate worker topology and manager-entrypoint mismatch before runtime, and expanded negative-path manager invariant coverage - next: Track C continues R3-B and downstream W3-S1 sequencing.`
 
 ---
 

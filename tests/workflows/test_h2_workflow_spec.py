@@ -19,6 +19,8 @@ class H2WorkflowSpecTests(unittest.TestCase):
         workflow = build_h2_manager_workflow_spec()
 
         self.assertEqual(H2_WORKFLOW_ID, workflow.workflow_id)
+        self.assertEqual("H2 Project Decomposition Manager Baseline", workflow.name)
+        self.assertEqual("1.0.0", workflow.version)
         self.assertEqual(WorkflowExecutionMode.MANAGER, workflow.execution_mode)
         self.assertEqual(H2_MANAGER_STEP_ID, workflow.entrypoint_step_id)
         self.assertEqual("h2.input.v1", workflow.input_schema_ref)
@@ -29,6 +31,7 @@ class H2WorkflowSpecTests(unittest.TestCase):
         assert manager_spec is not None
         self.assertEqual(H2_MANAGER_STEP_ID, manager_spec.manager_step_id)
         self.assertEqual(list(H2_WORKER_STEP_IDS), manager_spec.worker_step_ids)
+        self.assertNotIn(manager_spec.manager_step_id, manager_spec.worker_step_ids)
         self.assertEqual(8, manager_spec.max_turns)
         self.assertFalse(manager_spec.allow_revisit_workers)
 
@@ -41,6 +44,10 @@ class H2WorkflowSpecTests(unittest.TestCase):
         self.assertEqual("H2", workflow.metadata.get("hero_workflow"))
         self.assertEqual("manager", workflow.metadata.get("variant"))
         self.assertEqual("h2.workflow.v1", workflow.metadata.get("schema_contract"))
+        self.assertEqual(
+            {"source", "hero_workflow", "variant", "schema_contract"},
+            set(workflow.metadata),
+        )
 
     def test_h2_manager_workflow_executes_with_explicit_control_no_fallback(self) -> None:
         workflow = build_h2_manager_workflow_spec()

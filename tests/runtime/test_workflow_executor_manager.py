@@ -226,6 +226,23 @@ class WorkflowSpecManagerInvariantTests(unittest.TestCase):
                 steps=[WorkflowStepSpec(step_id="s1", agent_id="a1")],
             )
 
+    def test_manager_spec_requires_manager_execution_mode(self) -> None:
+        with self.assertRaisesRegex(ValueError, "manager_spec requires execution_mode 'manager'"):
+            WorkflowSpec(
+                workflow_id="invalid.manager.spec.mode",
+                name="Invalid Manager Spec Mode",
+                execution_mode=WorkflowExecutionMode.LINEAR,
+                steps=[
+                    WorkflowStepSpec(step_id="manager", agent_id="m1"),
+                    WorkflowStepSpec(step_id="worker", agent_id="w1"),
+                ],
+                manager_spec=ManagerSpec(
+                    manager_step_id="manager",
+                    worker_step_ids=["worker"],
+                    max_turns=3,
+                ),
+            )
+
     def test_manager_worker_list_cannot_include_manager_step(self) -> None:
         with self.assertRaisesRegex(ValueError, "cannot include manager_step_id"):
             WorkflowSpec(
@@ -239,6 +256,108 @@ class WorkflowSpecManagerInvariantTests(unittest.TestCase):
                 manager_spec=ManagerSpec(
                     manager_step_id="manager",
                     worker_step_ids=["manager", "worker"],
+                    max_turns=3,
+                ),
+            )
+
+    def test_manager_step_must_reference_declared_step(self) -> None:
+        with self.assertRaisesRegex(ValueError, r"manager_spec\.manager_step_id must reference"):
+            WorkflowSpec(
+                workflow_id="invalid.manager.missing_step",
+                name="Invalid Missing Manager Step",
+                execution_mode=WorkflowExecutionMode.MANAGER,
+                steps=[
+                    WorkflowStepSpec(step_id="worker", agent_id="w1"),
+                ],
+                manager_spec=ManagerSpec(
+                    manager_step_id="manager",
+                    worker_step_ids=["worker"],
+                    max_turns=3,
+                ),
+            )
+
+    def test_manager_worker_ids_must_reference_declared_steps(self) -> None:
+        with self.assertRaisesRegex(ValueError, "contains unknown workflow steps"):
+            WorkflowSpec(
+                workflow_id="invalid.manager.unknown_worker",
+                name="Invalid Unknown Worker",
+                execution_mode=WorkflowExecutionMode.MANAGER,
+                steps=[
+                    WorkflowStepSpec(step_id="manager", agent_id="m1"),
+                    WorkflowStepSpec(step_id="worker", agent_id="w1"),
+                ],
+                manager_spec=ManagerSpec(
+                    manager_step_id="manager",
+                    worker_step_ids=["worker", "missing_worker"],
+                    max_turns=3,
+                ),
+            )
+
+    def test_manager_worker_ids_cannot_be_empty(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must include at least one worker step"):
+            WorkflowSpec(
+                workflow_id="invalid.manager.empty_workers",
+                name="Invalid Empty Workers",
+                execution_mode=WorkflowExecutionMode.MANAGER,
+                steps=[
+                    WorkflowStepSpec(step_id="manager", agent_id="m1"),
+                    WorkflowStepSpec(step_id="worker", agent_id="w1"),
+                ],
+                manager_spec=ManagerSpec(
+                    manager_step_id="manager",
+                    worker_step_ids=[],
+                    max_turns=3,
+                ),
+            )
+
+    def test_manager_worker_ids_cannot_contain_duplicates(self) -> None:
+        with self.assertRaisesRegex(ValueError, "worker_step_ids contains duplicates"):
+            WorkflowSpec(
+                workflow_id="invalid.manager.duplicate_workers",
+                name="Invalid Duplicate Workers",
+                execution_mode=WorkflowExecutionMode.MANAGER,
+                steps=[
+                    WorkflowStepSpec(step_id="manager", agent_id="m1"),
+                    WorkflowStepSpec(step_id="worker", agent_id="w1"),
+                ],
+                manager_spec=ManagerSpec(
+                    manager_step_id="manager",
+                    worker_step_ids=["worker", "worker"],
+                    max_turns=3,
+                ),
+            )
+
+    def test_manager_max_turns_must_be_positive(self) -> None:
+        with self.assertRaisesRegex(ValueError, "manager_spec.max_turns must be positive"):
+            WorkflowSpec(
+                workflow_id="invalid.manager.max_turns",
+                name="Invalid Manager Max Turns",
+                execution_mode=WorkflowExecutionMode.MANAGER,
+                steps=[
+                    WorkflowStepSpec(step_id="manager", agent_id="m1"),
+                    WorkflowStepSpec(step_id="worker", agent_id="w1"),
+                ],
+                manager_spec=ManagerSpec(
+                    manager_step_id="manager",
+                    worker_step_ids=["worker"],
+                    max_turns=0,
+                ),
+            )
+
+    def test_manager_entrypoint_must_match_manager_step_id(self) -> None:
+        with self.assertRaisesRegex(ValueError, "entrypoint_step_id to match manager_step_id"):
+            WorkflowSpec(
+                workflow_id="invalid.manager.entrypoint",
+                name="Invalid Manager Entrypoint",
+                execution_mode=WorkflowExecutionMode.MANAGER,
+                steps=[
+                    WorkflowStepSpec(step_id="manager", agent_id="m1"),
+                    WorkflowStepSpec(step_id="worker", agent_id="w1"),
+                ],
+                entrypoint_step_id="worker",
+                manager_spec=ManagerSpec(
+                    manager_step_id="manager",
+                    worker_step_ids=["worker"],
                     max_turns=3,
                 ),
             )

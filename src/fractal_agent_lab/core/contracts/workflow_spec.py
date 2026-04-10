@@ -90,6 +90,7 @@ class WorkflowSpec:
 
     def __post_init__(self) -> None:
         step_ids = [step.step_id for step in self.steps]
+        step_id_set = set(step_ids)
         if len(step_ids) != len(set(step_ids)):
             duplicates = sorted({step_id for step_id in step_ids if step_ids.count(step_id) > 1})
             raise ValueError(
@@ -103,13 +104,45 @@ class WorkflowSpec:
             raise ValueError("execution_mode 'manager' requires non-null manager_spec.")
         if self.manager_spec is not None and self.execution_mode != WorkflowExecutionMode.MANAGER:
             raise ValueError("manager_spec requires execution_mode 'manager'.")
+        if self.manager_spec and self.manager_spec.manager_step_id not in step_id_set:
+            raise ValueError("manager_spec.manager_step_id must reference a declared workflow step.")
+        if self.manager_spec and not self.manager_spec.worker_step_ids:
+            raise ValueError("manager_spec.worker_step_ids must include at least one worker step.")
+        if self.manager_spec and len(self.manager_spec.worker_step_ids) != len(
+            set(self.manager_spec.worker_step_ids),
+        ):
+            duplicates = sorted(
+                {
+                    step_id
+                    for step_id in self.manager_spec.worker_step_ids
+                    if self.manager_spec.worker_step_ids.count(step_id) > 1
+                },
+            )
+            raise ValueError(
+                "manager_spec.worker_step_ids contains duplicates: " + ", ".join(duplicates),
+            )
+        if self.manager_spec:
+            unknown_workers = sorted(
+                step_id for step_id in self.manager_spec.worker_step_ids if step_id not in step_id_set
+            )
+            if unknown_workers:
+                raise ValueError(
+                    "manager_spec.worker_step_ids contains unknown workflow steps: "
+                    + ", ".join(unknown_workers),
+                )
         if self.manager_spec and self.manager_spec.max_turns <= 0:
             raise ValueError("manager_spec.max_turns must be positive.")
         if self.manager_spec and self.manager_spec.manager_step_id in self.manager_spec.worker_step_ids:
             raise ValueError("manager_spec.worker_step_ids cannot include manager_step_id.")
         if (
+            self.manager_spec
+            and self.entrypoint_step_id is not None
+            and self.entrypoint_step_id != self.manager_spec.manager_step_id
+        ):
+            raise ValueError("manager workflows require entrypoint_step_id to match manager_step_id.")
+        if (
             self.execution_mode == WorkflowExecutionMode.HANDOFF
             and self.entrypoint_step_id is not None
-            and self.entrypoint_step_id not in {step.step_id for step in self.steps}
+            and self.entrypoint_step_id not in step_id_set
         ):
             raise ValueError("handoff workflows require a valid entrypoint_step_id.")
