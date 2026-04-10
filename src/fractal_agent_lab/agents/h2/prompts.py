@@ -3,15 +3,15 @@ from __future__ import annotations
 from fractal_agent_lab.agents.h2.roles import H2Role
 
 
-H2_PROMPT_VERSION = "h2.prompt.v1"
+H2_PROMPT_VERSION = "h2.prompt.v2"
 
 
 ROLE_PROMPT_VERSION: dict[H2Role, str] = {
     H2Role.INTAKE: "h2/intake/v1",
-    H2Role.PLANNER: "h2/planner/v1",
+    H2Role.PLANNER: "h2/planner/v2",
     H2Role.ARCHITECT: "h2/architect/v1",
     H2Role.CRITIC: "h2/critic/v1",
-    H2Role.SYNTHESIZER: "h2/synthesizer/v1",
+    H2Role.SYNTHESIZER: "h2/synthesizer/v2",
 }
 
 
@@ -25,7 +25,7 @@ PROMPTS_BY_ROLE: dict[H2Role, str] = {
     H2Role.PLANNER: (
         "You are the H2 Planner agent. Use intake output to propose decomposition strategy and execution "
         "sequencing. Return keys: decomposition_strategy, dependency_order, implementation_waves, "
-        "phase_plan, blocking_dependencies, sequencing_rationale. "
+        "recommended_starting_slice, blocking_dependencies, sequencing_rationale. "
         "Do not redefine architecture boundaries and do not emit manager control."
     ),
     H2Role.ARCHITECT: (
@@ -45,7 +45,8 @@ PROMPTS_BY_ROLE: dict[H2Role, str] = {
         "Else if architect is missing, delegate architect. "
         "Else if critic is missing, delegate critic. "
         "When all worker outputs exist, return control.action=finalize with control.output keys: "
-        "project_summary, tracks, modules, phases, dependency_order, implementation_waves, risk_zones, "
-        "open_questions, recommended_starting_slice."
+        "project_summary, tracks, modules, phases, dependency_order, implementation_waves, "
+        "recommended_starting_slice, risk_zones, open_questions. Preserve unresolved risks and open "
+        "questions explicitly. Do not invent missing fields."
     ),
 }

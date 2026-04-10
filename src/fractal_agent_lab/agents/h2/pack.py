@@ -98,9 +98,18 @@ def validate_h2_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
         agent_id = H2_AGENT_IDS[role]
         spec = agent_specs_by_id[agent_id]
 
+        if spec.role != role.value:
+            raise ValueError(
+                f"Agent '{spec.agent_id}' must use canonical H2 role '{role.value}', got '{spec.role}'.",
+            )
+
         prompt_version = spec.metadata.get("prompt_version")
         if not isinstance(prompt_version, str) or not prompt_version:
             raise ValueError(f"Agent '{spec.agent_id}' missing non-empty prompt_version metadata.")
+        if prompt_version != ROLE_PROMPT_VERSION[role]:
+            raise ValueError(
+                f"Agent '{spec.agent_id}' must use prompt_version '{ROLE_PROMPT_VERSION[role]}'.",
+            )
 
         pack_prompt_version = spec.metadata.get("pack_prompt_version")
         if not isinstance(pack_prompt_version, str) or not pack_prompt_version:
@@ -109,7 +118,7 @@ def validate_h2_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
 
     if observed_pack_versions != {H2_PROMPT_VERSION}:
         raise ValueError(
-            "H2 manager pack must use one consistent pack_prompt_version (h2.prompt.v1).",
+            "H2 manager pack must use one consistent pack_prompt_version (h2.prompt.v2).",
         )
 
     for spec in agent_specs_by_id.values():

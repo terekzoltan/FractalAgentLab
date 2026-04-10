@@ -14,6 +14,19 @@ from fractal_agent_lab.workflows import (
 )
 
 
+EXPECTED_H2_FINAL_OUTPUT_KEYS = [
+    "project_summary",
+    "tracks",
+    "modules",
+    "phases",
+    "dependency_order",
+    "implementation_waves",
+    "recommended_starting_slice",
+    "risk_zones",
+    "open_questions",
+]
+
+
 class H2WorkflowSpecTests(unittest.TestCase):
     def test_h2_manager_workflow_schema_shape_is_explicit(self) -> None:
         workflow = build_h2_manager_workflow_spec()
@@ -97,7 +110,19 @@ class H2WorkflowSpecTests(unittest.TestCase):
                         "control": {
                             "action": "finalize",
                             "reason": "all_workers_completed",
-                            "output": {"decomposition_ready": True},
+                            "output": {
+                                "project_summary": "decompose broad project",
+                                "tracks": ["core", "workflow"],
+                                "modules": ["runtime", "agent_pack"],
+                                "phases": ["contract", "pack", "template", "smoke"],
+                                "dependency_order": ["schema", "pack", "template", "smoke"],
+                                "implementation_waves": [
+                                    {"wave": "W3-S1", "focus": ["R3-A", "R3-B", "R3-C", "R3-D"]},
+                                ],
+                                "recommended_starting_slice": "stabilize_h2_template_contract",
+                                "risk_zones": ["scope_sprawl", "contract_drift"],
+                                "open_questions": ["Which final output ordering should become canonical?"],
+                            },
                         },
                     }
                 raise AssertionError(f"Unexpected manager turn index: {manager_turn}")
@@ -127,7 +152,15 @@ class H2WorkflowSpecTests(unittest.TestCase):
 
         self.assertEqual(RunStatus.SUCCEEDED, run_state.status)
         output_payload: dict[str, Any] = run_state.output_payload or {}
-        self.assertEqual({"decomposition_ready": True}, output_payload.get("final_output"))
+        final_output = output_payload.get("final_output")
+        self.assertIsInstance(final_output, dict)
+        assert isinstance(final_output, dict)
+        self.assertEqual("decompose broad project", final_output.get("project_summary"))
+        self.assertEqual(EXPECTED_H2_FINAL_OUTPUT_KEYS, list(final_output.keys()))
+        self.assertIn("dependency_order", final_output)
+        self.assertIn("risk_zones", final_output)
+        self.assertIn("recommended_starting_slice", final_output)
+        self.assertIn("open_questions", final_output)
 
         orchestration = output_payload.get("manager_orchestration", {})
         self.assertEqual(H2_MANAGER_STEP_ID, orchestration.get("manager_step_id"))

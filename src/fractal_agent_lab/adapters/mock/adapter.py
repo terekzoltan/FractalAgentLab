@@ -417,6 +417,17 @@ class MockAdapter:
                 output=planner_output,
                 field_name="implementation_waves",
             )
+            implementation_waves = _require_mock_wave_list_field(
+                request=request,
+                step_id="planner",
+                values=implementation_waves,
+            )
+            recommended_starting_slice = _require_mock_text_field(
+                request=request,
+                step_id="planner",
+                output=planner_output,
+                field_name="recommended_starting_slice",
+            )
             risk_zones = _require_mock_list_field(
                 request=request,
                 step_id="critic",
@@ -441,9 +452,9 @@ class MockAdapter:
                         "phases": phases,
                         "dependency_order": dependency_order,
                         "implementation_waves": implementation_waves,
+                        "recommended_starting_slice": recommended_starting_slice,
                         "risk_zones": risk_zones,
                         "open_questions": open_questions,
-                        "recommended_starting_slice": "contracts_and_schema_alignment",
                     },
                 },
                 "role": request.role,
@@ -488,7 +499,7 @@ class MockAdapter:
                     {"wave": "W3-S1", "focus": ["R3-A", "R3-B", "R3-C", "R3-D"]},
                     {"wave": "W3-S2", "focus": ["R3-E", "R3-F", "R3-G", "R3-H"]},
                 ],
-                "phase_plan": ["definition", "integration", "validation"],
+                "recommended_starting_slice": "stabilize_h2_template_contract",
                 "blocking_dependencies": ["schema_contract_alignment", "registry_binding"],
                 "sequencing_rationale": "Stabilize contracts and roles before template polish and smoke finalization.",
                 "role": request.role,
@@ -836,6 +847,68 @@ def _require_mock_text_field(
             "reason": "malformed_upstream_output",
         },
     )
+
+
+def _require_mock_wave_list_field(
+    *,
+    request: AdapterStepRequest,
+    step_id: str,
+    values: list[Any],
+) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for index, value in enumerate(values):
+        if not isinstance(value, Mapping):
+            raise StepExecutionError(
+                (
+                    "MockAdapter strict structured-output check failed: "
+                    f"step '{request.step_id}' requires implementation_waves[{index}] to be an object "
+                    f"from upstream step '{step_id}'."
+                ),
+                details={
+                    "workflow_id": request.workflow_id,
+                    "step_id": request.step_id,
+                    "required_step_id": step_id,
+                    "required_field": "implementation_waves",
+                    "reason": "malformed_upstream_output",
+                },
+            )
+
+        wave_value = value.get("wave")
+        focus_value = value.get("focus")
+        if not isinstance(wave_value, str) or not wave_value.strip():
+            raise StepExecutionError(
+                (
+                    "MockAdapter strict structured-output check failed: "
+                    f"step '{request.step_id}' requires implementation_waves[{index}].wave to be non-empty text "
+                    f"from upstream step '{step_id}'."
+                ),
+                details={
+                    "workflow_id": request.workflow_id,
+                    "step_id": request.step_id,
+                    "required_step_id": step_id,
+                    "required_field": "implementation_waves.wave",
+                    "reason": "malformed_upstream_output",
+                },
+            )
+        if not isinstance(focus_value, list) or not focus_value:
+            raise StepExecutionError(
+                (
+                    "MockAdapter strict structured-output check failed: "
+                    f"step '{request.step_id}' requires implementation_waves[{index}].focus to be a non-empty list "
+                    f"from upstream step '{step_id}'."
+                ),
+                details={
+                    "workflow_id": request.workflow_id,
+                    "step_id": request.step_id,
+                    "required_step_id": step_id,
+                    "required_field": "implementation_waves.focus",
+                    "reason": "malformed_upstream_output",
+                },
+            )
+
+        normalized.append({"wave": wave_value.strip(), "focus": list(focus_value)})
+
+    return normalized
 
 
 def _clean_text(value: Any, *, fallback: str) -> str:

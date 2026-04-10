@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`, and Wave 3 `W3-S1` Step 1/2 (`R3-A` + `R3-B`) is now complete, with `R3-C` as the immediate Track C mainline step)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`, and Wave 3 `W3-S1` Step 1/2/3 (`R3-A` + `R3-B` + `R3-C`) is now complete from Track C side; next Track C coding checkpoint is `R3-E` after Step 4 `R3-D` finalization)
 
 ---
 
@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O` with state-safe memory eval + evidence-gated drift smoke semantics; after Meta Wave 2 closeout the next mainline Track E checkpoint is Wave 3 `R3-D` H2 smoke rubric work)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3 `W3-S1`, `R3-D` Step 3 skeleton prep is complete as a provisional docs-first artifact, while Step 4 finalization remains gated on `R3-C` output-template completion)
 
 ---
 
@@ -1040,6 +1040,9 @@ Entries:
 - `[2026-04-10][Track C] R3-A completed (⬜ -> ✅) - H2 workflow schema v1 delivered as `h2.manager.v1` with explicit five-role topology (`synthesizer` manager + `intake`/`planner`/`architect`/`critic` workers), stable schema refs/metadata, and manager-runtime compatibility tests that prove explicit control turns (not fallback-only success); no runtime churn, no registry wiring, and no H2 agent-pack implementation in this step - next: Track B reviews R3-A schema contract and Track C proceeds to R3-B role pack.`
 - `[2026-04-10][Track B] R3-A schema review completed (🔄 -> ✅ Track B scope) - Track B confirmed H2 manager-schema/runtime compatibility and hardened WorkflowSpec manager invariants so missing/unknown/duplicate manager-worker topology and manager-entrypoint mismatch are rejected before runtime, with targeted negative-path tests - next: Track C continues R3-B and Track B returns at R3-E schema review.`
 - `[2026-04-10][Track C] R3-B completed (⬜ -> ✅) - H2 manager role pack v1 delivered under `agents/h2` with explicit intake/planner/architect/critic/synthesizer separation, prompt-version metadata discipline, manager-only pack validation (no handoff topology), registry wiring for `h2.manager.v1`, and H2-specialized mock manager behavior with strict upstream-context guards; runnable mock-path tests confirm explicit delegate/finalize turn evidence and block fallback-only false-green acceptance - next: Track C proceeds to R3-C while Track E opens R3-D skeleton prep after R3-B.`
+- `[2026-04-10][Track E] R3-D skeleton prep started (⬜ -> 🔄) - Track E opened W3-S1 Step 3 docs-first H2 smoke-rubric skeleton work on top of R3-A review + R3-B runnable evidence, with explicit provisional-only semantics and no eval module/script/runtime expansion - next: publish skeleton artifact and keep finalization gated on R3-C.`
+- `[2026-04-10][Track E] R3-D skeleton prep completed (stays 🔄 at epic level) - Track E published docs/wave3/Wave3-W3-S1-TrackE-R3-D-H2-Smoke-Rubric-Skeleton.md with explicit Step-3 scope boundaries (current runnable evidence vs deferred finalization), preserving that final smoke rubric freeze belongs to Step 4 after R3-C - next: finalize R3-D once R3-C is complete.`
+- `[2026-04-10][Track C] R3-C completed (⬜ -> ✅) - H2 output-template v1 is now frozen with canonical section ordering and planner-owned `recommended_starting_slice`; H2 prompt semantics were tightened with selective role-level version bumps, and mock finalization now enforces stricter structured-output guards (including implementation-wave item shape) so template completeness failures cannot pass as green finalization - next: Track E finalizes R3-D in W3-S1 Step 4; Track C returns at R3-E after W3-S1 completion.`
 
 ---
 

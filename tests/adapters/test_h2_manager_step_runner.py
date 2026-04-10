@@ -10,6 +10,19 @@ from fractal_agent_lab.runtime import WorkflowExecutor
 from fractal_agent_lab.workflows import H2_WORKFLOW_ID
 
 
+EXPECTED_H2_FINAL_OUTPUT_KEYS = [
+    "project_summary",
+    "tracks",
+    "modules",
+    "phases",
+    "dependency_order",
+    "implementation_waves",
+    "recommended_starting_slice",
+    "risk_zones",
+    "open_questions",
+]
+
+
 class H2ManagerStepRunnerTests(unittest.TestCase):
     def test_h2_manager_workflow_is_registered_and_runnable_on_mock(self) -> None:
         workflow_ids = list_workflow_ids()
@@ -69,15 +82,15 @@ class H2ManagerStepRunnerTests(unittest.TestCase):
         )
 
         final_output = output_payload["final_output"]
-        self.assertIn("project_summary", final_output)
-        self.assertIn("tracks", final_output)
-        self.assertIn("modules", final_output)
-        self.assertIn("phases", final_output)
-        self.assertIn("dependency_order", final_output)
-        self.assertIn("implementation_waves", final_output)
-        self.assertIn("risk_zones", final_output)
-        self.assertIn("open_questions", final_output)
-        self.assertIn("recommended_starting_slice", final_output)
+        self.assertEqual(EXPECTED_H2_FINAL_OUTPUT_KEYS, list(final_output.keys()))
+
+        implementation_waves = final_output["implementation_waves"]
+        self.assertIsInstance(implementation_waves, list)
+        self.assertTrue(implementation_waves)
+        self.assertIsInstance(implementation_waves[0], dict)
+        self.assertIn("wave", implementation_waves[0])
+        self.assertIn("focus", implementation_waves[0])
+        self.assertIsInstance(implementation_waves[0]["focus"], list)
 
     def test_planner_fails_without_intake_context(self) -> None:
         workflow = get_workflow_spec(H2_WORKFLOW_ID)
@@ -212,11 +225,12 @@ class H2ManagerStepRunnerTests(unittest.TestCase):
                         "output": {
                             "dependency_order": ["schema", "pack"],
                             "implementation_waves": ["w3-s1"],
-                        },
-                    },
+                            "recommended_starting_slice": "contracts_and_schema_alignment",
+                },
+            },
                     "architect": {
                         "output": {
-                            "tracks": "not-a-list",
+                            "tracks": ["core", "workflow"],
                             "modules": ["workflows", "agents"],
                             "phases": ["contract", "pack"],
                         },
@@ -237,11 +251,12 @@ class H2ManagerStepRunnerTests(unittest.TestCase):
             "output": {
                 "dependency_order": ["schema", "pack"],
                 "implementation_waves": ["w3-s1"],
+                "recommended_starting_slice": "contracts_and_schema_alignment",
             },
         }
         run_state.step_results["architect"] = {
             "output": {
-                "tracks": "not-a-list",
+                "tracks": ["core", "workflow"],
                 "modules": ["workflows", "agents"],
                 "phases": ["contract", "pack"],
             },
@@ -257,7 +272,214 @@ class H2ManagerStepRunnerTests(unittest.TestCase):
         with self.assertRaises(StepExecutionError) as raised:
             step_runner(run_state=run_state, workflow=workflow, step=synthesizer_step)
 
+        self.assertIn("implementation_waves[0] to be an object", str(raised.exception))
+
+    def test_synthesizer_fails_when_architect_tracks_is_not_list(self) -> None:
+        workflow = get_workflow_spec(H2_WORKFLOW_ID)
+        step_runner = build_step_runner(
+            agent_specs_by_id=get_workflow_agent_specs(H2_WORKFLOW_ID),
+            providers_config={"default_provider": "mock"},
+            model_policy_config={
+                "tier_defaults": {
+                    "cheap_worker": "gpt-4o-mini",
+                    "specialist": "gpt-5.4-nano",
+                    "finalizer": "gpt-5.4-mini",
+                },
+            },
+        )
+        run_state = RunState(
+            run_id="run-h2-malformed-architect-tracks",
+            workflow_id=workflow.workflow_id,
+            input_payload={"goal": "Build a decomposition workflow"},
+            context={
+                "step_results": {
+                    "intake": {
+                        "output": {"project_summary": "Build a decomposition workflow"},
+                    },
+                    "planner": {
+                        "output": {
+                            "dependency_order": ["schema", "pack"],
+                            "implementation_waves": [{"wave": "W3-S1", "focus": ["R3-A", "R3-B"]}],
+                            "recommended_starting_slice": "stabilize_h2_template_contract",
+                        },
+                    },
+                    "architect": {
+                        "output": {
+                            "tracks": "not-a-list",
+                            "modules": ["workflows", "agents"],
+                            "phases": ["contract", "pack"],
+                        },
+                    },
+                    "critic": {
+                        "output": {
+                            "risk_zones": ["scope_sprawl"],
+                            "open_questions": ["What final output ordering should freeze in R3-C?"],
+                        },
+                    },
+                },
+            },
+        )
+        run_state.step_results = dict(run_state.context.get("step_results", {}))
+
+        synthesizer_step = _step_by_id(workflow, "synthesizer")
+        with self.assertRaises(StepExecutionError) as raised:
+            step_runner(run_state=run_state, workflow=workflow, step=synthesizer_step)
+
         self.assertIn("requires non-empty list field 'tracks'", str(raised.exception))
+
+    def test_synthesizer_fails_when_planner_lacks_recommended_starting_slice(self) -> None:
+        workflow = get_workflow_spec(H2_WORKFLOW_ID)
+        step_runner = build_step_runner(
+            agent_specs_by_id=get_workflow_agent_specs(H2_WORKFLOW_ID),
+            providers_config={"default_provider": "mock"},
+            model_policy_config={
+                "tier_defaults": {
+                    "cheap_worker": "gpt-4o-mini",
+                    "specialist": "gpt-5.4-nano",
+                    "finalizer": "gpt-5.4-mini",
+                },
+            },
+        )
+        run_state = RunState(
+            run_id="run-h2-missing-starting-slice",
+            workflow_id=workflow.workflow_id,
+            input_payload={"goal": "Build a decomposition workflow"},
+            context={
+                "step_results": {
+                    "intake": {
+                        "output": {"project_summary": "Build a decomposition workflow"},
+                    },
+                    "planner": {
+                        "output": {
+                            "dependency_order": ["schema", "pack"],
+                            "implementation_waves": [{"wave": "W3-S1", "focus": ["R3-A", "R3-B"]}],
+                        },
+                    },
+                    "architect": {
+                        "output": {
+                            "tracks": ["core"],
+                            "modules": ["workflows"],
+                            "phases": ["contract"],
+                        },
+                    },
+                    "critic": {
+                        "output": {
+                            "risk_zones": ["scope_sprawl"],
+                            "open_questions": ["Which template order should freeze?"],
+                        },
+                    },
+                },
+            },
+        )
+        run_state.step_results = dict(run_state.context.get("step_results", {}))
+
+        synthesizer_step = _step_by_id(workflow, "synthesizer")
+        with self.assertRaises(StepExecutionError) as raised:
+            step_runner(run_state=run_state, workflow=workflow, step=synthesizer_step)
+
+        self.assertIn("requires non-empty text field 'recommended_starting_slice'", str(raised.exception))
+
+    def test_synthesizer_fails_when_implementation_wave_item_lacks_wave_text(self) -> None:
+        workflow = get_workflow_spec(H2_WORKFLOW_ID)
+        step_runner = build_step_runner(
+            agent_specs_by_id=get_workflow_agent_specs(H2_WORKFLOW_ID),
+            providers_config={"default_provider": "mock"},
+            model_policy_config={
+                "tier_defaults": {
+                    "cheap_worker": "gpt-4o-mini",
+                    "specialist": "gpt-5.4-nano",
+                    "finalizer": "gpt-5.4-mini",
+                },
+            },
+        )
+        run_state = RunState(
+            run_id="run-h2-wave-item-missing-wave",
+            workflow_id=workflow.workflow_id,
+            input_payload={"goal": "Build a decomposition workflow"},
+            context={
+                "step_results": {
+                    "intake": {"output": {"project_summary": "Build a decomposition workflow"}},
+                    "planner": {
+                        "output": {
+                            "dependency_order": ["schema", "pack"],
+                            "implementation_waves": [{"wave": "", "focus": ["R3-A", "R3-B"]}],
+                            "recommended_starting_slice": "stabilize_h2_template_contract",
+                        },
+                    },
+                    "architect": {
+                        "output": {
+                            "tracks": ["core"],
+                            "modules": ["workflows"],
+                            "phases": ["contract"],
+                        },
+                    },
+                    "critic": {
+                        "output": {
+                            "risk_zones": ["scope_sprawl"],
+                            "open_questions": ["Which template order should freeze?"],
+                        },
+                    },
+                },
+            },
+        )
+        run_state.step_results = dict(run_state.context.get("step_results", {}))
+
+        synthesizer_step = _step_by_id(workflow, "synthesizer")
+        with self.assertRaises(StepExecutionError) as raised:
+            step_runner(run_state=run_state, workflow=workflow, step=synthesizer_step)
+
+        self.assertIn("requires implementation_waves[0].wave to be non-empty text", str(raised.exception))
+
+    def test_synthesizer_fails_when_implementation_wave_item_lacks_focus_list(self) -> None:
+        workflow = get_workflow_spec(H2_WORKFLOW_ID)
+        step_runner = build_step_runner(
+            agent_specs_by_id=get_workflow_agent_specs(H2_WORKFLOW_ID),
+            providers_config={"default_provider": "mock"},
+            model_policy_config={
+                "tier_defaults": {
+                    "cheap_worker": "gpt-4o-mini",
+                    "specialist": "gpt-5.4-nano",
+                    "finalizer": "gpt-5.4-mini",
+                },
+            },
+        )
+        run_state = RunState(
+            run_id="run-h2-wave-item-missing-focus",
+            workflow_id=workflow.workflow_id,
+            input_payload={"goal": "Build a decomposition workflow"},
+            context={
+                "step_results": {
+                    "intake": {"output": {"project_summary": "Build a decomposition workflow"}},
+                    "planner": {
+                        "output": {
+                            "dependency_order": ["schema", "pack"],
+                            "implementation_waves": [{"wave": "W3-S1", "focus": []}],
+                            "recommended_starting_slice": "stabilize_h2_template_contract",
+                        },
+                    },
+                    "architect": {
+                        "output": {
+                            "tracks": ["core"],
+                            "modules": ["workflows"],
+                            "phases": ["contract"],
+                        },
+                    },
+                    "critic": {
+                        "output": {
+                            "risk_zones": ["scope_sprawl"],
+                            "open_questions": ["Which template order should freeze?"],
+                        },
+                    },
+                },
+            },
+        )
+        run_state.step_results = dict(run_state.context.get("step_results", {}))
+
+        synthesizer_step = _step_by_id(workflow, "synthesizer")
+        with self.assertRaises(StepExecutionError) as raised:
+            step_runner(run_state=run_state, workflow=workflow, step=synthesizer_step)
+
+        self.assertIn("requires implementation_waves[0].focus to be a non-empty list", str(raised.exception))
 
 
 def _step_by_id(workflow, step_id: str):

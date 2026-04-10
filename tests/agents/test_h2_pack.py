@@ -20,8 +20,11 @@ class H2PackTests(unittest.TestCase):
         synthesizer = pack["h2_synthesizer_agent"]
         self.assertEqual("finalizer", synthesizer.model_policy_ref)
         self.assertEqual([], synthesizer.handoff_targets)
-        self.assertEqual("h2/synthesizer/v1", synthesizer.metadata["prompt_version"])
+        self.assertEqual("h2/synthesizer/v2", synthesizer.metadata["prompt_version"])
         self.assertEqual(H2_PROMPT_VERSION, synthesizer.metadata["pack_prompt_version"])
+
+        planner = pack["h2_planner_agent"]
+        self.assertEqual("h2/planner/v2", planner.metadata["prompt_version"])
 
         architect = pack["h2_architect_agent"]
         self.assertEqual("specialist", architect.model_policy_ref)
@@ -45,6 +48,22 @@ class H2PackTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(ValueError, "Unexpected H2 agent specs"):
+            validate_h2_agent_specs(pack)
+
+    def test_h2_pack_rejects_noncanonical_role_for_required_agent(self) -> None:
+        pack = build_h2_agent_pack()
+        planner = pack["h2_planner_agent"]
+        planner.role = "h2.shadow"
+
+        with self.assertRaisesRegex(ValueError, "must use canonical H2 role 'h2.planner'"):
+            validate_h2_agent_specs(pack)
+
+    def test_h2_pack_rejects_wrong_prompt_version_for_required_agent(self) -> None:
+        pack = build_h2_agent_pack()
+        planner = pack["h2_planner_agent"]
+        planner.metadata["prompt_version"] = "h2/planner/v1"
+
+        with self.assertRaisesRegex(ValueError, "must use prompt_version 'h2/planner/v2'"):
             validate_h2_agent_specs(pack)
 
 
