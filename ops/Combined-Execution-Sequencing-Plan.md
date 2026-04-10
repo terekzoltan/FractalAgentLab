@@ -932,7 +932,7 @@ Track D may add a late-wave real-provider MVP side batch, but that work should n
 **Owner priority:** C + B + E
 
 Epics:
-- ⬜ **R3-A** H2 workflow schema v1 — **Owner: Track C** (Track B reviews schema contract)
+- ✅ **R3-A** H2 workflow schema v1 — **Owner: Track C** (Track B reviews schema contract)
 - ⬜ **R3-B** H2 architect / planner / critic role pack — **Owner: Track C**
 - ⬜ **R3-C** H2 sequencing and risk-zone output template — **Owner: Track C**
 - ⬜ **R3-D** H2 smoke rubric — **Owner: Track E**
@@ -948,7 +948,7 @@ Epics:
 
 ### Sprint W3-S1 — Execution Steps
 
-**⬜ Step 1 — Track C defines the H2 contract first**
+**✅ Step 1 — Track C defines the H2 contract first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
