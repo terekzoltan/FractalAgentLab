@@ -979,7 +979,7 @@ Epics:
 **Owner priority:** C + E, supported by B/A
 
 Epics:
-- ⬜ **R3-E** H3 workflow schema v1 — **Owner: Track C** (Track B reviews)
+- ✅ **R3-E** H3 workflow schema v1 — **Owner: Track C** (Track B reviews)
 - ⬜ **R3-F** H3 systems / critic / synthesizer role pack — **Owner: Track C**
 - ⬜ **R3-G** H3 output sections: strengths / bottlenecks / merge risks / refactor ideas — **Owner: Track C**
 - ⬜ **R3-H** H3 draft smoke review — **Owner: Track E**
@@ -995,11 +995,11 @@ Epics:
 
 ### Sprint W3-S2 — Execution Steps
 
-**⬜ Step 1 — Track C defines the H3 contract first**
+**✅ Step 1 — Track C defines the H3 contract first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent session | R3-E | R3-A ✅ + R3-B ✅ + R3-C ✅ + R3-D ✅ | H3 should start from explicit architecture-review expectations, not reuse H2 loosely |
+| Track C agent session | ✅ R3-E | R3-A ✅ + R3-B ✅ + R3-C ✅ + R3-D ✅ | H3 manager schema v1 delivered with explicit manager envelope compatibility and deferred section-law freeze |
 
 **⬜ Step 2 — Track B reviews schema while Track C builds role pack in parallel**
 
@@ -1416,7 +1416,8 @@ The immediate mainline frontier is now:
 - Wave 3 `W3-S1` Step 2 is complete (`R3-A` schema review ✅ + `R3-B` role pack ✅)
 - Wave 3 `W3-S1` Step 3 is complete (`R3-C` output-template freeze ✅ + `R3-D` skeleton prep ✅)
 - Wave 3 `W3-S1` Step 4 is complete (`R3-D` final smoke rubric ✅)
-- `W3-S2` Step 1 (`R3-E`) is now open.
+- `W3-S2` Step 1 is complete (`R3-E` ✅).
+- `W3-S2` Step 2 is now open (`R3-E` schema review + `R3-F` in parallel).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
@@ -1463,10 +1464,10 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track C agent session` for `W3-S2` Step 1 / `⬜ R3-E`
-2. `Track B agent session` for `W3-S2` Step 2 / `⬜ R3-E` schema review
+1. `Track B agent session` for `W3-S2` Step 2 / `⬜ R3-E` schema review
+2. `Track C agent session` for `W3-S2` Step 2 / `⬜ R3-F`
 3. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
-4. Wave 3 real-provider side batch only after `W3-S1` is complete
+4. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`
@@ -1833,6 +1834,7 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-10][Track C] R3-C completed (⬜ -> ✅) - H2 output-template v1 frozen with canonical section ordering, planner-owned `recommended_starting_slice`, and stricter mock finalization shape checks (including implementation-wave item validation) while keeping template-law assertions on runnable acceptance/doc surfaces instead of shared workflow-spec compatibility tests - next: Track E finalizes R3-D smoke rubric in Step 4.`
 - `[2026-04-11][Track E] R3-D finalize started (⬜ -> 🔄) - Track E opened W3-S1 Step 4 finalize for the final H2 smoke rubric using `R3-C` frozen ordering/shape constraints while preserving the Step-3 skeleton as the immutable historical artifact.`
 - `[2026-04-11][Track E] R3-D finalized (🔄 -> ✅) - Track E released `docs/wave3/Wave3-W3-S1-TrackE-R3-D-H2-Smoke-Rubric-v1.md` as final `R3-D` output, and the active mainline moved to `W3-S2` Step 1 (`R3-E`) while `W3-S1` Step 4 stays closed.`
+- `[2026-04-11][Track C] R3-E completed (⬜ -> ✅) - H3 workflow schema v1 delivered as `h3.manager.v1` with explicit manager topology (`synthesizer` + `intake`/`planner`/`systems`/`critic`), manager-envelope compatibility assertions on workflow-spec tests (`step_results` + `manager_orchestration` + `final_output`), and explicit deferral of exact H3 section naming/order freeze to `R3-G`; next: Track B executes `R3-E` schema review while Track C proceeds to `R3-F` in Step 2.`
 
 ---
 

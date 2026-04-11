@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`, and Wave 3 `W3-S1` Step 1/2/3 (`R3-A` + `R3-B` + `R3-C`) is now complete from Track C side; `R3-D` Step 4 finalization is also complete and `R3-E` is now the next Track C checkpoint)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` is fully complete and `W3-S2` Step 1 `R3-E` is now complete from Track C side; next Track C checkpoint is `R3-F` while Track B performs `R3-E` schema review)
 
 ---
 
@@ -670,13 +670,15 @@ Input:
 - repo structure / system plan / architecture notes
 
 Output:
-- strong points
-- bottlenecks
-- merge-risk zones
-- refactor suggestions
+- representative architecture-review sections for strengths, bottlenecks, merge risks, and refactor ideas
+- exact H3 section naming/order is deferred until `R3-G`
 
 Likely orchestration:
-- intake -> planner -> systems -> critic -> synthesizer -> evaluator
+- intake -> planner -> systems -> critic -> synthesizer
+
+Executable v1 note:
+- `R3-E` uses manager envelope compatibility (`step_results` + `manager_orchestration` + `final_output`)
+- evaluator remains deferred from the executable v1 schema
 
 ---
 
@@ -1045,6 +1047,7 @@ Entries:
 - `[2026-04-10][Track C] R3-C completed (⬜ -> ✅) - H2 output-template v1 is now frozen with canonical section ordering and planner-owned `recommended_starting_slice`; H2 prompt semantics were tightened with selective role-level version bumps, and mock finalization now enforces stricter structured-output guards (including implementation-wave item shape) so template completeness failures cannot pass as green finalization - next: Track E finalizes R3-D in W3-S1 Step 4; Track C returns at R3-E after W3-S1 completion.`
 - `[2026-04-11][Track E] R3-D finalize started (⬜ -> 🔄) - Track E opened `W3-S1` Step 4 finalize for the final `h2.manager.v1` smoke-rubric v1 using frozen `R3-C` template constraints; the Step-3 skeleton remains as the immutable audit artifact.`
 - `[2026-04-11][Track E] R3-D finalized (🔄 -> ✅) - Track E published `docs/wave3/Wave3-W3-S1-TrackE-R3-D-H2-Smoke-Rubric-v1.md` as final v1 after `R3-C`, and moved `W3-S1` mainline forward to `W3-S2` Step 1 / `R3-E`; side work keeps `R3-H` tied to finalization semantics and no runtime/contract changes.`
+- `[2026-04-11][Track C] R3-E completed (⬜ -> ✅) - Track C delivered `h3.manager.v1` schema baseline with explicit `synthesizer` manager topology (`intake`/`planner`/`systems`/`critic` workers), root workflow exports, and workflow-spec tests proving manager-envelope compatibility (`step_results` + `manager_orchestration` + `final_output`) with explicit no-freeze guardrail for H3 section naming/order until `R3-G`; next: Track B reviews `R3-E` and Track C proceeds to `R3-F`.`
 
 ---
 
