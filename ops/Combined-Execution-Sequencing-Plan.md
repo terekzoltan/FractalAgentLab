@@ -935,7 +935,7 @@ Epics:
 - ✅ **R3-A** H2 workflow schema v1 — **Owner: Track C** (Track B reviews schema contract)
 - ✅ **R3-B** H2 architect / planner / critic role pack — **Owner: Track C**
 - ✅ **R3-C** H2 sequencing and risk-zone output template — **Owner: Track C**
-- 🔄 **R3-D** H2 smoke rubric — **Owner: Track E** (Step 3 skeleton prep complete; Step 4 finalize pending `R3-C`)
+- ✅ **R3-D** H2 smoke rubric — **Owner: Track E** (Step 3 skeleton prep + Step 4 finalize complete)
 
 **Sequential ordering:**
 1. R3-A first (schema must exist before roles wire to it)
@@ -968,11 +968,11 @@ Epics:
 | Track C agent session | ✅ R3-C | R3-B ✅ | H2 output template v1 now freezes canonical sequencing/risk section ordering with planner-owned starting-slice semantics |
 | Track E agent session | ✅ R3-D (skeleton prep) | R3-A ✅ + R3-B ✅ | Skeleton rubric drafted as explicit provisional artifact; final validation and freeze remain after `R3-C` |
 
-**⬜ Step 4 — Track E finalizes the smoke rubric with complete workflow**
+**✅ Step 4 — Track E finalizes the smoke rubric with complete workflow**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | R3-D (finalize) | R3-C ✅ | Validate usefulness for real project decomposition, not only structural completeness |
+| Track E agent session | ✅ R3-D (finalize) | R3-C ✅ + R3-D (skeleton prep) ✅ | Validate usefulness for real project decomposition, not only structural completeness |
 
 #### Sprint W3-S2 — H3 Architecture Review (draft quality)
 
@@ -1415,9 +1415,10 @@ The immediate mainline frontier is now:
 
 - Wave 3 `W3-S1` Step 2 is complete (`R3-A` schema review ✅ + `R3-B` role pack ✅)
 - Wave 3 `W3-S1` Step 3 is complete (`R3-C` output-template freeze ✅ + `R3-D` skeleton prep ✅)
-- `R3-D` remains in progress overall until Step 4 finalize (post-`R3-C` smoke-rubric freeze)
+- Wave 3 `W3-S1` Step 4 is complete (`R3-D` final smoke rubric ✅)
+- `W3-S2` Step 1 (`R3-E`) is now open.
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
-- Wave 3 real-provider side batch remains gated until `W3-S1` is complete
+- Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
 Wave 2 closeout consistency note:
 - runtime truth checked: W2-S3 semantics remain bounded at runtime/CLI boundaries (`load_session_memory_context`, post-run identity updater gating)
@@ -1462,8 +1463,8 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track E agent session` for `W3-S1` Step 4 / `🔄 R3-D` finalize (H2 smoke rubric freeze)
-2. `Track C agent session` for `W3-S2` Step 1 / `⬜ R3-E` after `R3-D` finalize
+1. `Track C agent session` for `W3-S2` Step 1 / `⬜ R3-E`
+2. `Track B agent session` for `W3-S2` Step 2 / `⬜ R3-E` schema review
 3. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
 4. Wave 3 real-provider side batch only after `W3-S1` is complete
 
@@ -1830,6 +1831,8 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-10][Track E] R3-D skeleton prep started (⬜ -> 🔄) - Track E opened W3-S1 Step 3 docs-first H2 smoke-rubric skeleton work after R3-A review + R3-B runnable baseline, with explicit provisional-only boundary and no eval/runtime expansion - next: publish skeleton artifact and keep finalization gated on R3-C.`
 - `[2026-04-10][Track E] R3-D skeleton prep completed (stays 🔄 at epic level) - Track E published docs/wave3/Wave3-W3-S1-TrackE-R3-D-H2-Smoke-Rubric-Skeleton.md with explicit Step-3-only provisional semantics (current runnable evidence vs deferred finalization), while keeping Step 4 finalize blocked on R3-C output-template completion - next: finalize R3-D after R3-C.`
 - `[2026-04-10][Track C] R3-C completed (⬜ -> ✅) - H2 output-template v1 frozen with canonical section ordering, planner-owned `recommended_starting_slice`, and stricter mock finalization shape checks (including implementation-wave item validation) while keeping template-law assertions on runnable acceptance/doc surfaces instead of shared workflow-spec compatibility tests - next: Track E finalizes R3-D smoke rubric in Step 4.`
+- `[2026-04-11][Track E] R3-D finalize started (⬜ -> 🔄) - Track E opened W3-S1 Step 4 finalize for the final H2 smoke rubric using `R3-C` frozen ordering/shape constraints while preserving the Step-3 skeleton as the immutable historical artifact.`
+- `[2026-04-11][Track E] R3-D finalized (🔄 -> ✅) - Track E released `docs/wave3/Wave3-W3-S1-TrackE-R3-D-H2-Smoke-Rubric-v1.md` as final `R3-D` output, and the active mainline moved to `W3-S2` Step 1 (`R3-E`) while `W3-S1` Step 4 stays closed.`
 
 ---
 
