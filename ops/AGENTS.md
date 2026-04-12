@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` is fully complete and `W3-S2` Step 2 `R3-F` is now complete from Track C side; next Track C checkpoint is `R3-G` while Track E prepares `R3-H` skeleton in parallel)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` is fully complete and `W3-S2` Step 3 (`R3-G` + `R3-H` skeleton prep) is complete; next active mainline item is Track E `R3-H` Step 4 finalize before Wave 3 proceeds to `W3-S3`)
 
 ---
 
@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3 `W3-S1`, `R3-D` Step 3 skeleton prep is preserved as the provisional audit trail while Step 4 finalization completed for v1 smoke rubric)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D` is fully complete and `W3-S2` Step 3 `R3-H` skeleton prep is complete as a provisional artifact with Step 4 finalization now open after `R3-G`)
 
 ---
 
@@ -671,7 +671,7 @@ Input:
 
 Output:
 - representative architecture-review sections for strengths, bottlenecks, merge risks, and refactor ideas
-- exact H3 section naming/order is deferred until `R3-G`
+- exact H3 section naming/order is frozen by `R3-G` as: `strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`
 
 Likely orchestration:
 - intake -> planner -> systems -> critic -> synthesizer
@@ -679,7 +679,7 @@ Likely orchestration:
 Executable v1 note:
 - `R3-E` uses manager envelope compatibility (`step_results` + `manager_orchestration` + `final_output`)
 - evaluator remains deferred from the executable v1 schema
-- `R3-F` runnable path currently uses default section naming (`strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`) for execution evidence only; exact section naming/order freeze remains `R3-G`
+- `R3-G` freezes H3 final section naming/order at runnable acceptance surface level; workflow-spec compatibility checks remain narrower than template-law assertions
 
 ---
 
@@ -1051,6 +1051,9 @@ Entries:
 - `[2026-04-11][Track C] R3-E completed (⬜ -> ✅) - Track C delivered `h3.manager.v1` schema baseline with explicit `synthesizer` manager topology (`intake`/`planner`/`systems`/`critic` workers), root workflow exports, and workflow-spec tests proving manager-envelope compatibility (`step_results` + `manager_orchestration` + `final_output`) with explicit no-freeze guardrail for H3 section naming/order until `R3-G`; next: Track B reviews `R3-E` and Track C proceeds to `R3-F`.`
 - `[2026-04-12][Track B] R3-E schema review completed (🔄 -> ✅ Track B scope) - Track B confirmed H3 schema/runtime boundary compatibility as docs-only confirmation (no new generic manager contract gap found), kept deferred section-law freeze explicitly outside `R3-E`, and closed review with green validation; next: Track C continues `R3-F` in the parallel W3-S2 Step 2 lane.`
 - `[2026-04-12][Track C] R3-F completed (⬜ -> ✅) - Track C delivered H3 manager role pack v1 under `agents/h3` with explicit intake/planner/systems/critic/synthesizer separation, manager-only pack validation (no handoff topology), `h3.manager.v1` registry wiring, and H3-specialized mock manager behavior with strict upstream-context plus malformed-output fail-loud checks; runnable tests prove explicit delegate/finalize turn evidence while keeping section naming/order as current runnable defaults only (exact freeze deferred to `R3-G`).`
+- `[2026-04-12][Track E] R3-H skeleton prep started (⬜ -> 🔄) - Track E opened W3-S2 Step 3 docs-first H3 smoke-review skeleton work using `R3-E` + Track B `R3-E` review + `R3-F` runnable evidence, with strict provisional-only boundaries and no eval/runtime/schema expansion - next: publish Step-3 skeleton artifact and keep finalize gated on `R3-G`.`
+- `[2026-04-12][Track E] R3-H skeleton prep completed (stays 🔄 at epic level) - Track E published `docs/wave3/Wave3-W3-S2-TrackE-R3-H-H3-Smoke-Review-Skeleton.md` as the Step-3 provisional artifact (`current runnable evidence` vs deferred `R3-G` section-law freeze), and preserved Step-4 finalize as the post-`R3-G` gate.`
+- `[2026-04-12][Track C] R3-G completed (⬜ -> ✅) - Track C froze H3 output sections v1 (`strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`) with synthesizer prompt/pack version alignment (`h3.prompt.v2`, `h3/synthesizer/v2`) and exact-order runnable acceptance assertions in H3 manager adapter tests, while preserving manager-envelope compatibility boundaries and evaluator deferral.`
 
 ---
 

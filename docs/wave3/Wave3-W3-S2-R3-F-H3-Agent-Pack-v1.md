@@ -6,6 +6,10 @@ This document records Track C delivery for Wave 3 Sprint `W3-S2` Step 2 epic `R3
 
 `R3-F` implements the first full H3 manager role pack (`intake`/`planner`/`systems`/`critic`/`synthesizer`) on top of the fixed `R3-E` workflow contract (`h3.manager.v1`).
 
+This document remains the historical `R3-F` delivery record. Current frozen H3 section-law and
+prompt/version canon after `R3-G` are recorded in
+`docs/wave3/Wave3-W3-S2-R3-G-H3-Output-Sections-v1.md`.
+
 ---
 
 ## Scope
@@ -58,6 +62,8 @@ Manager/worker alignment follows `src/fractal_agent_lab/workflows/h3.py`:
 
 ## Prompt Versioning
 
+At `R3-F` delivery time:
+
 - pack version: `h3.prompt.v1`
 - role versions:
   - `h3/intake/v1`
@@ -65,6 +71,12 @@ Manager/worker alignment follows `src/fractal_agent_lab/workflows/h3.py`:
   - `h3/systems/v1`
   - `h3/critic/v1`
   - `h3/synthesizer/v1`
+
+Current canon after `R3-G` freeze:
+
+- pack version: `h3.prompt.v2`
+- synthesizer role version: `h3/synthesizer/v2`
+- intake/planner/systems/critic remain on `v1`
 
 Each `AgentSpec` includes:
 
@@ -109,13 +121,13 @@ Added tests verify:
 - Manager orchestration authority remains in `workflow.manager_spec` and manager control output, not pack-level handoff topology.
 - Top-level manager output envelope is unchanged (`step_results` + `manager_orchestration` + `final_output`).
 - Evaluator remains deferred from executable H3 v1.
-- H3 mock finalizer currently uses runnable default naming (`strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`) for execution evidence only.
-- This runnable default naming is **not** frozen H3 section law; exact naming/order freeze remains `R3-G` scope.
+- At `R3-F` delivery time, H3 mock finalizer used runnable default naming (`strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`) for execution evidence only.
+- After `R3-G`, this section naming/order is frozen canon; see `docs/wave3/Wave3-W3-S2-R3-G-H3-Output-Sections-v1.md`.
 - No runtime/core schema contract changes were introduced.
 
 ---
 
 ## Downstream Handoff
 
-- `R3-G` can now freeze H3 output section naming/order against a runnable role-separated manager path.
-- `R3-H` skeleton prep can now anchor checks on explicit H3 manager orchestration and fail-loud worker-shape behavior.
+- `R3-F` handed off a runnable role-separated manager path for `R3-G` freeze work.
+- `R3-F` also unblocked `R3-H` skeleton prep on top of explicit H3 manager orchestration and fail-loud worker-shape behavior.

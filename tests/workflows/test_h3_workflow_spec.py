@@ -14,12 +14,7 @@ from fractal_agent_lab.workflows import (
 )
 
 
-H3_REVIEW_BUCKET_CANDIDATES = {
-    "strengths": ("strong_points", "strengths"),
-    "bottlenecks": ("bottlenecks",),
-    "merge_risks": ("merge_risk_zones", "merge_risks"),
-    "refactor_ideas": ("refactor_suggestions", "refactor_ideas"),
-}
+EXPECTED_H3_SECTION_KEYS = ["strengths", "bottlenecks", "merge_risks", "refactor_ideas"]
 
 
 class H3WorkflowSpecTests(unittest.TestCase):
@@ -107,9 +102,9 @@ class H3WorkflowSpecTests(unittest.TestCase):
                             "reason": "all_workers_completed",
                             "output": {
                                 "strengths": ["Clear separation between runtime and agent semantics."],
-                                "bottlenecks": ["Cross-track schema naming drift remains unresolved."],
-                                "merge_risks": ["Output-section naming may diverge before R3-G freeze."],
-                                "refactor_ideas": ["Introduce a shared H3 section naming registry in R3-G."],
+                                "bottlenecks": ["Cross-track status/doc drift can still confuse the frozen H3 contract."],
+                                "merge_risks": ["Cross-surface updates can regress frozen H3 section naming if tests weaken."],
+                                "refactor_ideas": ["Introduce shared helpers for H3 section-law assertions across runnable and schema tests."],
                             },
                         },
                     }
@@ -129,7 +124,7 @@ class H3WorkflowSpecTests(unittest.TestCase):
                 }
             if step.step_id == "critic":
                 return {
-                    "risk_notes": ["naming drift", "premature template freeze"],
+                    "risk_notes": ["cross-surface naming drift", "template-law regression"],
                 }
             raise AssertionError(f"Unexpected worker step: {step.step_id}")
 
@@ -144,13 +139,11 @@ class H3WorkflowSpecTests(unittest.TestCase):
         self.assertIsInstance(final_output, dict)
         assert isinstance(final_output, dict)
         self.assertTrue(final_output)
-        for concept_name, candidate_keys in H3_REVIEW_BUCKET_CANDIDATES.items():
-            matching_key = next((key for key in candidate_keys if key in final_output), None)
-            self.assertIsNotNone(matching_key, f"Missing representative H3 review bucket for {concept_name}.")
-            value = final_output.get(matching_key)
+        for key in EXPECTED_H3_SECTION_KEYS:
+            value = final_output.get(key)
             self.assertIsInstance(value, list)
             assert isinstance(value, list)
-            self.assertTrue(value, f"Representative H3 review bucket '{matching_key}' must be non-empty.")
+            self.assertTrue(value, f"Representative H3 review bucket '{key}' must be non-empty.")
 
         orchestration = output_payload.get("manager_orchestration", {})
         self.assertEqual(H3_MANAGER_STEP_ID, orchestration.get("manager_step_id"))

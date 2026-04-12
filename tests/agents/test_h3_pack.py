@@ -20,12 +20,15 @@ class H3PackTests(unittest.TestCase):
         synthesizer = pack["h3_synthesizer_agent"]
         self.assertEqual("finalizer", synthesizer.model_policy_ref)
         self.assertEqual([], synthesizer.handoff_targets)
-        self.assertEqual("h3/synthesizer/v1", synthesizer.metadata["prompt_version"])
+        self.assertEqual("h3/synthesizer/v2", synthesizer.metadata["prompt_version"])
         self.assertEqual(H3_PROMPT_VERSION, synthesizer.metadata["pack_prompt_version"])
 
         systems = pack["h3_systems_agent"]
         self.assertEqual("specialist", systems.model_policy_ref)
         self.assertEqual("h3/systems/v1", systems.metadata["prompt_version"])
+
+        planner = pack["h3_planner_agent"]
+        self.assertEqual("h3/planner/v1", planner.metadata["prompt_version"])
 
         intake = pack["h3_intake_agent"]
         self.assertEqual("cheap_worker", intake.model_policy_ref)

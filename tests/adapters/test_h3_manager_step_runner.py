@@ -10,7 +10,7 @@ from fractal_agent_lab.runtime import WorkflowExecutor
 from fractal_agent_lab.workflows import H3_WORKFLOW_ID
 
 
-H3_RUNNABLE_DEFAULT_KEYS = [
+EXPECTED_H3_FINAL_OUTPUT_KEYS = [
     "strengths",
     "bottlenecks",
     "merge_risks",
@@ -78,12 +78,12 @@ class H3ManagerStepRunnerTests(unittest.TestCase):
 
         final_output = output_payload["final_output"]
         self.assertIsInstance(final_output, dict)
-        self.assertEqual(set(H3_RUNNABLE_DEFAULT_KEYS), set(final_output))
-        for key in H3_RUNNABLE_DEFAULT_KEYS:
+        self.assertEqual(EXPECTED_H3_FINAL_OUTPUT_KEYS, list(final_output.keys()))
+        for key in EXPECTED_H3_FINAL_OUTPUT_KEYS:
             value = final_output.get(key)
             self.assertIsInstance(value, list)
             assert isinstance(value, list)
-            self.assertTrue(value, f"Runnable H3 review bucket '{key}' must be non-empty.")
+            self.assertTrue(value, f"H3 final output section '{key}' must be non-empty.")
 
     def test_planner_fails_without_intake_context(self) -> None:
         workflow = get_workflow_spec(H3_WORKFLOW_ID)

@@ -662,7 +662,7 @@ class MockAdapter:
                 "system_summary": "Architecture review should prioritize runtime boundaries and orchestration clarity.",
                 "constraints": [
                     "Keep claims grounded in observable repo surfaces.",
-                    "Avoid enforcing final section naming before R3-G.",
+                    "Use canonical H3 section naming and ordering from the frozen template.",
                 ],
                 "unknowns": [
                     "Which hotspots carry the highest merge risk under current sprint sequencing?",
@@ -708,7 +708,7 @@ class MockAdapter:
                     "Mock-path assumptions can drift from role prompt intent without strict tests.",
                 ],
                 "merge_risks": [
-                    "Premature H3 output-law freeze before R3-G.",
+                    "Cross-surface drift can reintroduce non-canonical H3 section naming.",
                     "Registry/pack mismatches causing non-runnable workflow ids.",
                 ],
                 "failure_modes": [

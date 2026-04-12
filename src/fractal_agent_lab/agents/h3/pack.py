@@ -117,7 +117,7 @@ def validate_h3_agent_specs(agent_specs_by_id: dict[str, AgentSpec]) -> None:
 
     if observed_pack_versions != {H3_PROMPT_VERSION}:
         raise ValueError(
-            "H3 manager pack must use one consistent pack_prompt_version (h3.prompt.v1).",
+            f"H3 manager pack must use one consistent pack_prompt_version ({H3_PROMPT_VERSION}).",
         )
 
     for spec in agent_specs_by_id.values():

@@ -3,7 +3,7 @@ from __future__ import annotations
 from fractal_agent_lab.agents.h3.roles import H3Role
 
 
-H3_PROMPT_VERSION = "h3.prompt.v1"
+H3_PROMPT_VERSION = "h3.prompt.v2"
 
 
 ROLE_PROMPT_VERSION: dict[H3Role, str] = {
@@ -11,7 +11,7 @@ ROLE_PROMPT_VERSION: dict[H3Role, str] = {
     H3Role.PLANNER: "h3/planner/v1",
     H3Role.SYSTEMS: "h3/systems/v1",
     H3Role.CRITIC: "h3/critic/v1",
-    H3Role.SYNTHESIZER: "h3/synthesizer/v1",
+    H3Role.SYNTHESIZER: "h3/synthesizer/v2",
 }
 
 
@@ -42,8 +42,8 @@ PROMPTS_BY_ROLE: dict[H3Role, str] = {
         "Else if planner is missing, delegate planner. "
         "Else if systems is missing, delegate systems. "
         "Else if critic is missing, delegate critic. "
-        "When all worker outputs exist, return control.action=finalize with representative architecture-review "
-        "sections for strengths, bottlenecks, merge risks, and refactor ideas. "
-        "Use current runnable default naming only; exact section naming/order is not frozen here."
+        "When all worker outputs exist, return control.action=finalize with control.output keys in exact order: "
+        "strengths, bottlenecks, merge_risks, refactor_ideas. Preserve unresolved pressure points explicitly "
+        "and do not invent missing sections or use alternate section names."
     ),
 }
