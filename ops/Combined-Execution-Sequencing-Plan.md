@@ -980,7 +980,7 @@ Epics:
 
 Epics:
 - ✅ **R3-E** H3 workflow schema v1 — **Owner: Track C** (Track B reviews)
-- ⬜ **R3-F** H3 systems / critic / synthesizer role pack — **Owner: Track C**
+- ✅ **R3-F** H3 systems / critic / synthesizer role pack — **Owner: Track C**
 - ⬜ **R3-G** H3 output sections: strengths / bottlenecks / merge risks / refactor ideas — **Owner: Track C**
 - ⬜ **R3-H** H3 draft smoke review — **Owner: Track E**
 
@@ -1001,12 +1001,12 @@ Epics:
 |---------|---------|--------|-------|
 | Track C agent session | ✅ R3-E | R3-A ✅ + R3-B ✅ + R3-C ✅ + R3-D ✅ | H3 manager schema v1 delivered with explicit manager envelope compatibility and deferred section-law freeze |
 
-**⬜ Step 2 — Track B reviews schema while Track C builds role pack in parallel**
+**✅ Step 2 — Track B reviews schema while Track C builds role pack in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent session | R3-E (schema review) | R3-E ✅ | Confirm H3 schema fits runtime contract expectations |
-| Track C agent session | R3-F | R3-E ✅ | Focus on systems/critic/synthesizer complementarity |
+| Track B agent session | ✅ R3-E (schema review) | R3-E ✅ | Confirmed H3 manager-schema/runtime boundary compatibility with deferred section-law guardrails intact |
+| Track C agent session | ✅ R3-F | R3-E ✅ | Delivered runnable H3 role pack with strict manager-path guardrails and no section-law freeze |
 
 **⬜ Step 3 — Track C hardens output sections while Track E prepares smoke review skeleton in parallel**
 
@@ -1417,7 +1417,8 @@ The immediate mainline frontier is now:
 - Wave 3 `W3-S1` Step 3 is complete (`R3-C` output-template freeze ✅ + `R3-D` skeleton prep ✅)
 - Wave 3 `W3-S1` Step 4 is complete (`R3-D` final smoke rubric ✅)
 - `W3-S2` Step 1 is complete (`R3-E` ✅).
-- `W3-S2` Step 2 is now open (`R3-E` schema review + `R3-F` in parallel).
+- `W3-S2` Step 2 is complete (`R3-E` schema review ✅ + `R3-F` role pack ✅).
+- `W3-S2` Step 3 is now open (`R3-G` + `R3-H` skeleton prep in parallel).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
@@ -1464,8 +1465,8 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track B agent session` for `W3-S2` Step 2 / `⬜ R3-E` schema review
-2. `Track C agent session` for `W3-S2` Step 2 / `⬜ R3-F`
+1. `Track C agent session` for `W3-S2` Step 3 / `⬜ R3-G`
+2. `Track E agent session` for `W3-S2` Step 3 / `⬜ R3-H` (skeleton prep)
 3. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
 4. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
 
@@ -1835,6 +1836,8 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-11][Track E] R3-D finalize started (⬜ -> 🔄) - Track E opened W3-S1 Step 4 finalize for the final H2 smoke rubric using `R3-C` frozen ordering/shape constraints while preserving the Step-3 skeleton as the immutable historical artifact.`
 - `[2026-04-11][Track E] R3-D finalized (🔄 -> ✅) - Track E released `docs/wave3/Wave3-W3-S1-TrackE-R3-D-H2-Smoke-Rubric-v1.md` as final `R3-D` output, and the active mainline moved to `W3-S2` Step 1 (`R3-E`) while `W3-S1` Step 4 stays closed.`
 - `[2026-04-11][Track C] R3-E completed (⬜ -> ✅) - H3 workflow schema v1 delivered as `h3.manager.v1` with explicit manager topology (`synthesizer` + `intake`/`planner`/`systems`/`critic`), manager-envelope compatibility assertions on workflow-spec tests (`step_results` + `manager_orchestration` + `final_output`), and explicit deferral of exact H3 section naming/order freeze to `R3-G`; next: Track B executes `R3-E` schema review while Track C proceeds to `R3-F` in Step 2.`
+- `[2026-04-12][Track B] W3-S2 Step 2 R3-E schema review completed (🔄 -> ✅ Track B scope) - Track B confirmed `h3.manager.v1` as a generic manager-contract-compatible schema with unchanged top-level manager envelope (`step_results`/`manager_orchestration`/`final_output`), validated deferred H3 section-law boundaries (`R3-G`), and found no new generic manager contract hole; this step remains in-progress only for parallel Track C `R3-F` execution.`
+- `[2026-04-12][Track C] R3-F completed (⬜ -> ✅) - H3 manager role pack v1 delivered under `agents/h3` with explicit intake/planner/systems/critic/synthesizer separation, manager-only pack validation, `h3.manager.v1` registry wiring, and H3-specialized mock manager behavior with strict upstream-context and malformed-output fail-loud guards; runnable tests prove explicit delegate/finalize turn evidence while keeping H3 section naming/order as current runnable defaults only (final freeze deferred to `R3-G`).`
 
 ---
 

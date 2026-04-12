@@ -22,6 +22,13 @@ from fractal_agent_lab.agents.h2 import (
     build_h2_agent_specs,
     validate_h2_agent_specs,
 )
+from fractal_agent_lab.agents.h3 import (
+    H3_AGENT_IDS,
+    H3_PROMPT_VERSION,
+    build_h3_agent_pack,
+    build_h3_agent_specs,
+    validate_h3_agent_specs,
+)
 from fractal_agent_lab.agents.h1_lite import (
     H1_LITE_AGENT_IDS,
     H1_LITE_PROMPT_VERSION,
@@ -54,4 +61,9 @@ __all__ = [
     "build_h2_agent_pack",
     "build_h2_agent_specs",
     "validate_h2_agent_specs",
+    "H3_AGENT_IDS",
+    "H3_PROMPT_VERSION",
+    "build_h3_agent_pack",
+    "build_h3_agent_specs",
+    "validate_h3_agent_specs",
 ]

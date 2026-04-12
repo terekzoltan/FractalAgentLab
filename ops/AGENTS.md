@@ -183,7 +183,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - declared orchestration truth matches emitted runtime truth
 - structural workflow invariants are rejected before runtime when practical
 
-**Status:** `🔄 in progress` (Track B completed W2-S1 `H2-A` / `H2-B` / `H2-C` / `H2-D`, W2-S3 Step 1 `H2-H` / `H2-N`, and W3-S1 Step 2 `R3-A` schema review; next likely Track B checkpoint is Wave 3 `R3-E` schema review support)
+**Status:** `🔄 in progress` (Track B completed W2-S1 `H2-A` / `H2-B` / `H2-C` / `H2-D`, W2-S3 Step 1 `H2-H` / `H2-N`, W3-S1 Step 2 `R3-A` schema review, and W3-S2 Step 2 `R3-E` schema review; next likely Track B checkpoint is Wave 3 `R3-I`/`R3-M` schema/runtime boundary support)
 
 ---
 
@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` is fully complete and `W3-S2` Step 1 `R3-E` is now complete from Track C side; next Track C checkpoint is `R3-F` while Track B performs `R3-E` schema review)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` is fully complete and `W3-S2` Step 2 `R3-F` is now complete from Track C side; next Track C checkpoint is `R3-G` while Track E prepares `R3-H` skeleton in parallel)
 
 ---
 
@@ -679,6 +679,7 @@ Likely orchestration:
 Executable v1 note:
 - `R3-E` uses manager envelope compatibility (`step_results` + `manager_orchestration` + `final_output`)
 - evaluator remains deferred from the executable v1 schema
+- `R3-F` runnable path currently uses default section naming (`strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`) for execution evidence only; exact section naming/order freeze remains `R3-G`
 
 ---
 
@@ -1048,6 +1049,8 @@ Entries:
 - `[2026-04-11][Track E] R3-D finalize started (⬜ -> 🔄) - Track E opened `W3-S1` Step 4 finalize for the final `h2.manager.v1` smoke-rubric v1 using frozen `R3-C` template constraints; the Step-3 skeleton remains as the immutable audit artifact.`
 - `[2026-04-11][Track E] R3-D finalized (🔄 -> ✅) - Track E published `docs/wave3/Wave3-W3-S1-TrackE-R3-D-H2-Smoke-Rubric-v1.md` as final v1 after `R3-C`, and moved `W3-S1` mainline forward to `W3-S2` Step 1 / `R3-E`; side work keeps `R3-H` tied to finalization semantics and no runtime/contract changes.`
 - `[2026-04-11][Track C] R3-E completed (⬜ -> ✅) - Track C delivered `h3.manager.v1` schema baseline with explicit `synthesizer` manager topology (`intake`/`planner`/`systems`/`critic` workers), root workflow exports, and workflow-spec tests proving manager-envelope compatibility (`step_results` + `manager_orchestration` + `final_output`) with explicit no-freeze guardrail for H3 section naming/order until `R3-G`; next: Track B reviews `R3-E` and Track C proceeds to `R3-F`.`
+- `[2026-04-12][Track B] R3-E schema review completed (🔄 -> ✅ Track B scope) - Track B confirmed H3 schema/runtime boundary compatibility as docs-only confirmation (no new generic manager contract gap found), kept deferred section-law freeze explicitly outside `R3-E`, and closed review with green validation; next: Track C continues `R3-F` in the parallel W3-S2 Step 2 lane.`
+- `[2026-04-12][Track C] R3-F completed (⬜ -> ✅) - Track C delivered H3 manager role pack v1 under `agents/h3` with explicit intake/planner/systems/critic/synthesizer separation, manager-only pack validation (no handoff topology), `h3.manager.v1` registry wiring, and H3-specialized mock manager behavior with strict upstream-context plus malformed-output fail-loud checks; runnable tests prove explicit delegate/finalize turn evidence while keeping section naming/order as current runnable defaults only (exact freeze deferred to `R3-G`).`
 
 ---
 

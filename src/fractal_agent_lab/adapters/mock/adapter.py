@@ -62,6 +62,8 @@ class MockAdapter:
             return self._build_h1_manager_output(request)
         if request.workflow_id == "h2.manager.v1":
             return self._build_h2_manager_output(request)
+        if request.workflow_id == "h3.manager.v1":
+            return self._build_h3_manager_output(request)
         if request.workflow_id == "h1.single.v1":
             return self._build_h1_single_output(request)
         if request.workflow_id == "h1.lite":
@@ -559,6 +561,170 @@ class MockAdapter:
 
         return {
             "message": f"No specialized h2.manager.v1 output for step '{request.step_id}'.",
+            "role": request.role,
+            "model": request.model,
+            "model_policy_ref": request.model_policy_ref,
+            "prompt_version": request.prompt_version,
+        }
+
+    def _build_h3_manager_output(self, request: AdapterStepRequest) -> dict[str, Any]:
+        goal = _clean_text(request.input_payload.get("goal"), fallback="Unspecified architecture review goal")
+        intake_output = _step_output(request, "intake")
+        planner_output = _step_output(request, "planner")
+        systems_output = _step_output(request, "systems")
+        critic_output = _step_output(request, "critic")
+
+        if request.step_id == "synthesizer":
+            if not intake_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "intake",
+                        "reason": "missing_intake_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+            if not planner_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "planner",
+                        "reason": "missing_planner_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+            if not systems_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "systems",
+                        "reason": "missing_systems_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+            if not critic_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "critic",
+                        "reason": "missing_critic_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+
+            strengths = _require_mock_list_field(
+                request=request,
+                step_id="systems",
+                output=systems_output,
+                field_name="architectural_strengths",
+            )
+            bottlenecks = _require_mock_list_field(
+                request=request,
+                step_id="critic",
+                output=critic_output,
+                field_name="bottlenecks",
+            )
+            merge_risks = _require_mock_list_field(
+                request=request,
+                step_id="critic",
+                output=critic_output,
+                field_name="merge_risks",
+            )
+            refactor_ideas = _require_mock_list_field(
+                request=request,
+                step_id="critic",
+                output=critic_output,
+                field_name="refactor_candidates",
+            )
+
+            return {
+                "control": {
+                    "action": "finalize",
+                    "reason": "all_workers_completed",
+                    "output": {
+                        "strengths": strengths,
+                        "bottlenecks": bottlenecks,
+                        "merge_risks": merge_risks,
+                        "refactor_ideas": refactor_ideas,
+                    },
+                },
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "intake":
+            return {
+                "review_scope": goal,
+                "system_summary": "Architecture review should prioritize runtime boundaries and orchestration clarity.",
+                "constraints": [
+                    "Keep claims grounded in observable repo surfaces.",
+                    "Avoid enforcing final section naming before R3-G.",
+                ],
+                "unknowns": [
+                    "Which hotspots carry the highest merge risk under current sprint sequencing?",
+                    "Which refactor ideas are safe without cross-track contract churn?",
+                ],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "planner":
+            _require_manager_context(request=request, required_step_id="intake")
+            return {
+                "review_sequence": ["runtime_boundaries", "workflow_specs", "agent_packs", "adapters"],
+                "focus_areas": ["separation_of_concerns", "integration_pressure", "test_signal_quality"],
+                "hotspot_priorities": ["manager_contract_boundaries", "false_green_paths"],
+                "evidence_gaps": ["real-provider variance", "cross-wave architectural debt tracking"],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "systems":
+            _require_manager_context(request=request, required_step_id="intake")
+            _require_manager_context(request=request, required_step_id="planner")
+            return {
+                "architectural_strengths": [
+                    "Manager envelope compatibility remains stable across workflow families.",
+                    "Workflow and agent contracts are explicitly versioned and test-covered.",
+                ],
+                "boundary_map": ["core/contracts", "workflows", "agents", "adapters/mock", "tests"],
+                "interface_pressures": ["workflow_registry_dual_map_consistency", "prompt_version_alignment"],
+                "coupling_hotspots": ["adapter_mock_vs_prompt_contract", "docs_status_vs_code_surface"],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "critic":
+            _require_manager_context(request=request, required_step_id="intake")
+            _require_manager_context(request=request, required_step_id="planner")
+            _require_manager_context(request=request, required_step_id="systems")
+            return {
+                "bottlenecks": [
+                    "Cross-track sequencing updates can lag behind executable code changes.",
+                    "Mock-path assumptions can drift from role prompt intent without strict tests.",
+                ],
+                "merge_risks": [
+                    "Premature H3 output-law freeze before R3-G.",
+                    "Registry/pack mismatches causing non-runnable workflow ids.",
+                ],
+                "failure_modes": [
+                    "Manager finalize without complete worker context.",
+                    "Role overlap between systems and critic reducing review signal quality.",
+                ],
+                "refactor_candidates": [
+                    "Introduce shared helpers for manager-output shape checks across workflow families.",
+                    "Consolidate repeated manager-turn assertions in reusable test utilities.",
+                ],
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        return {
+            "message": f"No specialized h3.manager.v1 output for step '{request.step_id}'.",
             "role": request.role,
             "model": request.model,
             "model_policy_ref": request.model_policy_ref,
