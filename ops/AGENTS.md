@@ -148,7 +148,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - trace is explorable enough to debug failures
 - CLI/export surfaces stay aligned with current runtime/eval semantics for exposed workflows
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track A has no immediate W2-S1 blocking epic and waits for later trace-viewer/workbench work)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track A next active mainline checkpoint is Wave 3 `W3-S3` Step 1 `R3-J` trace viewer improvements, with later workbench packaging still deferred)
 
 ---
 
@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` is fully complete and `W3-S2` Step 3 (`R3-G` + `R3-H` skeleton prep) is complete; next active mainline item is Track E `R3-H` Step 4 finalize before Wave 3 proceeds to `W3-S3`)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` and `W3-S2` are now fully complete through `R3-H` finalization, and Track C next active mainline checkpoint is `W3-S3` Step 1 `R3-I`)
 
 ---
 
@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D` is fully complete and `W3-S2` Step 3 `R3-H` skeleton prep is complete as a provisional artifact with Step 4 finalization now open after `R3-G`)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D` and `W3-S2` `R3-H` are fully complete including Step 4 finalization, and the next Track E mainline checkpoint is `W3-S3` Step 1 `R3-K`)
 
 ---
 
@@ -1054,6 +1054,8 @@ Entries:
 - `[2026-04-12][Track E] R3-H skeleton prep started (⬜ -> 🔄) - Track E opened W3-S2 Step 3 docs-first H3 smoke-review skeleton work using `R3-E` + Track B `R3-E` review + `R3-F` runnable evidence, with strict provisional-only boundaries and no eval/runtime/schema expansion - next: publish Step-3 skeleton artifact and keep finalize gated on `R3-G`.`
 - `[2026-04-12][Track E] R3-H skeleton prep completed (stays 🔄 at epic level) - Track E published `docs/wave3/Wave3-W3-S2-TrackE-R3-H-H3-Smoke-Review-Skeleton.md` as the Step-3 provisional artifact (`current runnable evidence` vs deferred `R3-G` section-law freeze), and preserved Step-4 finalize as the post-`R3-G` gate.`
 - `[2026-04-12][Track C] R3-G completed (⬜ -> ✅) - Track C froze H3 output sections v1 (`strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`) with synthesizer prompt/pack version alignment (`h3.prompt.v2`, `h3/synthesizer/v2`) and exact-order runnable acceptance assertions in H3 manager adapter tests, while preserving manager-envelope compatibility boundaries and evaluator deferral.`
+- `[2026-04-13][Track E] R3-H finalize started (⬜ -> 🔄) - Track E opened W3-S2 Step 4 finalize using frozen `R3-G` section-law, kept Step-3 skeleton immutable as historical evidence, and maintained docs-first/no-scope-creep boundaries - next: publish final H3 smoke review v1 and close W3-S2.`
+- `[2026-04-13][Track E] R3-H finalized (🔄 -> ✅) - Track E published `docs/wave3/Wave3-W3-S2-TrackE-R3-H-H3-Smoke-Review-v1.md` as final manual rubric v1, completed W3-S2 Step 4, and moved Track E mainline forward to W3-S3 Step 1 (`R3-K`).`
 
 ---
 

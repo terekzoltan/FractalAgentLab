@@ -127,6 +127,23 @@ class WorkflowExecutorManagerGuardrailTests(unittest.TestCase):
         self.assertIn("worker_a", output_payload.get("step_results", {}))
         self.assertIn("worker_b", output_payload.get("step_results", {}))
 
+    def test_strict_manager_control_rejects_missing_control_envelope(self) -> None:
+        workflow = _build_manager_workflow(worker_step_ids=["worker_a"], max_turns=3)
+        workflow.metadata["strict_manager_control"] = True
+
+        def runner(*, run_state, workflow, step):
+            _ = run_state
+            _ = workflow
+            if step.step_id == MANAGER_STEP_ID:
+                return {"note": "missing_control_envelope"}
+            return {"ok": step.step_id}
+
+        run_state = WorkflowExecutor(step_runner=runner).execute(workflow)
+
+        self.assertEqual(RunStatus.FAILED, run_state.status)
+        self.assertTrue(run_state.errors)
+        self.assertIn("no valid control envelope", run_state.errors[0].lower())
+
 
 class WorkflowExecutorManagerParsingTests(unittest.TestCase):
     def test_first_valid_control_wins_nested_output_control(self) -> None:

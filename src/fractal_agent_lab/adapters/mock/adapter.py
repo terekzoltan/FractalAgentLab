@@ -616,11 +616,77 @@ class MockAdapter:
                     "prompt_version": request.prompt_version,
                 }
 
+            _require_mock_text_field(
+                request=request,
+                step_id="intake",
+                output=intake_output,
+                field_name="review_scope",
+            )
+            _require_mock_text_field(
+                request=request,
+                step_id="intake",
+                output=intake_output,
+                field_name="system_summary",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="intake",
+                output=intake_output,
+                field_name="constraints",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="intake",
+                output=intake_output,
+                field_name="unknowns",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="planner",
+                output=planner_output,
+                field_name="review_sequence",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="planner",
+                output=planner_output,
+                field_name="focus_areas",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="planner",
+                output=planner_output,
+                field_name="hotspot_priorities",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="planner",
+                output=planner_output,
+                field_name="evidence_gaps",
+            )
             strengths = _require_mock_list_field(
                 request=request,
                 step_id="systems",
                 output=systems_output,
                 field_name="architectural_strengths",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="systems",
+                output=systems_output,
+                field_name="boundary_map",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="systems",
+                output=systems_output,
+                field_name="interface_pressures",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="systems",
+                output=systems_output,
+                field_name="coupling_hotspots",
             )
             bottlenecks = _require_mock_list_field(
                 request=request,
@@ -633,6 +699,12 @@ class MockAdapter:
                 step_id="critic",
                 output=critic_output,
                 field_name="merge_risks",
+            )
+            _require_mock_list_field(
+                request=request,
+                step_id="critic",
+                output=critic_output,
+                field_name="failure_modes",
             )
             refactor_ideas = _require_mock_list_field(
                 request=request,

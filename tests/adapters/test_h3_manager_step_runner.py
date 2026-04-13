@@ -214,22 +214,32 @@ class H3ManagerStepRunnerTests(unittest.TestCase):
                     "intake": {
                         "output": {
                             "review_scope": "Review architecture boundaries",
+                            "system_summary": "Review runtime and interface boundaries.",
+                            "constraints": ["stay repo-grounded"],
+                            "unknowns": ["merge pressure"],
                         },
                     },
                     "planner": {
                         "output": {
                             "review_sequence": ["runtime_boundaries"],
+                            "focus_areas": ["separation_of_concerns"],
+                            "hotspot_priorities": ["manager_contract_boundaries"],
+                            "evidence_gaps": ["real-provider variance"],
                         },
                     },
                     "systems": {
                         "output": {
                             "architectural_strengths": "not-a-list",
+                            "boundary_map": ["runtime", "agents"],
+                            "interface_pressures": ["registry consistency"],
+                            "coupling_hotspots": ["adapter_mock_vs_prompt_contract"],
                         },
                     },
                     "critic": {
                         "output": {
                             "bottlenecks": ["status drift"],
                             "merge_risks": ["early freeze"],
+                            "failure_modes": ["manager fallback drift"],
                             "refactor_candidates": ["shared review helper"],
                         },
                     },
@@ -243,6 +253,192 @@ class H3ManagerStepRunnerTests(unittest.TestCase):
             step_runner(run_state=run_state, workflow=workflow, step=synthesizer_step)
 
         self.assertIn("requires non-empty list field 'architectural_strengths'", str(raised.exception))
+
+    def test_synthesizer_fails_when_intake_constraints_is_not_list(self) -> None:
+        workflow = get_workflow_spec(H3_WORKFLOW_ID)
+        step_runner = build_step_runner(
+            agent_specs_by_id=get_workflow_agent_specs(H3_WORKFLOW_ID),
+            providers_config={"default_provider": "mock"},
+            model_policy_config={
+                "tier_defaults": {
+                    "cheap_worker": "gpt-4o-mini",
+                    "specialist": "gpt-5.4-nano",
+                    "finalizer": "gpt-5.4-mini",
+                },
+            },
+        )
+        run_state = RunState(
+            run_id="run-h3-malformed-intake-constraints",
+            workflow_id=workflow.workflow_id,
+            input_payload={"goal": "Review architecture boundaries"},
+            context={
+                "step_results": {
+                    "intake": {
+                        "output": {
+                            "review_scope": "Review architecture boundaries",
+                            "system_summary": "Review runtime and interface boundaries.",
+                            "constraints": "not-a-list",
+                            "unknowns": ["merge pressure"],
+                        },
+                    },
+                    "planner": {
+                        "output": {
+                            "review_sequence": ["runtime_boundaries"],
+                            "focus_areas": ["separation_of_concerns"],
+                            "hotspot_priorities": ["manager_contract_boundaries"],
+                            "evidence_gaps": ["real-provider variance"],
+                        },
+                    },
+                    "systems": {
+                        "output": {
+                            "architectural_strengths": ["clear workflow boundaries"],
+                            "boundary_map": ["runtime", "agents"],
+                            "interface_pressures": ["registry consistency"],
+                            "coupling_hotspots": ["adapter_mock_vs_prompt_contract"],
+                        },
+                    },
+                    "critic": {
+                        "output": {
+                            "bottlenecks": ["status drift"],
+                            "merge_risks": ["naming drift"],
+                            "failure_modes": ["manager fallback drift"],
+                            "refactor_candidates": ["shared assertion helper"],
+                        },
+                    },
+                },
+            },
+        )
+        run_state.step_results = dict(run_state.context.get("step_results", {}))
+
+        synthesizer_step = _step_by_id(workflow, "synthesizer")
+        with self.assertRaises(StepExecutionError) as raised:
+            step_runner(run_state=run_state, workflow=workflow, step=synthesizer_step)
+
+        self.assertIn("requires non-empty list field 'constraints'", str(raised.exception))
+
+    def test_synthesizer_fails_when_planner_focus_areas_is_not_list(self) -> None:
+        workflow = get_workflow_spec(H3_WORKFLOW_ID)
+        step_runner = build_step_runner(
+            agent_specs_by_id=get_workflow_agent_specs(H3_WORKFLOW_ID),
+            providers_config={"default_provider": "mock"},
+            model_policy_config={
+                "tier_defaults": {
+                    "cheap_worker": "gpt-4o-mini",
+                    "specialist": "gpt-5.4-nano",
+                    "finalizer": "gpt-5.4-mini",
+                },
+            },
+        )
+        run_state = RunState(
+            run_id="run-h3-malformed-planner-focus-areas",
+            workflow_id=workflow.workflow_id,
+            input_payload={"goal": "Review architecture boundaries"},
+            context={
+                "step_results": {
+                    "intake": {
+                        "output": {
+                            "review_scope": "Review architecture boundaries",
+                            "system_summary": "Review runtime and interface boundaries.",
+                            "constraints": ["stay repo-grounded"],
+                            "unknowns": ["merge pressure"],
+                        },
+                    },
+                    "planner": {
+                        "output": {
+                            "review_sequence": ["runtime_boundaries"],
+                            "focus_areas": "not-a-list",
+                            "hotspot_priorities": ["manager_contract_boundaries"],
+                            "evidence_gaps": ["real-provider variance"],
+                        },
+                    },
+                    "systems": {
+                        "output": {
+                            "architectural_strengths": ["clear workflow boundaries"],
+                            "boundary_map": ["runtime", "agents"],
+                            "interface_pressures": ["registry consistency"],
+                            "coupling_hotspots": ["adapter_mock_vs_prompt_contract"],
+                        },
+                    },
+                    "critic": {
+                        "output": {
+                            "bottlenecks": ["status drift"],
+                            "merge_risks": ["naming drift"],
+                            "failure_modes": ["manager fallback drift"],
+                            "refactor_candidates": ["shared assertion helper"],
+                        },
+                    },
+                },
+            },
+        )
+        run_state.step_results = dict(run_state.context.get("step_results", {}))
+
+        synthesizer_step = _step_by_id(workflow, "synthesizer")
+        with self.assertRaises(StepExecutionError) as raised:
+            step_runner(run_state=run_state, workflow=workflow, step=synthesizer_step)
+
+        self.assertIn("requires non-empty list field 'focus_areas'", str(raised.exception))
+
+    def test_synthesizer_fails_when_critic_failure_modes_is_not_list(self) -> None:
+        workflow = get_workflow_spec(H3_WORKFLOW_ID)
+        step_runner = build_step_runner(
+            agent_specs_by_id=get_workflow_agent_specs(H3_WORKFLOW_ID),
+            providers_config={"default_provider": "mock"},
+            model_policy_config={
+                "tier_defaults": {
+                    "cheap_worker": "gpt-4o-mini",
+                    "specialist": "gpt-5.4-nano",
+                    "finalizer": "gpt-5.4-mini",
+                },
+            },
+        )
+        run_state = RunState(
+            run_id="run-h3-malformed-critic-failure-modes",
+            workflow_id=workflow.workflow_id,
+            input_payload={"goal": "Review architecture boundaries"},
+            context={
+                "step_results": {
+                    "intake": {
+                        "output": {
+                            "review_scope": "Review architecture boundaries",
+                            "system_summary": "Review runtime and interface boundaries.",
+                            "constraints": ["stay repo-grounded"],
+                            "unknowns": ["merge pressure"],
+                        },
+                    },
+                    "planner": {
+                        "output": {
+                            "review_sequence": ["runtime_boundaries"],
+                            "focus_areas": ["separation_of_concerns"],
+                            "hotspot_priorities": ["manager_contract_boundaries"],
+                            "evidence_gaps": ["real-provider variance"],
+                        },
+                    },
+                    "systems": {
+                        "output": {
+                            "architectural_strengths": ["clear workflow boundaries"],
+                            "boundary_map": ["runtime", "agents"],
+                            "interface_pressures": ["registry consistency"],
+                            "coupling_hotspots": ["adapter_mock_vs_prompt_contract"],
+                        },
+                    },
+                    "critic": {
+                        "output": {
+                            "bottlenecks": ["status drift"],
+                            "merge_risks": ["naming drift"],
+                            "failure_modes": "not-a-list",
+                            "refactor_candidates": ["shared assertion helper"],
+                        },
+                    },
+                },
+            },
+        )
+        run_state.step_results = dict(run_state.context.get("step_results", {}))
+
+        synthesizer_step = _step_by_id(workflow, "synthesizer")
+        with self.assertRaises(StepExecutionError) as raised:
+            step_runner(run_state=run_state, workflow=workflow, step=synthesizer_step)
+
+        self.assertIn("requires non-empty list field 'failure_modes'", str(raised.exception))
 
 
 def _step_by_id(workflow, step_id: str):

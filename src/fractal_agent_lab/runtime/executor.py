@@ -593,6 +593,8 @@ class WorkflowExecutor:
                 manager_output=manager_output,
                 worker_step_ids=worker_step_ids,
                 completed_workers=completed_workers,
+                workflow_id=workflow.workflow_id,
+                require_control=workflow.metadata.get("strict_manager_control") is True,
             )
 
             turn_record: dict[str, Any] = {
@@ -807,10 +809,18 @@ class WorkflowExecutor:
         manager_output: Any,
         worker_step_ids: list[str],
         completed_workers: set[str],
+        workflow_id: str,
+        require_control: bool,
     ) -> ManagerDecision:
         parsed = self._try_parse_manager_decision(manager_output)
         if parsed is not None:
             return parsed
+
+        if require_control:
+            raise StepExecutionError(
+                f"Workflow '{workflow_id}' manager step emitted no valid control envelope.",
+                details={"workflow_id": workflow_id},
+            )
 
         for step_id in worker_step_ids:
             if step_id not in completed_workers:

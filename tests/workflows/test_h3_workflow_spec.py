@@ -48,7 +48,7 @@ class H3WorkflowSpecTests(unittest.TestCase):
         self.assertEqual("manager", workflow.metadata.get("variant"))
         self.assertEqual("h3.workflow.v1", workflow.metadata.get("schema_contract"))
         self.assertEqual(
-            {"source", "hero_workflow", "variant", "schema_contract"},
+            {"source", "hero_workflow", "variant", "schema_contract", "strict_manager_control"},
             set(workflow.metadata),
         )
 
@@ -113,18 +113,30 @@ class H3WorkflowSpecTests(unittest.TestCase):
             if step.step_id == "intake":
                 return {
                     "review_scope": "Assess architecture review readiness for H3.",
+                    "system_summary": "Review runtime and agent boundaries for contract clarity.",
+                    "constraints": ["stay grounded in repo-visible evidence"],
+                    "unknowns": ["real-provider variance"],
                 }
             if step.step_id == "planner":
                 return {
-                    "review_plan": ["contracts", "interfaces", "failure_paths"],
+                    "review_sequence": ["contracts", "interfaces", "failure_paths"],
+                    "focus_areas": ["manager envelope", "role separation"],
+                    "hotspot_priorities": ["false_green_paths"],
+                    "evidence_gaps": ["real-provider behavior"],
                 }
             if step.step_id == "systems":
                 return {
+                    "architectural_strengths": ["runtime and agent contracts remain separated"],
                     "boundary_map": ["runtime", "adapters", "agents", "evals"],
+                    "interface_pressures": ["registry consistency"],
+                    "coupling_hotspots": ["adapter mock vs prompt contract"],
                 }
             if step.step_id == "critic":
                 return {
-                    "risk_notes": ["cross-surface naming drift", "template-law regression"],
+                    "bottlenecks": ["cross-surface status/doc drift"],
+                    "merge_risks": ["template-law regression"],
+                    "failure_modes": ["manager fallback without strict control"],
+                    "refactor_candidates": ["shared H3 assertion helper"],
                 }
             raise AssertionError(f"Unexpected worker step: {step.step_id}")
 

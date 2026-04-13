@@ -65,5 +65,6 @@ def build_h3_manager_workflow_spec() -> WorkflowSpec:
             "hero_workflow": "H3",
             "variant": "manager",
             "schema_contract": H3_SCHEMA_CONTRACT,
+            "strict_manager_control": True,
         },
     )

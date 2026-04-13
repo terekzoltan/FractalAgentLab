@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-04-05
+**Last updated:** 2026-04-13
 
 ---
 
@@ -982,7 +982,7 @@ Epics:
 - ✅ **R3-E** H3 workflow schema v1 — **Owner: Track C** (Track B reviews)
 - ✅ **R3-F** H3 systems / critic / synthesizer role pack — **Owner: Track C**
 - ✅ **R3-G** H3 output sections: strengths / bottlenecks / merge risks / refactor ideas — **Owner: Track C**
-- 🔄 **R3-H** H3 draft smoke review — **Owner: Track E** (Step 3 skeleton prep complete; Step 4 finalize now open)
+- ✅ **R3-H** H3 draft smoke review — **Owner: Track E** (Step 3 skeleton prep + Step 4 finalize complete)
 
 **Sequential ordering:**
 1. R3-E first (schema)
@@ -1015,11 +1015,11 @@ Epics:
 | Track C agent session | ✅ R3-G | R3-F ✅ | H3 section naming/order is now frozen with runnable exact-order acceptance assertions |
 | Track E agent session | ✅ R3-H (skeleton prep) | R3-E ✅ + R3-F ✅ | Draft smoke review structure delivered as provisional artifact; Step 4 finalize is now unblocked by completed `R3-G` |
 
-**⬜ Step 4 — Track E finalizes the smoke review with complete workflow**
+**✅ Step 4 — Track E finalizes the smoke review with complete workflow**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | R3-H (finalize) | R3-G ✅ | H3 only needs draft-quality usefulness here, but it must not be embarrassing |
+| Track E agent session | ✅ R3-H (finalize) | R3-G ✅ | Final manual smoke review v1 published against frozen H3 section-law; draft-quality usefulness gate retained |
 
 #### Sprint W3-S3 — Project memory and visibility uplift
 
@@ -1419,7 +1419,8 @@ The immediate mainline frontier is now:
 - `W3-S2` Step 1 is complete (`R3-E` ✅).
 - `W3-S2` Step 2 is complete (`R3-E` schema review ✅ + `R3-F` role pack ✅).
 - `W3-S2` Step 3 is complete (`R3-G` ✅ + `R3-H` skeleton prep ✅).
-- `W3-S2` Step 4 is now open (`R3-H` finalize).
+- `W3-S2` Step 4 is complete (`R3-H` finalize ✅).
+- `W3-S3` Step 1 is now open (`R3-I` + `R3-J` + `R3-K` in parallel).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
@@ -1466,10 +1467,11 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track E agent session` for `W3-S2` Step 4 / `⬜ R3-H` (finalize)
-2. `Track C agent session` for `W3-S3` Step 1 / `⬜ R3-I`
-3. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
-4. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
+1. `Track C agent session` for `W3-S3` Step 1 / `⬜ R3-I`
+2. `Track A agent session` for `W3-S3` Step 1 / `⬜ R3-J`
+3. `Track E agent session` for `W3-S3` Step 1 / `⬜ R3-K`
+4. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
+5. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`
@@ -1842,6 +1844,8 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-12][Track E] R3-H skeleton prep started (⬜ -> 🔄) - Track E opened W3-S2 Step 3 docs-first H3 smoke-review skeleton work on top of `R3-E` + Track B `R3-E` review + `R3-F`, with explicit provisional-only semantics and no eval/module/runtime expansion; final freeze stays blocked on `R3-G`.`
 - `[2026-04-12][Track E] R3-H skeleton prep completed (stays 🔄 at epic level) - Track E published docs/wave3/Wave3-W3-S2-TrackE-R3-H-H3-Smoke-Review-Skeleton.md with explicit Step-3 boundary (`current runnable evidence` vs deferred `R3-G` section-law freeze), keeping `R3-H` Step 4 finalize as the post-`R3-G` gate.`
 - `[2026-04-12][Track C] R3-G completed (⬜ -> ✅) - H3 output sections are now frozen at exact canonical naming/order (`strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`) with synthesizer prompt/pack version alignment (`h3.prompt.v2`, `h3/synthesizer/v2`) and exact-order assertions on runnable H3 manager acceptance tests; manager-envelope compatibility remains unchanged and evaluator stays deferred.`
+- `[2026-04-13][Track E] R3-H finalize started (⬜ -> 🔄) - Track E opened W3-S2 Step 4 finalize for final H3 smoke review v1 using frozen `R3-G` section-law, preserving the Step-3 skeleton as a historical artifact and keeping docs-first/no-scope-creep boundaries.`
+- `[2026-04-13][Track E] R3-H finalized (🔄 -> ✅) - Track E published `docs/wave3/Wave3-W3-S2-TrackE-R3-H-H3-Smoke-Review-v1.md` as final manual rubric v1, closed W3-S2 Step 4, and moved active mainline focus to W3-S3 Step 1 (`R3-I`/`R3-J`/`R3-K`).`
 
 ---
 
