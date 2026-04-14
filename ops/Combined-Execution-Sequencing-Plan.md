@@ -1026,9 +1026,9 @@ Epics:
 **Owner priority:** C + A + E
 
 Epics:
-- ⬜ **R3-I** Project memory v1 (M2) for stable decisions and workflow learnings — **Owner: Track C**
-- ⬜ **R3-J** trace viewer improvements for multi-workflow browsing — **Owner: Track A**
-- ⬜ **R3-K** compare multiple runs/variants for H1/H2 — **Owner: Track E**
+- ✅ **R3-I** Project memory v1 (M2) for stable decisions and workflow learnings — **Owner: Track C**
+- ✅ **R3-J** trace viewer improvements for multi-workflow browsing — **Owner: Track A**
+- ✅ **R3-K** compare multiple runs/variants for H1/H2 — **Owner: Track E**
 - ⬜ **R3-L** portfolio-quality example runs documented — **Owner: Track A + Track E**
 
 **Sequential ordering:**
@@ -1048,13 +1048,16 @@ Epics:
 
 ### Sprint W3-S3 — Execution Steps
 
-**⬜ Step 1 — memory, compare logic, and viewer uplift can start in parallel**
+**✅ Step 1 — memory, compare logic, and viewer uplift can start in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent session | R3-I | R3-H ✅ | Start project memory only after H2/H3 are concrete enough to produce stable learnings |
-| Track A agent session | R3-J | R3-H ✅ | Viewer improvements should consume the now broader multi-workflow trace reality |
-| Track E agent session | R3-K | R3-D ✅ + R3-H ✅ | Comparison logic should use validated H1/H2 runs, not ad hoc examples |
+| Track C agent session | ✅ R3-I | R3-H ✅ | Project memory v1 delivered with explicit M2 boundary and anti-noise merge policy |
+| Track A agent session | ✅ R3-J | R3-H ✅ | Viewer improvements should consume the now broader multi-workflow trace reality |
+| Track E agent session | ✅ R3-K | R3-D ✅ + R3-H ✅ | Replay-backed H1 variant comparison reuse + H2 multi-run comparability surface delivered; no winner scoring |
+
+Status note:
+- `R3-J` moved through `🔄` and is now complete: Track A extended trace visibility from single-run drill-down to multi-workflow browse/list mode (`trace list`) with explicit row-level degrade policy, while preserving strict fail-loud semantics for `trace show --run-id`.
 
 **⬜ Step 2 — Track E curates portfolio-quality evidence first**
 
@@ -1420,7 +1423,8 @@ The immediate mainline frontier is now:
 - `W3-S2` Step 2 is complete (`R3-E` schema review ✅ + `R3-F` role pack ✅).
 - `W3-S2` Step 3 is complete (`R3-G` ✅ + `R3-H` skeleton prep ✅).
 - `W3-S2` Step 4 is complete (`R3-H` finalize ✅).
-- `W3-S3` Step 1 is now open (`R3-I` + `R3-J` + `R3-K` in parallel).
+- `W3-S3` Step 1 is complete (`R3-I` ✅ + `R3-J` ✅ + `R3-K` ✅).
+- `W3-S3` Step 2 is now open (`R3-L` evidence curation).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
@@ -1467,11 +1471,10 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track C agent session` for `W3-S3` Step 1 / `⬜ R3-I`
-2. `Track A agent session` for `W3-S3` Step 1 / `⬜ R3-J`
-3. `Track E agent session` for `W3-S3` Step 1 / `⬜ R3-K`
-4. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
-5. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
+1. `Track E agent session` for `W3-S3` Step 2 / `⬜ R3-L` (evidence curation)
+2. `Track A agent session` for `W3-S3` Step 3 / `⬜ R3-L` (presentation packaging) after evidence curation
+3. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
+4. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`
@@ -1846,6 +1849,11 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-12][Track C] R3-G completed (⬜ -> ✅) - H3 output sections are now frozen at exact canonical naming/order (`strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`) with synthesizer prompt/pack version alignment (`h3.prompt.v2`, `h3/synthesizer/v2`) and exact-order assertions on runnable H3 manager acceptance tests; manager-envelope compatibility remains unchanged and evaluator stays deferred.`
 - `[2026-04-13][Track E] R3-H finalize started (⬜ -> 🔄) - Track E opened W3-S2 Step 4 finalize for final H3 smoke review v1 using frozen `R3-G` section-law, preserving the Step-3 skeleton as a historical artifact and keeping docs-first/no-scope-creep boundaries.`
 - `[2026-04-13][Track E] R3-H finalized (🔄 -> ✅) - Track E published `docs/wave3/Wave3-W3-S2-TrackE-R3-H-H3-Smoke-Review-v1.md` as final manual rubric v1, closed W3-S2 Step 4, and moved active mainline focus to W3-S3 Step 1 (`R3-I`/`R3-J`/`R3-K`).`
+- `[2026-04-14][Track A] R3-J started (⬜ -> 🔄) - Wave 3 trace-viewer uplift implementation started to add multi-workflow trace browsing while preserving strict single-run drill-down semantics - next: ship `trace list` with explicit browse failure policy and regression coverage.`
+- `[2026-04-14][Track A] R3-J completed (🔄 -> ✅) - Track A delivered multi-workflow trace browsing via `trace list` with workflow/status filtering, row-level degrade handling for broken artifact pairs, and preserved fail-loud `trace show` behavior, with coverage in tests/cli/test_r3_j_trace_browser.py - next: continue W3-S3 Step 1 parallel lane until `R3-I` and `R3-K` close.`
+- `[2026-04-14][Track E] R3-K started (⬜ -> 🔄) - Track E opened W3-S3 Step 1 compare implementation with explicit split: reuse replay-backed H1 variant comparison surfaces and add replay-backed H2 multi-run comparability surface for `h2.manager.v1`; artifact-path claims stay bound to replay/validation outputs.`
+- `[2026-04-14][Track E] R3-K completed (🔄 -> ✅) - Track E delivered `R3-K` via `docs/wave3/Wave3-W3-S3-TrackE-R3-K-H1-H2-Comparison-v1.md`, added H2 compare contracts/projections/report+script with fail-loud tests, and left W3-S3 Step 1 in progress while `R3-I` remains open.`
+- `[2026-04-14][Track C] R3-I completed (⬜ -> ✅) - Track C delivered project-memory v1 (`M2`) with explicit `project_id`-keyed canonical store (`data/memory/projects/<project_id>.json`), additive project-memory context loading, and non-fatal post-run updater flow for successful `h2.manager.v1`/`h3.manager.v1` runs, with deterministic anti-noise merge/dedupe and explicit canonical-vs-sidecar separation.`
 
 ---
 

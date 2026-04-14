@@ -148,7 +148,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - trace is explorable enough to debug failures
 - CLI/export surfaces stay aligned with current runtime/eval semantics for exposed workflows
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track A next active mainline checkpoint is Wave 3 `W3-S3` Step 1 `R3-J` trace viewer improvements, with later workbench packaging still deferred)
+**Status:** `🔄 in progress` (Wave 3 `W3-S3` Step 1: `R3-J` completed; Track A now waits for `R3-I` closeout before `R3-L` presentation packaging)
 
 ---
 
@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` and `W3-S2` are now fully complete through `R3-H` finalization, and Track C next active mainline checkpoint is `W3-S3` Step 1 `R3-I`)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` and `W3-S2` are fully complete through `R3-H`, and Track C completed `W3-S3` Step 1 `R3-I` project-memory v1 while Step 2/3 `R3-L` remain Track E/Track A owned)
 
 ---
 
@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D` and `W3-S2` `R3-H` are fully complete including Step 4 finalization, and the next Track E mainline checkpoint is `W3-S3` Step 1 `R3-K`)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, and `W3-S3` Step 1 `R3-K` are complete on Track E scope, and the next Track E mainline checkpoint is `W3-S3` Step 2 `R3-L` after `R3-I`)
 
 ---
 
@@ -310,6 +310,29 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - onboarding snapshots
 
 **Status:** `✅ active role`
+
+---
+
+## 3A. Runbook Family
+
+The project maintains an explicit runbook family so the workflow can be reused more
+easily in this repo and in similar repos.
+
+Canonical runbook surfaces:
+
+- `ops/Meta-Coordinator-Runbook.md` = how the Meta Coordinator operates
+- `ops/Track-Implementation-Runbook.md` = shared default implementation-track loop
+- `ops/Track-A-Runbook.md` = Track A overlay
+- `ops/Track-B-Runbook.md` = Track B overlay
+- `ops/Track-C-Runbook.md` = Track C overlay
+- `ops/Track-D-Runbook.md` = Track D overlay
+- `ops/Track-E-Runbook.md` = Track E overlay
+
+Authority rule:
+
+- `ops/Combined-Execution-Sequencing-Plan.md` remains canonical for active frontier and step ordering
+- `ops/AGENTS.md` remains canonical for ownership and project guardrails
+- the runbooks describe how each role should operate within those boundaries
 
 ---
 
@@ -1056,6 +1079,11 @@ Entries:
 - `[2026-04-12][Track C] R3-G completed (⬜ -> ✅) - Track C froze H3 output sections v1 (`strengths`, `bottlenecks`, `merge_risks`, `refactor_ideas`) with synthesizer prompt/pack version alignment (`h3.prompt.v2`, `h3/synthesizer/v2`) and exact-order runnable acceptance assertions in H3 manager adapter tests, while preserving manager-envelope compatibility boundaries and evaluator deferral.`
 - `[2026-04-13][Track E] R3-H finalize started (⬜ -> 🔄) - Track E opened W3-S2 Step 4 finalize using frozen `R3-G` section-law, kept Step-3 skeleton immutable as historical evidence, and maintained docs-first/no-scope-creep boundaries - next: publish final H3 smoke review v1 and close W3-S2.`
 - `[2026-04-13][Track E] R3-H finalized (🔄 -> ✅) - Track E published `docs/wave3/Wave3-W3-S2-TrackE-R3-H-H3-Smoke-Review-v1.md` as final manual rubric v1, completed W3-S2 Step 4, and moved Track E mainline forward to W3-S3 Step 1 (`R3-K`).`
+- `[2026-04-14][Track E] R3-K started (⬜ -> 🔄) - Track E opened W3-S3 Step 1 comparison work with explicit split: H1 replay-backed variant comparison surfaces reused, H2 replay-backed multi-run comparability surface added for `h2.manager.v1`; no winner-scoring and no CLI artifact-path claims.`
+- `[2026-04-14][Track E] R3-K completed (🔄 -> ✅) - Track E delivered `docs/wave3/Wave3-W3-S3-TrackE-R3-K-H1-H2-Comparison-v1.md` plus H2 compare contracts/projections/report+script and fail-loud tests, and moved Track E to W3-S3 Step 2 `R3-L` wait-state behind `R3-I` completion.`
+- `[2026-04-14][Track A] R3-J started (⬜ -> 🔄) - Track A opened W3-S3 Step 1 viewer uplift for multi-workflow browsing while preserving strict single-run drill-down behavior in `trace show` - next: add `trace list` with explicit browse failure policy and filters.`
+- `[2026-04-14][Track A] R3-J completed (🔄 -> ✅) - Track A shipped multi-workflow trace browsing via `trace list` with workflow/status filters, row-level degrade warnings for broken artifact rows, and preserved fail-loud `trace show` semantics, with regression coverage in tests/cli/test_r3_j_trace_browser.py.`
+- `[2026-04-14][Track C] R3-I completed (⬜ -> ✅) - Track C delivered project-memory v1 (`M2`) with explicit `project_id`-keyed canonical store (`data/memory/projects/<project_id>.json`), additive project-memory context loading, and non-fatal post-run updater flow for successful `h2.manager.v1`/`h3.manager.v1` runs, with deterministic anti-noise merge/dedupe and explicit canonical-vs-sidecar separation.`
 
 ---
 

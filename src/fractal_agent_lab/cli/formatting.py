@@ -304,6 +304,82 @@ def build_trace_artifact_json_output(
     }
 
 
+def format_trace_browser_listing_text(
+    *,
+    rows: list[dict[str, Any]],
+    warnings: list[str],
+    workflow_id_filter: str | None,
+    status_filter: str | None,
+    limit: int | None,
+    data_dir: str,
+) -> str:
+    lines = ["Trace Browser", f"- data_dir: {data_dir}", f"- total_runs: {len(rows)}"]
+    if workflow_id_filter is not None:
+        lines.append(f"- filter.workflow_id: {workflow_id_filter}")
+    if status_filter is not None:
+        lines.append(f"- filter.status: {status_filter}")
+    if limit is not None:
+        lines.append(f"- limit: {limit}")
+
+    workflow_counts = _collect_workflow_counts(rows)
+    if workflow_counts:
+        lines.append("- workflow_counts:")
+        for workflow_id in sorted(workflow_counts):
+            lines.append(f"  - {workflow_id}: {workflow_counts[workflow_id]}")
+
+    if warnings:
+        lines.append(f"- warnings_count: {len(warnings)}")
+
+    lines.append("- runs:")
+    for row in rows:
+        run_id = _str_or_none(row.get("run_id")) or "unknown"
+        workflow_id = _str_or_none(row.get("workflow_id")) or "unknown"
+        status = _str_or_none(row.get("status")) or "unknown"
+        completed_at = _str_or_none(row.get("completed_at")) or "unknown"
+        trace_state = _str_or_none(row.get("trace_state")) or "unknown"
+        event_count = row.get("trace_event_count")
+        events_repr = str(event_count) if isinstance(event_count, int) else "unknown"
+        lines.append(
+            (
+                f"  - run_id={run_id} workflow={workflow_id} status={status} "
+                f"completed_at={completed_at} trace_state={trace_state} events={events_repr}"
+            ),
+        )
+
+    if warnings:
+        lines.append("- warnings:")
+        for warning in warnings:
+            lines.append(f"  - {warning}")
+
+    return "\n".join(lines)
+
+
+def build_trace_browser_listing_json_output(
+    *,
+    rows: list[dict[str, Any]],
+    warnings: list[str],
+    workflow_id_filter: str | None,
+    status_filter: str | None,
+    limit: int | None,
+    data_dir: str,
+) -> dict[str, Any]:
+    return {
+        "summary": {
+            "data_dir": data_dir,
+            "total_runs": len(rows),
+            "workflow_counts": _collect_workflow_counts(rows),
+            "warnings_count": len(warnings),
+        },
+        "filters": {
+            "workflow_id": workflow_id_filter,
+            "status": status_filter,
+            "limit": limit,
+        },
+        "runs": rows,
+        "warnings": warnings,
+    }
+
+
 def _fmt_ts(value: datetime | None) -> str | None:
     if value is None:
         return None
@@ -532,6 +608,14 @@ def _collect_lane_counts_from_payload(events: list[dict[str, Any]]) -> dict[str,
         if lane is None:
             continue
         counts[lane] = counts.get(lane, 0) + 1
+    return counts
+
+
+def _collect_workflow_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        workflow_id = _str_or_none(row.get("workflow_id")) or "unknown"
+        counts[workflow_id] = counts.get(workflow_id, 0) + 1
     return counts
 
 

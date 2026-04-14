@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
+from fractal_agent_lab.memory.project_memory import ProjectMemory
 from fractal_agent_lab.memory.session_memory import SessionMemory
 
 
@@ -64,4 +65,55 @@ class JSONSessionMemoryStore:
 
         if not isinstance(payload, dict):
             raise ValueError(f"Session memory JSON file must be an object: {path.as_posix()}")
+        return payload
+
+
+class JSONProjectMemoryStore:
+    def __init__(
+        self,
+        *,
+        data_dir: str | Path = "data",
+        data_subdir: str = "memory",
+    ) -> None:
+        if not isinstance(data_subdir, str) or not data_subdir.strip():
+            raise ValueError("data_subdir must be a non-empty string.")
+        self._root_dir = Path(data_dir) / data_subdir
+        self._projects_dir = self._root_dir / "projects"
+
+    @property
+    def root_dir(self) -> Path:
+        return self._root_dir
+
+    def load_project(self, *, project_id: str) -> ProjectMemory | None:
+        path = self._resolve_existing_project_path(project_id=project_id)
+        if not path.exists():
+            return None
+
+        payload = self._read_json_dict(path)
+        return ProjectMemory.from_dict(payload)
+
+    def save_project(self, project_memory: ProjectMemory) -> Path:
+        path = self.project_path(project_id=project_memory.project_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(project_memory.to_dict(), indent=2, ensure_ascii=True), encoding="utf-8")
+        return path
+
+    def project_path(self, *, project_id: str) -> Path:
+        return self._projects_dir / f"{_encoded_file_stem(project_id)}.json"
+
+    def _resolve_existing_project_path(self, *, project_id: str) -> Path:
+        preferred = self.project_path(project_id=project_id)
+        if preferred.exists():
+            return preferred
+
+        return self._projects_dir / f"{_safe_file_stem(project_id)}.json"
+
+    def _read_json_dict(self, path: Path) -> dict[str, object]:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"Invalid project memory JSON file at {path.as_posix()}: {error}") from error
+
+        if not isinstance(payload, dict):
+            raise ValueError(f"Project memory JSON file must be an object: {path.as_posix()}")
         return payload

@@ -293,6 +293,20 @@ PowerShell:
 $env:PYTHONPATH='src'; python -m fractal_agent_lab.cli trace show --run-id <run_id>
 ```
 
+### Browse stored traces across workflows
+
+Git Bash:
+
+```bash
+PYTHONPATH=src python -m fractal_agent_lab.cli trace list --format text
+```
+
+PowerShell:
+
+```powershell
+$env:PYTHONPATH='src'; python -m fractal_agent_lab.cli trace list --format text
+```
+
 ### Run the current tests
 
 Git Bash:

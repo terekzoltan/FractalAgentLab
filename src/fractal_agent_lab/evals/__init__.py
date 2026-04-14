@@ -10,6 +10,12 @@ from fractal_agent_lab.evals.h1_eval_contracts import (
     H1_COMPARISON_ROLE_BY_WORKFLOW_ID,
     H1_VARIANT_WORKFLOW_IDS,
 )
+from fractal_agent_lab.evals.h2_eval_contracts import (
+    H2_COMPARABLE_OUTPUT_KEYS,
+    H2_EXPECTED_MANAGER_DELEGATE_ORDER,
+    H2_EXPECTED_WORKFLOW_ID,
+)
+from fractal_agent_lab.evals.h2_run_comparison import run_h2_run_comparison_by_run_ids
 from fractal_agent_lab.evals.h1_smoke_comparison import (
     COMPARABLE_OUTPUT_KEYS,
     H1_SMOKE_VARIANTS,
@@ -30,6 +36,9 @@ __all__ = [
     "H1_COMPARISON_ROLE_BY_WORKFLOW_ID",
     "H1_SMOKE_VARIANTS",
     "H1_VARIANT_WORKFLOW_IDS",
+    "H2_COMPARABLE_OUTPUT_KEYS",
+    "H2_EXPECTED_MANAGER_DELEGATE_ORDER",
+    "H2_EXPECTED_WORKFLOW_ID",
     "TRACE_VIEWER_FIELDS",
     "capture_h1_baseline_tags_by_run_ids",
     "prepare_h1_evidence_prep",
@@ -38,6 +47,7 @@ __all__ = [
     "replay_run_artifacts_by_id",
     "run_h1_smoke_comparison",
     "run_h1_smoke_suite_by_run_ids",
+    "run_h2_run_comparison_by_run_ids",
     "validate_run_trace_artifacts",
     "validate_run_trace_by_run_id",
 ]

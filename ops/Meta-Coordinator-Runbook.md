@@ -95,6 +95,12 @@ The Meta Coordinator works primarily with these files:
 - `ops/AGENTS.md`
 - `ops/Combined-Execution-Sequencing-Plan.md`
 - `ops/Meta-Coordinator-Runbook.md`
+- `ops/Track-Implementation-Runbook.md`
+- `ops/Track-A-Runbook.md`
+- `ops/Track-B-Runbook.md`
+- `ops/Track-C-Runbook.md`
+- `ops/Track-D-Runbook.md`
+- `ops/Track-E-Runbook.md`
 - `ops/Review-Findings-Registry.md`
 - `ops/Meta-Hardening-Package-v01.md`
 - `docs/Repo-Visibility-and-Release-Policy-v01.md`
@@ -110,6 +116,13 @@ The Meta Coordinator works primarily with these files:
 - `docs/private/Coding-Vertical-Learning-Loop-v01.md` (when private coding heuristics are being distilled)
 - future track-specific notes or plans
 - future risk, audit, or benchmark documents
+
+Runbook family rule:
+
+- `ops/Meta-Coordinator-Runbook.md` defines how the Meta layer operates
+- `ops/Track-Implementation-Runbook.md` defines the shared default loop for implementation tracks
+- `ops/Track-A-Runbook.md` through `ops/Track-E-Runbook.md` define track-specific overlays
+- the runbooks are operational companions, not replacements for `AGENTS.md` or `Combined`
 
 Optional future artifacts:
 
@@ -447,17 +460,30 @@ Purpose:
 1. verify the active frontier in `ops/Combined-Execution-Sequencing-Plan.md`
 2. verify ownership and guardrails in `ops/AGENTS.md`
 3. inspect the referenced code/doc surfaces in the actual repo state
-4. decide whether the plan is truly `READY`, `NOT READY`, or `READY with guardrails`
-5. identify scope, sequencing, or contract risks
-6. answer any explicit open questions from the track
-7. produce a short track-facing summary message that can be sent back directly
+4. do a freshness re-check immediately before the verdict if parallel track activity or status drift is plausible
+5. decide whether the plan is truly `READY`, `NOT READY`, or `READY with guardrails`
+6. identify scope, sequencing, or contract risks
+7. answer any explicit open questions from the track
+8. produce a short track-facing summary message that can be sent back directly
 
 Important:
 
 - prefer actual file contents over plan claims
 - treat dirty-worktree reality as valid current state, but call that out explicitly when it matters
+- if `Combined` and summary/status wording drift, use `Combined` as active-frontier truth and log the drift
 - do not silently broaden a track's scope during review
 - keep co-owned epics split cleanly by saying which part belongs to Track E draft work, Track B confirmation work, Track C implementation work, etc.
+
+### Lightweight disclosure expectation for track handoffs
+
+Tracks should ideally include a lightweight disclosure block in substantive handoffs:
+
+- execution mode used
+- visibility/audit state used
+- whether any non-canonical artifact materially influenced the conclusion
+
+This is lighter than Meta's own disclosure requirement but helps future auditability and
+workflow automation.
 
 ### Default response structure
 

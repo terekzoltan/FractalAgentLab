@@ -14,12 +14,14 @@ from fractal_agent_lab.cli.config_loader import (
 )
 from fractal_agent_lab.cli.formatting import (
     build_json_output,
+    build_trace_browser_listing_json_output,
     build_trace_artifact_json_output,
     format_run_summary_text,
+    format_trace_browser_listing_text,
     format_trace_artifact_timeline_text,
     format_trace_summary_text,
 )
-from fractal_agent_lab.cli.trace_reader import load_trace_view_artifacts
+from fractal_agent_lab.cli.trace_reader import list_trace_browser_rows, load_trace_view_artifacts
 from fractal_agent_lab.cli.workflow_registry import (
     get_workflow_agent_specs,
     get_workflow_spec,
@@ -28,7 +30,9 @@ from fractal_agent_lab.cli.workflow_registry import (
 from fractal_agent_lab.core.models import RunStatus
 from fractal_agent_lab.identity import run_post_run_identity_update
 from fractal_agent_lab.memory import (
+    load_project_memory_context,
     load_session_memory_context,
+    run_post_run_project_memory_update,
     write_memory_candidates_artifact,
     write_session_memory_snapshot_artifact,
 )
@@ -99,6 +103,34 @@ def build_parser() -> argparse.ArgumentParser:
         default="text",
         help="Trace viewer output format",
     )
+    trace_list_parser = trace_subparsers.add_parser("list", help="List stored traces across workflows")
+    trace_list_parser.add_argument(
+        "--data-dir",
+        default="data",
+        help="Data directory that contains runs/ and traces/",
+    )
+    trace_list_parser.add_argument(
+        "--workflow-id",
+        default=None,
+        help="Optional exact workflow_id filter",
+    )
+    trace_list_parser.add_argument(
+        "--status",
+        default=None,
+        help="Optional exact status filter",
+    )
+    trace_list_parser.add_argument(
+        "--limit",
+        type=int,
+        default=30,
+        help="Maximum runs to list",
+    )
+    trace_list_parser.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Trace browser output format",
+    )
 
     subparsers.add_parser("list-workflows", help="List available workflows")
     return parser
@@ -155,6 +187,7 @@ def _handle_run(args: argparse.Namespace) -> int:
 
     data_dir = resolve_data_dir(runtime_config)
     run_context = load_session_memory_context(input_payload=input_payload, data_dir=data_dir)
+    run_context.update(load_project_memory_context(input_payload=input_payload, data_dir=data_dir))
 
     emitter = InMemoryTraceEmitter()
     state_store = InMemoryRunStateStore()
@@ -201,6 +234,14 @@ def _handle_run(args: argparse.Namespace) -> int:
         )
     except OSError as error:
         print(f"Warning: failed to write run/trace artifacts: {error}", file=sys.stderr)
+
+    try:
+        _ = run_post_run_project_memory_update(
+            run_state=run_state,
+            data_dir=data_dir,
+        )
+    except Exception as error:
+        print(f"Warning: project memory updater failed (non-fatal): {error}", file=sys.stderr)
 
     try:
         _ = run_post_run_identity_update(
@@ -288,6 +329,9 @@ def _inject_h1_prompt_tags(
 
 
 def _handle_trace(args: argparse.Namespace) -> int:
+    if args.trace_command == "list":
+        return _handle_trace_list(args)
+
     if args.trace_command != "show":
         print(f"Error: unsupported trace command '{args.trace_command}'.")
         return 2
@@ -319,6 +363,47 @@ def _handle_trace(args: argparse.Namespace) -> int:
             trace_events=trace_events,
             run_artifact_path=run_artifact_path,
             trace_artifact_path=trace_artifact_path,
+        ),
+    )
+    return 0
+
+
+def _handle_trace_list(args: argparse.Namespace) -> int:
+    if args.limit is not None and args.limit <= 0:
+        print("Error: --limit must be a positive integer.")
+        return 2
+
+    try:
+        rows, warnings = list_trace_browser_rows(
+            data_dir=args.data_dir,
+            workflow_id_filter=args.workflow_id,
+            status_filter=args.status,
+            limit=args.limit,
+        )
+    except ValueError as error:
+        print(f"Error: {error}")
+        return 2
+
+    if args.format == "json":
+        output = build_trace_browser_listing_json_output(
+            rows=rows,
+            warnings=warnings,
+            workflow_id_filter=args.workflow_id,
+            status_filter=args.status,
+            limit=args.limit,
+            data_dir=args.data_dir,
+        )
+        print(json.dumps(output, indent=2, ensure_ascii=True))
+        return 0
+
+    print(
+        format_trace_browser_listing_text(
+            rows=rows,
+            warnings=warnings,
+            workflow_id_filter=args.workflow_id,
+            status_filter=args.status,
+            limit=args.limit,
+            data_dir=args.data_dir,
         ),
     )
     return 0
