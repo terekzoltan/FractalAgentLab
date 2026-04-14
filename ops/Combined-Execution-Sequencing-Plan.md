@@ -1029,7 +1029,7 @@ Epics:
 - ✅ **R3-I** Project memory v1 (M2) for stable decisions and workflow learnings — **Owner: Track C**
 - ✅ **R3-J** trace viewer improvements for multi-workflow browsing — **Owner: Track A**
 - ✅ **R3-K** compare multiple runs/variants for H1/H2 — **Owner: Track E**
-- ⬜ **R3-L** portfolio-quality example runs documented — **Owner: Track A + Track E**
+- 🔄 **R3-L** portfolio-quality example runs documented — **Owner: Track A + Track E**
 
 **Sequential ordering:**
 1. R3-I, R3-J, R3-K can proceed in parallel (independent streams)
@@ -1059,11 +1059,11 @@ Epics:
 Status note:
 - `R3-J` moved through `🔄` and is now complete: Track A extended trace visibility from single-run drill-down to multi-workflow browse/list mode (`trace list`) with explicit row-level degrade policy, while preserving strict fail-loud semantics for `trace show --run-id`.
 
-**⬜ Step 2 — Track E curates portfolio-quality evidence first**
+**✅ Step 2 — Track E curates portfolio-quality evidence first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | R3-L (evidence curation) | R3-I ✅ + R3-J ✅ + R3-K ✅ | Curate the examples worth showing before Track A packages them |
+| Track E agent session | ✅ R3-L (evidence curation) | R3-I ✅ + R3-J ✅ + R3-K ✅ | Curated evidence published with honest current-state truth (`H1` replay-backed historical green, `H2` current corpus not comparison-ready, `H3` single-run validated/manual-rubric-backed) |
 
 **⬜ Step 3 — Track A packages the portfolio-facing presentation layer**
 
@@ -1424,7 +1424,8 @@ The immediate mainline frontier is now:
 - `W3-S2` Step 3 is complete (`R3-G` ✅ + `R3-H` skeleton prep ✅).
 - `W3-S2` Step 4 is complete (`R3-H` finalize ✅).
 - `W3-S3` Step 1 is complete (`R3-I` ✅ + `R3-J` ✅ + `R3-K` ✅).
-- `W3-S3` Step 2 is now open (`R3-L` evidence curation).
+- `W3-S3` Step 2 is complete (`R3-L` evidence curation ✅).
+- `W3-S3` Step 3 is now open (`R3-L` presentation packaging).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
@@ -1471,10 +1472,9 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track E agent session` for `W3-S3` Step 2 / `⬜ R3-L` (evidence curation)
-2. `Track A agent session` for `W3-S3` Step 3 / `⬜ R3-L` (presentation packaging) after evidence curation
-3. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
-4. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
+1. `Track A agent session` for `W3-S3` Step 3 / `⬜ R3-L` (presentation packaging)
+2. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
+3. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`
@@ -1854,6 +1854,7 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-14][Track E] R3-K started (⬜ -> 🔄) - Track E opened W3-S3 Step 1 compare implementation with explicit split: reuse replay-backed H1 variant comparison surfaces and add replay-backed H2 multi-run comparability surface for `h2.manager.v1`; artifact-path claims stay bound to replay/validation outputs.`
 - `[2026-04-14][Track E] R3-K completed (🔄 -> ✅) - Track E delivered `R3-K` via `docs/wave3/Wave3-W3-S3-TrackE-R3-K-H1-H2-Comparison-v1.md`, added H2 compare contracts/projections/report+script with fail-loud tests, and left W3-S3 Step 1 in progress while `R3-I` remains open.`
 - `[2026-04-14][Track C] R3-I completed (⬜ -> ✅) - Track C delivered project-memory v1 (`M2`) with explicit `project_id`-keyed canonical store (`data/memory/projects/<project_id>.json`), additive project-memory context loading, and non-fatal post-run updater flow for successful `h2.manager.v1`/`h3.manager.v1` runs, with deterministic anti-noise merge/dedupe and explicit canonical-vs-sidecar separation.`
+- `[2026-04-14][Track E] R3-L evidence curation completed (⬜ -> ✅ Track E Step 2 scope) - Track E published `docs/wave3/Wave3-W3-S3-TrackE-R3-L-Evidence-Curation-v1.md` plus explicit-run-id helper/script/tests (`r3_l_evidence_curation`) with disclosure and schema-version-labeled curated manifest; bounded H2 current-corpus sweep truth is explicit (`comparison_ready: false`), H1 is labeled replay-backed historical evidence, and M2 remains not demonstrated for selected runs - next: Track A executes W3-S3 Step 3 presentation packaging.`
 
 ---
 
