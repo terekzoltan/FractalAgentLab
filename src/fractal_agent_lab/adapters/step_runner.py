@@ -22,10 +22,12 @@ class AdapterStepRunner:
     def __post_init__(self) -> None:
         if self.adapters_by_provider:
             return
+        providers_block = _providers_block(self.router.providers_config)
+        openrouter_config = providers_block.get("openrouter", {})
         self.adapters_by_provider = {
             "mock": MockAdapter(),
             "openai": OpenAICompatibleAdapter(),
-            "openrouter": OpenRouterAdapter(),
+            "openrouter": OpenRouterAdapter(provider_config=openrouter_config),
         }
 
     def __call__(
@@ -119,3 +121,10 @@ def _prompt_version(agent_spec: AgentSpec | None) -> str | None:
     if isinstance(prompt_version, str) and prompt_version:
         return prompt_version
     return None
+
+
+def _providers_block(providers_config: Mapping[str, Any]) -> Mapping[str, Any]:
+    providers = providers_config.get("providers")
+    if isinstance(providers, Mapping):
+        return providers
+    return {}

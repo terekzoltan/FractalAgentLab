@@ -1126,11 +1126,11 @@ Meaning:
 
 ### Wave 3 side batch — Execution Steps
 
-**⬜ Step 1 — Track D lands one real-provider path first**
+**✅ Step 1 — Track D lands one real-provider path first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent session | R3-M | H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ | Keep the first real-provider path narrow: one adapter, one workflow family, one honest route |
+| Track D agent session | ✅ R3-M | H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ | OpenRouter adapter MVP delivered with `h1.single.v1` anchor, strict JSON-object parse/fail-loud behavior, requested-vs-response model inspectability, and fake-transport proof only |
 
 **⬜ Step 2 — routing policy and failure semantics harden in parallel**
 
@@ -1426,6 +1426,7 @@ The immediate mainline frontier is now:
 - `W3-S3` Step 1 is complete (`R3-I` ✅ + `R3-J` ✅ + `R3-K` ✅).
 - `W3-S3` Step 2 is complete (`R3-L` evidence curation ✅).
 - `W3-S3` Step 3 is complete (`R3-L` presentation packaging ✅).
+- Wave 3 side batch Step 1 is complete (`R3-M` ✅ with `h1.single.v1` anchor).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
@@ -1856,6 +1857,8 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-14][Track E] R3-L evidence curation completed (⬜ -> ✅ Track E Step 2 scope) - Track E published `docs/wave3/Wave3-W3-S3-TrackE-R3-L-Evidence-Curation-v1.md` plus explicit-run-id helper/script/tests (`r3_l_evidence_curation`) with disclosure and schema-version-labeled curated manifest; bounded H2 current-corpus sweep truth is explicit (`comparison_ready: false`), H1 is labeled replay-backed historical evidence, and M2 remains not demonstrated for selected runs - next: Track A executes W3-S3 Step 3 presentation packaging.`
 - `[2026-04-14][Track A] R3-L presentation packaging started (⬜ -> 🔄) - Track A opened W3-S3 Step 3 in docs-first mode to package Track E curated evidence truth with bounded README updates and explicit disclosure requirements - next: publish Track A R3-L packaging delivery doc and close coordination surfaces.`
 - `[2026-04-14][Track A] R3-L presentation packaging completed (🔄 -> ✅) - Track A published `docs/wave3/Wave3-W3-S3-TrackA-R3-L-Presentation-Packaging.md`, refreshed README current-focus/presentation wording with local-data boundedness, and completed W3-S3 Step 3 without introducing a new CLI presentation command.`
+- `[2026-04-15][Track D] R3-M started (⬜ -> 🔄) - Track D opened Wave 3 side-batch Step 1 with explicit scope lock (`h1.single.v1` anchor only), provider-boundary-only adapter changes, and fake-transport proof guardrail - next: implement OpenRouterAdapter MVP with strict JSON-object parse/fail-loud behavior and no semantic repair fallback.`
+- `[2026-04-15][Track D] R3-M completed (🔄 -> ✅) - Track D delivered OpenRouterAdapter MVP config plumbing + strict JSON-object-only normalization with requested-vs-response model inspectability, validated real `HTTPError` plus envelope/content negative paths and `h1.single.v1` fake-transport integration proof, and published a dedicated Wave 3 delivery doc for downstream `R3-N/R3-O/R3-P` sequencing.`
 
 ---
 

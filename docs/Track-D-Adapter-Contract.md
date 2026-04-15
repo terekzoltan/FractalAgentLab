@@ -64,9 +64,10 @@ Core objects:
   - path: `src/fractal_agent_lab/adapters/openai/adapter.py`
   - currently raises `RuntimeBoundaryError`
 
-- `OpenRouterAdapter` (placeholder)
+- `OpenRouterAdapter` (Wave 3 side-batch MVP)
   - path: `src/fractal_agent_lab/adapters/openrouter/adapter.py`
-  - currently raises `RuntimeBoundaryError`
+  - supports one bounded real-provider path for `h1.single.v1`
+  - strict JSON-object-only parse/fail-loud behavior remains MVP-scoped, not parity-complete
 
 Wave 0 default fallback route is `mock`.
 
@@ -169,6 +170,18 @@ Unknown adapter exceptions are wrapped into `StepExecutionError` inside `Adapter
   - explicit provider selection
   - explicit failure/fallback behavior
   - narrow smoke/evidence validation
+
+#### Wave 3 Step 1 (`R3-M`) implementation shape
+
+- acceptance anchor is locked to `h1.single.v1`
+- validation uses fake-transport evidence for adapter behavior (no live network smoke claim)
+- adapter enforces JSON-object-only response parsing and fails loudly on malformed/non-JSON responses
+- adapter does not repair workflow semantics:
+  - no invented fields
+  - no key-rename repair
+  - no semantic rescue fallback
+- `mock` remains default-safe path and no silent fallback-to-mock is allowed
+- delivery note: `docs/wave3/Wave3-W3-SB-TrackD-R3-M-OpenRouter-Adapter-MVP.md`
 
 ### Wave 4
 
