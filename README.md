@@ -142,17 +142,23 @@ This is a future-facing direction, but it is being grounded as an engineering pr
 
 ## Current Focus
 
-The project has finished Wave 1 core closeout and is entering Wave 2 engine hardening.
+The project is in Wave 3 mainline closeout (`W3-S3`) with docs-first presentation packaging
+on top of already delivered memory/viewer/comparison foundations.
 
-The immediate focus is on:
+Current packaging posture:
 
-- hardening state, trace, and replay contracts
-- making smoke/eval claims more trustworthy
-- preparing H2 project decomposition on top of the stabilized H1 family
-- introducing the first observational identity-layer implementation carefully
-- keeping the coding vertical and real-provider work in scoped, non-blocking lanes
+- H1 evidence is replay-backed historical evidence
+- H2 current corpus is explicitly not comparison-ready (`comparison_ready: false`)
+- H3 evidence is single-run validated/manual-rubric-backed evidence
+- M2 project-memory evidence is not demonstrated on the current curated run set
 
-An emergent identity subsystem has also been designed, but implementation is intentionally phased in later so the core runtime does not destabilize too early.
+Current presentation layer remains CLI-first:
+
+- `trace list` supports multi-run browse/navigation
+- `trace show` supports strict single-run drill-down
+
+These trace commands are explanatory visibility surfaces, not canonical evidence truth by
+themselves.
 
 ---
 
@@ -306,6 +312,13 @@ PowerShell:
 ```powershell
 $env:PYTHONPATH='src'; python -m fractal_agent_lab.cli trace list --format text
 ```
+
+Note:
+
+- exact curated run-id walkthroughs are maintained in wave delivery docs because they
+  depend on operator-local `data/` artifacts
+- `data/` is a local runtime surface (gitignored), so exact artifact availability is not
+  guaranteed across all clones
 
 ### Run the current tests
 

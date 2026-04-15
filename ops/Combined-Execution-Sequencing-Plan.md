@@ -1029,7 +1029,7 @@ Epics:
 - ✅ **R3-I** Project memory v1 (M2) for stable decisions and workflow learnings — **Owner: Track C**
 - ✅ **R3-J** trace viewer improvements for multi-workflow browsing — **Owner: Track A**
 - ✅ **R3-K** compare multiple runs/variants for H1/H2 — **Owner: Track E**
-- 🔄 **R3-L** portfolio-quality example runs documented — **Owner: Track A + Track E**
+- ✅ **R3-L** portfolio-quality example runs documented — **Owner: Track A + Track E**
 
 **Sequential ordering:**
 1. R3-I, R3-J, R3-K can proceed in parallel (independent streams)
@@ -1065,11 +1065,11 @@ Status note:
 |---------|---------|--------|-------|
 | Track E agent session | ✅ R3-L (evidence curation) | R3-I ✅ + R3-J ✅ + R3-K ✅ | Curated evidence published with honest current-state truth (`H1` replay-backed historical green, `H2` current corpus not comparison-ready, `H3` single-run validated/manual-rubric-backed) |
 
-**⬜ Step 3 — Track A packages the portfolio-facing presentation layer**
+**✅ Step 3 — Track A packages the portfolio-facing presentation layer**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track A agent session | R3-L (presentation packaging) | R3-L evidence curation ✅ | Viewer/narrative packaging should reflect validated examples, not invented showcase material |
+| Track A agent session | ✅ R3-L (presentation packaging) | R3-L evidence curation ✅ | Track A delivered docs-first packaging with bounded README refresh, explicit disclosure, and no new presentation command |
 
 #### Wave 3 side batch — First real-provider MVP
 
@@ -1425,7 +1425,7 @@ The immediate mainline frontier is now:
 - `W3-S2` Step 4 is complete (`R3-H` finalize ✅).
 - `W3-S3` Step 1 is complete (`R3-I` ✅ + `R3-J` ✅ + `R3-K` ✅).
 - `W3-S3` Step 2 is complete (`R3-L` evidence curation ✅).
-- `W3-S3` Step 3 is now open (`R3-L` presentation packaging).
+- `W3-S3` Step 3 is complete (`R3-L` presentation packaging ✅).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
@@ -1472,9 +1472,8 @@ Status note:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. `Track A agent session` for `W3-S3` Step 3 / `⬜ R3-L` (presentation packaging)
-2. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
-3. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
+1. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
+2. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`
@@ -1855,6 +1854,8 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-14][Track E] R3-K completed (🔄 -> ✅) - Track E delivered `R3-K` via `docs/wave3/Wave3-W3-S3-TrackE-R3-K-H1-H2-Comparison-v1.md`, added H2 compare contracts/projections/report+script with fail-loud tests, and left W3-S3 Step 1 in progress while `R3-I` remains open.`
 - `[2026-04-14][Track C] R3-I completed (⬜ -> ✅) - Track C delivered project-memory v1 (`M2`) with explicit `project_id`-keyed canonical store (`data/memory/projects/<project_id>.json`), additive project-memory context loading, and non-fatal post-run updater flow for successful `h2.manager.v1`/`h3.manager.v1` runs, with deterministic anti-noise merge/dedupe and explicit canonical-vs-sidecar separation.`
 - `[2026-04-14][Track E] R3-L evidence curation completed (⬜ -> ✅ Track E Step 2 scope) - Track E published `docs/wave3/Wave3-W3-S3-TrackE-R3-L-Evidence-Curation-v1.md` plus explicit-run-id helper/script/tests (`r3_l_evidence_curation`) with disclosure and schema-version-labeled curated manifest; bounded H2 current-corpus sweep truth is explicit (`comparison_ready: false`), H1 is labeled replay-backed historical evidence, and M2 remains not demonstrated for selected runs - next: Track A executes W3-S3 Step 3 presentation packaging.`
+- `[2026-04-14][Track A] R3-L presentation packaging started (⬜ -> 🔄) - Track A opened W3-S3 Step 3 in docs-first mode to package Track E curated evidence truth with bounded README updates and explicit disclosure requirements - next: publish Track A R3-L packaging delivery doc and close coordination surfaces.`
+- `[2026-04-14][Track A] R3-L presentation packaging completed (🔄 -> ✅) - Track A published `docs/wave3/Wave3-W3-S3-TrackA-R3-L-Presentation-Packaging.md`, refreshed README current-focus/presentation wording with local-data boundedness, and completed W3-S3 Step 3 without introducing a new CLI presentation command.`
 
 ---
 

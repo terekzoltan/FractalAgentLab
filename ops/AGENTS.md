@@ -148,7 +148,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - trace is explorable enough to debug failures
 - CLI/export surfaces stay aligned with current runtime/eval semantics for exposed workflows
 
-**Status:** `🔄 in progress` (Wave 3 `W3-S3` Step 1 `R3-J` and Step 2 Track E evidence curation are complete; Track A now owns open Step 3 `R3-L` presentation packaging)
+**Status:** `🔄 in progress` (Wave 3 `W3-S3` Step 1 `R3-J`, Step 2 Track E evidence curation, and Step 3 Track A presentation packaging are complete in docs-first mode; next Track A mainline action follows Combined frontier)
 
 ---
 
@@ -1085,6 +1085,8 @@ Entries:
 - `[2026-04-14][Track A] R3-J completed (🔄 -> ✅) - Track A shipped multi-workflow trace browsing via `trace list` with workflow/status filters, row-level degrade warnings for broken artifact rows, and preserved fail-loud `trace show` semantics, with regression coverage in tests/cli/test_r3_j_trace_browser.py.`
 - `[2026-04-14][Track C] R3-I completed (⬜ -> ✅) - Track C delivered project-memory v1 (`M2`) with explicit `project_id`-keyed canonical store (`data/memory/projects/<project_id>.json`), additive project-memory context loading, and non-fatal post-run updater flow for successful `h2.manager.v1`/`h3.manager.v1` runs, with deterministic anti-noise merge/dedupe and explicit canonical-vs-sidecar separation.`
 - `[2026-04-14][Track E] R3-L evidence curation completed (⬜ -> ✅ Track E Step 2 scope) - Track E delivered `docs/wave3/Wave3-W3-S3-TrackE-R3-L-Evidence-Curation-v1.md` and explicit-run-id helper/script/tests (`r3_l_evidence_curation`) with disclosure and schema-version-labeled curated manifest; bounded H2 current-corpus sweep truth is explicit (`comparison_ready: false`), H1 is marked replay-backed historical evidence, and M2 remains not demonstrated on selected runs - next: Track A executes W3-S3 Step 3 presentation packaging.`
+- `[2026-04-14][Track A] R3-L presentation packaging started (⬜ -> 🔄) - Track A opened W3-S3 Step 3 as docs-first packaging against Track E curated evidence, with explicit disclosure and bounded README framing requirements - next: publish Track A delivery doc and synchronize coordination closeout.`
+- `[2026-04-14][Track A] R3-L presentation packaging completed (🔄 -> ✅) - Track A delivered `docs/wave3/Wave3-W3-S3-TrackA-R3-L-Presentation-Packaging.md`, refreshed README with bounded current-presentation wording, and preserved trace surfaces as explanatory navigation (not canonical evidence truth).`
 
 ---
 
