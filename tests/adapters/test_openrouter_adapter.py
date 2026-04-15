@@ -89,8 +89,30 @@ class OpenRouterAdapterTests(unittest.TestCase):
             transport=fake_transport,
         )
 
-        with self.assertRaises(StepExecutionError):
+        with self.assertRaises(StepExecutionError) as raised:
             adapter.execute_step(_request())
+
+        self.assertTrue(raised.exception.details["fallback_eligible"])
+        self.assertEqual("http_status", raised.exception.details["failure_stage"])
+
+    def test_client_error_status_is_not_fallback_eligible(self) -> None:
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            return 400, "bad request"
+
+        adapter = OpenRouterAdapter(
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=fake_transport,
+        )
+
+        with self.assertRaises(StepExecutionError) as raised:
+            adapter.execute_step(_request())
+
+        self.assertFalse(raised.exception.details["fallback_eligible"])
+        self.assertEqual(400, raised.exception.details["status_code"])
 
     def test_real_http_error_uses_non_success_status_path(self) -> None:
         adapter = OpenRouterAdapter(environment={"OPENROUTER_API_KEY": "secret"})
@@ -108,6 +130,7 @@ class OpenRouterAdapterTests(unittest.TestCase):
 
         self.assertEqual("OpenRouter returned a non-success status.", str(raised.exception))
         self.assertEqual(503, raised.exception.details["status_code"])
+        self.assertTrue(raised.exception.details["fallback_eligible"])
 
     def test_invalid_envelope_json_raises_step_execution_error(self) -> None:
         def fake_transport(*, url, headers, payload, timeout_seconds):
@@ -122,8 +145,11 @@ class OpenRouterAdapterTests(unittest.TestCase):
             transport=fake_transport,
         )
 
-        with self.assertRaises(StepExecutionError):
+        with self.assertRaises(StepExecutionError) as raised:
             adapter.execute_step(_request())
+
+        self.assertFalse(raised.exception.details["fallback_eligible"])
+        self.assertEqual("response_envelope", raised.exception.details["failure_stage"])
 
     def test_missing_first_choice_raises_step_execution_error(self) -> None:
         def fake_transport(*, url, headers, payload, timeout_seconds):
@@ -138,8 +164,11 @@ class OpenRouterAdapterTests(unittest.TestCase):
             transport=fake_transport,
         )
 
-        with self.assertRaises(StepExecutionError):
+        with self.assertRaises(StepExecutionError) as raised:
             adapter.execute_step(_request())
+
+        self.assertFalse(raised.exception.details["fallback_eligible"])
+        self.assertEqual("response_content", raised.exception.details["failure_stage"])
 
     def test_missing_message_mapping_raises_step_execution_error(self) -> None:
         def fake_transport(*, url, headers, payload, timeout_seconds):
@@ -190,6 +219,8 @@ class OpenRouterAdapterTests(unittest.TestCase):
             adapter.execute_step(_request())
 
         self.assertEqual("OpenRouter request failed.", str(raised.exception))
+        self.assertTrue(raised.exception.details["fallback_eligible"])
+        self.assertEqual("transport", raised.exception.details["failure_stage"])
 
     def test_invalid_content_json_raises_step_execution_error(self) -> None:
         def fake_transport(*, url, headers, payload, timeout_seconds):
@@ -222,6 +253,21 @@ class OpenRouterAdapterTests(unittest.TestCase):
 
         with self.assertRaises(StepExecutionError):
             adapter.execute_step(_request())
+
+    def test_non_json_serializable_request_payload_raises_step_execution_error(self) -> None:
+        adapter = OpenRouterAdapter(
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=_unused_transport,
+        )
+        request = _request()
+        request.input_payload = {"idea": object()}
+
+        with self.assertRaises(StepExecutionError) as raised:
+            adapter.execute_step(request)
+
+        self.assertEqual("OpenRouter request payload is not JSON-serializable.", str(raised.exception))
+        self.assertFalse(raised.exception.details["fallback_eligible"])
+        self.assertEqual("request_payload", raised.exception.details["failure_stage"])
 
 
 def _request() -> AdapterStepRequest:

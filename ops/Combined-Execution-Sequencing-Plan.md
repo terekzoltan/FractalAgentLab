@@ -1132,12 +1132,12 @@ Meaning:
 |---------|---------|--------|-------|
 | Track D agent session | ✅ R3-M | H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ | OpenRouter adapter MVP delivered with `h1.single.v1` anchor, strict JSON-object parse/fail-loud behavior, requested-vs-response model inspectability, and fake-transport proof only |
 
-**⬜ Step 2 — routing policy and failure semantics harden in parallel**
+**✅ Step 2 — routing policy and failure semantics harden in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent session | R3-N | R3-M ✅ | Keep provider selection explicit and inspectable |
-| Track D agent session | R3-O | R3-M ✅ | Fallback should stay conservative and legible, not magical |
+| Track D agent session | ✅ R3-N | R3-M ✅ | Provider-selection truth source hardened to explicit `mock`/`openrouter` policy and reused by CLI override path |
+| Track D agent session | ✅ R3-O | R3-M ✅ + R3-N ✅ | Conservative fallback policy shipped as explicit single-attempt `openrouter -> mock` behavior only for recoverable provider failures |
 
 **⬜ Step 3 — Track B reviews the boundary while Track E validates the path**
 
@@ -1427,6 +1427,8 @@ The immediate mainline frontier is now:
 - `W3-S3` Step 2 is complete (`R3-L` evidence curation ✅).
 - `W3-S3` Step 3 is complete (`R3-L` presentation packaging ✅).
 - Wave 3 side batch Step 1 is complete (`R3-M` ✅ with `h1.single.v1` anchor).
+- Wave 3 side batch Step 2 is complete (`R3-N` ✅ + `R3-O` ✅).
+- Wave 3 side batch Step 3 is now open (`R3-O` Track B boundary review + `R3-P` Track E smoke/evidence path).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
@@ -1859,6 +1861,10 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-14][Track A] R3-L presentation packaging completed (🔄 -> ✅) - Track A published `docs/wave3/Wave3-W3-S3-TrackA-R3-L-Presentation-Packaging.md`, refreshed README current-focus/presentation wording with local-data boundedness, and completed W3-S3 Step 3 without introducing a new CLI presentation command.`
 - `[2026-04-15][Track D] R3-M started (⬜ -> 🔄) - Track D opened Wave 3 side-batch Step 1 with explicit scope lock (`h1.single.v1` anchor only), provider-boundary-only adapter changes, and fake-transport proof guardrail - next: implement OpenRouterAdapter MVP with strict JSON-object parse/fail-loud behavior and no semantic repair fallback.`
 - `[2026-04-15][Track D] R3-M completed (🔄 -> ✅) - Track D delivered OpenRouterAdapter MVP config plumbing + strict JSON-object-only normalization with requested-vs-response model inspectability, validated real `HTTPError` plus envelope/content negative paths and `h1.single.v1` fake-transport integration proof, and published a dedicated Wave 3 delivery doc for downstream `R3-N/R3-O/R3-P` sequencing.`
+- `[2026-04-15][Track D] R3-N started (⬜ -> 🔄) - Track D opened Wave 3 side-batch Step 2 with explicit routing-policy-v1 scope (`mock`/`openrouter` only) so provider selection truth is canonical before `R3-O` failure/fallback work - next: remove implicit first-enabled routing and align CLI override handling to the same provider-policy source.`
+- `[2026-04-15][Track D] R3-N completed (🔄 -> ✅) - Track D shipped explicit routing policy v1 with `mock`/`openrouter` bounded targets, removed implicit first-enabled routing, and aligned CLI `--provider` override to the same canonical policy source while preserving inspectable selection metadata in step raw output.`
+- `[2026-04-15][Track D] R3-O started (⬜ -> 🔄) - Track D opened conservative failure/fallback hardening on top of `R3-N` routing law with explicit policy gates (`none` default, `conservative_mock` opt-in) and strict no-runtime-redesign guardrails.`
+- `[2026-04-15][Track D] R3-O completed (🔄 -> ✅) - Track D delivered single-attempt `openrouter -> mock` conservative fallback only for recoverable provider failures, kept router as selection-only truth, and added provider-attempt/fallback inspectability in step raw + failure details with bounded adapter/CLI tests and Wave 3 delivery documentation.`
 
 ---
 

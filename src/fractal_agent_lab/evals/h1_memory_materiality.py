@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from fractal_agent_lab.adapters import build_step_runner
+from fractal_agent_lab.adapters.routing import apply_provider_override as apply_provider_override_policy
 from fractal_agent_lab.agents import build_h1_prompt_tags
 from fractal_agent_lab.cli.config_loader import build_runtime_limits, load_run_configs, resolve_data_dir
 from fractal_agent_lab.cli.workflow_registry import get_workflow_agent_specs, get_workflow_spec
@@ -46,6 +47,7 @@ def run_h2_l_h1_memory_materiality(
         raise ValueError("session_id must be a non-empty string.")
     if not isinstance(session_memory_payload, dict) or not session_memory_payload:
         raise ValueError("session_memory_payload must be a non-empty JSON object.")
+    _assert_mock_only_provider(provider)
 
     runtime_config, providers_config, model_policy_config = load_run_configs(
         runtime_config_path=runtime_config_path,
@@ -450,17 +452,15 @@ def _inject_h1_prompt_tags(*, run_state, workflow, workflow_agent_specs) -> None
 
 
 def _apply_provider_override(providers_config: dict[str, Any], provider: str) -> None:
-    providers_config["default_provider"] = provider
-    providers = providers_config.get("providers")
-    if not isinstance(providers, dict):
-        providers = {}
-        providers_config["providers"] = providers
+    apply_provider_override_policy(providers_config, provider)
 
-    provider_block = providers.get(provider)
-    if not isinstance(provider_block, dict):
-        provider_block = {}
-        providers[provider] = provider_block
-    provider_block["enabled"] = True
+
+def _assert_mock_only_provider(provider: str) -> None:
+    normalized = provider.strip().lower()
+    if normalized != "mock":
+        raise ValueError(
+            "run_h2_l_h1_memory_materiality remains mock-only in Wave 3; real-provider H1 evidence is deferred to R3-P.",
+        )
 
 
 def _nested_dict(payload: Any, *keys: str) -> dict[str, Any]:

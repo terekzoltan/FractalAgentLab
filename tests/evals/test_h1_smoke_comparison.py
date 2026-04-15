@@ -103,6 +103,13 @@ class H1SmokeComparisonTests(unittest.TestCase):
             ),
         )
 
+    def test_real_provider_override_is_rejected_in_wave3_scope(self) -> None:
+        with self.assertRaises(ValueError):
+            run_h1_smoke_comparison(
+                input_payload={"idea": "AI founder assistant for startup idea refinement"},
+                provider="openrouter",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -65,37 +65,35 @@ class OpenRouterAdapter:
                 timeout_seconds=timeout_seconds,
             )
         except URLError as error:
-            raise StepExecutionError(
+            raise _step_failure(
                 "OpenRouter request failed.",
-                details={
-                    "provider": self.name,
-                    "workflow_id": request.workflow_id,
-                    "step_id": request.step_id,
-                    "error_type": type(error).__name__,
-                    "error": str(error),
-                },
+                provider=self.name,
+                workflow_id=request.workflow_id,
+                step_id=request.step_id,
+                error=error,
+                fallback_eligible=True,
+                failure_stage="transport",
             ) from error
         except OSError as error:
-            raise StepExecutionError(
+            raise _step_failure(
                 "OpenRouter transport failed.",
-                details={
-                    "provider": self.name,
-                    "workflow_id": request.workflow_id,
-                    "step_id": request.step_id,
-                    "error_type": type(error).__name__,
-                    "error": str(error),
-                },
+                provider=self.name,
+                workflow_id=request.workflow_id,
+                step_id=request.step_id,
+                error=error,
+                fallback_eligible=True,
+                failure_stage="transport",
             ) from error
 
         if status_code < 200 or status_code >= 300:
-            raise StepExecutionError(
+            raise _step_failure(
                 "OpenRouter returned a non-success status.",
-                details={
-                    "provider": self.name,
-                    "workflow_id": request.workflow_id,
-                    "step_id": request.step_id,
-                    "status_code": status_code,
-                },
+                provider=self.name,
+                workflow_id=request.workflow_id,
+                step_id=request.step_id,
+                status_code=status_code,
+                fallback_eligible=_is_recoverable_http_status(status_code),
+                failure_stage="http_status",
             )
 
         response = _parse_json_object(
@@ -104,6 +102,7 @@ class OpenRouterAdapter:
             workflow_id=request.workflow_id,
             step_id=request.step_id,
             error_message="OpenRouter returned invalid JSON envelope.",
+            failure_stage="response_envelope",
         )
 
         content_text = _extract_content_text(
@@ -118,6 +117,7 @@ class OpenRouterAdapter:
             workflow_id=request.workflow_id,
             step_id=request.step_id,
             error_message="OpenRouter content is not valid JSON.",
+            failure_stage="response_content",
         )
 
         response_model = response.get("model")
@@ -209,11 +209,17 @@ class OpenRouterAdapter:
             "context": request.context,
             "agent_metadata": request.agent_metadata,
         }
+        content = _serialize_user_payload(
+            user_payload,
+            provider=self.name,
+            workflow_id=request.workflow_id,
+            step_id=request.step_id,
+        )
         return [
             {"role": "system", "content": system_instruction},
             {
                 "role": "user",
-                "content": json.dumps(user_payload, ensure_ascii=True, sort_keys=True, default=str),
+                "content": content,
             },
         ]
 
@@ -244,29 +250,29 @@ def _parse_json_object(
     workflow_id: str,
     step_id: str,
     error_message: str,
+    failure_stage: str,
 ) -> dict[str, Any]:
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError as error:
-        raise StepExecutionError(
+        raise _step_failure(
             error_message,
-            details={
-                "provider": provider,
-                "workflow_id": workflow_id,
-                "step_id": step_id,
-                "error_type": type(error).__name__,
-                "error": str(error),
-            },
+            provider=provider,
+            workflow_id=workflow_id,
+            step_id=step_id,
+            error=error,
+            fallback_eligible=False,
+            failure_stage=failure_stage,
         ) from error
     if not isinstance(parsed, dict):
-        raise StepExecutionError(
+        raise _step_failure(
             error_message,
-            details={
-                "provider": provider,
-                "workflow_id": workflow_id,
-                "step_id": step_id,
-                "error": "JSON root must be an object.",
-            },
+            provider=provider,
+            workflow_id=workflow_id,
+            step_id=step_id,
+            fallback_eligible=False,
+            failure_stage=failure_stage,
+            details={"error": "JSON root must be an object."},
         )
     return parsed
 
@@ -280,21 +286,33 @@ def _extract_content_text(
 ) -> str:
     choice = _first_choice(response)
     if not isinstance(choice, Mapping):
-        raise StepExecutionError(
+        raise _step_failure(
             "OpenRouter response is missing a valid first choice.",
-            details={"provider": provider, "workflow_id": workflow_id, "step_id": step_id},
+            provider=provider,
+            workflow_id=workflow_id,
+            step_id=step_id,
+            fallback_eligible=False,
+            failure_stage="response_content",
         )
     message = choice.get("message")
     if not isinstance(message, Mapping):
-        raise StepExecutionError(
+        raise _step_failure(
             "OpenRouter response choice is missing message content.",
-            details={"provider": provider, "workflow_id": workflow_id, "step_id": step_id},
+            provider=provider,
+            workflow_id=workflow_id,
+            step_id=step_id,
+            fallback_eligible=False,
+            failure_stage="response_content",
         )
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
-        raise StepExecutionError(
+        raise _step_failure(
             "OpenRouter response message content must be a non-empty string.",
-            details={"provider": provider, "workflow_id": workflow_id, "step_id": step_id},
+            provider=provider,
+            workflow_id=workflow_id,
+            step_id=step_id,
+            fallback_eligible=False,
+            failure_stage="response_content",
         )
     return content
 
@@ -307,3 +325,57 @@ def _first_choice(response: Mapping[str, Any]) -> Mapping[str, Any] | None:
     if isinstance(first, Mapping):
         return first
     return None
+
+
+def _is_recoverable_http_status(status_code: int) -> bool:
+    return status_code == 429 or status_code >= 500
+
+
+def _serialize_user_payload(
+    payload: Mapping[str, Any],
+    *,
+    provider: str,
+    workflow_id: str,
+    step_id: str,
+) -> str:
+    try:
+        return json.dumps(payload, ensure_ascii=True, sort_keys=True)
+    except (TypeError, ValueError) as error:
+        raise _step_failure(
+            "OpenRouter request payload is not JSON-serializable.",
+            provider=provider,
+            workflow_id=workflow_id,
+            step_id=step_id,
+            error=error,
+            fallback_eligible=False,
+            failure_stage="request_payload",
+        ) from error
+
+
+def _step_failure(
+    message: str,
+    *,
+    provider: str,
+    workflow_id: str,
+    step_id: str,
+    fallback_eligible: bool,
+    failure_stage: str,
+    error: Exception | None = None,
+    status_code: int | None = None,
+    details: Mapping[str, Any] | None = None,
+) -> StepExecutionError:
+    merged_details: dict[str, Any] = {
+        "provider": provider,
+        "workflow_id": workflow_id,
+        "step_id": step_id,
+        "fallback_eligible": fallback_eligible,
+        "failure_stage": failure_stage,
+    }
+    if error is not None:
+        merged_details["error_type"] = type(error).__name__
+        merged_details["error"] = str(error)
+    if status_code is not None:
+        merged_details["status_code"] = status_code
+    if isinstance(details, Mapping):
+        merged_details.update(details)
+    return StepExecutionError(message, details=merged_details)

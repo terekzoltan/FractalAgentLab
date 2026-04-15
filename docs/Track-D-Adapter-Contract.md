@@ -2,7 +2,8 @@
 
 ## Purpose
 
-This note defines the Wave 0 adapter boundary implemented by Track D for `F0-F` and `F0-I`.
+This note defines the Track D adapter boundary from Wave 0 foundations through the current
+Wave 3 side-batch policy state.
 
 It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
@@ -10,9 +11,9 @@ It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
 ## Wave
 
-- Current wave: Wave 0
-- Scope: `F0-F` minimal adapter path + `F0-I` config/provider selection shell
-- Out of scope: full provider parity, local model runtime, advanced tool/handoff bridges
+- Current frontier: Wave 3 side-batch Step 3 (`R3-O` Track B boundary review + `R3-P` Track E smoke/evidence)
+- Current scope: `R3-M` + `R3-N` + `R3-O` delivered as bounded Wave 3 provider policy stack
+- Out of scope: full provider parity, local-model runtime, advanced tool/handoff bridges, Wave 4 hardening
 
 ---
 
@@ -52,7 +53,7 @@ Core objects:
 
 ---
 
-## Implemented Providers in Wave 0
+## Implemented Providers
 
 - `MockAdapter` (active)
   - path: `src/fractal_agent_lab/adapters/mock/adapter.py`
@@ -69,11 +70,12 @@ Core objects:
   - supports one bounded real-provider path for `h1.single.v1`
   - strict JSON-object-only parse/fail-loud behavior remains MVP-scoped, not parity-complete
 
-Wave 0 default fallback route is `mock`.
+Safe default route remains `mock`.
+No silent provider fallback is allowed unless explicit fallback policy enables it.
 
 ---
 
-## Provider and Model Routing (v0)
+## Provider and Model Routing (Wave 3 policy v1)
 
 Routing helper lives in:
 
@@ -84,12 +86,29 @@ Input config sources:
 - `configs/providers.example.yaml`
 - `configs/model_policy.example.yaml`
 
-Resolution order:
+Wave 3 supported routing targets:
 
-1. `AgentSpec.metadata["provider"]` when enabled
-2. `providers_config.default_provider` when enabled
-3. first enabled provider in priority order (`openrouter`, `openai`, `local`, `mock`)
-4. fallback `mock`
+- `mock`
+- `openrouter`
+
+Example config in Wave 3 only advertises these bounded targets.
+
+Provider resolution order (`explicit_v1`):
+
+1. `AgentSpec.metadata["provider"]` when valid + enabled
+2. `providers_config.default_provider` when valid + enabled
+3. implicit safe default: `mock`
+
+Guardrails:
+
+- no `first enabled provider wins` behavior
+- `openai` and `local` are not Wave 3 routing targets
+- unsupported or disabled explicit selections fail loudly
+
+Fallback policy values:
+
+- default: `none`
+- opt-in: `conservative_mock`
 
 Model selection order:
 
@@ -129,10 +148,13 @@ Runtime controls read from config shell:
 
 Provider override behavior:
 
-- sets `default_provider`
-- force-enables the selected provider in config view for that run
+- uses the same provider-policy source as router selection
+- rejects unsupported targets (Wave 3: only `mock` and `openrouter`)
+- sets `default_provider` to the validated target
+- may enable the validated provider entry (`openrouter`) for that run
 
-This keeps provider selection at the adapter/config boundary, not in core workflow logic.
+This keeps provider selection at the adapter/config boundary, not in core workflow logic,
+and avoids CLI-vs-router policy drift.
 
 ---
 
@@ -144,6 +166,9 @@ Track D adapter path uses Track B runtime error vocabulary:
 - `StepExecutionError`
 
 Unknown adapter exceptions are wrapped into `StepExecutionError` inside `AdapterStepRunner`.
+
+When fallback policy is active, `AdapterStepRunner` also annotates provider-attempt context
+(`provider_attempts`, selected provider metadata, fallback policy/result) so failure paths remain inspectable.
 
 ---
 
@@ -182,6 +207,28 @@ Unknown adapter exceptions are wrapped into `StepExecutionError` inside `Adapter
   - no semantic rescue fallback
 - `mock` remains default-safe path and no silent fallback-to-mock is allowed
 - delivery note: `docs/wave3/Wave3-W3-SB-TrackD-R3-M-OpenRouter-Adapter-MVP.md`
+
+#### Wave 3 Step 2A (`R3-N`) implementation shape
+
+- router is the canonical provider-selection truth source
+- Wave 3 targets are bounded to `mock` and `openrouter`
+- selection mode is explicit (`explicit_v1`)
+- no `first enabled provider wins` behavior
+- CLI `--provider` override reuses the same policy source and does not create a second routing law
+
+#### Wave 3 Step 2B (`R3-O`) implementation shape
+
+- default fallback policy remains `none`
+- only explicit opt-in enables `conservative_mock`
+- conservative fallback is bounded to:
+  - single attempt
+  - `openrouter -> mock` only
+  - same request payload
+  - recoverable provider failures only
+- fallback execution point is `AdapterStepRunner`; router is not a fallback engine
+- fallback and provider-attempt behavior must stay inspectable in step `raw` and failure details
+- existing H1 compare/materiality eval surfaces remain mock-only until `R3-P`; shared override helpers do not widen real-provider evidence scope by themselves
+- delivery note: `docs/wave3/Wave3-W3-SB-TrackD-R3-N-R3-O-Routing-and-Failure-Policy-v1.md`
 
 ### Wave 4
 

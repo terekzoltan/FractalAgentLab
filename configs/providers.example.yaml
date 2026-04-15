@@ -1,11 +1,10 @@
 default_provider: mock
 
+routing:
+  selection_mode: explicit_v1
+  fallback_policy: none
+
 providers:
-  openai:
-    enabled: false
-    api_key_env: OPENAI_API_KEY
   openrouter:
     enabled: false
     api_key_env: OPENROUTER_API_KEY
-  local:
-    enabled: false

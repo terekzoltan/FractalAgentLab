@@ -6,6 +6,7 @@ import sys
 from typing import Any
 
 from fractal_agent_lab.adapters import build_step_runner
+from fractal_agent_lab.adapters.routing import apply_provider_override
 from fractal_agent_lab.agents import build_h1_prompt_tags
 from fractal_agent_lab.cli.config_loader import (
     build_runtime_limits,
@@ -85,7 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--provider",
         default=None,
-        help="Optional provider override (e.g. mock, openai, openrouter)",
+        help="Optional provider override (Wave 3: mock or openrouter)",
     )
 
     trace_parser = subparsers.add_parser("trace", help="Inspect stored run traces")
@@ -179,7 +180,7 @@ def _handle_run(args: argparse.Namespace) -> int:
             providers_config_path=args.providers_config,
             model_policy_config_path=args.model_policy_config,
         )
-        _apply_provider_override(providers_config, args.provider)
+        apply_provider_override(providers_config, args.provider)
         limits = build_runtime_limits(runtime_config)
     except ValueError as error:
         print(f"Error: {error}")
@@ -289,24 +290,6 @@ def _parse_input_payload(raw_input: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("--input-json must decode to a JSON object.")
     return value
-
-
-def _apply_provider_override(providers_config: dict[str, Any], provider: str | None) -> None:
-    if not provider:
-        return
-
-    providers_config["default_provider"] = provider
-
-    providers_block = providers_config.get("providers")
-    if not isinstance(providers_block, dict):
-        providers_block = {}
-        providers_config["providers"] = providers_block
-
-    provider_block = providers_block.get(provider)
-    if not isinstance(provider_block, dict):
-        provider_block = {}
-        providers_block[provider] = provider_block
-    provider_block["enabled"] = True
 
 
 def _inject_h1_prompt_tags(

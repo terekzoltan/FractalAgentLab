@@ -253,7 +253,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 3 side-batch Step 1 `R3-M` is now complete with an `h1.single.v1`-anchored OpenRouter MVP path and fake-transport proof; next Track D side-batch frontier is `R3-N`/`R3-O`, while broader provider parity/routing hardening still belongs to Wave 4)
+**Status:** `🔄 in progress` (Wave 3 side-batch Step 1 `R3-M` and Step 2 `R3-N` + `R3-O` are complete on Track D scope; next dependency is Track B `R3-O` boundary review, then Track E `R3-P` smoke/evidence path, while broader provider parity/routing hardening still belongs to Wave 4)
 
 ---
 
@@ -1089,6 +1089,10 @@ Entries:
 - `[2026-04-14][Track A] R3-L presentation packaging completed (🔄 -> ✅) - Track A delivered `docs/wave3/Wave3-W3-S3-TrackA-R3-L-Presentation-Packaging.md`, refreshed README with bounded current-presentation wording, and preserved trace surfaces as explanatory navigation (not canonical evidence truth).`
 - `[2026-04-15][Track D] R3-M started (⬜ -> 🔄) - Track D opened Wave 3 side-batch Step 1 with explicit scope lock (`h1.single.v1` acceptance anchor only), provider-boundary-only changes, and fake-transport proof guardrail - next: implement OpenRouterAdapter MVP with strict JSON-object-only parse/fail-loud behavior and no semantic-repair fallback.`
 - `[2026-04-15][Track D] R3-M completed (🔄 -> ✅) - Track D delivered OpenRouterAdapter MVP config plumbing plus strict JSON-object-only normalization (no key repair, no silent mock fallback, no hidden default model), preserved requested-vs-response model inspectability, validated real `HTTPError`/envelope/content negative paths plus `h1.single.v1` fake-transport integration proof, and published a separate Wave 3 delivery note for downstream `R3-N`/`R3-O`/`R3-P` consumers.`
+- `[2026-04-15][Track D] R3-N started (⬜ -> 🔄) - Track D opened Wave 3 side-batch Step 2 with explicit routing-policy-v1 scope (`mock`/`openrouter` only) so provider-selection truth is canonical before `R3-O` failure/fallback work - next: remove implicit first-enabled routing and align CLI override handling to the same provider-policy source.`
+- `[2026-04-15][Track D] R3-N completed (🔄 -> ✅) - Track D shipped explicit routing policy v1 with bounded Wave 3 targets (`mock`/`openrouter`), removed implicit first-enabled routing, and aligned CLI `--provider` override to the same canonical policy source while keeping selection metadata inspectable in step raw output.`
+- `[2026-04-15][Track D] R3-O started (⬜ -> 🔄) - Track D opened conservative failure/fallback hardening on top of `R3-N` routing law with explicit policy gates (`none` default, `conservative_mock` opt-in) and strict no-runtime-redesign guardrails.`
+- `[2026-04-15][Track D] R3-O completed (🔄 -> ✅) - Track D delivered single-attempt `openrouter -> mock` conservative fallback only for recoverable provider failures, kept router as selection-only truth, and added provider-attempt/fallback inspectability in step raw + failure details with bounded adapter/CLI test evidence and Wave 3 delivery documentation.`
 
 ---
 

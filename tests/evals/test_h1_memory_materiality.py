@@ -137,6 +137,15 @@ class H1MemoryMaterialityTests(unittest.TestCase):
                 session_id="thread-h2-l-empty-seed",
             )
 
+    def test_real_provider_override_is_rejected_in_wave3_scope(self) -> None:
+        with self.assertRaises(ValueError):
+            _ = run_h2_l_h1_memory_materiality(
+                input_payload={"idea": "x"},
+                session_memory_payload={"sticky": "x"},
+                session_id="thread-h2-l-openrouter",
+                provider="openrouter",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
