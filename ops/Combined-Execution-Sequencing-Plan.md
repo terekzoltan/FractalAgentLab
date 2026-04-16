@@ -1076,10 +1076,10 @@ Status note:
 **Owner priority:** Track D + Track E, with Track B boundary review
 
 Epics:
-- ⬜ **R3-M** OpenRouter adapter MVP for H1 — **Owner: Track D**
-- ⬜ **R3-N** provider routing policy v1 (`mock` / `openrouter` explicit selection) — **Owner: Track D**
-- ⬜ **R3-O** provider failure envelope + conservative fallback policy v1 — **Owner: Track D** (Track B reviews boundary)
-- ⬜ **R3-P** H1 real-provider smoke path and evidence note — **Owner: Track E + Track D**
+- ✅ **R3-M** OpenRouter adapter MVP for H1 — **Owner: Track D**
+- ✅ **R3-N** provider routing policy v1 (`mock` / `openrouter` explicit selection) — **Owner: Track D**
+- ✅ **R3-O** provider failure envelope + conservative fallback policy v1 — **Owner: Track D** (Track B reviews boundary)
+- ✅ **R3-P** H1 real-provider smoke path and evidence note — **Owner: Track E + Track D**
 
 **Sequential ordering:**
 1. `R3-M` first (one real adapter path must exist before routing/failure behavior can be validated)
@@ -1139,12 +1139,12 @@ Meaning:
 | Track D agent session | ✅ R3-N | R3-M ✅ | Provider-selection truth source hardened to explicit `mock`/`openrouter` policy and reused by CLI override path |
 | Track D agent session | ✅ R3-O | R3-M ✅ + R3-N ✅ | Conservative fallback policy shipped as explicit single-attempt `openrouter -> mock` behavior only for recoverable provider failures |
 
-**⬜ Step 3 — Track B reviews the boundary while Track E validates the path**
+**✅ Step 3 — Track B reviews the boundary while Track E validates the path**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent session | R3-O boundary review | R3-O implementation candidate ✅ | Confirm provider behavior does not pollute Track B canonical runtime contracts |
-| Track E agent session | R3-P | R3-N ✅ + R3-O ✅ | Prefer to reuse replay/smoke discipline if H2-E/H2-F exist, but do not overblock the first honest provider MVP |
+| Track B agent session | ✅ R3-O boundary review | R3-O implementation candidate ✅ | Track B boundary signoff completed: provider fallback/error semantics remain adapter-boundary behavior, and provider-specific details stay additive to generic runtime envelopes |
+| Track E agent session | ✅ R3-P | R3-N ✅ + R3-O ✅ + Track B `R3-O` signoff ✅ | Track E delivered bounded `h1.single.v1` + `openrouter` live+inspect smoke/evidence with canonical artifact-backed provider/fallback truth and explicit PASS law |
 
 ### Wave 3 risk note
 This is the first wave where the system may feel “smart enough” to overtrust.
@@ -1428,7 +1428,7 @@ The immediate mainline frontier is now:
 - `W3-S3` Step 3 is complete (`R3-L` presentation packaging ✅).
 - Wave 3 side batch Step 1 is complete (`R3-M` ✅ with `h1.single.v1` anchor).
 - Wave 3 side batch Step 2 is complete (`R3-N` ✅ + `R3-O` ✅).
-- Wave 3 side batch Step 3 is now open (`R3-O` Track B boundary review + `R3-P` Track E smoke/evidence path).
+- Wave 3 side batch Step 3 is complete (`R3-O` Track B boundary review ✅ + `R3-P` Track E smoke/evidence ✅).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
 - Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
 
@@ -1476,7 +1476,7 @@ Status note:
 If you want to know "which session do I run next?", use this order:
 
 1. optional side-vertical `CV1` work only if explicitly chosen, justified, and it does not slow mainline progress
-2. Wave 3 real-provider side batch remains optional in parallel, but not at mainline cost
+2. Wave 3 real-provider side-batch MVP (`R3-M` / `R3-N` / `R3-O` / `R3-P`) is complete; broader provider parity/routing hardening remains Wave 4 scope
 
 Reference:
 - `docs/wave1/Wave1-L1-L-H1-Decision-Log.md`
@@ -1865,6 +1865,7 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-15][Track D] R3-N completed (🔄 -> ✅) - Track D shipped explicit routing policy v1 with `mock`/`openrouter` bounded targets, removed implicit first-enabled routing, and aligned CLI `--provider` override to the same canonical policy source while preserving inspectable selection metadata in step raw output.`
 - `[2026-04-15][Track D] R3-O started (⬜ -> 🔄) - Track D opened conservative failure/fallback hardening on top of `R3-N` routing law with explicit policy gates (`none` default, `conservative_mock` opt-in) and strict no-runtime-redesign guardrails.`
 - `[2026-04-15][Track D] R3-O completed (🔄 -> ✅) - Track D delivered single-attempt `openrouter -> mock` conservative fallback only for recoverable provider failures, kept router as selection-only truth, and added provider-attempt/fallback inspectability in step raw + failure details with bounded adapter/CLI tests and Wave 3 delivery documentation.`
+- `[2026-04-16][Track E] R3-P completed (⬜ -> ✅ Track E Step 3 scope) - Track E delivered `docs/wave3/Wave3-W3-SB-TrackE-R3-P-H1-Real-Provider-Smoke-Evidence-v1.md` with bounded `h1.single.v1` + `openrouter` live+inspect evidence, implemented artifact-backed helper/script/tests (`r3_p_h1_real_provider_smoke`), and kept `track_e_evidence_ready` separate from `real_provider_smoke_passed` while reading provider/fallback truth directly from canonical run artifacts.`
 
 ---
 

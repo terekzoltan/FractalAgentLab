@@ -53,7 +53,7 @@ Conservative fallback behavior:
 - router remains selection-only (not fallback engine)
 - single attempt only
 - only `openrouter -> mock`
-- same request payload
+- same run/workflow/step/input/context payload, with fallback execution model unset (`model=None`) so top-level execution truth is not polluted by the original selected model
 - only recoverable provider failures
 
 Non-goal behaviors explicitly blocked:
@@ -107,7 +107,7 @@ Regression checks should include adjacent adapter paths (`h1/h2/h3` mock-manager
 
 ## Known Gaps / Next Step Inputs
 
-- `R3-O` still requires Track B boundary review confirmation (`R3-O boundary review` in Combined Step 3)
-- `R3-P` remains the downstream Track E smoke/evidence closeout
+- Track B `R3-O` boundary review confirmation is now complete (`docs/wave3/Wave3-W3-SB-TrackB-R3-O-Boundary-Review.md`)
+- `R3-P` downstream Track E smoke/evidence closeout is now delivered (`docs/wave3/Wave3-W3-SB-TrackE-R3-P-H1-Real-Provider-Smoke-Evidence-v1.md`)
 - existing `h1_smoke_comparison` / `h1_memory_materiality` eval surfaces remain mock-only in Wave 3 so the bounded `h1.single.v1` real-provider claim does not widen prematurely
 - OpenAI/local routing and broader parity hardening remain Wave 4 scope

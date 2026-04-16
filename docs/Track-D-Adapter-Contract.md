@@ -11,8 +11,8 @@ It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
 ## Wave
 
-- Current frontier: Wave 3 side-batch Step 3 (`R3-O` Track B boundary review + `R3-P` Track E smoke/evidence)
-- Current scope: `R3-M` + `R3-N` + `R3-O` delivered as bounded Wave 3 provider policy stack
+- Current frontier: Wave 3 side-batch MVP closeout (`R3-M` + `R3-N` + `R3-O` + `R3-P`) is complete
+- Current scope: bounded first real-provider MVP for `h1.single.v1` with explicit routing/fallback policy and Track E smoke/evidence note
 - Out of scope: full provider parity, local-model runtime, advanced tool/handoff bridges, Wave 4 hardening
 
 ---
@@ -223,11 +223,11 @@ When fallback policy is active, `AdapterStepRunner` also annotates provider-atte
 - conservative fallback is bounded to:
   - single attempt
   - `openrouter -> mock` only
-  - same request payload
+  - same run/workflow/step/input/context payload, with fallback execution model unset (`model=None`) so top-level execution truth stays provider-accurate
   - recoverable provider failures only
 - fallback execution point is `AdapterStepRunner`; router is not a fallback engine
 - fallback and provider-attempt behavior must stay inspectable in step `raw` and failure details
-- existing H1 compare/materiality eval surfaces remain mock-only until `R3-P`; shared override helpers do not widen real-provider evidence scope by themselves
+- existing H1 compare/materiality eval surfaces remain mock-only in Wave 3; `R3-P` adds a separate bounded `h1.single.v1` real-provider smoke/evidence surface without widening those evals
 - delivery note: `docs/wave3/Wave3-W3-SB-TrackD-R3-N-R3-O-Routing-and-Failure-Policy-v1.md`
 
 ### Wave 4

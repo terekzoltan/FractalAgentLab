@@ -183,7 +183,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - declared orchestration truth matches emitted runtime truth
 - structural workflow invariants are rejected before runtime when practical
 
-**Status:** `🔄 in progress` (Track B completed W2-S1 `H2-A` / `H2-B` / `H2-C` / `H2-D`, W2-S3 Step 1 `H2-H` / `H2-N`, W3-S1 Step 2 `R3-A` schema review, and W3-S2 Step 2 `R3-E` schema review; next likely Track B checkpoint is Wave 3 side-batch `R3-O` boundary review support)
+**Status:** `🔄 in progress` (Track B completed W2-S1 `H2-A` / `H2-B` / `H2-C` / `H2-D`, W2-S3 Step 1 `H2-H` / `H2-N`, W3-S1 Step 2 `R3-A` schema review, W3-S2 Step 2 `R3-E` schema review, and Wave 3 side-batch Step 3 `R3-O` boundary review; next likely Track B checkpoint is future shared-boundary review support as side-batch/mainline provider evidence evolves)
 
 ---
 
@@ -253,7 +253,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 3 side-batch Step 1 `R3-M` and Step 2 `R3-N` + `R3-O` are complete on Track D scope; next dependency is Track B `R3-O` boundary review, then Track E `R3-P` smoke/evidence path, while broader provider parity/routing hardening still belongs to Wave 4)
+**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; broader provider parity/routing hardening remains Wave 4 scope)
 
 ---
 
@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, and `W3-S3` Step 1 `R3-K` + Step 2 `R3-L` evidence curation are complete on Track E scope; next mainline action is Track A Step 3 packaging)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, and side-batch `R3-P` real-provider smoke/evidence closeout are complete on Track E scope)
 
 ---
 
@@ -1093,6 +1093,8 @@ Entries:
 - `[2026-04-15][Track D] R3-N completed (🔄 -> ✅) - Track D shipped explicit routing policy v1 with bounded Wave 3 targets (`mock`/`openrouter`), removed implicit first-enabled routing, and aligned CLI `--provider` override to the same canonical policy source while keeping selection metadata inspectable in step raw output.`
 - `[2026-04-15][Track D] R3-O started (⬜ -> 🔄) - Track D opened conservative failure/fallback hardening on top of `R3-N` routing law with explicit policy gates (`none` default, `conservative_mock` opt-in) and strict no-runtime-redesign guardrails.`
 - `[2026-04-15][Track D] R3-O completed (🔄 -> ✅) - Track D delivered single-attempt `openrouter -> mock` conservative fallback only for recoverable provider failures, kept router as selection-only truth, and added provider-attempt/fallback inspectability in step raw + failure details with bounded adapter/CLI test evidence and Wave 3 delivery documentation.`
+- `[2026-04-16][Track B] R3-O boundary review completed (⬜ -> ✅ Track B Step 3 scope) - Track B confirmed provider fallback/error semantics remain adapter-boundary behavior, top-level step `provider`/`model` report executed truth after fallback, and `raw.routing`/`raw.provider_attempts`/`raw.fallback` plus provider-specific failure details are additive inspectability surfaces only (not new runtime law); no shared runtime redesign was required - next: Track E can finalize `R3-P` smoke/evidence wording with Track B boundary signoff gate satisfied.`
+- `[2026-04-16][Track E] R3-P completed (⬜ -> ✅ Track E Step 3 scope) - Track E delivered `docs/wave3/Wave3-W3-SB-TrackE-R3-P-H1-Real-Provider-Smoke-Evidence-v1.md` with bounded `h1.single.v1` + `openrouter` live+inspect evidence, added `r3_p_h1_real_provider_smoke` helper/script/tests, and enforced separate `track_e_evidence_ready` vs `real_provider_smoke_passed` semantics with provider/fallback truth read directly from canonical run artifacts.`
 
 ---
 
