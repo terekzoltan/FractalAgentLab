@@ -47,6 +47,7 @@ Execution model clarification:
 
 - near-term coding-vertical operation remains OpenCode-anchored
 - this policy governs review/gate semantics; it does not imply native autonomous execution
+- packet-friendly rendering of review/gate outputs is allowed, but transport shape does not change the authority boundary
 
 ---
 
@@ -155,6 +156,7 @@ Default rule for the coding vertical:
 
 - review/gate may recommend commit readiness
 - review/gate does not imply autonomous commit authority by default
+- packetization, command rendering, or queue delivery do not change this rule
 
 Actual commits still require:
 
@@ -261,6 +263,23 @@ Potentially valid reasons:
 - no executable test path exists yet
 - environment limitation is clearly stated
 - the change is truly docs-only or otherwise non-executable
+
+---
+
+## Packet-rendering boundary
+
+Review/gate outputs may later be rendered into packet-compatible forms such as:
+
+- `review`
+- `review_fix`
+- `commit_decision`
+
+That rendering is acceptable only if:
+
+- findings remain primary
+- severity remains legible
+- testing gaps and residual risks remain explicit
+- the gate decision remains advisory unless a later workflow explicitly changes authority semantics
 
 ---
 

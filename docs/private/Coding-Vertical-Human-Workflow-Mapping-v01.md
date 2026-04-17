@@ -21,6 +21,12 @@ Typical commands or intents include:
 - `SEQ NEXT`
 - `IMPLEMENT`
 - `REVIEW`
+- `REVIEW JAVIT`
+- `TERV REVIEW`
+- `TERV REVIEW UTAN`
+- `FORK MERGE`
+- `COMPACT`
+- `REMINDER`
 - explicit commit decision or commit refusal
 
 The workflow is not prompt-only.
@@ -199,11 +205,46 @@ Minimum packet:
 
 These packets reduce repeated cognitive overhead and make the current workflow easier to formalize later.
 
+Near-term target:
+
+- make these packets cheap enough that the operator usually only needs light approval or Enter
+- keep packet transport cheaper without hiding the real source-of-truth checks
+
 ---
 
 ## Practical shorthand variants
 
 The current human loop also uses short operator shorthands that should be treated as structured variants, not freeform chat noise.
+
+Recommended canonical base packet ids:
+
+- `wave_start`
+- `seq_next`
+- `implement`
+- `review`
+- `review_fix`
+- `plan_review`
+- `plan_review_after`
+- `fork_merge`
+- `compact`
+- `commit_decision`
+- `reminder`
+
+Recommended modifiers/options:
+
+- `deep`
+- `step`
+- `parallel`
+- `forked`
+- `question_me`
+- `commit_if_clean`
+- `no_edit_except_commit`
+- `track_message_required`
+
+Interpretation rule:
+
+- the semantic packet family should be canonical
+- operator prose may stay richer and more personal on top of that family
 
 ### `REVIEW` deep variant
 
@@ -222,6 +263,11 @@ This means the packet should additionally include:
 - practical test/use instructions when meaningful
 - explicit `commit` / `hold` outcome
 - explicit note that no code changes should be made during the review except the eventual commit
+
+Example mapping:
+
+- notebook shorthand `MINI/STEP REVIEW` -> `review` + `step`
+- notebook shorthand `QUESTION ME` -> interaction-policy flag, not a separate base packet type
 
 ### `REVIEW JAVIT`
 
@@ -329,6 +375,13 @@ Required packet additions:
 
 These shorthand variants are useful because they already reflect the real operator workflow and can later be mapped directly into H4/H5-style structured runs.
 
+Important distinction:
+
+- packet compiler != session bus != autopilot
+- packet compiler formalizes structure and rendering
+- session bus is a later transport/dispatch layer
+- autopilot would be a much later, evidence-gated behavior and should not be assumed early
+
 ---
 
 ## Continuous optimization rule
@@ -379,6 +432,11 @@ Meaning:
 
 - the lab provides workflow logic, artifacts, sequencing, review/gate policy, and learning-loop discipline
 - OpenCode remains the main execution substrate that actually touches the repo
+
+OpenCode integration note:
+
+- stable OpenCode custom commands are a good shell-level interface for these packet types
+- the shell command layer and the Fractal packet law should align, but they are not the same responsibility
 
 This is valid.
 The coding vertical does not need to replace the shell immediately in order to be useful.
@@ -462,6 +520,12 @@ Important distinction:
 - OpenCode session agents operate the repo/session/tool surface
 - Fractal Agent Lab workflow agents are the internal H4/H5 roles that perform the structured workflow itself
 
+Additional distinction:
+
+- lightweight operator transport packets are not automatically the same thing as canonical H4/H5 workflow artifacts
+- transport packets may live in local inbox/outbox style workflow state
+- actual H4/H5 workflow artifacts stay governed by the coding-vertical artifact contract
+
 This distinction matters because the near-term proto workflow may still rely on OpenCode directly performing some planning/review work from policy docs, while the intended later model is explicit workflow invocation through Fractal Agent Lab.
 
 ### Role-aware invocation note
@@ -525,6 +589,10 @@ Preferred near-term interpretation:
 - `SEQ NEXT` = stronger automated readiness + planning companion
 - later `TERV REVIEW` = H4-adjacent structured plan critique mode
 
+Near-term UX bias:
+
+- aim for enter-only packet dispatch before any stronger session-to-session automation
+
 ### Stage C — Assisted review and gating
 
 `H5` begins to automate:
@@ -545,6 +613,7 @@ Only after earlier stages prove trustworthy:
 - limited implementation chaining
 - richer orchestration
 - stronger eval and policy feedback loops
+- guarded session-bus style transport and dispatch
 
 ---
 
@@ -570,6 +639,8 @@ The first successful coding-vertical slices should feel like:
 - the current workflow, but safer to audit and replay
 
 They should not feel like a separate system with unrelated behavior.
+
+They should also not feel like a workbench-first rewrite while the main pain is still manual coordination transport.
 
 ---
 

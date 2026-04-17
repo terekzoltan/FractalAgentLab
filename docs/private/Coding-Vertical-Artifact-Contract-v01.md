@@ -23,6 +23,12 @@ Canonical repo truth remains:
 
 Coding artifacts extend that truth as sidecars, not as a rival system.
 
+Clarification:
+
+- this contract governs actual `H4/H5` workflow artifacts
+- lightweight operator transport packets, inbox/outbox entries, or coordination-layer queue items are outside this contract unless they are explicitly materialized as real workflow artifacts
+- transport convenience should not be mistaken for canonical artifact law
+
 ### Canonical sidecar path
 
 ```

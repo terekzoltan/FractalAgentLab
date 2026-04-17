@@ -1430,7 +1430,8 @@ The immediate mainline frontier is now:
 - Wave 3 side batch Step 2 is complete (`R3-N` ✅ + `R3-O` ✅).
 - Wave 3 side batch Step 3 is complete (`R3-O` Track B boundary review ✅ + `R3-P` Track E smoke/evidence ✅).
 - `CV1` may be activated only by explicit side-vertical choice and it still must not replace or slow the mainline frontier
-- Wave 3 real-provider side batch is now eligible in parallel, but `W3-S2`/`W3-S3` mainline remains priority on bandwidth conflict
+- Wave 3 closeout is now complete across both the mainline and the real-provider side batch; broader provider parity/routing hardening remains Wave 4 scope
+- the coding-vertical reorientation batch is now closed at Meta level: `CV1` remains optional, but its canon is now explicitly packet/compiler-first with near `enter-only` operator flow as the first UX target and guarded dispatch deferred to later expansion
 
 Wave 2 closeout consistency note:
 - runtime truth checked: W2-S3 semantics remain bounded at runtime/CLI boundaries (`load_session_memory_context`, post-run identity updater gating)
@@ -1578,13 +1579,19 @@ Epics:
 
 #### `CV1` — Thin `H4` pilot
 
-**Status:** `⏸ ready by named prerequisites; remains optional side-vertical work and does not replace the active Wave 2 mainline frontier`  
+**Status:** `⏸ ready by named prerequisites; remains optional side-vertical work and does not replace the current recommended frontier order`  
 **Owner priority:** Track C, with Track D support and Track E evaluation
+
+Near-term UX stance:
+
+- `CV1` is the first thin packet/compiler-first slice for the current `WAVE START` / `SEQ NEXT` loop
+- the first operator win should be cheaper, more legible transport and near `enter-only` support
+- guarded dispatch or session-bus behavior belongs later only if evidence earns it
 
 Epics:
 - ⬜ **CV1-A** request normalization and repo-intake artifact — **Owner: Track C**
 - ⬜ **CV1-B** implementation-plan artifact and risk register — **Owner: Track C**
-- ⬜ **CV1-C** minimal repo-tool wrapper surface for H4 — **Owner: Track D**
+- ⬜ **CV1-C** minimal coordination-layer / helper surface for H4 — **Owner: Track D**
 - ⬜ **CV1-D** thin baseline/eval check for H4 usefulness — **Owner: Track E**
 - ⬜ **CV1-META1** H4 pilot closeout and `CV2` readiness check — **Owner: Meta Coordinator**
 
@@ -1611,6 +1618,7 @@ Epics:
 - the tool surface stays narrow
 - the planning artifact is materially better than an unstructured one-shot answer
 - the pilot preserves the current status-aware `WAVE START` / `SEQ NEXT` behavior instead of bypassing it
+- packet outputs are legible enough to reduce manual transport friction without weakening readiness honesty
 
 ### `CV1` — Execution Steps
 
@@ -1625,7 +1633,7 @@ Epics:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track C agent session | CV1-B | CV1-A ✅ | The implementation plan should be explicit about touched surfaces, tests, docs, and risks |
-| Track D agent session | CV1-C | CV1-A ✅ | Add only the smallest repo-tool wrapper surface needed for the pilot |
+| Track D agent session | CV1-C | CV1-A ✅ | Add only the smallest coordination/helper surface needed for packet rendering, artifact writing, or local queue support; do not widen into a broad repo-tool garden |
 
 **⬜ Step 3 — Track E checks whether the H4 pilot is actually better than a freeform plan**
 
@@ -1666,6 +1674,7 @@ Epics:
 - the gate can say `hold` honestly
 - at least one meaningful cycle feeds the private learning loop without overfitting one run
 - the slice preserves the current review-before-commit behavior and may refuse commit cleanly
+- packet-friendly review/gate outputs are acceptable only if they preserve those same honesty rules
 
 ### `CV2` — Execution Steps
 
@@ -1794,6 +1803,7 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-03-20][Meta] Coding vertical expanded inside Combined - `CV0`, `CV1`, and `CV2` now have explicit epics, owners, prerequisites, execution steps, and gates without displacing the live Wave 1 frontier - next: keep `CV0` blocked until Wave 1 truly closes.`
 - `[2026-03-20][Meta] W1-S2 stabilization formally closed - all five stabilization fixes are accepted, targeted validation passes, and the active frontier now returns to Wave 1 Sprint `W1-S3` (`L1-J` / `L1-K` / `L1-L` / `L1-M`) - next: run the W1-S3 parallel opening step.`
 - `[2026-03-20][Meta] Current human workflow mapped into the coding vertical - H4/H5 are now explicitly tied to the existing Combined-driven Meta+track workflow instead of an abstract coding-agent model - next: preserve this mapping when refining CV0/CV1/CV2.`
+- `[2026-04-17][Meta] Coding-vertical reorientation closed at docs level - the private canon now treats the near-term direction as coordination-layer-first (`packet law` + cheaper operator transport + near `enter-only` flow), keeps OpenCode as the hands and Combined as the control surface, and defers guarded dispatch/session-bus behavior to later earned expansion - next: if explicitly chosen, `CV1` may open under this sharper packet/compiler-first interpretation.`
 - `[2026-03-09][Meta] Track ownership and sequential ordering added to all epics across all waves - every epic now has explicit owner and ordering constraints documented.`
 - `[2026-03-09][Track D] F0-F implemented - StepRunner adapter boundary, MockAdapter path, and provider routing shell are active - next: wire CLI config loading path for F0-I.`
 - `[2026-03-09][Track D] F0-I implemented - CLI now loads runtime/providers/model policy config and applies provider selection shell through adapter step runner - next: coordinate smoke/acceptance with Track A/E.`

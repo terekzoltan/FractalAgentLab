@@ -36,6 +36,7 @@ Output style:
 - touched-surface map
 - risks
 - acceptance checks
+- packet-friendly rendering when useful for operator transport
 
 ---
 
@@ -105,6 +106,8 @@ If the request assumes a task is ready but the current frontier says otherwise, 
 
 If AGENTS and Combined differ on active sequencing interpretation, use Combined for active frontier/readiness and call out the mismatch explicitly.
 
+If the planning output is also rendered as a packet for transport, the packet must preserve the same readiness/order truth instead of simplifying it away.
+
 ---
 
 ## Planning rules
@@ -151,6 +154,16 @@ Do not treat prompt provenance as quality scoring or gate authority by itself.
 
 `H4` planning should map to the existing coding-vertical artifact contract.
 It must not redefine artifact validity/canonicality rules inside a planning response.
+
+### 9. Keep transport rendering subordinate to planning truth
+
+Packet-friendly output is useful when it reduces operator friction.
+
+But:
+
+- transport convenience must not weaken readiness honesty
+- rendering must not hide unknowns, blockers, or non-goals
+- packetization must not silently replace Combined-driven sequencing judgment
 
 ---
 

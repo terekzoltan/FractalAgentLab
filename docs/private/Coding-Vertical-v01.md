@@ -19,6 +19,7 @@ The coding vertical should be framed as:
 - an auditable multi-agent delivery loop
 - repo-aware planning + review + commit gate
 - workflow governance for software delivery
+- a coordination layer built around packet law and transport discipline
 
 Avoid framing it as:
 
@@ -59,6 +60,7 @@ It grows from a real pattern:
 
 Reference:
 - `docs/private/Coding-Vertical-Human-Workflow-Mapping-v01.md`
+- `docs/private/Coordination-Layer-Packet-Bus-v01.md`
 
 ---
 
@@ -79,6 +81,7 @@ Expected outputs:
 - risk register
 - implementation plan
 - acceptance checks
+- packet-compatible planning outputs for operator transport when useful
 
 ### `H5` — Implementation, Review & Commit Gate
 
@@ -92,6 +95,7 @@ Expected outputs:
 - residual risk summary
 - plan-adherence note
 - commit-gate decision
+- packet-compatible review/gate outputs for operator transport when useful
 
 ---
 
@@ -119,6 +123,20 @@ The best heuristics, prompt variants, failure corpora, and benchmark gold sets s
 This vertical must extend the existing repo contracts.
 It must not create a rival canonical runtime or artifact regime.
 
+### 6. Transport first, bigger autonomy later
+
+The next useful gain is cheaper coordination transport, not default unattended coding.
+
+Near-term priority:
+
+- formalize packet law
+- reduce repeated operator copy/paste
+- improve provenance and handoff legibility
+
+Later option:
+
+- guarded dispatch and stronger chaining only after evidence says they help
+
 ---
 
 ## Integration boundaries
@@ -132,6 +150,12 @@ That means:
 - OpenCode remains the main execution shell for repo access, file edits, search, git, test runs, and multi-session usage
 - Fractal Agent Lab adds the workflow-intelligence layer on top of that shell
 - `H4/H5` should improve the current workflow, not try to replace the execution environment immediately
+
+Near-term shorthand:
+
+- `Combined` = live control surface
+- OpenCode = hands
+- Fractal Agent Lab = method
 
 This is the preferred current direction.
 
@@ -147,6 +171,11 @@ Helpful shorthand:
 
 - OpenCode = control surface
 - Fractal Agent Lab = workflow engine
+
+Near-term UX north star:
+
+- make the first meaningful operator win `enter-only`
+- do not promise autonomous coding-by-default earlier than the evidence supports
 
 This means the coding vertical should feel like a governed workflow layer running through OpenCode, not like an attempt to replace OpenCode with a separate IDE or opaque swarm.
 
@@ -184,6 +213,9 @@ In that model:
 
 This is a later option, not the primary near-term target.
 
+Another later option is a guarded coordination/session bus that can dispatch packets between OpenCode sessions.
+That belongs to later coding-vertical expansion, not the first thin pilot.
+
 ### What this vertical may do later
 
 - add repo-aware planning workflows
@@ -191,6 +223,7 @@ This is a later option, not the primary near-term target.
 - add explicit commit-gate outputs
 - add coding-specific eval and benchmark surfaces
 - add targeted repo-tool wrappers
+- add guarded packet transport and later session-to-session dispatch
 
 ### What this vertical must not do early
 
@@ -199,6 +232,7 @@ This is a later option, not the primary near-term target.
 - assume auto-commit authority by default
 - turn prompt packs into the main source of truth
 - publish the strongest private operating knowledge casually
+- imply a workbench-first or session-bus-first rollout before packet/usefulness evidence exists
 
 ---
 
@@ -267,6 +301,7 @@ Owns only where needed:
 - `docs/private/Coding-Vertical-Repo-Aware-Planning-Policy-v01.md`
 - `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md`
 - `docs/private/Coding-Vertical-Learning-Loop-v01.md`
+- `docs/private/Coordination-Layer-Packet-Bus-v01.md`
 
 ---
 
@@ -279,8 +314,10 @@ It is:
 - docs-first
 - governance-first
 - private-leverage-aware
+- packet-law and coordination-layer aware
 
 It is not:
 - immediate top-of-queue runtime work
 - a literal drop-in rewrite
 - a reason to abandon the current Wave 1 closeout and Wave 2 hardening spine
+- a workbench-first or autonomous-coding-first push

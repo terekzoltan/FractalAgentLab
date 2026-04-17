@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 `W3-S1` and `W3-S2` are fully complete through `R3-H`, and Track C completed `W3-S3` Step 1 `R3-I` project-memory v1 while Step 2/3 `R3-L` remain Track E/Track A owned)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 mainline is complete on Track C-owned scope through `R3-I` project-memory v1, and subsequent `R3-L` work closed on Track E/Track A scope; next Track C action follows Combined frontier and any explicit `CV1` activation)
 
 ---
 
@@ -710,7 +710,7 @@ Executable v1 note:
 **Status:** future vertical; docs-only `CV0` is now allowed after Wave 1 core closeout, but executable work remains gated
 
 Purpose:
-- turn human software-delivery intent + repo state into governed planning, review, and commit-readiness workflows
+- turn human software-delivery intent + repo state into governed planning, review, packet, and commit-readiness workflows
 
 Subflows:
 - `H4` — Codebase Context & Planning
@@ -720,6 +720,7 @@ Positioning rule:
 - treat this as workflow governance for software delivery
 - do not frame it as a black-box "ultimate coder"
 - treat it as the formalization of the current human-driven Combined-aware delivery workflow, not a detached coding fantasy
+- keep the near-term direction coordination-layer-first: packet law, provenance, and cheaper transport before any stronger autonomy claims
 
 Unlock rule:
 - docs/policy batch is now allowed because Wave 1 core closeout is complete
@@ -911,10 +912,16 @@ Phase rule:
 - after Wave 2 contract/replay/smoke hardening: thin `CV1` (`H4`) pilot
 - only later: thin `CV2` (`H5`) review/gate slice
 
+Near-term bias:
+- first improve packetization and operator transport
+- aim for near `enter-only` coordination before stronger session-to-session automation
+- keep richer dispatch/session-bus behavior as later guarded expansion
+
 Control rule:
 - do not let coding-vertical implementation steal focus from the current main wave
 - treat repo-aware software delivery as an earned extension of the engine, not a reset of project identity
 - treat the coding vertical's strongest review/gate/planning heuristics as private learning-loop assets by default
+- keep OpenCode as the practical command/shell surface and Combined as the live control surface
 
 ---
 
@@ -1095,6 +1102,8 @@ Entries:
 - `[2026-04-15][Track D] R3-O completed (🔄 -> ✅) - Track D delivered single-attempt `openrouter -> mock` conservative fallback only for recoverable provider failures, kept router as selection-only truth, and added provider-attempt/fallback inspectability in step raw + failure details with bounded adapter/CLI test evidence and Wave 3 delivery documentation.`
 - `[2026-04-16][Track B] R3-O boundary review completed (⬜ -> ✅ Track B Step 3 scope) - Track B confirmed provider fallback/error semantics remain adapter-boundary behavior, top-level step `provider`/`model` report executed truth after fallback, and `raw.routing`/`raw.provider_attempts`/`raw.fallback` plus provider-specific failure details are additive inspectability surfaces only (not new runtime law); no shared runtime redesign was required - next: Track E can finalize `R3-P` smoke/evidence wording with Track B boundary signoff gate satisfied.`
 - `[2026-04-16][Track E] R3-P completed (⬜ -> ✅ Track E Step 3 scope) - Track E delivered `docs/wave3/Wave3-W3-SB-TrackE-R3-P-H1-Real-Provider-Smoke-Evidence-v1.md` with bounded `h1.single.v1` + `openrouter` live+inspect evidence, added `r3_p_h1_real_provider_smoke` helper/script/tests, and enforced separate `track_e_evidence_ready` vs `real_provider_smoke_passed` semantics with provider/fallback truth read directly from canonical run artifacts.`
+- `[2026-04-16][Meta] Wave 3 cleanup/retro sync completed - coordination surfaces now record Wave 3 mainline plus side-batch as fully closed, stale post-closeout summary wording was removed, and `CV1` remains an explicit optional next side-vertical while broader provider parity/routing hardening stays Wave 4 scope - next: run the planned input/prompt audit before any `CV1` activation.`
+- `[2026-04-17][Meta] Coding-vertical reorientation closed - private coding-vertical canon now sharpens the near-term direction around a coordination layer (`packet law`, provenance, and cheaper operator transport), makes near `enter-only` flow the first UX target, keeps OpenCode as the practical shell and Combined as the live control surface, and defers guarded dispatch/session-bus behavior to later earned expansion - next: `CV1` may start only if explicitly chosen under this packet/compiler-first interpretation.`
 
 ---
 
@@ -1400,9 +1409,10 @@ These are not the active implementation frontier, but they are now canonical fut
 6. `docs/private/Coding-Vertical-Repo-Aware-Planning-Policy-v01.md`
 7. `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md`
 8. `docs/private/Coding-Vertical-Learning-Loop-v01.md`
-9. `docs/private/Coding-Vertical-H4-Planning-Prompt-Review-v01.md`
-10. `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md`
-11. `docs/private/Model-Reasoning-Effort-Policy-Note-v01.md`
+9. `docs/private/Coordination-Layer-Packet-Bus-v01.md`
+10. `docs/private/Coding-Vertical-H4-Planning-Prompt-Review-v01.md`
+11. `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md`
+12. `docs/private/Model-Reasoning-Effort-Policy-Note-v01.md`
 
 **CV0 execution status:** complete; `CV0-A`/`CV0-B`/`CV0-C`/`CV0-D` are now closed, and `CV1` is ready by named prerequisites but remains subordinate to the active mainline frontier in Combined.
 

@@ -67,6 +67,7 @@ Near-term execution model:
 
 - `H4` is a planning companion for OpenCode sessions
 - it should improve the current human loop, not replace the main shell or repo operator
+- it should produce packet-friendly planning outputs before any broader dispatch/session-bus ambition
 
 #### `repo_intake`
 
@@ -133,6 +134,11 @@ Early pilot note:
 Reference contract:
 - `docs/private/Coding-Vertical-Artifact-Contract-v01.md`
 
+Operator-transport note:
+
+- these artifacts may later be rendered into packet-friendly forms for OpenCode session transport
+- that rendering does not make the transport packet itself canonical artifact truth
+
 ### Early orchestration recommendation
 
 Start simple:
@@ -156,7 +162,14 @@ Helper-layer note:
   - changed-surface helper
   - touched-files / touched-zones helper
   - artifact-writing helper
+-  packet-rendering helper
+-  queue/inbox/outbox helper only if it stays local and narrow
 - avoid broad repo tool platformization or shell replacement
+
+Coordination-layer note:
+
+- early H4 should align with a coordination-layer / packet-compiler direction
+- guarded dispatch and richer session transport belong later, not in the first thin slice
 
 Boundary reminder:
 
@@ -185,6 +198,7 @@ Near-term boundary:
 
 - actual implementation remains primarily OpenCode-session work
 - early executable `CV2` should review and evaluate implementation reality, not replace the implementer
+- early executable `CV2` may emit packet-friendly review/gate outputs, but should not imply autonomous action from that alone
 
 ### Recommended early roles
 
@@ -243,6 +257,7 @@ Authority note:
 
 - early `commit_gate` output should remain advisory only
 - do not imply autonomous commit authority by default
+- packetization or command-friendly rendering does not change this authority boundary
 
 ### Early orchestration recommendation
 
@@ -269,6 +284,7 @@ Early H4/H5 should not attempt:
 - default background coding swarms
 - broad codebase-wide tool platformization
 - enterprise permissions/governance infrastructure
+- workbench-first expansion before packet transport pain is reduced
 
 ---
 
@@ -280,3 +296,4 @@ Early H4/H5 should not attempt:
 - `docs/private/Coding-Vertical-Artifact-Contract-v01.md`
 - `docs/private/Coding-Vertical-Repo-Aware-Planning-Policy-v01.md`
 - `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md`
+- `docs/private/Coordination-Layer-Packet-Bus-v01.md`

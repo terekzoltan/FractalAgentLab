@@ -114,6 +114,7 @@ The Meta Coordinator works primarily with these files:
 - `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md` (when H5 review/gate policy is in scope)
 - `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md` (when CV0-C review decisions must be reconciled before CV0-D closeout)
 - `docs/private/Coding-Vertical-Learning-Loop-v01.md` (when private coding heuristics are being distilled)
+- `docs/private/Coordination-Layer-Packet-Bus-v01.md` (when packet law, transport semantics, or guarded dispatch boundaries are in scope)
 - future track-specific notes or plans
 - future risk, audit, or benchmark documents
 
@@ -348,7 +349,28 @@ Readiness rule:
 - if the proposed vertical behavior no longer matches the current human workflow semantics, stop and repair the mapping before widening scope
 - during `CV0-C`, keep scope docs-only; do not imply `CV2` unlock or executable gate semantics
 
-### 13. `coding-learning-loop-review`
+### 13. `coordination-layer-design`
+
+Use when:
+
+- packet-law or transport-law needs canonization
+- coordination friction is coming more from session handoff cost than from missing workflow semantics
+- manual override vs packet emission vs guarded dispatch boundaries need clarification
+- OpenCode-anchored command/bridge integration needs design guidance without opening runtime churn
+
+Main output:
+
+- updated coordination-layer design docs
+- explicit boundary note between operator transport packets and canonical H4/H5 workflow artifacts
+- explicit note on whether the proposed change is enter-only support, guarded dispatch, or later orchestration expansion
+- any required sequencing/runbook wording updates
+
+Boundary rule:
+
+- prefer transport formalization before UI/workbench expansion when the visible bottleneck is repeated operator copy/paste or context transport
+- do not treat packetization by itself as permission for stronger autonomy claims
+
+### 14. `coding-learning-loop-review`
 
 Use when:
 
@@ -398,7 +420,7 @@ When running `full-sweep`, follow this order:
 7. update readiness matrix
 8. update risk notes
 9. update hero workflow progress
-10. if the coding vertical is active, inspect its private rollout and learning-loop docs
+10. if the coding vertical is active, inspect its private rollout, coordination-layer, and learning-loop docs
 11. decide next wave or sprint actions
 12. write concise summary for the user or project owner
 

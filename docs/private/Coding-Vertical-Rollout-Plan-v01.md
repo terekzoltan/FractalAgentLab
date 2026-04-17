@@ -20,6 +20,11 @@ The coding vertical is allowed to grow only in this order:
 
 Do not invert this order.
 
+Near-term UX rule:
+
+- target `enter-only` operator flow before stronger session-to-session automation
+- treat guarded dispatch and session-bus behavior as later earned expansion
+
 ---
 
 ## Mainline prerequisite map
@@ -158,6 +163,12 @@ Prove that repo-aware planning can become a first-class artifact workflow withou
 
 This is the first thin automation slice of the current `WAVE START` / `SEQ NEXT` style loop.
 
+Near-term interpretation:
+
+- `CV1` is packet/compiler-first
+- it should make planning/resequencing easier to emit, transport, and review
+- it should not begin as a broad orchestration or session-bus feature set
+
 Success should not mean "the plan sounds nicer".
 Success should mean:
 
@@ -181,6 +192,7 @@ Outputs:
 - affected surfaces
 - likely touched files
 - unknowns and assumptions
+- packet-friendly `wave_start` rendering when useful
 
 Automation stance:
 
@@ -196,6 +208,7 @@ Outputs:
 - explicit `implementation_plan.md`
 - explicit `acceptance_checks.json`
 - embedded risk section inside the plan for the first executable slice
+- packet-friendly `seq_next` rendering when useful
 
 Automation stance:
 
@@ -228,11 +241,13 @@ Outputs:
 - changed-surface helper
 - touched-files / touched-zones helper
 - artifact-writing helper
+- optional packet-rendering or local queue helper if it stays narrow
 
 Clarification:
 - wrapper work here means thin standard helpers around repeated repo operations
 - it does not mean replacing OpenCode as the main execution shell
 - it must not become a broad repo tool garden or shell replacement
+- it should bias toward coordination-layer / packet support before any richer session-bus ambition
 
 #### `CV1-D` Thin baseline/eval check
 Owner:
@@ -249,6 +264,7 @@ In near-term execution:
 - OpenCode sessions remain the main implementation operators
 - `CV1` is a planning companion layer, not a repo-writing replacement
 - future `fal` commands may support the current personal Meta-style / track-style operating pattern where useful, but they remain explicit helper workflows rather than universal autonomous shells
+- OpenCode custom commands and later bridge surfaces may consume the packet outputs, but that consumption is not the same thing as canonical artifact law
 
 ### Acceptance
 
@@ -262,6 +278,7 @@ In near-term execution:
 - touched-surface mapping is materially clearer than ad hoc planning
 - test/docs obligations are more explicit and easier to review
 - false-ready planning behavior is reduced
+- packet outputs are legible enough to support cheaper operator transport without losing readiness honesty
 
 ### Anti-scope rule
 
@@ -271,6 +288,7 @@ In near-term execution:
 - commit authority
 - complex handoff-heavy coding swarms
 - broad repo-tool platformization
+- early guarded session bus or chaining claims that outrun the evidence
 
 ### Recommended session order
 
@@ -296,6 +314,7 @@ Near-term interpretation:
 
 - implementation itself remains primarily OpenCode-session work
 - `CV2` should first prove review usefulness and evidence legibility before any stronger gate authority is considered
+- packet-friendly review / review-fix / commit-decision outputs are acceptable if they preserve findings-first honesty
 
 ### Scope
 
@@ -390,6 +409,8 @@ Practical focus:
 ### Possible later scope
 
 - H4 -> H5 chaining
+- packet inbox/outbox and guarded dispatch
+- later session create/fork/message/command/event bridge work
 - coding-specific benchmarks
 - selected orchestration expansion tied to the project-wide orchestration ladder:
   - `O1` manager-first remains the safe default
@@ -422,3 +443,12 @@ The intended order is:
 4. run `CV1`
 5. only later run `CV2`
 6. treat `CV3` as earned expansion, not a promise
+
+More explicit evolution ladder:
+
+1. current manual reality
+2. enter-only packet support
+3. assisted dispatch
+4. guarded session bus
+5. supervised chaining
+6. later optional higher autonomy
