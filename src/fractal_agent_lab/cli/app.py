@@ -39,12 +39,17 @@ from fractal_agent_lab.memory import (
 )
 from fractal_agent_lab.runtime import WorkflowExecutor
 from fractal_agent_lab.state import InMemoryRunStateStore
+from fractal_agent_lab.tools.h4_packet_compiler import write_wave_start_packet_sidecars_from_context_report
 from fractal_agent_lab.tracing import (
     InMemoryTraceEmitter,
     write_run_artifact,
     write_trace_artifact,
 )
-from fractal_agent_lab.workflows.h4_artifacts import write_h4_context_report_artifact
+from fractal_agent_lab.workflows.h4_artifacts import (
+    write_h4_context_report_artifact,
+    write_h4_seq_next_acceptance_checks_artifact,
+    write_h4_seq_next_implementation_plan_artifact,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -237,13 +242,42 @@ def _handle_run(args: argparse.Namespace) -> int:
     except OSError as error:
         print(f"Warning: failed to write run/trace artifacts: {error}", file=sys.stderr)
 
+    h4_context_report_path = None
     try:
-        _ = write_h4_context_report_artifact(
+        h4_context_report_path = write_h4_context_report_artifact(
             run_state=run_state,
             data_dir=data_dir,
         )
     except Exception as error:
         print(f"Warning: failed to write H4 context report artifact: {error}", file=sys.stderr)
+
+    try:
+        if h4_context_report_path is not None:
+            # Track D-owned additive helper surface: derive non-canonical wave_start packets from canonical H4 context report truth.
+            _ = write_wave_start_packet_sidecars_from_context_report(
+                context_report_path=h4_context_report_path,
+                run_id=run_state.run_id,
+                data_dir=data_dir,
+            )
+    except Exception as error:
+        print(f"Warning: failed to write H4 wave_start packet sidecars: {error}", file=sys.stderr)
+
+    try:
+        # Track C-owned seq_next artifact writers stay on the canonical run path; CV1-C does not own these artifacts.
+        _ = write_h4_seq_next_implementation_plan_artifact(
+            run_state=run_state,
+            data_dir=data_dir,
+        )
+    except Exception as error:
+        print(f"Warning: failed to write H4 implementation plan artifact: {error}", file=sys.stderr)
+
+    try:
+        _ = write_h4_seq_next_acceptance_checks_artifact(
+            run_state=run_state,
+            data_dir=data_dir,
+        )
+    except Exception as error:
+        print(f"Warning: failed to write H4 acceptance checks artifact: {error}", file=sys.stderr)
 
     try:
         _ = run_post_run_project_memory_update(

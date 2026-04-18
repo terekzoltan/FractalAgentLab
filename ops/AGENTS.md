@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 mainline is complete on Track C-owned scope through `R3-I` project-memory v1 with later `R3-L` closed on Track E/Track A scope; coding-vertical `CV1-A` is now complete as a narrow `h4.wave_start.v1` intake slice, and next Track C side-vertical step is `CV1-B` while preserving Track D ownership of adapter/helper expansion)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 mainline is complete on Track C-owned scope through `R3-I` project-memory v1 with later `R3-L` closed on Track E/Track A scope; coding-vertical `CV1-A` and `CV1-B` are now complete as separate `h4.wave_start.v1` and `h4.seq_next.v1` slices, while adapter/helper expansion ownership remains on Track D with any default-mock seq-next seam treated as an explicit shared-boundary checkpoint)
 
 ---
 
@@ -253,7 +253,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; broader provider parity/routing hardening remains Wave 4 scope)
+**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; coding-vertical `CV1-C` is now complete as a thin wave_start packet/helper slice, `CV1-B` is complete on Track C, and broader provider parity/routing hardening remains Wave 4 scope)
 
 ---
 
@@ -1105,6 +1105,9 @@ Entries:
 - `[2026-04-16][Meta] Wave 3 cleanup/retro sync completed - coordination surfaces now record Wave 3 mainline plus side-batch as fully closed, stale post-closeout summary wording was removed, and `CV1` remains an explicit optional next side-vertical while broader provider parity/routing hardening stays Wave 4 scope - next: run the planned input/prompt audit before any `CV1` activation.`
 - `[2026-04-17][Meta] Coding-vertical reorientation closed - private coding-vertical canon now sharpens the near-term direction around a coordination layer (`packet law`, provenance, and cheaper operator transport), makes near `enter-only` flow the first UX target, keeps OpenCode as the practical shell and Combined as the live control surface, and defers guarded dispatch/session-bus behavior to later earned expansion - next: `CV1` may start only if explicitly chosen under this packet/compiler-first interpretation.`
 - `[2026-04-18][Track C] CV1-A completed (⬜ -> ✅) - Track C delivered `h4.wave_start.v1` as a narrow repo-intake manager slice with explicit role separation (`repo_intake`, `architect_critic`, `synthesizer`), canonical `context_report.json` sidecar writing on the existing `fal run` path (`workflow_id: h4`, `workflow_variant: h4.wave_start.v1`), and CLI-level integration proof while keeping adapter specialization/helper-surface widening out of CV1-A scope for later Track D-owned handling.`
+- `[2026-04-18][Track D] CV1-C started (⬜ -> 🔄) - Track D opened CV1 Step 2 helper/compiler work with strict guardrails: wave_start-only packet compilation derived from canonical H4 context-report truth, additive CLI hook only, and no queue/inbox/outbox or session-bus expansion.`
+- `[2026-04-18][Track D] CV1-C completed (🔄 -> ✅) - Track D delivered `docs/wave3/Wave3-CV1-C-TrackD-H4-Helper-Surface-v1.md` with a thin `tools` packet compiler (`wave_start` only), non-canonical packet sidecar writing under `artifacts/<run_id>/packets/`, and bounded tests proving compile/render/write behavior while explicitly deferring future `h4.seq_next.v1` runnable default-mock seam proof to a later narrow request if needed.`
+- `[2026-04-18][Track C] CV1-B completed (⬜ -> ✅) - Track C delivered `h4.seq_next.v1` as a separate planning workflow (`repo_intake`, `planner`, `architect_critic`, `synthesizer`) with required `implementation_plan.md` and `acceptance_checks.json` artifact writing on the canonical `fal run` path, embedded risk register in `implementation_plan.md`, and preserved caution/risk/non-goal surfaces through final output and artifacts; default-mock seq-next runnable proof remains an explicit shared-boundary checkpoint instead of silent adapter-surface widening.`
 
 ---
 

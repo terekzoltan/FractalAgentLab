@@ -66,6 +66,24 @@ class CV1AH4WaveStartCliTests(unittest.TestCase):
             for item in context_report["likely_touched_files"]:
                 self.assertTrue(item.startswith("hypothesis:"))
 
+            packet_json_path = data_dir / "artifacts" / run_id / "packets" / "wave_start.packet.json"
+            packet_md_path = data_dir / "artifacts" / run_id / "packets" / "wave_start.packet.md"
+            self.assertTrue(packet_json_path.exists())
+            self.assertTrue(packet_md_path.exists())
+
+            packet_json = json.loads(packet_json_path.read_text(encoding="utf-8"))
+            self.assertEqual("wave_start", packet_json["packet_type"])
+            self.assertEqual("1.0", packet_json["packet_version"])
+            self.assertEqual("Track D", packet_json["track"])
+            self.assertEqual("CV1-C", packet_json["step_ref"])
+            self.assertEqual("actual_fal_workflow_run", packet_json["execution_mode"])
+            self.assertEqual("h4.wave_start.v1", packet_json["upstream"]["workflow_variant"])
+            self.assertEqual(context_report["current_frontier"], packet_json["content"]["current_frontier"])
+
+            packet_markdown = packet_md_path.read_text(encoding="utf-8")
+            self.assertIn("# Packet: wave_start", packet_markdown)
+            self.assertIn("## Wave Start", packet_markdown)
+
     def test_h4_wave_start_cli_warns_when_context_report_fields_are_missing(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fal-cv1-a-cli-missing-") as tmp_dir:
             data_dir = Path(tmp_dir)
@@ -97,6 +115,7 @@ class CV1AH4WaveStartCliTests(unittest.TestCase):
             run_id = payload["summary"]["run_id"]
             self.assertIn("Warning: failed to write H4 context report artifact", err.getvalue())
             self.assertFalse((data_dir / "artifacts" / run_id / "context_report.json").exists())
+            self.assertFalse((data_dir / "artifacts" / run_id / "packets" / "wave_start.packet.json").exists())
 
 
 def _scripted_h4_step_runner(*, run_state, workflow, step):

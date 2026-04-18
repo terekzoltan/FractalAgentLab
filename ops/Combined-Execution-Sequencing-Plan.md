@@ -1590,8 +1590,8 @@ Near-term UX stance:
 
 Epics:
 - ✅ **CV1-A** request normalization and repo-intake artifact — **Owner: Track C**
-- ⬜ **CV1-B** implementation-plan artifact and risk register — **Owner: Track C**
-- ⬜ **CV1-C** minimal coordination-layer / helper surface for H4 — **Owner: Track D**
+- ✅ **CV1-B** implementation-plan artifact and risk register — **Owner: Track C**
+- ✅ **CV1-C** minimal coordination-layer / helper surface for H4 — **Owner: Track D**
 - ⬜ **CV1-D** thin baseline/eval check for H4 usefulness — **Owner: Track E**
 - ⬜ **CV1-META1** H4 pilot closeout and `CV2` readiness check — **Owner: Meta Coordinator**
 
@@ -1628,12 +1628,12 @@ Epics:
 |---------|---------|--------|-------|
 | Track C agent session | ✅ CV1-A | CV0-D ✅ + H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ + H2-E ✅ + H2-F ✅ + H2-G ✅ + H2-H ✅ | Delivered `h4.wave_start.v1` as a narrow 3-role manager intake path with canonical `context_report.json` sidecar proof on the `fal run` path and no adapter-surface widening |
 
-**⬜ Step 2 — planning artifacts and the minimal tool surface advance in parallel**
+**✅ Step 2 — planning artifacts and the minimal tool surface advance in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent session | CV1-B | CV1-A ✅ | The implementation plan should be explicit about touched surfaces, tests, docs, and risks |
-| Track D agent session | CV1-C | CV1-A ✅ | Add only the smallest coordination/helper surface needed for packet rendering, artifact writing, or local queue support; do not widen into a broad repo-tool garden |
+| Track C agent session | ✅ CV1-B | CV1-A ✅ | Delivered `h4.seq_next.v1` as a separate 4-role planning workflow with required `implementation_plan.md` + `acceptance_checks.json` artifact writing on canonical `fal run`; risk register remains embedded in the plan, caution/risk/non-goal fields are preserved, and the default-mock runnable seam is kept as an explicit shared-boundary checkpoint |
+| Track D agent session | ✅ CV1-C | CV1-A ✅ | Delivered a wave_start-only helper/compiler slice that derives packet sidecars from canonical `context_report.json`, writes non-canonical transport outputs under `artifacts/<run_id>/packets/`, and keeps queue/session-bus scope explicitly out |
 
 **⬜ Step 3 — Track E checks whether the H4 pilot is actually better than a freeform plan**
 
@@ -1877,6 +1877,9 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-15][Track D] R3-O completed (🔄 -> ✅) - Track D delivered single-attempt `openrouter -> mock` conservative fallback only for recoverable provider failures, kept router as selection-only truth, and added provider-attempt/fallback inspectability in step raw + failure details with bounded adapter/CLI tests and Wave 3 delivery documentation.`
 - `[2026-04-16][Track E] R3-P completed (⬜ -> ✅ Track E Step 3 scope) - Track E delivered `docs/wave3/Wave3-W3-SB-TrackE-R3-P-H1-Real-Provider-Smoke-Evidence-v1.md` with bounded `h1.single.v1` + `openrouter` live+inspect evidence, implemented artifact-backed helper/script/tests (`r3_p_h1_real_provider_smoke`), and kept `track_e_evidence_ready` separate from `real_provider_smoke_passed` while reading provider/fallback truth directly from canonical run artifacts.`
 - `[2026-04-18][Track C] CV1-A completed (⬜ -> ✅) - Track C delivered `h4.wave_start.v1` with a narrow manager topology (`repo_intake`, `architect_critic`, `synthesizer`), canonical `context_report.json` sidecar writing on the existing `fal run` path (`workflow_id: h4`, `workflow_variant: h4.wave_start.v1`), and CLI-level integration proof while deferring adapter specialization/helper-surface expansion to later CV1 steps.`
+- `[2026-04-18][Track D] CV1-C started (⬜ -> 🔄) - Track D opened CV1 Step 2 helper/compiler work with strict guardrails: wave_start-only packet compilation derived from canonical H4 context-report truth, additive CLI hook only, and no queue/inbox/outbox or session-bus expansion.`
+- `[2026-04-18][Track D] CV1-C completed (🔄 -> ✅) - Track D delivered `docs/wave3/Wave3-CV1-C-TrackD-H4-Helper-Surface-v1.md` with a thin `tools` packet compiler (`wave_start` only), non-canonical transport sidecar writing under `artifacts/<run_id>/packets/`, and bounded tests proving compile/render/write behavior while keeping Track C planning artifacts and future `h4.seq_next.v1` runnable mock-seam proof out of this step.`
+- `[2026-04-18][Track C] CV1-B completed (⬜ -> ✅) - Track C delivered `h4.seq_next.v1` as a separate planning workflow (`repo_intake`, `planner`, `architect_critic`, `synthesizer`) with required `implementation_plan.md` and `acceptance_checks.json` artifact writing on the canonical `fal run` path, preserved caution/risk/non-goal surfaces in finalized output/artifacts, and kept default-mock runnable proof as an explicit shared-boundary checkpoint rather than silently widening adapter ownership.`
 
 ---
 
