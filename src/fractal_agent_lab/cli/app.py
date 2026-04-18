@@ -44,6 +44,7 @@ from fractal_agent_lab.tracing import (
     write_run_artifact,
     write_trace_artifact,
 )
+from fractal_agent_lab.workflows.h4_artifacts import write_h4_context_report_artifact
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -235,6 +236,14 @@ def _handle_run(args: argparse.Namespace) -> int:
         )
     except OSError as error:
         print(f"Warning: failed to write run/trace artifacts: {error}", file=sys.stderr)
+
+    try:
+        _ = write_h4_context_report_artifact(
+            run_state=run_state,
+            data_dir=data_dir,
+        )
+    except Exception as error:
+        print(f"Warning: failed to write H4 context report artifact: {error}", file=sys.stderr)
 
     try:
         _ = run_post_run_project_memory_update(

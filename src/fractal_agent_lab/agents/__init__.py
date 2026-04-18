@@ -35,6 +35,14 @@ from fractal_agent_lab.agents.h1_lite import (
     build_h1_lite_agent_specs,
     validate_h1_lite_agent_specs,
 )
+from fractal_agent_lab.agents.h4 import (
+    H4_WAVE_START_AGENT_IDS,
+    H4_WAVE_START_AGENT_IDS_LIST,
+    H4_WAVE_START_PROMPT_VERSION,
+    build_h4_wave_start_agent_pack,
+    build_h4_wave_start_agent_specs,
+    validate_h4_wave_start_agent_specs,
+)
 
 __all__ = [
     "H1_AGENT_IDS",
@@ -66,4 +74,10 @@ __all__ = [
     "build_h3_agent_pack",
     "build_h3_agent_specs",
     "validate_h3_agent_specs",
+    "H4_WAVE_START_AGENT_IDS",
+    "H4_WAVE_START_AGENT_IDS_LIST",
+    "H4_WAVE_START_PROMPT_VERSION",
+    "build_h4_wave_start_agent_pack",
+    "build_h4_wave_start_agent_specs",
+    "validate_h4_wave_start_agent_specs",
 ]

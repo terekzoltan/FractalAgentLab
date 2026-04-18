@@ -64,6 +64,8 @@ class MockAdapter:
             return self._build_h2_manager_output(request)
         if request.workflow_id == "h3.manager.v1":
             return self._build_h3_manager_output(request)
+        if request.workflow_id == "h4.wave_start.v1":
+            return self._build_h4_wave_start_output(request)
         if request.workflow_id == "h1.single.v1":
             return self._build_h1_single_output(request)
         if request.workflow_id == "h1.lite":
@@ -803,6 +805,201 @@ class MockAdapter:
             "prompt_version": request.prompt_version,
         }
 
+    def _build_h4_wave_start_output(self, request: AdapterStepRequest) -> dict[str, Any]:
+        goal = _clean_text(request.input_payload.get("goal"), fallback="Unspecified wave_start goal")
+        repo_intake_output = _step_output(request, "repo_intake")
+        architect_critic_output = _step_output(request, "architect_critic")
+
+        if request.step_id == "synthesizer":
+            if not repo_intake_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "repo_intake",
+                        "reason": "missing_repo_intake_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+            if not architect_critic_output:
+                return {
+                    "control": {
+                        "action": "delegate",
+                        "target_step_id": "architect_critic",
+                        "reason": "missing_architect_critic_output",
+                    },
+                    "role": request.role,
+                    "prompt_version": request.prompt_version,
+                }
+
+            return {
+                "control": {
+                    "action": "finalize",
+                    "reason": "all_workers_completed",
+                    "output": {
+                        "repo_summary": _require_mock_text_field(
+                            request=request,
+                            step_id="repo_intake",
+                            output=repo_intake_output,
+                            field_name="repo_summary",
+                        ),
+                        "changed_surfaces": _require_mock_list_field(
+                            request=request,
+                            step_id="repo_intake",
+                            output=repo_intake_output,
+                            field_name="changed_surfaces",
+                        ),
+                        "relevant_docs": _require_mock_list_field(
+                            request=request,
+                            step_id="repo_intake",
+                            output=repo_intake_output,
+                            field_name="relevant_docs",
+                        ),
+                        "relevant_code_areas": _require_mock_list_field(
+                            request=request,
+                            step_id="repo_intake",
+                            output=repo_intake_output,
+                            field_name="relevant_code_areas",
+                        ),
+                        "likely_touched_files": _require_mock_list_field(
+                            request=request,
+                            step_id="repo_intake",
+                            output=repo_intake_output,
+                            field_name="likely_touched_files",
+                        ),
+                        "assumptions": _require_mock_list_field(
+                            request=request,
+                            step_id="repo_intake",
+                            output=repo_intake_output,
+                            field_name="assumptions",
+                        ),
+                        "unknowns": _require_mock_list_field(
+                            request=request,
+                            step_id="repo_intake",
+                            output=repo_intake_output,
+                            field_name="unknowns",
+                        ),
+                        "recent_change_notes": _require_mock_list_field(
+                            request=request,
+                            step_id="repo_intake",
+                            output=repo_intake_output,
+                            field_name="recent_change_notes",
+                        ),
+                        "current_frontier": _require_mock_text_field(
+                            request=request,
+                            step_id="repo_intake",
+                            output=repo_intake_output,
+                            field_name="current_frontier",
+                        ),
+                        "blockers_or_holds": _require_mock_list_field(
+                            request=request,
+                            step_id="architect_critic",
+                            output=architect_critic_output,
+                            field_name="blockers_or_holds",
+                            allow_empty=True,
+                        ),
+                        "shared_zone_cautions": _require_mock_list_field(
+                            request=request,
+                            step_id="architect_critic",
+                            output=architect_critic_output,
+                            field_name="shared_zone_cautions",
+                        ),
+                        "sequencing_risks": _require_mock_list_field(
+                            request=request,
+                            step_id="architect_critic",
+                            output=architect_critic_output,
+                            field_name="sequencing_risks",
+                        ),
+                        "non_goals": _require_mock_list_field(
+                            request=request,
+                            step_id="architect_critic",
+                            output=architect_critic_output,
+                            field_name="non_goals",
+                        ),
+                        "next_recommended_action": _require_mock_text_field(
+                            request=request,
+                            step_id="architect_critic",
+                            output=architect_critic_output,
+                            field_name="next_recommended_action",
+                        ),
+                    },
+                },
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "repo_intake":
+            return {
+                "repo_summary": (
+                    f"{goal} requires repo-aware context refresh against the current Combined frontier, ownership guardrails, "
+                    "and recent coding-vertical decisions before any detailed planning begins."
+                ),
+                "changed_surfaces": [
+                    "ops",
+                    "docs/private",
+                    "src/fractal_agent_lab/workflows",
+                    "src/fractal_agent_lab/agents",
+                ],
+                "relevant_docs": [
+                    "ops/Combined-Execution-Sequencing-Plan.md",
+                    "ops/AGENTS.md",
+                    "docs/private/Coding-Vertical-Rollout-Plan-v01.md",
+                    "docs/private/Coding-Vertical-Repo-Aware-Planning-Policy-v01.md",
+                ],
+                "relevant_code_areas": [
+                    "hypothesis: src/fractal_agent_lab/workflows/h4.py",
+                    "hypothesis: src/fractal_agent_lab/agents/h4/",
+                    "hypothesis: src/fractal_agent_lab/cli/workflow_registry.py",
+                ],
+                "likely_touched_files": [
+                    "hypothesis: src/fractal_agent_lab/workflows/h4_artifacts.py",
+                    "hypothesis: src/fractal_agent_lab/cli/app.py",
+                    "hypothesis: tests/cli/test_cv1_a_h4_wave_start_cli.py",
+                ],
+                "assumptions": [
+                    "CV1-A remains a narrow wave_start intake slice and does not absorb SEQ NEXT planning.",
+                    "Packet-friendly rendering remains additive convenience rather than packet-bus behavior.",
+                ],
+                "unknowns": [
+                    "Whether CV1-C later needs helper surfaces for packet rendering or local queue support.",
+                    "How much additional repo-intake structure improves reviewability before overbuilding the pilot.",
+                ],
+                "recent_change_notes": [
+                    "Meta reorientation set the coding vertical to packet/compiler-first and near enter-only UX.",
+                    "CV1-A must prove canonical fal run path artifact writing without widening into packet-bus scope.",
+                ],
+                "current_frontier": "CV1 Step 1 / CV1-A",
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        if request.step_id == "architect_critic":
+            _require_manager_context(request=request, required_step_id="repo_intake")
+            return {
+                "blockers_or_holds": [],
+                "shared_zone_cautions": [
+                    "cli/app.py is a Track A-owned shared boundary, so H4 artifact writing must stay minimal and additive.",
+                ],
+                "sequencing_risks": [
+                    "Do not absorb adapter product specialization or helper-platform scope into CV1-A before CV1-C.",
+                ],
+                "non_goals": [
+                    "No packet bus, inbox/outbox queue, or autonomous dispatch behavior in CV1-A.",
+                    "No SEQ NEXT planning artifact generation in the wave_start slice.",
+                ],
+                "next_recommended_action": "After CV1-A acceptance, open CV1-B and CV1-C in parallel.",
+                "role": request.role,
+                "prompt_version": request.prompt_version,
+            }
+
+        return {
+            "message": f"No specialized h4.wave_start.v1 output for step '{request.step_id}'.",
+            "role": request.role,
+            "model": request.model,
+            "model_policy_ref": request.model_policy_ref,
+            "prompt_version": request.prompt_version,
+        }
+
     def _build_h1_handoff_output(self, request: AdapterStepRequest) -> dict[str, Any]:
         idea = _clean_text(request.input_payload.get("idea"), fallback="Unspecified startup idea")
         intake_output = _step_output(request, "intake")
@@ -1039,15 +1236,18 @@ def _require_mock_list_field(
     step_id: str,
     output: Mapping[str, Any],
     field_name: str,
+    allow_empty: bool = False,
 ) -> list[Any]:
     value = output.get(field_name)
-    if isinstance(value, list) and value:
+    if isinstance(value, list) and (allow_empty or value):
         return list(value)
+
+    expected = "list" if allow_empty else "non-empty list"
 
     raise StepExecutionError(
         (
             "MockAdapter strict structured-output check failed: "
-            f"step '{request.step_id}' requires non-empty list field '{field_name}' from upstream step '{step_id}'."
+            f"step '{request.step_id}' requires {expected} field '{field_name}' from upstream step '{step_id}'."
         ),
         details={
             "workflow_id": request.workflow_id,

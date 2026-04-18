@@ -220,7 +220,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - memory policy is explicit, not accidental
 - identity behavior is explicit and versionable (profile changes traceable per run)
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 mainline is complete on Track C-owned scope through `R3-I` project-memory v1, and subsequent `R3-L` work closed on Track E/Track A scope; next Track C action follows Combined frontier and any explicit `CV1` activation)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; W2-S2 Step 2 Track C implementation batch is complete with `H2-K` + `H2-N`; Wave 3 mainline is complete on Track C-owned scope through `R3-I` project-memory v1 with later `R3-L` closed on Track E/Track A scope; coding-vertical `CV1-A` is now complete as a narrow `h4.wave_start.v1` intake slice, and next Track C side-vertical step is `CV1-B` while preserving Track D ownership of adapter/helper expansion)
 
 ---
 
@@ -1104,6 +1104,7 @@ Entries:
 - `[2026-04-16][Track E] R3-P completed (⬜ -> ✅ Track E Step 3 scope) - Track E delivered `docs/wave3/Wave3-W3-SB-TrackE-R3-P-H1-Real-Provider-Smoke-Evidence-v1.md` with bounded `h1.single.v1` + `openrouter` live+inspect evidence, added `r3_p_h1_real_provider_smoke` helper/script/tests, and enforced separate `track_e_evidence_ready` vs `real_provider_smoke_passed` semantics with provider/fallback truth read directly from canonical run artifacts.`
 - `[2026-04-16][Meta] Wave 3 cleanup/retro sync completed - coordination surfaces now record Wave 3 mainline plus side-batch as fully closed, stale post-closeout summary wording was removed, and `CV1` remains an explicit optional next side-vertical while broader provider parity/routing hardening stays Wave 4 scope - next: run the planned input/prompt audit before any `CV1` activation.`
 - `[2026-04-17][Meta] Coding-vertical reorientation closed - private coding-vertical canon now sharpens the near-term direction around a coordination layer (`packet law`, provenance, and cheaper operator transport), makes near `enter-only` flow the first UX target, keeps OpenCode as the practical shell and Combined as the live control surface, and defers guarded dispatch/session-bus behavior to later earned expansion - next: `CV1` may start only if explicitly chosen under this packet/compiler-first interpretation.`
+- `[2026-04-18][Track C] CV1-A completed (⬜ -> ✅) - Track C delivered `h4.wave_start.v1` as a narrow repo-intake manager slice with explicit role separation (`repo_intake`, `architect_critic`, `synthesizer`), canonical `context_report.json` sidecar writing on the existing `fal run` path (`workflow_id: h4`, `workflow_variant: h4.wave_start.v1`), and CLI-level integration proof while keeping adapter specialization/helper-surface widening out of CV1-A scope for later Track D-owned handling.`
 
 ---
 

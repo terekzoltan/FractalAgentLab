@@ -1589,7 +1589,7 @@ Near-term UX stance:
 - guarded dispatch or session-bus behavior belongs later only if evidence earns it
 
 Epics:
-- ⬜ **CV1-A** request normalization and repo-intake artifact — **Owner: Track C**
+- ✅ **CV1-A** request normalization and repo-intake artifact — **Owner: Track C**
 - ⬜ **CV1-B** implementation-plan artifact and risk register — **Owner: Track C**
 - ⬜ **CV1-C** minimal coordination-layer / helper surface for H4 — **Owner: Track D**
 - ⬜ **CV1-D** thin baseline/eval check for H4 usefulness — **Owner: Track E**
@@ -1622,11 +1622,11 @@ Epics:
 
 ### `CV1` — Execution Steps
 
-**⬜ Step 1 — Track C establishes the repo-aware intake first**
+**✅ Step 1 — Track C establishes the repo-aware intake first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent session | CV1-A | CV0-D ✅ + H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ + H2-E ✅ + H2-F ✅ + H2-G ✅ + H2-H ✅ | Start from actual repo intake and current Combined frontier, not only the user request |
+| Track C agent session | ✅ CV1-A | CV0-D ✅ + H2-A ✅ + H2-B ✅ + H2-C ✅ + H2-D ✅ + H2-E ✅ + H2-F ✅ + H2-G ✅ + H2-H ✅ | Delivered `h4.wave_start.v1` as a narrow 3-role manager intake path with canonical `context_report.json` sidecar proof on the `fal run` path and no adapter-surface widening |
 
 **⬜ Step 2 — planning artifacts and the minimal tool surface advance in parallel**
 
@@ -1876,6 +1876,7 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-15][Track D] R3-O started (⬜ -> 🔄) - Track D opened conservative failure/fallback hardening on top of `R3-N` routing law with explicit policy gates (`none` default, `conservative_mock` opt-in) and strict no-runtime-redesign guardrails.`
 - `[2026-04-15][Track D] R3-O completed (🔄 -> ✅) - Track D delivered single-attempt `openrouter -> mock` conservative fallback only for recoverable provider failures, kept router as selection-only truth, and added provider-attempt/fallback inspectability in step raw + failure details with bounded adapter/CLI tests and Wave 3 delivery documentation.`
 - `[2026-04-16][Track E] R3-P completed (⬜ -> ✅ Track E Step 3 scope) - Track E delivered `docs/wave3/Wave3-W3-SB-TrackE-R3-P-H1-Real-Provider-Smoke-Evidence-v1.md` with bounded `h1.single.v1` + `openrouter` live+inspect evidence, implemented artifact-backed helper/script/tests (`r3_p_h1_real_provider_smoke`), and kept `track_e_evidence_ready` separate from `real_provider_smoke_passed` while reading provider/fallback truth directly from canonical run artifacts.`
+- `[2026-04-18][Track C] CV1-A completed (⬜ -> ✅) - Track C delivered `h4.wave_start.v1` with a narrow manager topology (`repo_intake`, `architect_critic`, `synthesizer`), canonical `context_report.json` sidecar writing on the existing `fal run` path (`workflow_id: h4`, `workflow_variant: h4.wave_start.v1`), and CLI-level integration proof while deferring adapter specialization/helper-surface expansion to later CV1 steps.`
 
 ---
 
