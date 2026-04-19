@@ -1641,15 +1641,15 @@ Epics:
 |---------|---------|--------|-------|
 | Track E agent session | ✅ CV1-D | CV1-B ✅ + CV1-C ✅ | Delivered a thin inspect-first usefulness check with explicit `PASS` / `FAIL` / `BLOCKED` semantics, lane-split evidence (`seq_next` main verdict, `wave_start` additive packet legibility), and bounded canonical-artifact-first evaluation before Meta decides whether the H4 pilot should advance |
 
-**⬜ Step 4 — Meta closes the H4 pilot before any H5 slice is allowed to open**
+**✅ Step 4 — Meta closes the H4 pilot before any H5 slice is allowed to open**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | CV1-META1 | CV1-D ✅ | Decide whether `CV2` stays blocked and record what the H4 pilot actually taught |
+| Meta Coordinator session | ✅ CV1-META1 | CV1-D ✅ | Meta closed the thin H4 pilot, recorded that the pilot stack is implemented but current repo-visible usefulness evidence remains `BLOCKED` (`missing_canonical_run_trace_pair` for `h4.seq_next.v1`), and kept `CV2` blocked until real local H4 evidence exists |
 
 #### `CV2` — Thin `H5` review/gate slice
 
-**Status:** `🚫 blocked until CV1 evidence exists`  
+**Status:** `🚫 blocked after CV1-META1; current H4 usefulness evidence is BLOCKED because repo-visible local h4.seq_next.v1 run/trace/artifact corpus is not present`  
 **Owner priority:** Track E, with Track D support and Meta closeout
 
 Epics:
@@ -1664,7 +1664,7 @@ Epics:
 3. `CV2-D` after `CV2-C`
 
 **Prerequisites:**
-- `CV1-META1` ⬜
+- `CV1-META1` ✅
 - coding artifacts are stable enough to compare and review honestly
 - commit-gate semantics have at least one credible evidence cycle behind them
 

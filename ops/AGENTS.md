@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, and side-batch `R3-P` real-provider smoke/evidence closeout are complete on Track E scope)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, side-batch `R3-P` real-provider smoke/evidence closeout, and coding-vertical `CV1-D` thin H4 usefulness-check surface are complete on Track E scope, while the current Meta closeout still keeps `CV2` blocked because repo-visible local `h4.seq_next.v1` usefulness evidence is not yet present)
 
 ---
 
@@ -1108,6 +1108,8 @@ Entries:
 - `[2026-04-18][Track D] CV1-C started (⬜ -> 🔄) - Track D opened CV1 Step 2 helper/compiler work with strict guardrails: wave_start-only packet compilation derived from canonical H4 context-report truth, additive CLI hook only, and no queue/inbox/outbox or session-bus expansion.`
 - `[2026-04-18][Track D] CV1-C completed (🔄 -> ✅) - Track D delivered `docs/wave3/Wave3-CV1-C-TrackD-H4-Helper-Surface-v1.md` with a thin `tools` packet compiler (`wave_start` only), non-canonical packet sidecar writing under `artifacts/<run_id>/packets/`, and bounded tests proving compile/render/write behavior while explicitly deferring future `h4.seq_next.v1` runnable default-mock seam proof to a later narrow request if needed.`
 - `[2026-04-18][Track C] CV1-B completed (⬜ -> ✅) - Track C delivered `h4.seq_next.v1` as a separate planning workflow (`repo_intake`, `planner`, `architect_critic`, `synthesizer`) with required `implementation_plan.md` and `acceptance_checks.json` artifact writing on the canonical `fal run` path, embedded risk register in `implementation_plan.md`, and preserved caution/risk/non-goal surfaces through final output and artifacts; default-mock seq-next runnable proof remains an explicit shared-boundary checkpoint instead of silent adapter-surface widening.`
+- `[2026-04-19][Track E] CV1-D completed (⬜ -> ✅) - Track E delivered `docs/wave3/Wave3-CV1-D-TrackE-H4-Usefulness-Check-v1.md` plus an inspect-first H4 usefulness helper/script/tests with explicit `PASS` / `FAIL` / `BLOCKED` semantics, matched-task disclosure, main `seq_next` usefulness lane, and additive `wave_start` packet-legibility lane; packet evidence remains additive-only and empty baseline / non-success seq-next runs no longer permit false-green outcomes.`
+- `[2026-04-19][Meta] CV1-META1 completed (⬜ -> ✅) - Meta closed the thin H4 pilot, recorded that the implementation stack (`CV1-A` / `CV1-B` / `CV1-C` / `CV1-D`) is complete, but the current repo-visible usefulness evidence remains `BLOCKED` because no local `h4.seq_next.v1` run/trace/artifact corpus is present; `CV2` therefore remains blocked until real local H4 evidence exists.`
 
 ---
 
