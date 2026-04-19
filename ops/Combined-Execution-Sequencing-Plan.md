@@ -1635,11 +1635,11 @@ Epics:
 | Track C agent session | ✅ CV1-B | CV1-A ✅ | Delivered `h4.seq_next.v1` as a separate 4-role planning workflow with required `implementation_plan.md` + `acceptance_checks.json` artifact writing on canonical `fal run`; risk register remains embedded in the plan, caution/risk/non-goal fields are preserved, and the default-mock runnable seam is kept as an explicit shared-boundary checkpoint |
 | Track D agent session | ✅ CV1-C | CV1-A ✅ | Delivered a wave_start-only helper/compiler slice that derives packet sidecars from canonical `context_report.json`, writes non-canonical transport outputs under `artifacts/<run_id>/packets/`, and keeps queue/session-bus scope explicitly out |
 
-**⬜ Step 3 — Track E checks whether the H4 pilot is actually better than a freeform plan**
+**✅ Step 3 — Track E checks whether the H4 pilot is actually better than a freeform plan**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | CV1-D | CV1-B ✅ + CV1-C ✅ | The pilot is only worth keeping if it becomes more inspectable and useful than unstructured planning |
+| Track E agent session | ✅ CV1-D | CV1-B ✅ + CV1-C ✅ | Delivered a thin inspect-first usefulness check with explicit `PASS` / `FAIL` / `BLOCKED` semantics, lane-split evidence (`seq_next` main verdict, `wave_start` additive packet legibility), and bounded canonical-artifact-first evaluation before Meta decides whether the H4 pilot should advance |
 
 **⬜ Step 4 — Meta closes the H4 pilot before any H5 slice is allowed to open**
 
