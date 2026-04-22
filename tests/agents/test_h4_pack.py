@@ -56,11 +56,18 @@ class H4SeqNextPackTests(unittest.TestCase):
 
         planner = pack["h4_planner_agent"]
         self.assertEqual("specialist", planner.model_policy_ref)
-        self.assertEqual("h4/planner/v1", planner.metadata["prompt_version"])
+        self.assertEqual("h4/planner/v3", planner.metadata["prompt_version"])
+        self.assertIn("risk_register must be a non-empty JSON array of objects", planner.instructions)
+        self.assertIn("must each be non-empty JSON arrays of plain strings", planner.instructions)
 
         synthesizer = pack["h4_synthesizer_agent"]
         self.assertEqual("finalizer", synthesizer.model_policy_ref)
-        self.assertEqual("h4/synthesizer/v3", synthesizer.metadata["prompt_version"])
+        self.assertEqual("h4/synthesizer/v6", synthesizer.metadata["prompt_version"])
+        self.assertIn("Treat context.step_results as the only source of worker completion truth", synthesizer.instructions)
+        self.assertIn("Before choosing an action, inspect these exact worker ids in order", synthesizer.instructions)
+        self.assertIn("Never return finalize if any worker is missing", synthesizer.instructions)
+        self.assertIn("do not finalize yet; the next action must still be delegate architect_critic", synthesizer.instructions)
+        self.assertIn("Never convert risk_register rows into plain strings", synthesizer.instructions)
 
         for spec in pack.values():
             self.assertEqual([], spec.handoff_targets)
@@ -86,7 +93,7 @@ class H4SeqNextPackTests(unittest.TestCase):
         pack = build_h4_seq_next_agent_pack()
         pack["h4_planner_agent"].metadata["prompt_version"] = "h4/planner/v0"
 
-        with self.assertRaisesRegex(ValueError, "must use prompt_version 'h4/planner/v1'"):
+        with self.assertRaisesRegex(ValueError, "must use prompt_version 'h4/planner/v3'"):
             validate_h4_seq_next_agent_specs(pack)
 
 

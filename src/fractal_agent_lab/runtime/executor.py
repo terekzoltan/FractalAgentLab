@@ -604,6 +604,21 @@ class WorkflowExecutor:
             }
 
             if decision.action == ManagerAction.FINALIZE:
+                if workflow.metadata.get("strict_manager_control") is True:
+                    missing_workers = [
+                        step_id for step_id in worker_step_ids if step_id not in completed_workers
+                    ]
+                    if missing_workers:
+                        raise StepExecutionError(
+                            "Manager attempted finalize before all worker steps completed.",
+                            details={
+                                "workflow_id": workflow.workflow_id,
+                                "turn_index": turn_index,
+                                "completed_workers": sorted(completed_workers),
+                                "worker_step_ids": list(worker_step_ids),
+                                "missing_worker_step_ids": missing_workers,
+                            },
+                        )
                 manager_history.append(turn_record)
                 run_state.context["manager_orchestration"] = {
                     "manager_step_id": manager_step.step_id,

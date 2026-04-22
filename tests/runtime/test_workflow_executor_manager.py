@@ -144,6 +144,43 @@ class WorkflowExecutorManagerGuardrailTests(unittest.TestCase):
         self.assertTrue(run_state.errors)
         self.assertIn("no valid control envelope", run_state.errors[0].lower())
 
+    def test_strict_manager_control_rejects_finalize_before_all_workers_complete(self) -> None:
+        workflow = _build_manager_workflow(worker_step_ids=["worker_a", "worker_b"], max_turns=4)
+        workflow.metadata["strict_manager_control"] = True
+
+        def runner(*, run_state, workflow, step):
+            _ = workflow
+            if step.step_id == MANAGER_STEP_ID:
+                turn = int(run_state.context.get("turn", 0)) + 1
+                run_state.context["turn"] = turn
+                if turn == 1:
+                    return {
+                        "control": {
+                            "action": "delegate",
+                            "target_step_id": "worker_a",
+                            "reason": "first_only",
+                        },
+                    }
+                return {
+                    "control": {
+                        "action": "finalize",
+                        "reason": "premature_finalize",
+                        "output": {"result": "should_not_succeed"},
+                    },
+                }
+            return {"ok": step.step_id}
+
+        run_state = WorkflowExecutor(step_runner=runner).execute(workflow)
+
+        self.assertEqual(RunStatus.FAILED, run_state.status)
+        self.assertTrue(run_state.errors)
+        self.assertIn("finalize before all worker steps completed", run_state.errors[0].lower())
+        failure = run_state.failure or {}
+        details = failure.get("details") if isinstance(failure, dict) else {}
+        self.assertIsInstance(details, dict)
+        assert isinstance(details, dict)
+        self.assertEqual(["worker_b"], details.get("missing_worker_step_ids"))
+
 
 class WorkflowExecutorManagerParsingTests(unittest.TestCase):
     def test_first_valid_control_wins_nested_output_control(self) -> None:
