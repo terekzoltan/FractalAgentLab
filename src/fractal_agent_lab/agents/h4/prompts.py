@@ -4,7 +4,7 @@ from fractal_agent_lab.agents.h4.roles import H4SeqNextRole, H4WaveStartRole
 
 
 H4_WAVE_START_PROMPT_VERSION = "h4.wave_start.prompt.v1"
-H4_SEQ_NEXT_PROMPT_VERSION = "h4.seq_next.prompt.v1"
+H4_SEQ_NEXT_PROMPT_VERSION = "h4.seq_next.prompt.v2"
 
 
 WAVE_START_ROLE_PROMPT_VERSION: dict[H4WaveStartRole, str] = {
@@ -17,7 +17,7 @@ SEQ_NEXT_ROLE_PROMPT_VERSION: dict[H4SeqNextRole, str] = {
     H4SeqNextRole.REPO_INTAKE: "h4/repo_intake/v2",
     H4SeqNextRole.PLANNER: "h4/planner/v1",
     H4SeqNextRole.ARCHITECT_CRITIC: "h4/architect_critic/v2",
-    H4SeqNextRole.SYNTHESIZER: "h4/synthesizer/v2",
+    H4SeqNextRole.SYNTHESIZER: "h4/synthesizer/v3",
 }
 
 
@@ -65,13 +65,19 @@ SEQ_NEXT_PROMPTS_BY_ROLE: dict[H4SeqNextRole, str] = {
         "docs_required, blocking_conditions, next_recommended_action. Keep unresolved pressure visible. Do not emit manager control."
     ),
     H4SeqNextRole.SYNTHESIZER: (
-        "You are the H4 seq_next Synthesizer manager and finalizer. Use manager control envelope. If repo_intake is missing, "
-        "delegate repo_intake. Else if planner is missing, delegate planner. Else if architect_critic is missing, delegate "
-        "architect_critic. When all workers exist, finalize with control.output keys in this order: task_summary, intent, "
-        "repo_summary, changed_surfaces, relevant_docs, relevant_code_areas, likely_touched_files, assumptions, unknowns, "
-        "recent_change_notes, current_frontier, step_order, dependencies, test_plan, documentation_obligations, risk_register, "
-        "open_questions, blockers_or_holds, shared_zone_cautions, sequencing_risks, non_goals, functional_checks, tests_required, "
-        "docs_required, blocking_conditions, next_recommended_action. Preserve caution/risk/non-goal visibility and do not hide "
-        "uncertainty to make the plan look cleaner."
+        "You are the H4 seq_next Synthesizer manager and finalizer. Return exactly one top-level JSON object with a nested "
+        "'control' object. Never emit dotted keys like 'control.output', 'control.action', or 'control.target_step_id'. "
+        "If repo_intake is missing, return exactly {\"control\": {\"action\": \"delegate\", \"target_step_id\": "
+        "\"repo_intake\", \"reason\": \"missing_repo_intake_output\"}}. Else if planner is missing, return exactly "
+        "{\"control\": {\"action\": \"delegate\", \"target_step_id\": \"planner\", \"reason\": "
+        "\"missing_planner_output\"}}. Else if architect_critic is missing, return exactly {\"control\": {\"action\": "
+        "\"delegate\", \"target_step_id\": \"architect_critic\", \"reason\": \"missing_architect_critic_output\"}}. "
+        "When all workers exist, return exactly one top-level object shaped like {\"control\": {\"action\": \"finalize\", "
+        "\"reason\": \"all_workers_completed\", \"output\": {...}}}. The nested control.output object must contain these keys in "
+        "this exact order: task_summary, intent, repo_summary, changed_surfaces, relevant_docs, relevant_code_areas, likely_touched_files, "
+        "assumptions, unknowns, recent_change_notes, current_frontier, step_order, dependencies, test_plan, documentation_obligations, "
+        "risk_register, open_questions, blockers_or_holds, shared_zone_cautions, sequencing_risks, non_goals, functional_checks, "
+        "tests_required, docs_required, blocking_conditions, next_recommended_action. Preserve caution/risk/non-goal visibility and do "
+        "not hide uncertainty to make the plan look cleaner."
     ),
 }

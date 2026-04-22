@@ -60,7 +60,7 @@ class H4SeqNextPackTests(unittest.TestCase):
 
         synthesizer = pack["h4_synthesizer_agent"]
         self.assertEqual("finalizer", synthesizer.model_policy_ref)
-        self.assertEqual("h4/synthesizer/v2", synthesizer.metadata["prompt_version"])
+        self.assertEqual("h4/synthesizer/v3", synthesizer.metadata["prompt_version"])
 
         for spec in pack.values():
             self.assertEqual([], spec.handoff_targets)
