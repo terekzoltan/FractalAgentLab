@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from fractal_agent_lab.core.contracts import AgentSpec
 from fractal_agent_lab.core.errors import RuntimeBoundaryError
 
-SUPPORTED_PROVIDER_TARGETS: tuple[str, ...] = ("mock", "openrouter")
+SUPPORTED_PROVIDER_TARGETS: tuple[str, ...] = ("mock", "openai", "openrouter")
 SUPPORTED_FALLBACK_POLICIES: tuple[str, ...] = ("none", "conservative_mock")
 DEFAULT_PROVIDER_TARGET = "mock"
 DEFAULT_SELECTION_MODE = "explicit_v1"

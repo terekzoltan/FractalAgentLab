@@ -49,12 +49,26 @@ class ProviderRouterPolicyTests(unittest.TestCase):
 
     def test_rejects_unsupported_default_provider(self) -> None:
         router = ProviderRouter(
-            providers_config={"default_provider": "openai"},
+            providers_config={"default_provider": "unsupported-provider"},
             model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
         )
 
         with self.assertRaises(RuntimeBoundaryError):
             router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+    def test_accepts_openai_default_provider_when_enabled(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "openai",
+                "providers": {"openai": {"enabled": True}},
+            },
+            model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+        )
+
+        selection = router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("openai", selection.provider)
+        self.assertEqual("default_provider", selection.selection_source)
 
     def test_agent_metadata_provider_is_respected_when_enabled(self) -> None:
         router = ProviderRouter(
@@ -121,7 +135,16 @@ class ProviderOverridePolicyTests(unittest.TestCase):
         providers_config: dict[str, object] = {}
 
         with self.assertRaises(ValueError):
-            apply_provider_override(providers_config, "openai")
+            apply_provider_override(providers_config, "local")
+
+    def test_apply_provider_override_accepts_openai_and_enables_it(self) -> None:
+        providers_config: dict[str, object] = {}
+
+        apply_provider_override(providers_config, "OpenAI")
+
+        self.assertEqual("openai", providers_config["default_provider"])
+        providers_block = providers_config["providers"]
+        self.assertTrue(providers_block["openai"]["enabled"])
 
 
 if __name__ == "__main__":

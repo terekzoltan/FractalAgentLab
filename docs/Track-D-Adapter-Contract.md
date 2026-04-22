@@ -11,9 +11,9 @@ It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
 ## Wave
 
-- Current frontier: Wave 3 side-batch MVP closeout (`R3-M` + `R3-N` + `R3-O` + `R3-P`) is complete
-- Current scope: bounded first real-provider MVP for `h1.single.v1` with explicit routing/fallback policy and Track E smoke/evidence note
-- Out of scope: full provider parity, local-model runtime, advanced tool/handoff bridges, Wave 4 hardening
+- Current frontier: Wave 4 Sprint `W4-S1` Step 1 (`P4-A`) adds the second meaningful provider path
+- Current scope: bounded second real-provider adapter MVP for `h1.single.v1` without widening into cross-provider eval or routing-v2 hardening
+- Out of scope: full provider parity, local-model runtime, advanced tool/handoff bridges, Wave 4 Step 2+ epics (`P4-B`, `P4-C`, `P4-D`, `P4-E`, `P4-F`)
 
 ---
 
@@ -61,9 +61,9 @@ Core objects:
   - scripted responses (`step_id`, `agent_id`, `__default__`)
   - failure simulation via configured `fail_steps`
 
-- `OpenAICompatibleAdapter` (placeholder)
+- `OpenAICompatibleAdapter` (Wave 4 `P4-A` MVP)
   - path: `src/fractal_agent_lab/adapters/openai/adapter.py`
-  - currently raises `RuntimeBoundaryError`
+  - supports bounded real-provider Chat Completions path with explicit model requirement and strict JSON-object-only fail-loud parsing
 
 - `OpenRouterAdapter` (Wave 3 side-batch MVP)
   - path: `src/fractal_agent_lab/adapters/openrouter/adapter.py`
@@ -75,7 +75,7 @@ No silent provider fallback is allowed unless explicit fallback policy enables i
 
 ---
 
-## Provider and Model Routing (Wave 3 policy v1)
+## Provider and Model Routing (Wave 4 policy state)
 
 Routing helper lives in:
 
@@ -86,12 +86,13 @@ Input config sources:
 - `configs/providers.example.yaml`
 - `configs/model_policy.example.yaml`
 
-Wave 3 supported routing targets:
+Wave 4 supported routing targets:
 
 - `mock`
+- `openai`
 - `openrouter`
 
-Example config in Wave 3 only advertises these bounded targets.
+Example config now advertises these bounded Wave 4 targets.
 
 Provider resolution order (`explicit_v1`):
 
@@ -102,7 +103,7 @@ Provider resolution order (`explicit_v1`):
 Guardrails:
 
 - no `first enabled provider wins` behavior
-- `openai` and `local` are not Wave 3 routing targets
+- `local` is not a Wave 4 routing target in `P4-A`
 - unsupported or disabled explicit selections fail loudly
 
 Fallback policy values:
@@ -149,9 +150,9 @@ Runtime controls read from config shell:
 Provider override behavior:
 
 - uses the same provider-policy source as router selection
-- rejects unsupported targets (Wave 3: only `mock` and `openrouter`)
+- rejects unsupported targets (Wave 4: `mock`, `openai`, `openrouter`)
 - sets `default_provider` to the validated target
-- may enable the validated provider entry (`openrouter`) for that run
+- may enable the validated provider entry (`openai` or `openrouter`) for that run
 
 This keeps provider selection at the adapter/config boundary, not in core workflow logic,
 and avoids CLI-vs-router policy drift.
@@ -177,7 +178,7 @@ When fallback policy is active, `AdapterStepRunner` also annotates provider-atte
 ### Wave 0
 
 - `MockAdapter` is the only active execution path.
-- `OpenAICompatibleAdapter` and `OpenRouterAdapter` are placeholders only.
+- `OpenAICompatibleAdapter` and `OpenRouterAdapter` are placeholders only in this historical Wave 0 phase.
 - provider selection shell exists, but no real-provider execution claim is made.
 
 ### Wave 2

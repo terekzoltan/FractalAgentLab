@@ -92,7 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--provider",
         default=None,
-        help="Optional provider override (Wave 3: mock or openrouter)",
+        help="Optional provider override (Wave 4: mock, openai, or openrouter)",
     )
 
     trace_parser = subparsers.add_parser("trace", help="Inspect stored run traces")

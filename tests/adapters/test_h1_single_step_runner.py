@@ -137,6 +137,101 @@ class H1SingleStepRunnerTests(unittest.TestCase):
         self.assertEqual(1, len(step_payload["raw"]["provider_attempts"]))
         self.assertFalse(step_payload["raw"]["fallback"]["used"])
 
+    def test_h1_single_workflow_runs_with_openai_adapter_and_threads_openai_config(self) -> None:
+        workflow = build_h1_single_workflow_spec()
+
+        fake_response = _FakeHTTPResponse(
+            status_code=200,
+            body_text=json.dumps(
+                {
+                    "id": "resp-openai-1",
+                    "model": "openai/test-model",
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "clarified_idea": "AI founder copilot",
+                                        "strongest_assumptions": ["Founders need sharper positioning."],
+                                        "weak_points": ["Audience fit is still uncertain."],
+                                        "alternatives": ["Narrow to pre-seed founders only."],
+                                        "recommended_mvp_direction": "Start with a constrained refinement flow.",
+                                        "next_3_validation_steps": [
+                                            "Interview 3 founders",
+                                            "Run 5 guided sessions",
+                                            "Measure decision-speed delta",
+                                        ],
+                                    },
+                                ),
+                            },
+                        },
+                    ],
+                },
+            ),
+        )
+
+        captured_urls: list[str] = []
+
+        def _capture_openai_urlopen(request, timeout):
+            _ = timeout
+            captured_urls.append(request.full_url)
+            return fake_response
+
+        with (
+            patch.dict(
+                "os.environ",
+                {"CUSTOM_OPENAI_TEST_KEY": "test-key"},
+                clear=False,
+            ),
+            patch(
+                "fractal_agent_lab.adapters.openai.adapter.urlopen",
+                side_effect=_capture_openai_urlopen,
+            ),
+        ):
+            executor = WorkflowExecutor(
+                step_runner=build_step_runner(
+                    agent_specs_by_id=build_h1_single_agent_pack(),
+                    providers_config={
+                        "default_provider": "openai",
+                        "providers": {
+                            "openai": {
+                                "enabled": True,
+                                "api_key_env": "CUSTOM_OPENAI_TEST_KEY",
+                                "chat_completions_url": "https://api.example-openai.test/v1/chat/completions",
+                            },
+                        },
+                    },
+                    model_policy_config={
+                        "tier_defaults": {
+                            "finalizer": "openai/test-model",
+                        },
+                    },
+                ),
+            )
+
+            run_state = executor.execute(
+                workflow=workflow,
+                input_payload={"idea": "AI founder copilot for idea refinement"},
+            )
+
+        self.assertEqual(RunStatus.SUCCEEDED, run_state.status)
+        self.assertEqual(H1_SINGLE_WORKFLOW_ID, run_state.workflow_id)
+        self.assertIn(H1_SINGLE_STEP_ID, run_state.step_results)
+        self.assertEqual(["https://api.example-openai.test/v1/chat/completions"], captured_urls)
+
+        step_payload = run_state.step_results[H1_SINGLE_STEP_ID]
+        self.assertEqual("openai", step_payload["provider"])
+        self.assertEqual("openai/test-model", step_payload["model"])
+        self.assertTrue(step_payload["raw"]["openai"])
+        self.assertEqual("openai/test-model", step_payload["raw"]["requested_model"])
+        self.assertEqual("openai/test-model", step_payload["raw"]["response_model"])
+        self.assertEqual("openai", step_payload["raw"]["routing"]["selected_provider"])
+        self.assertEqual("default_provider", step_payload["raw"]["routing"]["selection_source"])
+        self.assertEqual("explicit_v1", step_payload["raw"]["routing"]["selection_mode"])
+        self.assertEqual("none", step_payload["raw"]["routing"]["fallback_policy"])
+        self.assertEqual(1, len(step_payload["raw"]["provider_attempts"]))
+        self.assertFalse(step_payload["raw"]["fallback"]["used"])
+
     def test_recoverable_openrouter_failure_uses_single_mock_fallback(self) -> None:
         workflow = build_h1_single_workflow_spec()
         mock_adapter = _RecordingMockAdapter()

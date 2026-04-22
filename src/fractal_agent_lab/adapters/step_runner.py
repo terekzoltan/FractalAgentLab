@@ -23,10 +23,11 @@ class AdapterStepRunner:
         if self.adapters_by_provider:
             return
         providers_block = _providers_block(self.router.providers_config)
+        openai_config = providers_block.get("openai", {})
         openrouter_config = providers_block.get("openrouter", {})
         self.adapters_by_provider = {
             "mock": MockAdapter(),
-            "openai": OpenAICompatibleAdapter(),
+            "openai": OpenAICompatibleAdapter(provider_config=openai_config),
             "openrouter": OpenRouterAdapter(provider_config=openrouter_config),
         }
 
