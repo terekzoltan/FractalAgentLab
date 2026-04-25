@@ -103,6 +103,37 @@ class ProviderRouterPolicyTests(unittest.TestCase):
 
         self.assertEqual("conservative_mock", selection.fallback_policy)
 
+    def test_rejects_conservative_mock_for_openai_provider(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "openai",
+                "routing": {"fallback_policy": "conservative_mock"},
+                "providers": {"openai": {"enabled": True}},
+            },
+            model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("openai", raised.exception.details["provider"])
+        self.assertEqual("conservative_mock", raised.exception.details["fallback_policy"])
+
+    def test_rejects_conservative_mock_for_mock_provider(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "mock",
+                "routing": {"fallback_policy": "conservative_mock"},
+            },
+            model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("mock", raised.exception.details["provider"])
+        self.assertEqual("openrouter -> mock", raised.exception.details["supported_fallback_route"])
+
     def test_rejects_unknown_fallback_policy(self) -> None:
         router = ProviderRouter(
             providers_config={"routing": {"fallback_policy": "always_mock"}},
@@ -111,6 +142,101 @@ class ProviderRouterPolicyTests(unittest.TestCase):
 
         with self.assertRaises(RuntimeBoundaryError):
             router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+    def test_rejects_malformed_routing_block_via_resolve(self) -> None:
+        router = ProviderRouter(
+            providers_config={"routing": "not-a-mapping"},
+            model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("routing", raised.exception.details["config_key"])
+
+    def test_rejects_malformed_providers_block_via_resolve(self) -> None:
+        router = ProviderRouter(
+            providers_config={"providers": "not-a-mapping"},
+            model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("providers", raised.exception.details["config_key"])
+
+    def test_rejects_malformed_tier_defaults_via_resolve(self) -> None:
+        router = ProviderRouter(
+            providers_config={"default_provider": "mock"},
+            model_policy_config={"tier_defaults": "not-a-mapping"},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("tier_defaults", raised.exception.details["config_key"])
+
+    def test_rejects_malformed_workflow_overrides_via_resolve(self) -> None:
+        router = ProviderRouter(
+            providers_config={"default_provider": "mock"},
+            model_policy_config={"workflow_overrides": "not-a-mapping"},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("workflow_overrides", raised.exception.details["config_key"])
+
+    def test_rejects_malformed_workflow_override_entry_via_resolve(self) -> None:
+        router = ProviderRouter(
+            providers_config={"default_provider": "mock"},
+            model_policy_config={"workflow_overrides": {"h1.single.v1": "not-a-mapping"}},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("h1.single.v1", raised.exception.details["workflow_id"])
+
+    def test_rejects_openai_without_resolved_model(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "openai",
+                "providers": {"openai": {"enabled": True}},
+            },
+            model_policy_config={},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("openai", raised.exception.details["provider"])
+        self.assertEqual("specialist", raised.exception.details["model_policy_ref"])
+
+    def test_rejects_openrouter_without_resolved_model(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "openrouter",
+                "providers": {"openrouter": {"enabled": True}},
+            },
+            model_policy_config={},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("openrouter", raised.exception.details["provider"])
+
+    def test_mock_provider_allows_missing_model(self) -> None:
+        router = ProviderRouter(
+            providers_config={"default_provider": "mock"},
+            model_policy_config={},
+        )
+
+        selection = router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("mock", selection.provider)
+        self.assertIsNone(selection.model)
 
 
 class ProviderOverridePolicyTests(unittest.TestCase):
@@ -145,6 +271,24 @@ class ProviderOverridePolicyTests(unittest.TestCase):
         self.assertEqual("openai", providers_config["default_provider"])
         providers_block = providers_config["providers"]
         self.assertTrue(providers_block["openai"]["enabled"])
+
+    def test_apply_provider_override_rejects_malformed_providers_block_for_openai(self) -> None:
+        providers_config: dict[str, object] = {"providers": "not-a-mapping"}
+
+        with self.assertRaises(ValueError) as raised:
+            apply_provider_override(providers_config, "openai")
+
+        self.assertIn("providers.providers must be a mapping", str(raised.exception))
+        self.assertEqual("not-a-mapping", providers_config["providers"])
+
+    def test_apply_provider_override_rejects_malformed_providers_block_for_openrouter(self) -> None:
+        providers_config: dict[str, object] = {"providers": "not-a-mapping"}
+
+        with self.assertRaises(ValueError) as raised:
+            apply_provider_override(providers_config, "openrouter")
+
+        self.assertIn("providers.providers must be a mapping", str(raised.exception))
+        self.assertEqual("not-a-mapping", providers_config["providers"])
 
 
 if __name__ == "__main__":

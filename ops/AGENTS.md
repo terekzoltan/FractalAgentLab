@@ -253,7 +253,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; coding-vertical `CV1-C` is now complete as a thin wave_start packet/helper slice, `CV1-B` is complete on Track C, and broader provider parity/routing hardening remains Wave 4 scope)
+**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; coding-vertical `CV1-C` is complete as a thin wave_start packet/helper slice; Wave 4 `P4-A` OpenAI-compatible adapter MVP and `P4-C` routing policy hardening v2 are complete; current Wave 4 blocker is `P4-B` real cross-provider PASS evidence before `P4-D` can open)
 
 ---
 
@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, side-batch `R3-P` real-provider smoke/evidence closeout, and coding-vertical `CV1-D` thin H4 usefulness-check surface are complete on Track E scope, while the current Meta closeout still keeps `CV2` blocked because repo-visible local `h4.seq_next.v1` usefulness evidence is not yet present)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, side-batch `R3-P` real-provider smoke/evidence closeout, and coding-vertical `CV1-D` thin H4 usefulness-check surface are complete; Wave 4 `P4-B` cross-provider smoke surface is implemented but still needs a real `openrouter` + `openai` PASS pair; post-CV1 live H4 evidence clears the old missing-evidence blocker for `CV2`, but `CV2` remains ready-but-inactive until explicitly chosen)
 
 ---
 
@@ -912,6 +912,10 @@ Phase rule:
 - after Wave 2 contract/replay/smoke hardening: thin `CV1` (`H4`) pilot
 - only later: thin `CV2` (`H5`) review/gate slice
 
+Current status note:
+- `CV1` is implemented and post-closeout live H4 evidence cleared the old missing-evidence blocker for `CV2`
+- `CV2` remains ready-but-inactive optional side-vertical work until explicitly chosen
+
 Near-term bias:
 - first improve packetization and operator transport
 - aim for near `enter-only` coordination before stronger session-to-session automation
@@ -1109,7 +1113,11 @@ Entries:
 - `[2026-04-18][Track D] CV1-C completed (🔄 -> ✅) - Track D delivered `docs/wave3/Wave3-CV1-C-TrackD-H4-Helper-Surface-v1.md` with a thin `tools` packet compiler (`wave_start` only), non-canonical packet sidecar writing under `artifacts/<run_id>/packets/`, and bounded tests proving compile/render/write behavior while explicitly deferring future `h4.seq_next.v1` runnable default-mock seam proof to a later narrow request if needed.`
 - `[2026-04-18][Track C] CV1-B completed (⬜ -> ✅) - Track C delivered `h4.seq_next.v1` as a separate planning workflow (`repo_intake`, `planner`, `architect_critic`, `synthesizer`) with required `implementation_plan.md` and `acceptance_checks.json` artifact writing on the canonical `fal run` path, embedded risk register in `implementation_plan.md`, and preserved caution/risk/non-goal surfaces through final output and artifacts; default-mock seq-next runnable proof remains an explicit shared-boundary checkpoint instead of silent adapter-surface widening.`
 - `[2026-04-19][Track E] CV1-D completed (⬜ -> ✅) - Track E delivered `docs/wave3/Wave3-CV1-D-TrackE-H4-Usefulness-Check-v1.md` plus an inspect-first H4 usefulness helper/script/tests with explicit `PASS` / `FAIL` / `BLOCKED` semantics, matched-task disclosure, main `seq_next` usefulness lane, and additive `wave_start` packet-legibility lane; packet evidence remains additive-only and empty baseline / non-success seq-next runs no longer permit false-green outcomes.`
-- `[2026-04-19][Meta] CV1-META1 completed (⬜ -> ✅) - Meta closed the thin H4 pilot, recorded that the implementation stack (`CV1-A` / `CV1-B` / `CV1-C` / `CV1-D`) is complete, but the current repo-visible usefulness evidence remains `BLOCKED` because no local `h4.seq_next.v1` run/trace/artifact corpus is present; `CV2` therefore remains blocked until real local H4 evidence exists.`
+- `[2026-04-19][Meta] CV1-META1 completed (⬜ -> ✅) - Meta closed the thin H4 pilot, recorded that the implementation stack (`CV1-A` / `CV1-B` / `CV1-C` / `CV1-D`) is complete, but closeout-time repo-visible usefulness evidence was `BLOCKED` because no local `h4.seq_next.v1` run/trace/artifact corpus was present; `CV2` was therefore kept blocked at closeout.`
+- `[2026-04-22][Meta] H4 live evidence blocker cleared - run `a887ffe1-617b-426b-a1bf-d7263d022673` produced the full `h4.seq_next.v1` manager chain plus canonical `implementation_plan.md` and `acceptance_checks.json`, and `CV1-D` is recorded as `PASS`; the old missing-evidence blocker is cleared, but `CV2` remains ready-but-inactive until explicitly chosen.`
+- `[2026-04-25][Track D] P4-A status synced - Wave 4 `P4-A` OpenAI-compatible adapter MVP is recorded complete from `docs/wave4/Wave4-W4-S1-TrackD-P4-A-OpenAI-Compatible-Adapter-MVP.md`; current Wave 4 frontier is parallel `P4-B` / `P4-C` when chosen.`
+- `[2026-04-25][Track D] P4-C accepted after Meta re-review - routing policy hardening v2 is complete with malformed-config fail-loud behavior, real-provider model requirements, and `conservative_mock` compatibility bounded to `openrouter -> mock`; next: keep provider-pressure hardening blocked until `P4-B` evidence closes.`
+- `[2026-04-25][Track E] P4-B evidence surface accepted but not closed - cross-provider smoke helper/script/tests/doc are implemented for `h1.single.v1`, but a real `openrouter` + `openai` PASS run pair is still required before `P4-B` can become ✅.`
 
 ---
 

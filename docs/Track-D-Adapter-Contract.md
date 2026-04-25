@@ -11,9 +11,11 @@ It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
 ## Wave
 
-- Current frontier: Wave 4 Sprint `W4-S1` Step 1 (`P4-A`) adds the second meaningful provider path
-- Current scope: bounded second real-provider adapter MVP for `h1.single.v1` without widening into cross-provider eval or routing-v2 hardening
-- Out of scope: full provider parity, local-model runtime, advanced tool/handoff bridges, Wave 4 Step 2+ epics (`P4-B`, `P4-C`, `P4-D`, `P4-E`, `P4-F`)
+- Current frontier: Wave 4 Sprint `W4-S1` Step 2 after `P4-A` completion
+- Completed Track D scope: `P4-A` OpenAI-compatible adapter MVP and `P4-C` routing policy hardening v2
+- Parallel evidence scope: `P4-B` remains Track E-owned cross-provider smoke comparison evidence, with Track D provider paths as inputs
+- Future Wave 4 scope: `P4-D` rate-limit/backoff hardening, optional `P4-E`, and `P4-F` routing guidance closeout
+- Out of scope for this contract state: local-model runtime, advanced tool/handoff bridges, provider scoring, and provider/model quality parity claims
 
 ---
 
@@ -103,13 +105,22 @@ Provider resolution order (`explicit_v1`):
 Guardrails:
 
 - no `first enabled provider wins` behavior
-- `local` is not a Wave 4 routing target in `P4-A`
+- `local` is not a Wave 4 routing target in `P4-A` / `P4-C`
 - unsupported or disabled explicit selections fail loudly
+- malformed routing/model-policy config blocks fail loudly instead of being silently coerced to empty mappings
+- real providers (`openai`, `openrouter`) require a resolved non-empty model at the routing boundary
 
 Fallback policy values:
 
 - default: `none`
 - opt-in: `conservative_mock`
+
+Fallback compatibility (`P4-C` hardening):
+
+- `conservative_mock` is valid only when the selected provider is `openrouter`
+- `openai + conservative_mock` fails loudly
+- `mock + conservative_mock` fails loudly
+- this mirrors the execution truth in `AdapterStepRunner`, where conservative fallback remains bounded to `openrouter -> mock`
 
 Model selection order:
 
@@ -238,6 +249,14 @@ When fallback policy is active, `AdapterStepRunner` also annotates provider-atte
 - routing policy becomes stronger and evidence-backed
 - rate-limit/backoff behavior is hardened
 - optional local-model experimentation remains contained
+
+#### Wave 4 Step 2B (`P4-C`) implementation shape
+
+- `selection_mode` remains `explicit_v1`; `P4-C` is policy hardening, not a config-mode rename
+- malformed provider/model-policy config blocks now fail loudly through `ProviderRouter.resolve(...)`
+- real-provider selections require a resolved non-empty model before adapter execution
+- `conservative_mock` compatibility is aligned with runtime truth and remains valid only for selected provider `openrouter`
+- `P4-C` does not claim `P4-B` cross-provider smoke comparison evidence, model-quality parity, or provider-quality parity
 
 ---
 

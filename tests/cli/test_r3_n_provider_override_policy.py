@@ -121,6 +121,35 @@ class R3NProviderOverridePolicyCliTests(unittest.TestCase):
         payload = json.loads(out.getvalue())
         self.assertEqual("succeeded", payload["summary"]["status"])
 
+    def test_run_rejects_provider_override_when_providers_block_is_malformed(self) -> None:
+        for provider in ("openai", "openrouter"):
+            with self.subTest(provider=provider):
+                with tempfile.TemporaryDirectory(prefix="fal-r3-n-cli-") as tmp_dir:
+                    tmp_path = Path(tmp_dir)
+                    runtime_config = _write_runtime_config(tmp_path)
+                    providers_config = _write_malformed_providers_config(tmp_path)
+                    out = io.StringIO()
+                    with redirect_stdout(out):
+                        code = run_cli(
+                            [
+                                "run",
+                                "h1.single.v1",
+                                "--input-json",
+                                '{"idea":"Provider override policy"}',
+                                "--format",
+                                "json",
+                                "--runtime-config",
+                                runtime_config.as_posix(),
+                                "--providers-config",
+                                providers_config.as_posix(),
+                                "--provider",
+                                provider,
+                            ],
+                        )
+
+                self.assertEqual(2, code)
+                self.assertIn("providers.providers must be a mapping", out.getvalue())
+
 
 def _write_runtime_config(data_dir: Path) -> Path:
     runtime_config = data_dir / "runtime.yaml"
@@ -140,6 +169,12 @@ def _write_runtime_config(data_dir: Path) -> Path:
         encoding="utf-8",
     )
     return runtime_config
+
+
+def _write_malformed_providers_config(data_dir: Path) -> Path:
+    providers_config = data_dir / "providers.json"
+    providers_config.write_text(json.dumps({"providers": "not-a-mapping"}), encoding="utf-8")
+    return providers_config
 
 
 class _FakeHTTPResponse:

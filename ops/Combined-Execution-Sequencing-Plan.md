@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-04-13
+**Last updated:** 2026-04-25
 
 ---
 
@@ -1172,9 +1172,9 @@ Mitigation:
 #### Sprint W4-S1 — Second-provider parity and routing hardening
 
 Epics:
-- ⬜ **P4-A** OpenAI-compatible adapter MVP / parity pass — **Owner: Track D**
-- ⬜ **P4-B** cross-provider smoke comparison (`openrouter` vs `openai`) — **Owner: Track E + Track D**
-- ⬜ **P4-C** routing policy hardening v2 — **Owner: Track D**
+- ✅ **P4-A** OpenAI-compatible adapter MVP / parity pass — **Owner: Track D**
+- 🔄 **P4-B** cross-provider smoke comparison (`openrouter` vs `openai`) — **Owner: Track E + Track D**
+- ✅ **P4-C** routing policy hardening v2 — **Owner: Track D**
 
 **Sequential ordering:**
 1. P4-A first (the second meaningful provider path must exist before parity comparison or routing hardening)
@@ -1187,18 +1187,18 @@ Epics:
 
 ### Sprint W4-S1 — Execution Steps
 
-**⬜ Step 1 — Track D lands the second meaningful provider path first**
+**✅ Step 1 — Track D lands the second meaningful provider path first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent session | P4-A | R3-M ✅ + R3-N ✅ + R3-O ✅ | Add the second real-provider path on top of the already working first-provider MVP |
+| Track D agent session | ✅ P4-A | R3-M ✅ + R3-N ✅ + R3-O ✅ | Delivered the OpenAI-compatible adapter MVP as the second real-provider path, bounded to `h1.single.v1` fake-transport proof and adapter-boundary parity; see `docs/wave4/Wave4-W4-S1-TrackD-P4-A-OpenAI-Compatible-Adapter-MVP.md` |
 
-**⬜ Step 2 — comparison and routing hardening advance in parallel**
+**🔄 Step 2 — comparison and routing hardening advance in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | P4-B | P4-A ✅ | Compare `openrouter` vs `openai` using a stable H1 path, not toy-only prompts |
-| Track D agent session | P4-C | P4-A ✅ | Improve routing policy with real-provider evidence, not config theory alone |
+| Track E agent session | 🔄 P4-B | P4-A ✅ | Comparison helper/script/tests/doc are implemented, but epic closeout still requires a real `openrouter` + `openai` `h1.single.v1` run pair with `PASS` |
+| Track D agent session | ✅ P4-C | P4-A ✅ | Routing policy hardening v2 landed: malformed config blocks fail loudly, real providers require resolved models, and `conservative_mock` stays bounded to `openrouter -> mock` |
 
 #### Sprint W4-S2 — Rate-limit/backoff and optional local widening
 
@@ -1487,8 +1487,10 @@ Reference:
 
 This is a planned side-vertical sequence, not the mainline queue.
 
-Wave 1 core closeout is complete and `CV0` is now closed.
-`CV1` is ready by named prerequisites but remains optional side-vertical work; `CV2` remains blocked until `CV1` evidence exists.
+Wave 1 core closeout is complete, `CV0` is closed, and `CV1` is implemented.
+The original `CV1-META1` closeout kept `CV2` blocked because local `h4.seq_next.v1` evidence was missing at that time.
+Post-closeout live hardening later produced a canonically complete `h4.seq_next.v1` evidence run, so the missing-evidence blocker is now cleared.
+`CV2` remains optional side-vertical work and must still be explicitly activated before any H5 implementation starts.
 
 Use this in the following order:
 
@@ -1592,8 +1594,8 @@ Epics:
 - ✅ **CV1-A** request normalization and repo-intake artifact — **Owner: Track C**
 - ✅ **CV1-B** implementation-plan artifact and risk register — **Owner: Track C**
 - ✅ **CV1-C** minimal coordination-layer / helper surface for H4 — **Owner: Track D**
-- ⬜ **CV1-D** thin baseline/eval check for H4 usefulness — **Owner: Track E**
-- ⬜ **CV1-META1** H4 pilot closeout and `CV2` readiness check — **Owner: Meta Coordinator**
+- ✅ **CV1-D** thin baseline/eval check for H4 usefulness — **Owner: Track E**
+- ✅ **CV1-META1** H4 pilot closeout and `CV2` readiness check — **Owner: Meta Coordinator**
 
 **Sequential ordering:**
 1. `CV1-A` first (repo-aware intake is the foundation of the pilot)
@@ -1645,11 +1647,17 @@ Epics:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | ✅ CV1-META1 | CV1-D ✅ | Meta closed the thin H4 pilot, recorded that the pilot stack is implemented but current repo-visible usefulness evidence remains `BLOCKED` (`missing_canonical_run_trace_pair` for `h4.seq_next.v1`), and kept `CV2` blocked until real local H4 evidence exists |
+| Meta Coordinator session | ✅ CV1-META1 | CV1-D ✅ | Meta closed the thin H4 pilot and, at that time, recorded usefulness evidence as `BLOCKED` because no local `h4.seq_next.v1` run/trace/artifact corpus was present; later live hardening produced the missing corpus and clears that specific blocker |
+
+Post-closeout evidence update:
+- live hardening run `a887ffe1-617b-426b-a1bf-d7263d022673` succeeded with the full `repo_intake -> planner -> architect_critic -> finalize` manager chain
+- canonical artifacts exist under `data/artifacts/a887ffe1-617b-426b-a1bf-d7263d022673/implementation_plan.md` and `data/artifacts/a887ffe1-617b-426b-a1bf-d7263d022673/acceptance_checks.json`
+- `CV1-D` rerun on that evidence is recorded as `PASS` in `docs/private/H4-SeqNext-Live-Hardening-Summary-v01.md`
+- this clears the old missing-evidence blocker, but does not automatically start `CV2`
 
 #### `CV2` — Thin `H5` review/gate slice
 
-**Status:** `🚫 blocked after CV1-META1; current H4 usefulness evidence is BLOCKED because repo-visible local h4.seq_next.v1 run/trace/artifact corpus is not present`  
+**Status:** `⬜ ready but not active; post-CV1 live H4 evidence cleared the old missing-evidence blocker, but CV2 requires explicit activation before work starts`  
 **Owner priority:** Track E, with Track D support and Meta closeout
 
 Epics:
@@ -1665,6 +1673,7 @@ Epics:
 
 **Prerequisites:**
 - `CV1-META1` ✅
+- post-CV1 live `h4.seq_next.v1` evidence exists and cleared the old missing-evidence blocker (`a887ffe1-617b-426b-a1bf-d7263d022673`)
 - coding artifacts are stable enough to compare and review honestly
 - commit-gate semantics have at least one credible evidence cycle behind them
 
@@ -1682,8 +1691,8 @@ Epics:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | CV2-A | CV1-META1 ✅ | Findings should be primary, severity-ordered, and artifactized |
-| Track D + Track E session | CV2-B | CV1-META1 ✅ | Capture actual test evidence or an explicit reason why it does not exist |
+| Track E agent session | CV2-A | CV1-META1 ✅ + H4 evidence ✅ | Findings should be primary, severity-ordered, and artifactized |
+| Track D + Track E session | CV2-B | CV1-META1 ✅ + H4 evidence ✅ | Capture actual test evidence or an explicit reason why it does not exist |
 
 **⬜ Step 2 — Track E makes the commit-gate decision only after review and evidence exist**
 
@@ -1880,6 +1889,10 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-18][Track D] CV1-C started (⬜ -> 🔄) - Track D opened CV1 Step 2 helper/compiler work with strict guardrails: wave_start-only packet compilation derived from canonical H4 context-report truth, additive CLI hook only, and no queue/inbox/outbox or session-bus expansion.`
 - `[2026-04-18][Track D] CV1-C completed (🔄 -> ✅) - Track D delivered `docs/wave3/Wave3-CV1-C-TrackD-H4-Helper-Surface-v1.md` with a thin `tools` packet compiler (`wave_start` only), non-canonical transport sidecar writing under `artifacts/<run_id>/packets/`, and bounded tests proving compile/render/write behavior while keeping Track C planning artifacts and future `h4.seq_next.v1` runnable mock-seam proof out of this step.`
 - `[2026-04-18][Track C] CV1-B completed (⬜ -> ✅) - Track C delivered `h4.seq_next.v1` as a separate planning workflow (`repo_intake`, `planner`, `architect_critic`, `synthesizer`) with required `implementation_plan.md` and `acceptance_checks.json` artifact writing on the canonical `fal run` path, preserved caution/risk/non-goal surfaces in finalized output/artifacts, and kept default-mock runnable proof as an explicit shared-boundary checkpoint rather than silently widening adapter ownership.`
+- `[2026-04-22][Meta] H4 live evidence blocker cleared - post-CV1 live hardening produced run `a887ffe1-617b-426b-a1bf-d7263d022673` with full manager chain, canonical `implementation_plan.md` + `acceptance_checks.json`, and `CV1-D PASS`; this clears the old missing-evidence blocker but does not auto-start `CV2` - next: treat `CV2` as ready-but-inactive optional side-vertical work until explicitly chosen.`
+- `[2026-04-25][Track D] P4-A status synced - Wave 4 `P4-A` OpenAI-compatible adapter MVP is recorded complete from `docs/wave4/Wave4-W4-S1-TrackD-P4-A-OpenAI-Compatible-Adapter-MVP.md`; active W4-S1 frontier moves to parallel `P4-B` / `P4-C` - next: Track E/Track D run cross-provider smoke comparison and routing hardening when chosen.`
+- `[2026-04-25][Track D] P4-C accepted after Meta re-review - routing policy hardening v2 now fail-louds malformed provider/model-policy blocks, requires resolved models for real providers, and keeps conservative fallback compatible only with `openrouter -> mock` - next: keep `P4-D` blocked until `P4-B` also reaches PASS.`
+- `[2026-04-25][Track E] P4-B surface accepted but evidence gate remains open - cross-provider smoke helper/script/tests/doc are implemented for `h1.single.v1`, but no real `openrouter` + `openai` PASS pair is recorded yet; `P4-B` remains 🔄 and Wave 4 `P4-D` remains blocked.`
 
 ---
 

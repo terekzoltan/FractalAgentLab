@@ -8,6 +8,7 @@ from fractal_agent_lab.core.errors import RuntimeBoundaryError
 
 SUPPORTED_PROVIDER_TARGETS: tuple[str, ...] = ("mock", "openai", "openrouter")
 SUPPORTED_FALLBACK_POLICIES: tuple[str, ...] = ("none", "conservative_mock")
+REAL_PROVIDER_TARGETS: tuple[str, ...] = ("openai", "openrouter")
 DEFAULT_PROVIDER_TARGET = "mock"
 DEFAULT_SELECTION_MODE = "explicit_v1"
 DEFAULT_FALLBACK_POLICY = "none"
@@ -36,6 +37,21 @@ class ProviderRouter:
         provider, selection_source = self._resolve_provider(agent_spec)
         policy_ref = agent_spec.model_policy_ref if agent_spec else self.default_policy_ref
         model = self._resolve_model(workflow_id=workflow_id, model_policy_ref=policy_ref)
+        self._assert_fallback_policy_compatible(
+            provider=provider,
+            fallback_policy=fallback_policy,
+            selection_source=selection_source,
+            selection_mode=selection_mode,
+        )
+        self._assert_model_available_for_provider(
+            workflow_id=workflow_id,
+            provider=provider,
+            model=model,
+            model_policy_ref=policy_ref,
+            selection_source=selection_source,
+            selection_mode=selection_mode,
+            fallback_policy=fallback_policy,
+        )
         return ProviderSelection(
             provider=provider,
             model=model,
@@ -144,36 +160,110 @@ class ProviderRouter:
             ) from error
 
     def _resolve_model(self, *, workflow_id: str, model_policy_ref: str | None) -> str | None:
-        workflow_overrides = self.model_policy_config.get("workflow_overrides", {})
-        if isinstance(workflow_overrides, Mapping):
-            workflow_map = workflow_overrides.get(workflow_id)
-            if isinstance(workflow_map, Mapping):
-                override = workflow_map.get(model_policy_ref or self.default_policy_ref)
-                if isinstance(override, str) and override:
-                    return override
+        workflow_overrides = self._model_policy_mapping("workflow_overrides")
+        workflow_map = workflow_overrides.get(workflow_id)
+        if workflow_map is not None and not isinstance(workflow_map, Mapping):
+            raise RuntimeBoundaryError(
+                "model_policy.workflow_overrides entry must be a mapping.",
+                details={
+                    "workflow_id": workflow_id,
+                    "workflow_override_type": type(workflow_map).__name__,
+                },
+            )
+        if isinstance(workflow_map, Mapping):
+            override = workflow_map.get(model_policy_ref or self.default_policy_ref)
+            if isinstance(override, str) and override:
+                return override
 
-        tier_defaults = self.model_policy_config.get("tier_defaults", {})
-        if isinstance(tier_defaults, Mapping):
-            candidate = tier_defaults.get(model_policy_ref or self.default_policy_ref)
-            if isinstance(candidate, str) and candidate:
-                return candidate
+        tier_defaults = self._model_policy_mapping("tier_defaults")
+        candidate = tier_defaults.get(model_policy_ref or self.default_policy_ref)
+        if isinstance(candidate, str) and candidate:
+            return candidate
 
-            fallback = tier_defaults.get(self.default_policy_ref)
-            if isinstance(fallback, str) and fallback:
-                return fallback
+        fallback = tier_defaults.get(self.default_policy_ref)
+        if isinstance(fallback, str) and fallback:
+            return fallback
         return None
 
+    def _assert_fallback_policy_compatible(
+        self,
+        *,
+        provider: str,
+        fallback_policy: str,
+        selection_source: str,
+        selection_mode: str,
+    ) -> None:
+        if fallback_policy != "conservative_mock":
+            return
+        if provider == "openrouter":
+            return
+        raise RuntimeBoundaryError(
+            "providers.routing.fallback_policy 'conservative_mock' is only valid with selected provider 'openrouter'.",
+            details={
+                "provider": provider,
+                "fallback_policy": fallback_policy,
+                "selection_source": selection_source,
+                "selection_mode": selection_mode,
+                "supported_fallback_route": "openrouter -> mock",
+            },
+        )
+
+    def _assert_model_available_for_provider(
+        self,
+        *,
+        workflow_id: str,
+        provider: str,
+        model: str | None,
+        model_policy_ref: str | None,
+        selection_source: str,
+        selection_mode: str,
+        fallback_policy: str,
+    ) -> None:
+        if provider not in REAL_PROVIDER_TARGETS:
+            return
+        if isinstance(model, str) and model.strip():
+            return
+        raise RuntimeBoundaryError(
+            "Real provider selection requires a resolved non-empty model.",
+            details={
+                "workflow_id": workflow_id,
+                "provider": provider,
+                "model_policy_ref": model_policy_ref,
+                "selection_source": selection_source,
+                "selection_mode": selection_mode,
+                "fallback_policy": fallback_policy,
+            },
+        )
+
     def _routing_block(self) -> Mapping[str, Any]:
-        routing = self.providers_config.get("routing", {})
-        if isinstance(routing, Mapping):
-            return routing
-        return {}
+        return self._providers_config_mapping("routing")
 
     def _providers_block(self) -> Mapping[str, Any]:
-        providers = self.providers_config.get("providers", {})
-        if isinstance(providers, Mapping):
-            return providers
-        return {}
+        return self._providers_config_mapping("providers")
+
+    def _providers_config_mapping(self, key: str) -> Mapping[str, Any]:
+        value = self.providers_config.get(key, {})
+        if isinstance(value, Mapping):
+            return value
+        raise RuntimeBoundaryError(
+            f"providers.{key} must be a mapping.",
+            details={
+                "config_key": key,
+                "value_type": type(value).__name__,
+            },
+        )
+
+    def _model_policy_mapping(self, key: str) -> Mapping[str, Any]:
+        value = self.model_policy_config.get(key, {})
+        if isinstance(value, Mapping):
+            return value
+        raise RuntimeBoundaryError(
+            f"model_policy.{key} must be a mapping.",
+            details={
+                "config_key": key,
+                "value_type": type(value).__name__,
+            },
+        )
 
     def _is_enabled(self, provider_name: str, providers_block: Mapping[str, Any]) -> bool:
         provider_entry = providers_block.get(provider_name)
@@ -217,12 +307,16 @@ def apply_provider_override(providers_config: dict[str, Any], provider: str | No
         return
 
     selected_provider = validate_provider_target(normalized)
-    providers_config["default_provider"] = selected_provider
 
-    providers_block = providers_config.get("providers")
-    if not isinstance(providers_block, dict):
+    if "providers" not in providers_config:
         providers_block = {}
         providers_config["providers"] = providers_block
+    else:
+        providers_block = providers_config["providers"]
+        if not isinstance(providers_block, dict):
+            raise ValueError("providers.providers must be a mapping.")
+
+    providers_config["default_provider"] = selected_provider
 
     if selected_provider == DEFAULT_PROVIDER_TARGET:
         return

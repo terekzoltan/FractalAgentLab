@@ -145,5 +145,30 @@ It is:
 
 - `CV1-META1`: complete
 - `CV1` H4 pilot: implemented as a thin planning companion stack
-- current usefulness evidence: `BLOCKED`
-- `CV2`: remains blocked
+- closeout-time usefulness evidence: `BLOCKED`
+- closeout-time `CV2` status: blocked
+
+---
+
+## Post-Closeout Evidence Update
+
+This section records later evidence and supersedes only the missing-evidence blocker above.
+It does not rewrite the original closeout decision retroactively.
+
+Later live hardening produced a real OpenRouter `h4.seq_next.v1` run with:
+
+- run id: `a887ffe1-617b-426b-a1bf-d7263d022673`
+- full manager chain: `repo_intake -> planner -> architect_critic -> finalize`
+- canonical `implementation_plan.md`
+- canonical `acceptance_checks.json`
+- `CV1-D` usefulness result recorded as `PASS`
+
+Reference:
+
+- `docs/private/H4-SeqNext-Live-Hardening-Summary-v01.md`
+
+Updated interpretation:
+
+- the original `missing_canonical_run_trace_pair` blocker is now cleared
+- `CV2` is no longer blocked by missing H4 usefulness evidence
+- `CV2` still does not start automatically; it remains an optional side-vertical slice requiring explicit activation
