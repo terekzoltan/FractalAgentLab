@@ -140,6 +140,12 @@ This implementation creates the Track E comparison surface. `P4-B` should not be
 
 If credentials, model mapping, network, or provider service availability blocks live proof, the report should remain `BLOCKED` and coordination should not mark `P4-B` complete.
 
+Current operator-state note:
+
+- live OpenAI evidence is currently blocked because no `OPENAI_API_KEY` is available
+- this is an external credential blocker, not a P4-B helper/script failure
+- OpenRouter-first Wave 4 hardening may continue only if it avoids provider-parity claims and keeps this live OpenAI proof deferred
+
 ---
 
 ## Downstream Note

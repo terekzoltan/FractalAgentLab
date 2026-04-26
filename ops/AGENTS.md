@@ -253,7 +253,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; coding-vertical `CV1-C` is complete as a thin wave_start packet/helper slice; Wave 4 `P4-A` OpenAI-compatible adapter MVP and `P4-C` routing policy hardening v2 are complete; current Wave 4 blocker is `P4-B` real cross-provider PASS evidence before `P4-D` can open)
+**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; coding-vertical `CV1-C` is complete as a thin wave_start packet/helper slice; Wave 4 `P4-A` OpenAI-compatible adapter MVP and `P4-C` routing policy hardening v2 are complete; `P4-B` live cross-provider PASS evidence is blocked by missing `OPENAI_API_KEY`; `P4-D` may open only as OpenRouter-first provider pressure hardening without cross-provider parity claims)
 
 ---
 
@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, side-batch `R3-P` real-provider smoke/evidence closeout, and coding-vertical `CV1-D` thin H4 usefulness-check surface are complete; Wave 4 `P4-B` cross-provider smoke surface is implemented but still needs a real `openrouter` + `openai` PASS pair; post-CV1 live H4 evidence clears the old missing-evidence blocker for `CV2`, but `CV2` remains ready-but-inactive until explicitly chosen)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, side-batch `R3-P` real-provider smoke/evidence closeout, and coding-vertical `CV1-D` thin H4 usefulness-check surface are complete; Wave 4 `P4-B` cross-provider smoke surface is implemented but live PASS is blocked by missing `OPENAI_API_KEY`; post-CV1 live H4 evidence clears the old missing-evidence blocker for `CV2`, but `CV2` remains ready-but-inactive until explicitly chosen)
 
 ---
 
@@ -1118,6 +1118,7 @@ Entries:
 - `[2026-04-25][Track D] P4-A status synced - Wave 4 `P4-A` OpenAI-compatible adapter MVP is recorded complete from `docs/wave4/Wave4-W4-S1-TrackD-P4-A-OpenAI-Compatible-Adapter-MVP.md`; current Wave 4 frontier is parallel `P4-B` / `P4-C` when chosen.`
 - `[2026-04-25][Track D] P4-C accepted after Meta re-review - routing policy hardening v2 is complete with malformed-config fail-loud behavior, real-provider model requirements, and `conservative_mock` compatibility bounded to `openrouter -> mock`; next: keep provider-pressure hardening blocked until `P4-B` evidence closes.`
 - `[2026-04-25][Track E] P4-B evidence surface accepted but not closed - cross-provider smoke helper/script/tests/doc are implemented for `h1.single.v1`, but a real `openrouter` + `openai` PASS run pair is still required before `P4-B` can become ✅.`
+- `[2026-04-25][Meta] OpenRouter-first W4-S2 exception accepted - `P4-B` remains blocked/deferred by missing `OPENAI_API_KEY`, but `P4-D` may open as OpenRouter-first rate-limit/backoff hardening without cross-provider parity claims; final provider-parity evidence remains blocked until a real OpenAI key exists.`
 
 ---
 

@@ -1173,7 +1173,7 @@ Mitigation:
 
 Epics:
 - ✅ **P4-A** OpenAI-compatible adapter MVP / parity pass — **Owner: Track D**
-- 🔄 **P4-B** cross-provider smoke comparison (`openrouter` vs `openai`) — **Owner: Track E + Track D**
+- 🚫 **P4-B** cross-provider smoke comparison (`openrouter` vs `openai`) — **Owner: Track E + Track D**
 - ✅ **P4-C** routing policy hardening v2 — **Owner: Track D**
 
 **Sequential ordering:**
@@ -1193,12 +1193,17 @@ Epics:
 |---------|---------|--------|-------|
 | Track D agent session | ✅ P4-A | R3-M ✅ + R3-N ✅ + R3-O ✅ | Delivered the OpenAI-compatible adapter MVP as the second real-provider path, bounded to `h1.single.v1` fake-transport proof and adapter-boundary parity; see `docs/wave4/Wave4-W4-S1-TrackD-P4-A-OpenAI-Compatible-Adapter-MVP.md` |
 
-**🔄 Step 2 — comparison and routing hardening advance in parallel**
+**🚫/✅ Step 2 — comparison evidence is blocked, routing hardening is complete**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | 🔄 P4-B | P4-A ✅ | Comparison helper/script/tests/doc are implemented, but epic closeout still requires a real `openrouter` + `openai` `h1.single.v1` run pair with `PASS` |
+| Track E agent session | 🚫 P4-B | P4-A ✅ | Comparison helper/script/tests/doc are implemented, but live `PASS` evidence is blocked by missing `OPENAI_API_KEY`; no provider-parity claim is made |
 | Track D agent session | ✅ P4-C | P4-A ✅ | Routing policy hardening v2 landed: malformed config blocks fail loudly, real providers require resolved models, and `conservative_mock` stays bounded to `openrouter -> mock` |
+
+Pragmatic gate decision:
+- `P4-B` remains blocked/deferred until an `OPENAI_API_KEY` exists and a real `openrouter` + `openai` run pair reaches `PASS`
+- because the operator runtime is OpenRouter-first, `P4-D` may open as **OpenRouter-first rate-limit/backoff hardening** without claiming cross-provider parity
+- this exception does not mark `P4-B` complete and does not permit provider-quality or OpenAI-live claims
 
 #### Sprint W4-S2 — Rate-limit/backoff and optional local widening
 
@@ -1208,8 +1213,8 @@ Epics:
 - ⬜ **P4-F** routing notes: which tasks deserve which model tier — **Owner: Track D + Meta**
 
 **Sequential ordering:**
-1. P4-D is the mainline hardening unit
-2. P4-E is an optional side lane (may overlap with P4-D if separate session capacity exists and no shared-surface conflict)
+1. P4-D is the mainline hardening unit and may start under the OpenRouter-first exception above
+2. P4-E is an optional side lane only by explicit choice; do not open it just because P4-D is open
 3. P4-F after P4-D (and optionally incorporating P4-E evidence if that experiment ran)
 
 **P4-E execution rule:**
@@ -1229,8 +1234,8 @@ Epics:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent session | P4-D | P4-A ✅ + P4-B ✅ + P4-C ✅ | Mainline hardening: provider pressure-handling |
-| Track D agent session (optional side lane) | P4-E | P4-A ✅ + P4-B ✅ + P4-C ✅ | Only if separate capacity; keep isolated from mainline paths |
+| Track D agent session | P4-D | P4-A ✅ + P4-C ✅ + P4-B implementation surface accepted / OpenAI live evidence deferred | OpenRouter-first provider pressure-handling; must not claim cross-provider parity |
+| Track D agent session (optional side lane) | P4-E | P4-D explicitly allowed or complete | Optional only by separate explicit choice; keep isolated from mainline paths |
 
 **⬜ Step 2 — Track D prepares routing guidance**
 
@@ -1249,6 +1254,11 @@ Epics:
 - routing policy is documented and evidence-backed
 - rate-limit/backoff behavior is documented and bounded
 - core logic does not fork per provider
+
+Current exception note:
+- OpenAI-compatible adapter behavior is proven by adapter-boundary/fake-transport evidence, but live OpenAI evidence is deferred until an `OPENAI_API_KEY` exists
+- Wave 4 may continue through OpenRouter-first hardening because the operator runtime path is OpenRouter-first
+- final provider-parity claims remain blocked until `P4-B` live evidence reaches `PASS`
 
 ---
 
@@ -1891,8 +1901,9 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-18][Track C] CV1-B completed (⬜ -> ✅) - Track C delivered `h4.seq_next.v1` as a separate planning workflow (`repo_intake`, `planner`, `architect_critic`, `synthesizer`) with required `implementation_plan.md` and `acceptance_checks.json` artifact writing on the canonical `fal run` path, preserved caution/risk/non-goal surfaces in finalized output/artifacts, and kept default-mock runnable proof as an explicit shared-boundary checkpoint rather than silently widening adapter ownership.`
 - `[2026-04-22][Meta] H4 live evidence blocker cleared - post-CV1 live hardening produced run `a887ffe1-617b-426b-a1bf-d7263d022673` with full manager chain, canonical `implementation_plan.md` + `acceptance_checks.json`, and `CV1-D PASS`; this clears the old missing-evidence blocker but does not auto-start `CV2` - next: treat `CV2` as ready-but-inactive optional side-vertical work until explicitly chosen.`
 - `[2026-04-25][Track D] P4-A status synced - Wave 4 `P4-A` OpenAI-compatible adapter MVP is recorded complete from `docs/wave4/Wave4-W4-S1-TrackD-P4-A-OpenAI-Compatible-Adapter-MVP.md`; active W4-S1 frontier moves to parallel `P4-B` / `P4-C` - next: Track E/Track D run cross-provider smoke comparison and routing hardening when chosen.`
-- `[2026-04-25][Track D] P4-C accepted after Meta re-review - routing policy hardening v2 now fail-louds malformed provider/model-policy blocks, requires resolved models for real providers, and keeps conservative fallback compatible only with `openrouter -> mock` - next: keep `P4-D` blocked until `P4-B` also reaches PASS.`
-- `[2026-04-25][Track E] P4-B surface accepted but evidence gate remains open - cross-provider smoke helper/script/tests/doc are implemented for `h1.single.v1`, but no real `openrouter` + `openai` PASS pair is recorded yet; `P4-B` remains 🔄 and Wave 4 `P4-D` remains blocked.`
+- `[2026-04-25][Track D] P4-C accepted after Meta re-review - routing policy hardening v2 now fail-louds malformed provider/model-policy blocks, requires resolved models for real providers, and keeps conservative fallback compatible only with `openrouter -> mock`; this satisfies the routing prerequisite for OpenRouter-first `P4-D` under the exception below.`
+- `[2026-04-25][Track E] P4-B surface accepted but evidence gate remains open - cross-provider smoke helper/script/tests/doc are implemented for `h1.single.v1`, but no real `openrouter` + `openai` PASS pair is recorded yet; `P4-B` remains blocked/deferred while OpenRouter-first `P4-D` may proceed without provider-parity claims under the exception below.`
+- `[2026-04-25][Meta] OpenRouter-first W4-S2 exception accepted - `P4-B` remains blocked/deferred by missing `OPENAI_API_KEY`, but `P4-D` may open as OpenRouter-first provider pressure hardening without cross-provider parity claims; final provider-parity evidence remains blocked until a real OpenAI key exists.`
 
 ---
 
