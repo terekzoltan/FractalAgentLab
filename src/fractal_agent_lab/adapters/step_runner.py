@@ -329,6 +329,9 @@ def _attempt_record(
             record["status_code"] = details.get("status_code")
         if "fallback_eligible" in details:
             record["fallback_eligible"] = bool(details.get("fallback_eligible"))
+        provider_retry = details.get("provider_retry")
+        if isinstance(provider_retry, Mapping):
+            record["provider_retry"] = dict(provider_retry)
     return record
 
 

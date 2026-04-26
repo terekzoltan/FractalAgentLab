@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from fractal_agent_lab.adapters.base import AdapterStepResult
 from fractal_agent_lab.adapters import build_step_runner
+from fractal_agent_lab.adapters.openrouter import OpenRouterAdapter
 from fractal_agent_lab.agents import build_h1_single_agent_pack
 from fractal_agent_lab.core.errors import StepExecutionError
 from fractal_agent_lab.core.models import RunStatus
@@ -355,6 +356,121 @@ class H1SingleStepRunnerTests(unittest.TestCase):
         self.assertEqual(RunStatus.FAILED, run_state.status)
         self.assertEqual(0, mock_adapter.calls)
 
+    def test_openrouter_retry_exhaustion_preserves_retry_evidence_after_mock_fallback(self) -> None:
+        workflow = build_h1_single_workflow_spec()
+        responses = [(429, "rate limited"), (429, "still limited")]
+
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            return responses.pop(0)
+
+        mock_adapter = _RecordingMockAdapter()
+        executor = WorkflowExecutor(
+            step_runner=build_step_runner(
+                agent_specs_by_id=build_h1_single_agent_pack(),
+                providers_config={
+                    "default_provider": "openrouter",
+                    "routing": {"fallback_policy": "conservative_mock"},
+                    "providers": {
+                        "openrouter": {
+                            "enabled": True,
+                        },
+                    },
+                },
+                model_policy_config={
+                    "tier_defaults": {
+                        "finalizer": "openrouter/test-model",
+                    },
+                },
+                adapters_by_provider={
+                    "openrouter": OpenRouterAdapter(
+                        provider_config={"retry": {"max_retries": 1, "backoff_seconds": 0.0}},
+                        environment={"OPENROUTER_API_KEY": "secret"},
+                        transport=fake_transport,
+                    ),
+                    "mock": mock_adapter,
+                },
+            ),
+        )
+
+        run_state = executor.execute(
+            workflow=workflow,
+            input_payload={"idea": "AI founder copilot for idea refinement"},
+        )
+
+        self.assertEqual(RunStatus.SUCCEEDED, run_state.status)
+        self.assertEqual(1, mock_adapter.calls)
+        step_payload = run_state.step_results[H1_SINGLE_STEP_ID]
+        self.assertEqual("mock", step_payload["provider"])
+        self.assertTrue(step_payload["raw"]["fallback"]["used"])
+        attempts = step_payload["raw"]["provider_attempts"]
+        self.assertEqual(2, len(attempts))
+        self.assertEqual("openrouter", attempts[0]["provider"])
+        self.assertEqual("failed", attempts[0]["outcome"])
+        self.assertTrue(attempts[0]["provider_retry"]["exhausted"])
+        self.assertEqual(429, attempts[0]["provider_retry"]["final_status_code"])
+        self.assertEqual("mock", attempts[1]["provider"])
+        self.assertEqual("succeeded", attempts[1]["outcome"])
+
+    def test_openrouter_retry_success_does_not_use_mock_fallback(self) -> None:
+        workflow = build_h1_single_workflow_spec()
+        responses = [(429, "rate limited"), (200, _openrouter_success_body())]
+
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            return responses.pop(0)
+
+        mock_adapter = _RecordingMockAdapter()
+        executor = WorkflowExecutor(
+            step_runner=build_step_runner(
+                agent_specs_by_id=build_h1_single_agent_pack(),
+                providers_config={
+                    "default_provider": "openrouter",
+                    "routing": {"fallback_policy": "conservative_mock"},
+                    "providers": {
+                        "openrouter": {
+                            "enabled": True,
+                        },
+                    },
+                },
+                model_policy_config={
+                    "tier_defaults": {
+                        "finalizer": "openrouter/test-model",
+                    },
+                },
+                adapters_by_provider={
+                    "openrouter": OpenRouterAdapter(
+                        provider_config={"retry": {"max_retries": 1, "backoff_seconds": 0.0}},
+                        environment={"OPENROUTER_API_KEY": "secret"},
+                        transport=fake_transport,
+                    ),
+                    "mock": mock_adapter,
+                },
+            ),
+        )
+
+        run_state = executor.execute(
+            workflow=workflow,
+            input_payload={"idea": "AI founder copilot for idea refinement"},
+        )
+
+        self.assertEqual(RunStatus.SUCCEEDED, run_state.status)
+        self.assertEqual(0, mock_adapter.calls)
+        step_payload = run_state.step_results[H1_SINGLE_STEP_ID]
+        self.assertEqual("openrouter", step_payload["provider"])
+        self.assertFalse(step_payload["raw"]["fallback"]["used"])
+        self.assertTrue(step_payload["raw"]["provider_retry"]["used"])
+        attempts = step_payload["raw"]["provider_attempts"]
+        self.assertEqual(1, len(attempts))
+        self.assertEqual("openrouter", attempts[0]["provider"])
+        self.assertEqual("succeeded", attempts[0]["outcome"])
+
 
 class _FakeHTTPResponse:
     def __init__(self, *, status_code: int, body_text: str) -> None:
@@ -374,6 +490,32 @@ class _FakeHTTPResponse:
 
     def read(self) -> bytes:
         return self._body
+
+
+def _openrouter_success_body() -> str:
+    return json.dumps(
+        {
+            "id": "resp-retry-success",
+            "model": "openrouter/test-model",
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "clarified_idea": "AI founder copilot",
+                                "strongest_assumptions": ["assumption"],
+                                "weak_points": ["weak"],
+                                "alternatives": ["alt"],
+                                "recommended_mvp_direction": "mvp",
+                                "next_3_validation_steps": ["step1", "step2", "step3"],
+                            },
+                        ),
+                    },
+                    "finish_reason": "stop",
+                },
+            ],
+        },
+    )
 
 
 class _FailingOpenRouterAdapter:

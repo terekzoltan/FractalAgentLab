@@ -11,3 +11,6 @@ providers:
   openrouter:
     enabled: false
     api_key_env: OPENROUTER_API_KEY
+    retry:
+      max_retries: 1
+      backoff_seconds: 0.0

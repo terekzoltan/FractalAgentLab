@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import os
+import time
 from typing import Any, Mapping, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -56,45 +57,18 @@ class OpenRouterAdapter:
         transport = self.transport or _urllib_transport
         url = self._chat_completions_url()
         timeout_seconds = self._timeout_seconds()
+        retry_policy = self._retry_policy()
 
-        try:
-            status_code, body_text = transport(
-                url=url,
-                headers=headers,
-                payload=payload,
-                timeout_seconds=timeout_seconds,
-            )
-        except URLError as error:
-            raise _step_failure(
-                "OpenRouter request failed.",
-                provider=self.name,
-                workflow_id=request.workflow_id,
-                step_id=request.step_id,
-                error=error,
-                fallback_eligible=True,
-                failure_stage="transport",
-            ) from error
-        except OSError as error:
-            raise _step_failure(
-                "OpenRouter transport failed.",
-                provider=self.name,
-                workflow_id=request.workflow_id,
-                step_id=request.step_id,
-                error=error,
-                fallback_eligible=True,
-                failure_stage="transport",
-            ) from error
-
-        if status_code < 200 or status_code >= 300:
-            raise _step_failure(
-                "OpenRouter returned a non-success status.",
-                provider=self.name,
-                workflow_id=request.workflow_id,
-                step_id=request.step_id,
-                status_code=status_code,
-                fallback_eligible=_is_recoverable_http_status(status_code),
-                failure_stage="http_status",
-            )
+        status_code, body_text, provider_retry = self._execute_transport_with_retries(
+            transport=transport,
+            url=url,
+            headers=headers,
+            payload=payload,
+            timeout_seconds=timeout_seconds,
+            workflow_id=request.workflow_id,
+            step_id=request.step_id,
+            retry_policy=retry_policy,
+        )
 
         response = _parse_json_object(
             body_text,
@@ -103,6 +77,7 @@ class OpenRouterAdapter:
             step_id=request.step_id,
             error_message="OpenRouter returned invalid JSON envelope.",
             failure_stage="response_envelope",
+            details=_retry_failure_details(provider_retry),
         )
 
         content_text = _extract_content_text(
@@ -110,6 +85,7 @@ class OpenRouterAdapter:
             provider=self.name,
             workflow_id=request.workflow_id,
             step_id=request.step_id,
+            details=_retry_failure_details(provider_retry),
         )
         output = _parse_json_object(
             content_text,
@@ -118,6 +94,7 @@ class OpenRouterAdapter:
             step_id=request.step_id,
             error_message="OpenRouter content is not valid JSON.",
             failure_stage="response_content",
+            details=_retry_failure_details(provider_retry),
         )
 
         response_model = response.get("model")
@@ -138,6 +115,7 @@ class OpenRouterAdapter:
                 "response_model": response_model if isinstance(response_model, str) and response_model else None,
                 "finish_reason": finish_reason,
                 "usage": dict(raw_usage),
+                "provider_retry": provider_retry,
             },
         )
 
@@ -177,6 +155,144 @@ class OpenRouterAdapter:
             "OpenRouter provider config 'timeout_seconds' must be a positive number.",
             details={"provider": self.name},
         )
+
+    def _retry_policy(self) -> "_RetryPolicy":
+        provider_config = self._provider_config()
+        if "retry" not in provider_config:
+            return _RetryPolicy(max_retries=0, backoff_seconds=0.0)
+        raw_retry = provider_config["retry"]
+        if not isinstance(raw_retry, Mapping):
+            raise _provider_config_error(
+                "OpenRouter provider config 'retry' must be a mapping.",
+                provider=self.name,
+                config_key="retry",
+                value=raw_retry,
+            )
+
+        raw_max_retries = raw_retry.get("max_retries", 0)
+        if not isinstance(raw_max_retries, int) or isinstance(raw_max_retries, bool) or not 0 <= raw_max_retries <= 3:
+            raise _provider_config_error(
+                "OpenRouter provider config 'retry.max_retries' must be an integer from 0 to 3.",
+                provider=self.name,
+                config_key="retry.max_retries",
+                value=raw_max_retries,
+            )
+
+        raw_backoff_seconds = raw_retry.get("backoff_seconds", 0.0)
+        if (
+            not isinstance(raw_backoff_seconds, (int, float))
+            or isinstance(raw_backoff_seconds, bool)
+            or not 0.0 <= float(raw_backoff_seconds) <= 10.0
+        ):
+            raise _provider_config_error(
+                "OpenRouter provider config 'retry.backoff_seconds' must be a number from 0.0 to 10.0.",
+                provider=self.name,
+                config_key="retry.backoff_seconds",
+                value=raw_backoff_seconds,
+            )
+
+        return _RetryPolicy(max_retries=raw_max_retries, backoff_seconds=float(raw_backoff_seconds))
+
+    def _execute_transport_with_retries(
+        self,
+        *,
+        transport: OpenRouterTransport,
+        url: str,
+        headers: Mapping[str, str],
+        payload: Mapping[str, Any],
+        timeout_seconds: float,
+        workflow_id: str,
+        step_id: str,
+        retry_policy: "_RetryPolicy",
+    ) -> tuple[int, str, dict[str, Any]]:
+        attempt_count = 0
+        while True:
+            attempt_count += 1
+            try:
+                status_code, body_text = transport(
+                    url=url,
+                    headers=headers,
+                    payload=payload,
+                    timeout_seconds=timeout_seconds,
+                )
+            except URLError as error:
+                if _should_retry(recoverable=True, attempt_count=attempt_count, retry_policy=retry_policy):
+                    _sleep_backoff(retry_policy.backoff_seconds)
+                    continue
+                provider_retry = _provider_retry_metadata(
+                    retry_policy=retry_policy,
+                    attempt_count=attempt_count,
+                    recoverable=True,
+                    final_status_code=None,
+                    failure_stage="transport",
+                    exhausted=True,
+                )
+                raise _step_failure(
+                    "OpenRouter request failed.",
+                    provider=self.name,
+                    workflow_id=workflow_id,
+                    step_id=step_id,
+                    error=error,
+                    fallback_eligible=True,
+                    failure_stage="transport",
+                    details={"provider_retry": provider_retry},
+                ) from error
+            except OSError as error:
+                if _should_retry(recoverable=True, attempt_count=attempt_count, retry_policy=retry_policy):
+                    _sleep_backoff(retry_policy.backoff_seconds)
+                    continue
+                provider_retry = _provider_retry_metadata(
+                    retry_policy=retry_policy,
+                    attempt_count=attempt_count,
+                    recoverable=True,
+                    final_status_code=None,
+                    failure_stage="transport",
+                    exhausted=True,
+                )
+                raise _step_failure(
+                    "OpenRouter transport failed.",
+                    provider=self.name,
+                    workflow_id=workflow_id,
+                    step_id=step_id,
+                    error=error,
+                    fallback_eligible=True,
+                    failure_stage="transport",
+                    details={"provider_retry": provider_retry},
+                ) from error
+
+            if status_code < 200 or status_code >= 300:
+                recoverable = _is_recoverable_http_status(status_code)
+                if _should_retry(recoverable=recoverable, attempt_count=attempt_count, retry_policy=retry_policy):
+                    _sleep_backoff(retry_policy.backoff_seconds)
+                    continue
+                provider_retry = _provider_retry_metadata(
+                    retry_policy=retry_policy,
+                    attempt_count=attempt_count,
+                    recoverable=recoverable,
+                    final_status_code=status_code,
+                    failure_stage="http_status",
+                    exhausted=recoverable,
+                )
+                raise _step_failure(
+                    "OpenRouter returned a non-success status.",
+                    provider=self.name,
+                    workflow_id=workflow_id,
+                    step_id=step_id,
+                    status_code=status_code,
+                    fallback_eligible=recoverable,
+                    failure_stage="http_status",
+                    details={"provider_retry": provider_retry},
+                )
+
+            provider_retry = _provider_retry_metadata(
+                retry_policy=retry_policy,
+                attempt_count=attempt_count,
+                recoverable=False,
+                final_status_code=None,
+                failure_stage=None,
+                exhausted=False,
+            )
+            return status_code, body_text, provider_retry
 
     def _chat_completions_url(self) -> str:
         explicit_url = self._provider_config().get("chat_completions_url")
@@ -251,6 +367,7 @@ def _parse_json_object(
     step_id: str,
     error_message: str,
     failure_stage: str,
+    details: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     try:
         parsed = json.loads(text)
@@ -263,8 +380,12 @@ def _parse_json_object(
             error=error,
             fallback_eligible=False,
             failure_stage=failure_stage,
+            details=details,
         ) from error
     if not isinstance(parsed, dict):
+        merged_details = {"error": "JSON root must be an object."}
+        if isinstance(details, Mapping):
+            merged_details.update(details)
         raise _step_failure(
             error_message,
             provider=provider,
@@ -272,7 +393,7 @@ def _parse_json_object(
             step_id=step_id,
             fallback_eligible=False,
             failure_stage=failure_stage,
-            details={"error": "JSON root must be an object."},
+            details=merged_details,
         )
     return parsed
 
@@ -283,6 +404,7 @@ def _extract_content_text(
     provider: str,
     workflow_id: str,
     step_id: str,
+    details: Mapping[str, Any] | None = None,
 ) -> str:
     choice = _first_choice(response)
     if not isinstance(choice, Mapping):
@@ -293,6 +415,7 @@ def _extract_content_text(
             step_id=step_id,
             fallback_eligible=False,
             failure_stage="response_content",
+            details=details,
         )
     message = choice.get("message")
     if not isinstance(message, Mapping):
@@ -303,6 +426,7 @@ def _extract_content_text(
             step_id=step_id,
             fallback_eligible=False,
             failure_stage="response_content",
+            details=details,
         )
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
@@ -313,6 +437,7 @@ def _extract_content_text(
             step_id=step_id,
             fallback_eligible=False,
             failure_stage="response_content",
+            details=details,
         )
     return content
 
@@ -329,6 +454,61 @@ def _first_choice(response: Mapping[str, Any]) -> Mapping[str, Any] | None:
 
 def _is_recoverable_http_status(status_code: int) -> bool:
     return status_code == 429 or status_code >= 500
+
+
+@dataclass(frozen=True, slots=True)
+class _RetryPolicy:
+    max_retries: int
+    backoff_seconds: float
+
+
+def _should_retry(*, recoverable: bool, attempt_count: int, retry_policy: _RetryPolicy) -> bool:
+    return recoverable and attempt_count <= retry_policy.max_retries
+
+
+def _provider_retry_metadata(
+    *,
+    retry_policy: _RetryPolicy,
+    attempt_count: int,
+    recoverable: bool,
+    final_status_code: int | None,
+    failure_stage: str | None,
+    exhausted: bool,
+) -> dict[str, Any]:
+    retry_count = max(0, attempt_count - 1)
+    return {
+        "used": retry_count > 0,
+        "max_retries": retry_policy.max_retries,
+        "attempt_count": attempt_count,
+        "retry_count": retry_count,
+        "recoverable": recoverable,
+        "final_status_code": final_status_code,
+        "failure_stage": failure_stage,
+        "exhausted": exhausted,
+    }
+
+
+def _retry_failure_details(provider_retry: Mapping[str, Any]) -> dict[str, Any] | None:
+    if provider_retry.get("used") is True:
+        return {"provider_retry": dict(provider_retry)}
+    return None
+
+
+def _sleep_backoff(backoff_seconds: float) -> None:
+    if backoff_seconds <= 0:
+        return
+    time.sleep(backoff_seconds)
+
+
+def _provider_config_error(message: str, *, provider: str, config_key: str, value: Any) -> RuntimeBoundaryError:
+    return RuntimeBoundaryError(
+        message,
+        details={
+            "provider": provider,
+            "config_key": config_key,
+            "value_type": type(value).__name__,
+        },
+    )
 
 
 def _serialize_user_payload(

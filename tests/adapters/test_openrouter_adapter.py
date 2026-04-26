@@ -222,6 +222,220 @@ class OpenRouterAdapterTests(unittest.TestCase):
         self.assertTrue(raised.exception.details["fallback_eligible"])
         self.assertEqual("transport", raised.exception.details["failure_stage"])
 
+    def test_retries_rate_limit_status_then_succeeds(self) -> None:
+        responses = [(429, "rate limited"), (200, _success_body())]
+
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            return responses.pop(0)
+
+        adapter = OpenRouterAdapter(
+            provider_config={"retry": {"max_retries": 1, "backoff_seconds": 0.0}},
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=fake_transport,
+        )
+
+        result = adapter.execute_step(_request())
+
+        provider_retry = result.raw["provider_retry"]
+        self.assertTrue(provider_retry["used"])
+        self.assertEqual(2, provider_retry["attempt_count"])
+        self.assertEqual(1, provider_retry["retry_count"])
+        self.assertFalse(provider_retry["exhausted"])
+        self.assertEqual([], responses)
+
+    def test_retries_server_error_status_then_succeeds(self) -> None:
+        responses = [(503, "service unavailable"), (200, _success_body())]
+
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            return responses.pop(0)
+
+        adapter = OpenRouterAdapter(
+            provider_config={"retry": {"max_retries": 1, "backoff_seconds": 0.0}},
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=fake_transport,
+        )
+
+        result = adapter.execute_step(_request())
+
+        self.assertEqual("ok", result.output["clarified_idea"])
+        self.assertTrue(result.raw["provider_retry"]["used"])
+        self.assertEqual(2, result.raw["provider_retry"]["attempt_count"])
+
+    def test_rate_limit_retry_exhaustion_preserves_retry_details(self) -> None:
+        responses = [(429, "rate limited"), (429, "still limited")]
+
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            return responses.pop(0)
+
+        adapter = OpenRouterAdapter(
+            provider_config={"retry": {"max_retries": 1, "backoff_seconds": 0.0}},
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=fake_transport,
+        )
+
+        with self.assertRaises(StepExecutionError) as raised:
+            adapter.execute_step(_request())
+
+        provider_retry = raised.exception.details["provider_retry"]
+        self.assertEqual(429, raised.exception.details["status_code"])
+        self.assertTrue(raised.exception.details["fallback_eligible"])
+        self.assertTrue(provider_retry["used"])
+        self.assertTrue(provider_retry["recoverable"])
+        self.assertTrue(provider_retry["exhausted"])
+        self.assertEqual(429, provider_retry["final_status_code"])
+        self.assertEqual("http_status", provider_retry["failure_stage"])
+        self.assertEqual(2, provider_retry["attempt_count"])
+        self.assertEqual(1, provider_retry["retry_count"])
+
+    def test_client_error_status_does_not_retry_when_retry_is_configured(self) -> None:
+        calls = 0
+
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            nonlocal calls
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            calls += 1
+            return 400, "bad request"
+
+        adapter = OpenRouterAdapter(
+            provider_config={"retry": {"max_retries": 3, "backoff_seconds": 0.0}},
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=fake_transport,
+        )
+
+        with self.assertRaises(StepExecutionError) as raised:
+            adapter.execute_step(_request())
+
+        provider_retry = raised.exception.details["provider_retry"]
+        self.assertEqual(1, calls)
+        self.assertFalse(raised.exception.details["fallback_eligible"])
+        self.assertFalse(provider_retry["used"])
+        self.assertFalse(provider_retry["recoverable"])
+        self.assertFalse(provider_retry["exhausted"])
+        self.assertEqual(400, provider_retry["final_status_code"])
+
+    def test_retries_url_error_then_succeeds(self) -> None:
+        responses = [URLError("network down"), (200, _success_body())]
+
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            response = responses.pop(0)
+            if isinstance(response, Exception):
+                raise response
+            return response
+
+        adapter = OpenRouterAdapter(
+            provider_config={"retry": {"max_retries": 1, "backoff_seconds": 0.0}},
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=fake_transport,
+        )
+
+        result = adapter.execute_step(_request())
+
+        self.assertEqual("ok", result.output["clarified_idea"])
+        self.assertTrue(result.raw["provider_retry"]["used"])
+        self.assertEqual(2, result.raw["provider_retry"]["attempt_count"])
+
+    def test_retries_os_error_then_succeeds(self) -> None:
+        responses = [OSError("socket reset"), (200, _success_body())]
+
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            response = responses.pop(0)
+            if isinstance(response, Exception):
+                raise response
+            return response
+
+        adapter = OpenRouterAdapter(
+            provider_config={"retry": {"max_retries": 1, "backoff_seconds": 0.0}},
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=fake_transport,
+        )
+
+        result = adapter.execute_step(_request())
+
+        self.assertEqual("ok", result.output["clarified_idea"])
+        self.assertTrue(result.raw["provider_retry"]["used"])
+        self.assertEqual(2, result.raw["provider_retry"]["attempt_count"])
+
+    def test_nonzero_backoff_uses_sleep_between_retries(self) -> None:
+        responses = [(503, "service unavailable"), (200, _success_body())]
+
+        def fake_transport(*, url, headers, payload, timeout_seconds):
+            _ = url
+            _ = headers
+            _ = payload
+            _ = timeout_seconds
+            return responses.pop(0)
+
+        adapter = OpenRouterAdapter(
+            provider_config={"retry": {"max_retries": 1, "backoff_seconds": 0.25}},
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=fake_transport,
+        )
+
+        with patch("fractal_agent_lab.adapters.openrouter.adapter.time.sleep") as sleep:
+            result = adapter.execute_step(_request())
+
+        self.assertEqual("ok", result.output["clarified_idea"])
+        sleep.assert_called_once_with(0.25)
+        self.assertTrue(result.raw["provider_retry"]["used"])
+
+    def test_invalid_retry_config_raises_runtime_boundary_error(self) -> None:
+        cases = [
+            ({"retry": None}, "retry"),
+            ({"retry": {"max_retries": -1}}, "retry.max_retries"),
+            ({"retry": {"max_retries": 4}}, "retry.max_retries"),
+            ({"retry": {"max_retries": "1"}}, "retry.max_retries"),
+            ({"retry": {"backoff_seconds": -1}}, "retry.backoff_seconds"),
+            ({"retry": {"backoff_seconds": 11}}, "retry.backoff_seconds"),
+        ]
+        for provider_config, config_key in cases:
+            with self.subTest(config_key=config_key, provider_config=provider_config):
+                adapter = OpenRouterAdapter(
+                    provider_config=provider_config,
+                    environment={"OPENROUTER_API_KEY": "secret"},
+                    transport=_unused_transport,
+                )
+
+                with self.assertRaises(RuntimeBoundaryError) as raised:
+                    adapter.execute_step(_request())
+
+                self.assertEqual("openrouter", raised.exception.details["provider"])
+                self.assertEqual(config_key, raised.exception.details["config_key"])
+
+    def test_malformed_retry_block_raises_runtime_boundary_error(self) -> None:
+        adapter = OpenRouterAdapter(
+            provider_config={"retry": "not-a-mapping"},
+            environment={"OPENROUTER_API_KEY": "secret"},
+            transport=_unused_transport,
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            adapter.execute_step(_request())
+
+        self.assertEqual("retry", raised.exception.details["config_key"])
+
     def test_invalid_content_json_raises_step_execution_error(self) -> None:
         def fake_transport(*, url, headers, payload, timeout_seconds):
             _ = url
@@ -283,6 +497,28 @@ def _request() -> AdapterStepRequest:
         model_policy_ref="finalizer",
         prompt_version="h1/single/v1",
         model="test-model",
+    )
+
+
+def _success_body() -> str:
+    return json.dumps(
+        {
+            "id": "resp-retry-success",
+            "model": "openrouter/test-model",
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "clarified_idea": "ok",
+                                "recommended_mvp_direction": "ship bounded retry",
+                            },
+                        ),
+                    },
+                    "finish_reason": "stop",
+                },
+            ],
+        },
     )
 
 

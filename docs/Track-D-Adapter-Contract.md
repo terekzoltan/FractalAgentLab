@@ -11,10 +11,10 @@ It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
 ## Wave
 
-- Current frontier: Wave 4 Sprint `W4-S1` Step 2 after `P4-A` completion
-- Completed Track D scope: `P4-A` OpenAI-compatible adapter MVP and `P4-C` routing policy hardening v2
+- Current frontier: Wave 4 Sprint `W4-S2` Step 2 (`P4-F`) technical routing notes after `P4-D` acceptance
+- Completed Track D scope: `P4-A` OpenAI-compatible adapter MVP, `P4-C` routing policy hardening v2, and `P4-D` rate-limit/backoff handling v1 (OpenRouter-first only)
 - Parallel evidence scope: `P4-B` remains Track E-owned cross-provider smoke comparison evidence, with Track D provider paths as inputs
-- Future Wave 4 scope: `P4-D` rate-limit/backoff hardening, optional `P4-E`, and `P4-F` routing guidance closeout
+- Future Wave 4 scope after `P4-D`: optional `P4-E` and `P4-F` routing guidance closeout
 - Out of scope for this contract state: local-model runtime, advanced tool/handoff bridges, provider scoring, and provider/model quality parity claims
 
 ---
@@ -257,6 +257,29 @@ When fallback policy is active, `AdapterStepRunner` also annotates provider-atte
 - real-provider selections require a resolved non-empty model before adapter execution
 - `conservative_mock` compatibility is aligned with runtime truth and remains valid only for selected provider `openrouter`
 - `P4-C` does not claim `P4-B` cross-provider smoke comparison evidence, model-quality parity, or provider-quality parity
+
+#### Wave 4 Step 1 (`P4-D`) implementation shape
+
+- `P4-D` is OpenRouter-first provider pressure handling under the W4-S2 exception
+- OpenRouter retry is opt-in under `providers.openrouter.retry`
+- missing retry config disables retry (`max_retries=0`, `backoff_seconds=0.0`)
+- explicit `retry: null` is malformed config and fails loudly
+- `max_retries` means extra HTTP attempts after the first attempt; valid range is integer `0..3`
+- `backoff_seconds` is a fixed delay between retry attempts; valid range is numeric `0.0..10.0`
+- malformed retry config fails loudly with `RuntimeBoundaryError`
+- retry-eligible pressure failures are HTTP `429`, HTTP `5xx`, `URLError`, and `OSError`
+- non-retryable failures include non-recoverable `4xx`, response-envelope parse failures, response-content JSON failures, and request serialization failures
+- retry evidence is reported as `provider_retry`, not by expanding `provider_attempts` into HTTP-level entries
+- `provider_attempts` remains adapter-level attempt truth; `provider_retry` summarizes HTTP retry behavior inside the OpenRouter adapter attempt
+- if OpenRouter retry exhausts and `conservative_mock` fallback succeeds, `AdapterStepRunner` preserves `provider_retry` on the failed OpenRouter provider attempt
+
+No claims:
+
+- no OpenAI retry support claim
+- no cross-provider parity claim
+- no `P4-B` completion claim
+- no fallback widening beyond existing `openrouter -> mock`
+- no `Retry-After` support in v1
 
 ---
 

@@ -253,7 +253,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; coding-vertical `CV1-C` is complete as a thin wave_start packet/helper slice; Wave 4 `P4-A` OpenAI-compatible adapter MVP and `P4-C` routing policy hardening v2 are complete; `P4-B` live cross-provider PASS evidence is blocked by missing `OPENAI_API_KEY`; `P4-D` may open only as OpenRouter-first provider pressure hardening without cross-provider parity claims)
+**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; coding-vertical `CV1-C` is complete as a thin wave_start packet/helper slice; Wave 4 `P4-A` OpenAI-compatible adapter MVP, `P4-C` routing policy hardening v2, and `P4-D` OpenRouter-first retry/backoff hardening are complete; `P4-B` live cross-provider PASS evidence remains blocked by missing `OPENAI_API_KEY`; next Track D mainline is `P4-F` technical routing notes unless optional `P4-E` is explicitly chosen)
 
 ---
 
@@ -1116,9 +1116,10 @@ Entries:
 - `[2026-04-19][Meta] CV1-META1 completed (⬜ -> ✅) - Meta closed the thin H4 pilot, recorded that the implementation stack (`CV1-A` / `CV1-B` / `CV1-C` / `CV1-D`) is complete, but closeout-time repo-visible usefulness evidence was `BLOCKED` because no local `h4.seq_next.v1` run/trace/artifact corpus was present; `CV2` was therefore kept blocked at closeout.`
 - `[2026-04-22][Meta] H4 live evidence blocker cleared - run `a887ffe1-617b-426b-a1bf-d7263d022673` produced the full `h4.seq_next.v1` manager chain plus canonical `implementation_plan.md` and `acceptance_checks.json`, and `CV1-D` is recorded as `PASS`; the old missing-evidence blocker is cleared, but `CV2` remains ready-but-inactive until explicitly chosen.`
 - `[2026-04-25][Track D] P4-A status synced - Wave 4 `P4-A` OpenAI-compatible adapter MVP is recorded complete from `docs/wave4/Wave4-W4-S1-TrackD-P4-A-OpenAI-Compatible-Adapter-MVP.md`; current Wave 4 frontier is parallel `P4-B` / `P4-C` when chosen.`
-- `[2026-04-25][Track D] P4-C accepted after Meta re-review - routing policy hardening v2 is complete with malformed-config fail-loud behavior, real-provider model requirements, and `conservative_mock` compatibility bounded to `openrouter -> mock`; next: keep provider-pressure hardening blocked until `P4-B` evidence closes.`
+- `[2026-04-25][Track D] P4-C accepted after Meta re-review - routing policy hardening v2 is complete with malformed-config fail-loud behavior, real-provider model requirements, and `conservative_mock` compatibility bounded to `openrouter -> mock`; this satisfies the routing prerequisite for OpenRouter-first `P4-D` under the Meta exception.`
 - `[2026-04-25][Track E] P4-B evidence surface accepted but not closed - cross-provider smoke helper/script/tests/doc are implemented for `h1.single.v1`, but a real `openrouter` + `openai` PASS run pair is still required before `P4-B` can become ✅.`
 - `[2026-04-25][Meta] OpenRouter-first W4-S2 exception accepted - `P4-B` remains blocked/deferred by missing `OPENAI_API_KEY`, but `P4-D` may open as OpenRouter-first rate-limit/backoff hardening without cross-provider parity claims; final provider-parity evidence remains blocked until a real OpenAI key exists.`
+- `[2026-04-26][Track D] P4-D accepted after Meta re-review - OpenRouter-first retry/backoff hardening is complete with opt-in retry config, fail-loud malformed retry blocks including explicit null, retry evidence preserved through direct OpenRouter and fallback-backed success paths, and no OpenAI/provider-parity claims - next: `P4-F` technical routing notes may start unless optional `P4-E` is explicitly chosen.`
 
 ---
 
