@@ -117,7 +117,10 @@ Guardrails:
 - `local` was not a Wave 4 routing target in `P4-A` / `P4-C`; it is added only by optional `P4-E`
 - unsupported or disabled explicit selections fail loudly
 - malformed routing/model-policy config blocks fail loudly instead of being silently coerced to empty mappings
-- `providers.<provider>.enabled` must be a real boolean when present; missing means disabled, and explicit non-boolean values fail loudly
+- `providers.<provider>.enabled` must be a real boolean when present for every provider, including `mock`
+- missing `enabled` means disabled for real providers, while `mock` remains the safe default and does not require an enabled entry
+- `providers.mock.enabled: false` is a valid boolean config value but does not disable the safe default `mock` route
+- explicit non-boolean `enabled` values fail loudly for every provider, including `mock`
 - real providers (`openai`, `openrouter`, `local`) require a resolved non-empty model at the routing boundary
 - no hidden local default model exists
 

@@ -106,6 +106,8 @@ class ProviderRouter:
         source: str,
     ) -> None:
         if provider_name == DEFAULT_PROVIDER_TARGET:
+            # Keep mock as the safe default while still rejecting malformed explicit config.
+            self._is_enabled(provider_name, providers_block)
             return
         if self._is_enabled(provider_name, providers_block):
             return

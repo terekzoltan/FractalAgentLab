@@ -21,6 +21,62 @@ class ProviderRouterPolicyTests(unittest.TestCase):
         self.assertEqual("explicit_v1", selection.selection_mode)
         self.assertEqual("none", selection.fallback_policy)
 
+    def test_mock_default_allows_missing_mock_provider_entry(self) -> None:
+        router = ProviderRouter(
+            providers_config={"default_provider": "mock", "providers": {}},
+            model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+        )
+
+        selection = router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("mock", selection.provider)
+        self.assertEqual("default_provider", selection.selection_source)
+
+    def test_mock_default_allows_missing_enabled_key(self) -> None:
+        router = ProviderRouter(
+            providers_config={"default_provider": "mock", "providers": {"mock": {}}},
+            model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+        )
+
+        selection = router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("mock", selection.provider)
+        self.assertEqual("default_provider", selection.selection_source)
+
+    def test_mock_default_allows_boolean_false_enabled(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "mock",
+                "providers": {"mock": {"enabled": False}},
+            },
+            model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+        )
+
+        selection = router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("mock", selection.provider)
+        self.assertEqual("default_provider", selection.selection_source)
+
+    def test_rejects_non_boolean_enabled_for_mock_default_provider(self) -> None:
+        malformed_values = ["false", "true", 1, 0, None]
+
+        for malformed_value in malformed_values:
+            with self.subTest(enabled=malformed_value):
+                router = ProviderRouter(
+                    providers_config={
+                        "default_provider": "mock",
+                        "providers": {"mock": {"enabled": malformed_value}},
+                    },
+                    model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+                )
+
+                with self.assertRaises(RuntimeBoundaryError) as raised:
+                    router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+                self.assertEqual("mock", raised.exception.details["provider"])
+                self.assertEqual("providers.mock.enabled", raised.exception.details["config_key"])
+                self.assertEqual(type(malformed_value).__name__, raised.exception.details["value_type"])
+
     def test_uses_explicit_default_provider_when_enabled(self) -> None:
         router = ProviderRouter(
             providers_config={
