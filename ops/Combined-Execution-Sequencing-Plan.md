@@ -1501,7 +1501,7 @@ This is a planned side-vertical sequence, not the mainline queue.
 Wave 1 core closeout is complete, `CV0` is closed, and `CV1` is implemented.
 The original `CV1-META1` closeout kept `CV2` blocked because local `h4.seq_next.v1` evidence was missing at that time.
 Post-closeout live hardening later produced a canonically complete `h4.seq_next.v1` evidence run, so the missing-evidence blocker is now cleared.
-`CV2` remains optional side-vertical work and must still be explicitly activated before any H5 implementation starts.
+`CV2` was explicitly activated on 2026-04-27 as a narrow H5 review/gate side-vertical; it remains subordinate to the main wave spine and does not imply implementation automation.
 
 Use this in the following order:
 
@@ -1664,16 +1664,16 @@ Post-closeout evidence update:
 - live hardening run `a887ffe1-617b-426b-a1bf-d7263d022673` succeeded with the full `repo_intake -> planner -> architect_critic -> finalize` manager chain
 - canonical artifacts exist under `data/artifacts/a887ffe1-617b-426b-a1bf-d7263d022673/implementation_plan.md` and `data/artifacts/a887ffe1-617b-426b-a1bf-d7263d022673/acceptance_checks.json`
 - `CV1-D` rerun on that evidence is recorded as `PASS` in `docs/private/H4-SeqNext-Live-Hardening-Summary-v01.md`
-- this clears the old missing-evidence blocker, but does not automatically start `CV2`
+- this cleared the old missing-evidence blocker at the time; explicit `CV2` activation is recorded below
 
 #### `CV2` — Thin `H5` review/gate slice
 
-**Status:** `⬜ ready but not active; post-CV1 live H4 evidence cleared the old missing-evidence blocker, but CV2 requires explicit activation before work starts`  
+**Status:** `🔄 active; Step 1 CV2-A/CV2-B evidence gathering is open after explicit activation on 2026-04-27`
 **Owner priority:** Track E, with Track D support and Meta closeout
 
 Epics:
-- ⬜ **CV2-A** findings-first review artifact — **Owner: Track E**
-- ⬜ **CV2-B** test-evidence capture artifact — **Owner: Track D + Track E**
+- 🔄 **CV2-A** findings-first review artifact — **Owner: Track E**
+- 🔄 **CV2-B** test-evidence capture artifact — **Owner: Track D + Track E**
 - ⬜ **CV2-C** explicit commit-gate artifact — **Owner: Track E**
 - ⬜ **CV2-D** policy feedback loop and private-learning note — **Owner: Meta Coordinator**
 
@@ -1698,12 +1698,12 @@ Epics:
 
 ### `CV2` — Execution Steps
 
-**⬜ Step 1 — review findings and test evidence are gathered in parallel**
+**🔄 Step 1 — review findings and test evidence are gathered in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | CV2-A | CV1-META1 ✅ + H4 evidence ✅ | Findings should be primary, severity-ordered, and artifactized |
-| Track D + Track E session | CV2-B | CV1-META1 ✅ + H4 evidence ✅ | Capture actual test evidence or an explicit reason why it does not exist |
+| Track E agent session | 🔄 CV2-A | CV1-META1 ✅ + H4 evidence ✅ | Findings should be primary, severity-ordered, and artifactized |
+| Track D + Track E session | 🔄 CV2-B | CV1-META1 ✅ + H4 evidence ✅ | Track D captures actual test evidence or an explicit reason why it does not exist; Track E sanity-checks evidence sufficiency before CV2-C |
 
 **⬜ Step 2 — Track E makes the commit-gate decision only after review and evidence exist**
 
@@ -1908,6 +1908,7 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-26][Track D] P4-D accepted after Meta re-review - OpenRouter-first retry/backoff handling v1 is complete with opt-in retry config, fail-loud malformed retry blocks including explicit null, retry evidence preserved through direct OpenRouter and fallback-backed success paths, and no OpenAI/provider-parity claims - next: `P4-F` technical routing notes may start; `P4-E` remains optional only by explicit choice.`
 - `[2026-04-27][Track D] P4-E accepted after Meta step review - optional local adapter MVP with routing integration is complete under explicit user choice, `local` remains disabled by default, requires explicit selection and a resolved model, preserves `openrouter -> mock` as the only conservative fallback route, and makes no live local/runtime/provider-parity claim - next: `P4-F` technical routing notes should incorporate P4-D + P4-E evidence.`
 - `[2026-04-27][Meta] P4-F policy closeout completed - Track D technical routing notes and Meta rollout guidance now define current provider route guidance, model-tier usage, and no-claim boundaries; Wave 4 provider-expansion work is operationally closed under the OpenRouter-first exception, while `P4-B` live provider-parity evidence remains blocked/deferred until `OPENAI_API_KEY` exists.`
+- `[2026-04-27][Meta] CV2 explicitly activated - thin H5 review/gate side-vertical Step 1 is now open with `CV2-A` Track E findings-first review artifact and `CV2-B` Track D then Track E test-evidence capture/sufficiency path running in parallel; this does not introduce implementation automation or change Wave 4 provider-parity blockers.`
 
 ---
 
