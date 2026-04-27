@@ -70,6 +70,35 @@ class ProviderRouterPolicyTests(unittest.TestCase):
         self.assertEqual("openai", selection.provider)
         self.assertEqual("default_provider", selection.selection_source)
 
+    def test_accepts_local_default_provider_when_enabled(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "local",
+                "providers": {"local": {"enabled": True}},
+            },
+            model_policy_config={"tier_defaults": {"specialist": "local/test-model"}},
+        )
+
+        selection = router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("local", selection.provider)
+        self.assertEqual("local/test-model", selection.model)
+        self.assertEqual("default_provider", selection.selection_source)
+
+    def test_rejects_disabled_local_default_provider(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "local",
+                "providers": {"local": {"enabled": False}},
+            },
+            model_policy_config={"tier_defaults": {"specialist": "local/test-model"}},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("local", raised.exception.details["provider"])
+
     def test_agent_metadata_provider_is_respected_when_enabled(self) -> None:
         router = ProviderRouter(
             providers_config={
@@ -132,6 +161,22 @@ class ProviderRouterPolicyTests(unittest.TestCase):
             router.resolve(workflow_id="h1.single.v1", agent_spec=None)
 
         self.assertEqual("mock", raised.exception.details["provider"])
+        self.assertEqual("openrouter -> mock", raised.exception.details["supported_fallback_route"])
+
+    def test_rejects_conservative_mock_for_local_provider(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "local",
+                "routing": {"fallback_policy": "conservative_mock"},
+                "providers": {"local": {"enabled": True}},
+            },
+            model_policy_config={"tier_defaults": {"specialist": "local/test-model"}},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("local", raised.exception.details["provider"])
         self.assertEqual("openrouter -> mock", raised.exception.details["supported_fallback_route"])
 
     def test_rejects_unknown_fallback_policy(self) -> None:
@@ -227,6 +272,20 @@ class ProviderRouterPolicyTests(unittest.TestCase):
 
         self.assertEqual("openrouter", raised.exception.details["provider"])
 
+    def test_rejects_local_without_resolved_model(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "local",
+                "providers": {"local": {"enabled": True}},
+            },
+            model_policy_config={},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("local", raised.exception.details["provider"])
+
     def test_mock_provider_allows_missing_model(self) -> None:
         router = ProviderRouter(
             providers_config={"default_provider": "mock"},
@@ -261,7 +320,16 @@ class ProviderOverridePolicyTests(unittest.TestCase):
         providers_config: dict[str, object] = {}
 
         with self.assertRaises(ValueError):
-            apply_provider_override(providers_config, "local")
+            apply_provider_override(providers_config, "unsupported-provider")
+
+    def test_apply_provider_override_accepts_local_and_enables_it(self) -> None:
+        providers_config: dict[str, object] = {}
+
+        apply_provider_override(providers_config, "Local")
+
+        self.assertEqual("local", providers_config["default_provider"])
+        providers_block = providers_config["providers"]
+        self.assertTrue(providers_block["local"]["enabled"])
 
     def test_apply_provider_override_accepts_openai_and_enables_it(self) -> None:
         providers_config: dict[str, object] = {}

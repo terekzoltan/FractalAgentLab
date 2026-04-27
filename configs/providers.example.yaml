@@ -5,6 +5,9 @@ routing:
   fallback_policy: none
 
 providers:
+  local:
+    enabled: false
+    endpoint_url: http://localhost:11434/fractal-agent-lab/v1/step
   openai:
     enabled: false
     api_key_env: OPENAI_API_KEY

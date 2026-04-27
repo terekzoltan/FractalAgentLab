@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Mapping
 
 from fractal_agent_lab.adapters.base import AdapterStepRequest, AdapterStepResult, ModelAdapter
+from fractal_agent_lab.adapters.local import LocalModelAdapter
 from fractal_agent_lab.adapters.mock import MockAdapter
 from fractal_agent_lab.adapters.openai import OpenAICompatibleAdapter
 from fractal_agent_lab.adapters.openrouter import OpenRouterAdapter
@@ -23,10 +24,12 @@ class AdapterStepRunner:
         if self.adapters_by_provider:
             return
         providers_block = _providers_block(self.router.providers_config)
+        local_config = providers_block.get("local", {})
         openai_config = providers_block.get("openai", {})
         openrouter_config = providers_block.get("openrouter", {})
         self.adapters_by_provider = {
             "mock": MockAdapter(),
+            "local": LocalModelAdapter(provider_config=local_config),
             "openai": OpenAICompatibleAdapter(provider_config=openai_config),
             "openrouter": OpenRouterAdapter(provider_config=openrouter_config),
         }

@@ -253,7 +253,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - model selection policy is explicit and inspectable
 - mock-backed orchestration evidence should fail loudly when prerequisite context is missing
 
-**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; coding-vertical `CV1-C` is complete as a thin wave_start packet/helper slice; Wave 4 `P4-A` OpenAI-compatible adapter MVP, `P4-C` routing policy hardening v2, and `P4-D` OpenRouter-first retry/backoff hardening are complete; `P4-B` live cross-provider PASS evidence remains blocked by missing `OPENAI_API_KEY`; next Track D mainline is `P4-F` technical routing notes unless optional `P4-E` is explicitly chosen)
+**Status:** `🔄 in progress` (Wave 3 side-batch MVP `R3-M` + `R3-N` + `R3-O` + `R3-P` is complete with Track B boundary signoff and Track E smoke/evidence closeout; coding-vertical `CV1-C` is complete as a thin wave_start packet/helper slice; Wave 4 `P4-A` OpenAI-compatible adapter MVP, `P4-C` routing policy hardening v2, `P4-D` OpenRouter-first retry/backoff hardening, and optional `P4-E` local adapter MVP with routing integration are complete; `P4-B` live cross-provider PASS evidence remains blocked by missing `OPENAI_API_KEY`; next Track D mainline is `P4-F` technical routing notes)
 
 ---
 
@@ -1120,6 +1120,7 @@ Entries:
 - `[2026-04-25][Track E] P4-B evidence surface accepted but not closed - cross-provider smoke helper/script/tests/doc are implemented for `h1.single.v1`, but a real `openrouter` + `openai` PASS run pair is still required before `P4-B` can become ✅.`
 - `[2026-04-25][Meta] OpenRouter-first W4-S2 exception accepted - `P4-B` remains blocked/deferred by missing `OPENAI_API_KEY`, but `P4-D` may open as OpenRouter-first rate-limit/backoff hardening without cross-provider parity claims; final provider-parity evidence remains blocked until a real OpenAI key exists.`
 - `[2026-04-26][Track D] P4-D accepted after Meta re-review - OpenRouter-first retry/backoff hardening is complete with opt-in retry config, fail-loud malformed retry blocks including explicit null, retry evidence preserved through direct OpenRouter and fallback-backed success paths, and no OpenAI/provider-parity claims - next: `P4-F` technical routing notes may start unless optional `P4-E` is explicitly chosen.`
+- `[2026-04-27][Track D] P4-E accepted after Meta step review - optional local adapter MVP with routing integration is complete under explicit user choice, `local` remains disabled by default, requires explicit selection and a resolved model, preserves `openrouter -> mock` as the only conservative fallback route, and makes no live local/runtime/provider-parity claim - next: `P4-F` technical routing notes should incorporate P4-D + P4-E evidence.`
 
 ---
 

@@ -97,6 +97,63 @@ class R3NProviderOverridePolicyCliTests(unittest.TestCase):
         self.assertEqual("openai", step_payload["raw"]["routing"]["selected_provider"])
         self.assertFalse(step_payload["raw"]["fallback"]["used"])
 
+    def test_run_accepts_supported_local_provider_override(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="fal-r3-n-cli-") as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            runtime_config = _write_runtime_config(tmp_path)
+            model_policy_config = _write_model_policy_config(tmp_path, model="local/test-model")
+            out = io.StringIO()
+            fake_response = _FakeHTTPResponse(
+                status_code=200,
+                body_text=json.dumps(
+                    {
+                        "model": "local/test-model",
+                        "output": {
+                            "clarified_idea": "Provider override policy",
+                            "strongest_assumptions": ["assumption"],
+                            "weak_points": ["weak"],
+                            "alternatives": ["alt"],
+                            "recommended_mvp_direction": "mvp",
+                            "next_3_validation_steps": ["s1", "s2", "s3"],
+                        },
+                    },
+                ),
+            )
+            with (
+                patch(
+                    "fractal_agent_lab.adapters.local.adapter.urlopen",
+                    return_value=fake_response,
+                ),
+                redirect_stdout(out),
+            ):
+                code = run_cli(
+                    [
+                        "run",
+                        "h1.single.v1",
+                        "--input-json",
+                        '{"idea":"Provider override policy"}',
+                        "--format",
+                        "json",
+                        "--runtime-config",
+                        runtime_config.as_posix(),
+                        "--model-policy-config",
+                        model_policy_config.as_posix(),
+                        "--provider",
+                        "local",
+                    ],
+                )
+
+        self.assertEqual(0, code)
+        payload = json.loads(out.getvalue())
+        self.assertEqual("succeeded", payload["summary"]["status"])
+        output_payload = payload["summary"]["output_payload"]
+        step_payload = output_payload["step_results"]["single"]
+        self.assertEqual("local", step_payload["provider"])
+        self.assertEqual("local/test-model", step_payload["model"])
+        self.assertTrue(step_payload["raw"]["local"])
+        self.assertEqual("local", step_payload["raw"]["routing"]["selected_provider"])
+        self.assertFalse(step_payload["raw"]["fallback"]["used"])
+
     def test_run_accepts_supported_mock_provider_override(self) -> None:
         with tempfile.TemporaryDirectory(prefix="fal-r3-n-cli-") as tmp_dir:
             runtime_config = _write_runtime_config(Path(tmp_dir))
@@ -122,7 +179,7 @@ class R3NProviderOverridePolicyCliTests(unittest.TestCase):
         self.assertEqual("succeeded", payload["summary"]["status"])
 
     def test_run_rejects_provider_override_when_providers_block_is_malformed(self) -> None:
-        for provider in ("openai", "openrouter"):
+        for provider in ("openai", "openrouter", "local"):
             with self.subTest(provider=provider):
                 with tempfile.TemporaryDirectory(prefix="fal-r3-n-cli-") as tmp_dir:
                     tmp_path = Path(tmp_dir)
@@ -169,6 +226,22 @@ def _write_runtime_config(data_dir: Path) -> Path:
         encoding="utf-8",
     )
     return runtime_config
+
+
+def _write_model_policy_config(data_dir: Path, *, model: str) -> Path:
+    model_policy_config = data_dir / "model_policy.yaml"
+    model_policy_config.write_text(
+        "\n".join(
+            [
+                "tier_defaults:",
+                f"  finalizer: {model}",
+                "workflow_overrides: {}",
+            ],
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return model_policy_config
 
 
 def _write_malformed_providers_config(data_dir: Path) -> Path:

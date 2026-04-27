@@ -1209,19 +1209,19 @@ Pragmatic gate decision:
 
 Epics:
 - ✅ **P4-D** rate-limit/backoff handling v1 — **Owner: Track D**
-- ⬜ **P4-E** optional local or secondary adapter experiment — **Owner: Track D**
+- ✅ **P4-E** optional local or secondary adapter experiment — **Owner: Track D**
 - ⬜ **P4-F** routing notes: which tasks deserve which model tier — **Owner: Track D + Meta**
 
 **Sequential ordering:**
 1. P4-D is the mainline hardening unit and is complete under the OpenRouter-first exception above
-2. P4-E is an optional side lane only by explicit choice; do not open it just because P4-D is open
-3. P4-F after P4-D (and optionally incorporating P4-E evidence if that experiment ran)
+2. P4-E was explicitly chosen as an optional local adapter MVP side lane after P4-D and is complete
+3. P4-F after P4-D, incorporating P4-E evidence because the optional experiment ran
 
 **P4-E execution rule:**
 - P4-E is explicitly optional and non-blocking for Wave 4 closure
-- If separate session capacity exists and the user explicitly chooses it: P4-E may run as an isolated optional side lane after P4-D acceptance
-- If no separate capacity or no explicit choice exists: P4-E remains inactive
-- P4-E must stay isolated from mainline provider paths regardless of timing
+- P4-E was explicitly chosen as a local adapter MVP with routing integration and completed after P4-D acceptance
+- P4-E remains optional/non-blocking for future Wave 4 closure decisions despite being completed here
+- P4-E evidence may feed P4-F but must stay isolated from provider-parity and P4-B claims
 
 **Execution assignment for co-owned epic:**
 - `P4-F`: **Track D -> Meta**
@@ -1230,18 +1230,18 @@ Epics:
 
 ### Sprint W4-S2 — Execution Steps
 
-**✅ Step 1 — Track D hardened rate-limit/backoff behavior (P4-E side lane not chosen)**
+**✅ Step 1 — Track D hardened provider pressure handling and completed the optional local adapter experiment**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track D agent session | ✅ P4-D | P4-A ✅ + P4-C ✅ + P4-B implementation surface accepted / OpenAI live evidence deferred | Completed OpenRouter-first retry/backoff provider pressure handling with opt-in config, retry inspectability, and no cross-provider parity claim |
-| Track D agent session (optional side lane) | P4-E | P4-D complete | Optional only by separate explicit choice; not chosen for this step and remains isolated from mainline paths |
+| Track D agent session (optional side lane) | ✅ P4-E | P4-D complete + explicit user choice | Completed local adapter MVP with routing integration, disabled-by-default config, fake-transport `h1.single.v1` proof, and no live local/provider-parity claim |
 
 **⬜ Step 2 — Track D prepares routing guidance**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent session | P4-F (technical routing notes) | P4-D ✅ | Prepare evidence-backed model-tier recommendations, incorporating `P4-E` only if that experiment actually ran |
+| Track D agent session | P4-F (technical routing notes) | P4-D ✅ + P4-E ✅ | Prepare evidence-backed model-tier recommendations, incorporating the completed optional local adapter experiment without making provider-parity claims |
 
 **⬜ Step 3 — Meta finalizes the rollout note**
 
@@ -1905,6 +1905,7 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-25][Track E] P4-B surface accepted but evidence gate remains open - cross-provider smoke helper/script/tests/doc are implemented for `h1.single.v1`, but no real `openrouter` + `openai` PASS pair is recorded yet; `P4-B` remains blocked/deferred while OpenRouter-first `P4-D` may proceed without provider-parity claims under the exception below.`
 - `[2026-04-25][Meta] OpenRouter-first W4-S2 exception accepted - `P4-B` remains blocked/deferred by missing `OPENAI_API_KEY`, but `P4-D` may open as OpenRouter-first provider pressure hardening without cross-provider parity claims; final provider-parity evidence remains blocked until a real OpenAI key exists.`
 - `[2026-04-26][Track D] P4-D accepted after Meta re-review - OpenRouter-first retry/backoff handling v1 is complete with opt-in retry config, fail-loud malformed retry blocks including explicit null, retry evidence preserved through direct OpenRouter and fallback-backed success paths, and no OpenAI/provider-parity claims - next: `P4-F` technical routing notes may start; `P4-E` remains optional only by explicit choice.`
+- `[2026-04-27][Track D] P4-E accepted after Meta step review - optional local adapter MVP with routing integration is complete under explicit user choice, `local` remains disabled by default, requires explicit selection and a resolved model, preserves `openrouter -> mock` as the only conservative fallback route, and makes no live local/runtime/provider-parity claim - next: `P4-F` technical routing notes should incorporate P4-D + P4-E evidence.`
 
 ---
 

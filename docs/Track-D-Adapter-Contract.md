@@ -3,7 +3,7 @@
 ## Purpose
 
 This note defines the Track D adapter boundary from Wave 0 foundations through the current
-Wave 3 side-batch policy state.
+Wave 4 provider-expansion policy state.
 
 It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
@@ -11,11 +11,11 @@ It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
 ## Wave
 
-- Current frontier: Wave 4 Sprint `W4-S2` Step 2 (`P4-F`) technical routing notes after `P4-D` acceptance
-- Completed Track D scope: `P4-A` OpenAI-compatible adapter MVP, `P4-C` routing policy hardening v2, and `P4-D` rate-limit/backoff handling v1 (OpenRouter-first only)
+- Current frontier: Wave 4 Sprint `W4-S2` Step 2 (`P4-F`) technical routing notes after `P4-E` acceptance
+- Completed Track D scope: `P4-A` OpenAI-compatible adapter MVP, `P4-C` routing policy hardening v2, `P4-D` rate-limit/backoff handling v1 (OpenRouter-first only), and optional `P4-E` local adapter MVP with routing integration
 - Parallel evidence scope: `P4-B` remains Track E-owned cross-provider smoke comparison evidence, with Track D provider paths as inputs
-- Future Wave 4 scope after `P4-D`: optional `P4-E` and `P4-F` routing guidance closeout
-- Out of scope for this contract state: local-model runtime, advanced tool/handoff bridges, provider scoring, and provider/model quality parity claims
+- Future Wave 4 scope after `P4-E`: `P4-F` routing guidance closeout
+- Out of scope for this contract state: live local runtime support claim, advanced tool/handoff bridges, provider scoring, and provider/model quality parity claims
 
 ---
 
@@ -72,6 +72,14 @@ Core objects:
   - supports one bounded real-provider path for `h1.single.v1`
   - strict JSON-object-only parse/fail-loud behavior remains MVP-scoped, not parity-complete
 
+- `LocalModelAdapter` (Wave 4 optional `P4-E` MVP)
+  - path: `src/fractal_agent_lab/adapters/local/adapter.py`
+  - supports an explicit local provider route behind disabled-by-default config
+  - requires explicit provider selection, enabled provider config, and resolved non-empty model
+  - uses a strict JSON HTTP endpoint contract for default transport and fake/injected transport for acceptance evidence
+  - supports JSON-object `output` or JSON-object OpenAI-style `choices[0].message.content`
+  - no live local runtime, model quality, or provider parity claim is made
+
 Safe default route remains `mock`.
 No silent provider fallback is allowed unless explicit fallback policy enables it.
 
@@ -93,6 +101,7 @@ Wave 4 supported routing targets:
 - `mock`
 - `openai`
 - `openrouter`
+- `local` (`P4-E` optional experimental route; disabled by default)
 
 Example config now advertises these bounded Wave 4 targets.
 
@@ -105,10 +114,11 @@ Provider resolution order (`explicit_v1`):
 Guardrails:
 
 - no `first enabled provider wins` behavior
-- `local` is not a Wave 4 routing target in `P4-A` / `P4-C`
+- `local` was not a Wave 4 routing target in `P4-A` / `P4-C`; it is added only by optional `P4-E`
 - unsupported or disabled explicit selections fail loudly
 - malformed routing/model-policy config blocks fail loudly instead of being silently coerced to empty mappings
-- real providers (`openai`, `openrouter`) require a resolved non-empty model at the routing boundary
+- real providers (`openai`, `openrouter`, `local`) require a resolved non-empty model at the routing boundary
+- no hidden local default model exists
 
 Fallback policy values:
 
@@ -119,6 +129,7 @@ Fallback compatibility (`P4-C` hardening):
 
 - `conservative_mock` is valid only when the selected provider is `openrouter`
 - `openai + conservative_mock` fails loudly
+- `local + conservative_mock` fails loudly
 - `mock + conservative_mock` fails loudly
 - this mirrors the execution truth in `AdapterStepRunner`, where conservative fallback remains bounded to `openrouter -> mock`
 
@@ -161,9 +172,9 @@ Runtime controls read from config shell:
 Provider override behavior:
 
 - uses the same provider-policy source as router selection
-- rejects unsupported targets (Wave 4: `mock`, `openai`, `openrouter`)
+- rejects unsupported targets (Wave 4: `mock`, `openai`, `openrouter`, `local`)
 - sets `default_provider` to the validated target
-- may enable the validated provider entry (`openai` or `openrouter`) for that run
+- may enable the validated provider entry (`openai`, `openrouter`, or `local`) for that run
 
 This keeps provider selection at the adapter/config boundary, not in core workflow logic,
 and avoids CLI-vs-router policy drift.
@@ -280,6 +291,28 @@ No claims:
 - no `P4-B` completion claim
 - no fallback widening beyond existing `openrouter -> mock`
 - no `Retry-After` support in v1
+
+#### Wave 4 Optional Step (`P4-E`) implementation shape
+
+- `P4-E` is an explicitly chosen optional local adapter MVP, not a Wave 4 closure prerequisite
+- `local` is added as a supported provider target only after `P4-C` hardening; this is a compatibility extension, not retroactive `P4-C` scope
+- local provider config remains disabled by default in `configs/providers.example.yaml`
+- selection stays explicit through agent metadata, `default_provider`, or CLI `--provider local`
+- local execution requires a resolved non-empty model from model policy; there is no hidden default local model
+- default local transport sends a strict JSON HTTP POST to `providers.local.endpoint_url`
+- injected/fake transport is accepted for tests and does not require `endpoint_url`
+- accepted response shapes are JSON-object `output` or JSON-object OpenAI-style `choices[0].message.content`
+- all malformed config, transport failure, non-success HTTP status, malformed envelope, and malformed content paths fail loudly
+- local adapter failures mark `fallback_eligible: false`
+- `conservative_mock` remains only `openrouter -> mock`; `local + conservative_mock` fails at routing compatibility
+
+No claims:
+
+- no live local runtime claim
+- no local model quality claim
+- no provider parity claim
+- no `P4-B` completion claim
+- no fallback widening beyond existing `openrouter -> mock`
 
 ---
 

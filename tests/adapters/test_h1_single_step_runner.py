@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from fractal_agent_lab.adapters.base import AdapterStepResult
 from fractal_agent_lab.adapters import build_step_runner
+from fractal_agent_lab.adapters.local import LocalModelAdapter
 from fractal_agent_lab.adapters.openrouter import OpenRouterAdapter
 from fractal_agent_lab.agents import build_h1_single_agent_pack
 from fractal_agent_lab.core.errors import StepExecutionError
@@ -132,6 +133,79 @@ class H1SingleStepRunnerTests(unittest.TestCase):
         self.assertEqual("openrouter/test-model", step_payload["raw"]["requested_model"])
         self.assertEqual("openrouter/test-model", step_payload["raw"]["response_model"])
         self.assertEqual("openrouter", step_payload["raw"]["routing"]["selected_provider"])
+        self.assertEqual("default_provider", step_payload["raw"]["routing"]["selection_source"])
+        self.assertEqual("explicit_v1", step_payload["raw"]["routing"]["selection_mode"])
+        self.assertEqual("none", step_payload["raw"]["routing"]["fallback_policy"])
+        self.assertEqual(1, len(step_payload["raw"]["provider_attempts"]))
+        self.assertFalse(step_payload["raw"]["fallback"]["used"])
+
+    def test_h1_single_workflow_runs_with_local_adapter_using_fake_transport(self) -> None:
+        workflow = build_h1_single_workflow_spec()
+        captured_payloads: list[dict[str, object]] = []
+
+        def fake_transport(*, url, payload, timeout_seconds):
+            self.assertEqual("local://injected-transport", url)
+            self.assertEqual(30.0, timeout_seconds)
+            captured_payloads.append(dict(payload))
+            return 200, json.dumps(
+                {
+                    "model": "local/test-model",
+                    "output": {
+                        "clarified_idea": "AI founder copilot",
+                        "strongest_assumptions": ["Founders need sharper positioning."],
+                        "weak_points": ["Audience fit is still uncertain."],
+                        "alternatives": ["Narrow to pre-seed founders only."],
+                        "recommended_mvp_direction": "Start with a constrained refinement flow.",
+                        "next_3_validation_steps": [
+                            "Interview 3 founders",
+                            "Run 5 guided sessions",
+                            "Measure decision-speed delta",
+                        ],
+                    },
+                },
+            )
+
+        executor = WorkflowExecutor(
+            step_runner=build_step_runner(
+                agent_specs_by_id=build_h1_single_agent_pack(),
+                providers_config={
+                    "default_provider": "local",
+                    "providers": {
+                        "local": {
+                            "enabled": True,
+                        },
+                    },
+                },
+                model_policy_config={
+                    "tier_defaults": {
+                        "finalizer": "local/test-model",
+                    },
+                },
+                adapters_by_provider={
+                    "local": LocalModelAdapter(transport=fake_transport),
+                    "mock": _RecordingMockAdapter(),
+                },
+            ),
+        )
+
+        run_state = executor.execute(
+            workflow=workflow,
+            input_payload={"idea": "AI founder copilot for idea refinement"},
+        )
+
+        self.assertEqual(RunStatus.SUCCEEDED, run_state.status)
+        self.assertEqual(1, len(captured_payloads))
+        request_payload = captured_payloads[0]["request"]
+        self.assertEqual(H1_SINGLE_WORKFLOW_ID, request_payload["workflow_id"])
+        self.assertEqual(H1_SINGLE_STEP_ID, request_payload["step_id"])
+
+        step_payload = run_state.step_results[H1_SINGLE_STEP_ID]
+        self.assertEqual("local", step_payload["provider"])
+        self.assertEqual("local/test-model", step_payload["model"])
+        self.assertTrue(step_payload["raw"]["local"])
+        self.assertEqual("local/test-model", step_payload["raw"]["requested_model"])
+        self.assertEqual("local/test-model", step_payload["raw"]["response_model"])
+        self.assertEqual("local", step_payload["raw"]["routing"]["selected_provider"])
         self.assertEqual("default_provider", step_payload["raw"]["routing"]["selection_source"])
         self.assertEqual("explicit_v1", step_payload["raw"]["routing"]["selection_mode"])
         self.assertEqual("none", step_payload["raw"]["routing"]["fallback_policy"])

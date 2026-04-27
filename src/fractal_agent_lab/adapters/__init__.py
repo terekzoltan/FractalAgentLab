@@ -3,6 +3,7 @@ from fractal_agent_lab.adapters.base import (
     AdapterStepResult,
     ModelAdapter,
 )
+from fractal_agent_lab.adapters.local import LocalModelAdapter
 from fractal_agent_lab.adapters.mock import MockAdapter
 from fractal_agent_lab.adapters.openai import OpenAICompatibleAdapter
 from fractal_agent_lab.adapters.openrouter import OpenRouterAdapter
@@ -13,6 +14,7 @@ __all__ = [
     "AdapterStepRequest",
     "AdapterStepResult",
     "AdapterStepRunner",
+    "LocalModelAdapter",
     "MockAdapter",
     "ModelAdapter",
     "OpenAICompatibleAdapter",
