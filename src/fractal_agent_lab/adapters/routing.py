@@ -269,8 +269,19 @@ class ProviderRouter:
         provider_entry = providers_block.get(provider_name)
         if not isinstance(provider_entry, Mapping):
             return False
-        enabled = provider_entry.get("enabled", False)
-        return bool(enabled)
+        if "enabled" not in provider_entry:
+            return False
+        enabled = provider_entry["enabled"]
+        if isinstance(enabled, bool):
+            return enabled
+        raise RuntimeBoundaryError(
+            f"providers.{provider_name}.enabled must be a boolean when provided.",
+            details={
+                "provider": provider_name,
+                "config_key": f"providers.{provider_name}.enabled",
+                "value_type": type(enabled).__name__,
+            },
+        )
 
 
 def supported_provider_targets() -> tuple[str, ...]:

@@ -99,6 +99,47 @@ class ProviderRouterPolicyTests(unittest.TestCase):
 
         self.assertEqual("local", raised.exception.details["provider"])
 
+    def test_missing_enabled_key_keeps_explicit_provider_disabled(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "openrouter",
+                "providers": {"openrouter": {}},
+            },
+            model_policy_config={"tier_defaults": {"specialist": "gpt-5.4-mini"}},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+        self.assertEqual("openrouter", raised.exception.details["provider"])
+        self.assertEqual("default_provider", raised.exception.details["source"])
+        self.assertNotIn("config_key", raised.exception.details)
+
+    def test_rejects_non_boolean_enabled_for_default_provider(self) -> None:
+        malformed_values = ["false", "true", 1, 0, None]
+        provider_models = {
+            "openrouter": "openrouter/test-model",
+            "local": "local/test-model",
+        }
+
+        for provider, model in provider_models.items():
+            for malformed_value in malformed_values:
+                with self.subTest(provider=provider, enabled=malformed_value):
+                    router = ProviderRouter(
+                        providers_config={
+                            "default_provider": provider,
+                            "providers": {provider: {"enabled": malformed_value}},
+                        },
+                        model_policy_config={"tier_defaults": {"specialist": model}},
+                    )
+
+                    with self.assertRaises(RuntimeBoundaryError) as raised:
+                        router.resolve(workflow_id="h1.single.v1", agent_spec=None)
+
+                    self.assertEqual(provider, raised.exception.details["provider"])
+                    self.assertEqual(f"providers.{provider}.enabled", raised.exception.details["config_key"])
+                    self.assertEqual(type(malformed_value).__name__, raised.exception.details["value_type"])
+
     def test_agent_metadata_provider_is_respected_when_enabled(self) -> None:
         router = ProviderRouter(
             providers_config={
@@ -117,6 +158,27 @@ class ProviderRouterPolicyTests(unittest.TestCase):
 
         self.assertEqual("openrouter", selection.provider)
         self.assertEqual("agent_metadata", selection.selection_source)
+
+    def test_rejects_non_boolean_enabled_for_agent_metadata_provider(self) -> None:
+        router = ProviderRouter(
+            providers_config={
+                "default_provider": "mock",
+                "providers": {"openrouter": {"enabled": "false"}},
+            },
+            model_policy_config={"tier_defaults": {"specialist": "openrouter/test-model"}},
+        )
+        agent_spec = AgentSpec(
+            agent_id="h1_single_agent",
+            role="h1.single",
+            metadata={"provider": "openrouter"},
+        )
+
+        with self.assertRaises(RuntimeBoundaryError) as raised:
+            router.resolve(workflow_id="h1.single.v1", agent_spec=agent_spec)
+
+        self.assertEqual("openrouter", raised.exception.details["provider"])
+        self.assertEqual("providers.openrouter.enabled", raised.exception.details["config_key"])
+        self.assertEqual("str", raised.exception.details["value_type"])
 
     def test_accepts_conservative_mock_fallback_policy(self) -> None:
         router = ProviderRouter(

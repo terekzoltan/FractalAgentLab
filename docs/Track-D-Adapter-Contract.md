@@ -11,10 +11,10 @@ It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
 ## Wave
 
-- Current frontier: Wave 4 Sprint `W4-S2` Step 2 (`P4-F`) technical routing notes delivered for Meta policy closeout
-- Completed Track D scope: `P4-A` OpenAI-compatible adapter MVP, `P4-C` routing policy hardening v2, `P4-D` rate-limit/backoff handling v1 (OpenRouter-first only), and optional `P4-E` local adapter MVP with routing integration
+- Current state: Wave 4 Sprint `W4-S2` `P4-F` technical routing notes and Meta policy closeout are complete
+- Completed Track D scope: `P4-A` OpenAI-compatible adapter MVP, `P4-C` routing policy hardening v2, `P4-D` rate-limit/backoff handling v1 (OpenRouter-first only), optional `P4-E` local adapter MVP with routing integration, and `P4-F` technical routing notes
 - Parallel evidence scope: `P4-B` remains Track E-owned cross-provider smoke comparison evidence, with Track D provider paths as inputs
-- Future Wave 4 scope after `P4-E`: `P4-F` routing guidance closeout
+- Post-closeout correction scope: provider enabled-flag fail-loud hardening; this is not a new Wave 4 feature
 - Out of scope for this contract state: live local runtime support claim, advanced tool/handoff bridges, provider scoring, and provider/model quality parity claims
 
 ---
@@ -117,6 +117,7 @@ Guardrails:
 - `local` was not a Wave 4 routing target in `P4-A` / `P4-C`; it is added only by optional `P4-E`
 - unsupported or disabled explicit selections fail loudly
 - malformed routing/model-policy config blocks fail loudly instead of being silently coerced to empty mappings
+- `providers.<provider>.enabled` must be a real boolean when present; missing means disabled, and explicit non-boolean values fail loudly
 - real providers (`openai`, `openrouter`, `local`) require a resolved non-empty model at the routing boundary
 - no hidden local default model exists
 
@@ -319,9 +320,17 @@ No claims:
 - `P4-F` is a docs-only technical routing note, not routing redesign
 - delivery note: `docs/wave4/Wave4-W4-S2-TrackD-P4-F-Technical-Routing-Notes-v1.md`
 - Track D scope is current routing law, model-tier observations, provider-route evidence maturity, and bounded recommendations
-- Meta owns final rollout/policy closeout
+- Meta owns final rollout/policy closeout, which is complete as `docs/wave4/Wave4-W4-S2-Meta-P4-F-Policy-Closeout-v1.md`
 - no code, adapter, routing implementation, or model-policy config changes are part of `P4-F`
 - `P4-F` does not close `P4-B` and does not make provider-parity, live-local, or OpenAI-retry claims
+
+#### Wave 4 post-closeout correction
+
+- provider enabled-flag strictness was hardened after Wave 4 deep review
+- missing provider entries and missing `enabled` keys remain disabled
+- explicit non-boolean `enabled` values are malformed config and fail loudly with provider/config details
+- this correction preserves the `P4-C` fail-loud routing contract and the `P4-E` local disabled-by-default safety boundary
+- this is not a new Wave 4 provider feature and does not change P4-B/provider-parity status
 
 ---
 
