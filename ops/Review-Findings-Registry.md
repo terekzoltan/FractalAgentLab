@@ -65,6 +65,7 @@ Use one or more of these labels when possible:
 | RF-2026-03-19-04 | 2026-03-19 | W1-S2 review | Medium | CLI summary treated manager runs as first-class but under-represented handoff and single variants | `surface_inconsistency` | Track A | fixed | when eval makes variants comparable, CLI summary should adopt a shared variant-aware output surface |
 | RF-2026-03-19-05 | 2026-03-19 | W1-S2 review | Low | JSON trace output omitted `parent_event_id` and `correlation_id`, weakening handoff-chain reconstruction | `surface_inconsistency` | Track A | fixed | trace export views should include the full versioned trace contract unless explicitly redacted |
 | RF-2026-04-26-01 | 2026-04-26 | W4-S2 P4-D review | Medium | explicit `providers.openrouter.retry: null` was treated like missing retry config instead of malformed config, weakening fail-loud config semantics | `contract_gap`, `missing_negative_test` | Track D | fixed | distinguish absent config keys from explicit null/malformed values in provider config validators and add negative tests for null config blocks |
+| RF-2026-04-27-01 | 2026-04-27 | CV2-A H5 review artifact | Medium | `providers.mock.enabled` can bypass the documented boolean-only enabled-flag strictness because the mock provider path returns before `_is_enabled()` validation | `contract_gap`, `missing_negative_test`, `docs_status_drift` | Track D | open | either validate malformed `providers.mock.enabled` before the mock fast path, or explicitly document and test a mock exemption |
 
 ---
 
