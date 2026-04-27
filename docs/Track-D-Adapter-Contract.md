@@ -11,7 +11,7 @@ It is intentionally minimal and aligned to Track B canonical runtime contracts.
 
 ## Wave
 
-- Current frontier: Wave 4 Sprint `W4-S2` Step 2 (`P4-F`) technical routing notes after `P4-E` acceptance
+- Current frontier: Wave 4 Sprint `W4-S2` Step 2 (`P4-F`) technical routing notes delivered for Meta policy closeout
 - Completed Track D scope: `P4-A` OpenAI-compatible adapter MVP, `P4-C` routing policy hardening v2, `P4-D` rate-limit/backoff handling v1 (OpenRouter-first only), and optional `P4-E` local adapter MVP with routing integration
 - Parallel evidence scope: `P4-B` remains Track E-owned cross-provider smoke comparison evidence, with Track D provider paths as inputs
 - Future Wave 4 scope after `P4-E`: `P4-F` routing guidance closeout
@@ -313,6 +313,15 @@ No claims:
 - no provider parity claim
 - no `P4-B` completion claim
 - no fallback widening beyond existing `openrouter -> mock`
+
+#### Wave 4 Step 2 (`P4-F`) technical routing notes
+
+- `P4-F` is a docs-only technical routing note, not routing redesign
+- delivery note: `docs/wave4/Wave4-W4-S2-TrackD-P4-F-Technical-Routing-Notes-v1.md`
+- Track D scope is current routing law, model-tier observations, provider-route evidence maturity, and bounded recommendations
+- Meta owns final rollout/policy closeout
+- no code, adapter, routing implementation, or model-policy config changes are part of `P4-F`
+- `P4-F` does not close `P4-B` and does not make provider-parity, live-local, or OpenAI-retry claims
 
 ---
 
