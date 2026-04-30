@@ -59,15 +59,15 @@ target_artifacts:
   - docs/private/CV2-C-TrackE-Advisory-Commit-Gate-v01.md
 baseline_created_at_commit: e2b5379
 h4_input_bundle_commit: e2b5379
-comparison_valid_at_commit: e2b5379
+comparison_valid_at_commit: 0cc3da5
 input_bundle_complete: true
 input_blocked_for_h4: false
 roi_gate_decision: skip_live_h4_call
 user_approved_live_h4_call: false
 h4_run_id: null
 h4_cost_usd: 0
-cycle_validity: valid_pre_call_roi_gate
-final_recommendation: skip
+cycle_validity: valid_post_comparison
+final_recommendation: skip_validated_post_comparison
 ```
 
 ### Baseline Used
@@ -129,6 +129,38 @@ Final recommendation for this task class:
 
 - `skip` for live H4 when a Track already has a concrete, repo-grounded, verification-ready gate plan.
 - H4 may remain optional only if the baseline is absent, unstable, or missing risk/test/no-claim structure.
+
+### Post-Comparison Closeout
+
+Inputs reviewed:
+
+- Track E baseline plan supplied by the operator for `CV2-C`.
+- H4 ROI skip decision commit: `8996b8b Record H4 assist Cycle 1 ROI gate`.
+- Final `CV2-C` artifact commit: `0cc3da5 Complete CV2-C advisory commit gate`.
+- Final artifact: `docs/private/CV2-C-TrackE-Advisory-Commit-Gate-v01.md`.
+
+Observed final `CV2-C` outcome:
+
+- gate status: `pass`
+- advisory only: true
+- autonomous commit authority: false
+- H4 Assist authority: none
+- live H4/OpenRouter call: none
+
+Post-comparison judgment:
+
+- The H4 skip decision was correct.
+- The final `CV2-C` artifact followed the Track E baseline structure closely enough that live H4 would not likely have added material delta.
+- The artifact preserved the core boundaries already present in the baseline: advisory-only gate, no autonomous commit authority, no provider-parity/live-provider claims, explicit resolved-finding handling, and explicit verification evidence.
+- No missing gate logic, actionable risk, tests/docs obligation, or no-claim boundary was discovered that would have justified the extra OpenRouter cost and comparison overhead.
+
+Final Cycle 1 recommendation:
+
+- `skip_validated_post_comparison`
+
+Policy implication:
+
+- For review/gate work where a Track already has a concrete, repo-grounded, verification-ready baseline and the final artifact lands cleanly against that plan, H4 should be skipped unless the operator specifically wants a paid comparison/control artifact.
 
 ## Pending Cycles
 
