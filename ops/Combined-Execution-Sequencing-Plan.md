@@ -1668,14 +1668,14 @@ Post-closeout evidence update:
 
 #### `CV2` — Thin `H5` review/gate slice
 
-**Status:** `🔄 active; Step 1 CV2-A/CV2-B evidence gathering is complete, and CV2-C advisory commit-gate is ready to start`
+**Status:** `✅ complete as a manual thin H5 review/gate slice; no native H5 runtime automation or provider-parity claim`
 **Owner priority:** Track E, with Track D support and Meta closeout
 
 Epics:
 - ✅ **CV2-A** findings-first review artifact — **Owner: Track E**
 - ✅ **CV2-B** test-evidence capture artifact — **Owner: Track D + Track E**
-- ⬜ **CV2-C** explicit commit-gate artifact — **Owner: Track E**
-- ⬜ **CV2-D** policy feedback loop and private-learning note — **Owner: Meta Coordinator**
+- ✅ **CV2-C** explicit commit-gate artifact — **Owner: Track E**
+- ✅ **CV2-D** policy feedback loop and private-learning note — **Owner: Meta Coordinator**
 
 **Sequential ordering:**
 1. `CV2-A` and `CV2-B` can proceed in parallel on the same implementation candidate
@@ -1705,17 +1705,17 @@ Epics:
 | Track E agent session | ✅ CV2-A | CV1-META1 ✅ + H4 evidence ✅ | Findings-first review artifact delivered in `docs/private/CV2-A-H5-Findings-First-Review-v01.md`; medium finding `RF-2026-04-27-01` was discovered and later fixed by Track D commit `6fb49cf` |
 | Track D + Track E session | ✅ CV2-B | CV1-META1 ✅ + H4 evidence ✅ | Track D evidence handoff delivered in `docs/private/CV2-B-TrackD-Test-Evidence-Handoff-v01.md`; Track E sufficiency review delivered in `docs/private/CV2-B-TrackE-Evidence-Sufficiency-Review-v01.md`, concluding CV2-C may start after `6fb49cf` fixed the medium issue |
 
-**⬜ Step 2 — Track E makes the commit-gate decision only after review and evidence exist**
+**✅ Step 2 — Track E made the commit-gate decision only after review and evidence existed**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | CV2-C | CV2-A ✅ + CV2-B ✅ | Gate status must stay explicit: `pass`, `pass_with_warnings`, or `hold` |
+| Track E agent session | ✅ CV2-C | CV2-A ✅ + CV2-B ✅ | Advisory commit-gate artifact delivered in `docs/private/CV2-C-TrackE-Advisory-Commit-Gate-v01.md` with gate status `pass`; advisory-only, no autonomous commit authority, no provider-parity/live-provider claim |
 
-**⬜ Step 3 — Meta feeds durable lessons back into the private coding-vertical policy layer**
+**✅ Step 3 — Meta fed durable lessons back into the private coding-vertical policy layer**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator session | CV2-D | CV2-C ✅ | Distill durable lessons cautiously; do not overfit a single cycle into doctrine |
+| Meta Coordinator session | ✅ CV2-D | CV2-C ✅ | Private-learning closeout delivered in `docs/private/CV2-D-Meta-Policy-Feedback-Private-Learning-Note-v01.md`; immediate policy/registry edits not required, and the slice is closed without overfitting one manual cycle into doctrine |
 
 ---
 
@@ -1910,6 +1910,7 @@ These remain open by design so that implementation can teach the architecture.
 - `[2026-04-27][Meta] P4-F policy closeout completed - Track D technical routing notes and Meta rollout guidance now define current provider route guidance, model-tier usage, and no-claim boundaries; Wave 4 provider-expansion work is operationally closed under the OpenRouter-first exception, while `P4-B` live provider-parity evidence remains blocked/deferred until `OPENAI_API_KEY` exists.`
 - `[2026-04-27][Meta] CV2 explicitly activated - thin H5 review/gate side-vertical Step 1 is now open with `CV2-A` Track E findings-first review artifact and `CV2-B` Track D then Track E test-evidence capture/sufficiency path running in parallel; this does not introduce implementation automation or change Wave 4 provider-parity blockers.`
 - `[2026-04-27][Meta] CV2 Step 1 accepted - `CV2-A` and `CV2-B` artifacts are complete, Track D fixed `RF-2026-04-27-01` in `6fb49cf`, Track E sufficiency review allows `CV2-C` to start, and no provider-parity/live OpenAI claims are introduced.`
+- `[2026-04-30][Meta] CV2 thin H5 slice completed - `CV2-C` advisory commit-gate passed in `0cc3da5`, `CV2-D` private-learning closeout records cautious lessons without immediate policy/registry edits, and H4 Assist Cycle 1/2 both validated skip-first ROI behavior; provider parity remains blocked by `P4-B` live OpenAI evidence.`
 
 ---
 

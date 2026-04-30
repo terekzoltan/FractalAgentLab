@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, side-batch `R3-P` real-provider smoke/evidence closeout, and coding-vertical `CV1-D` thin H4 usefulness-check surface are complete; Wave 4 `P4-B` cross-provider smoke surface is implemented but live PASS is blocked by missing `OPENAI_API_KEY`; `CV2-A` findings-first review and `CV2-B` evidence sufficiency are complete, so `CV2-C` advisory commit-gate is ready to start)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, side-batch `R3-P` real-provider smoke/evidence closeout, and coding-vertical `CV1-D` thin H4 usefulness-check surface are complete; Wave 4 `P4-B` cross-provider smoke surface is implemented but live PASS is blocked by missing `OPENAI_API_KEY`; `CV2-A`, `CV2-B`, and `CV2-C` are complete, and Meta `CV2-D` closes the manual thin H5 review/gate slice without provider-parity or native-H5-runtime claims)
 
 ---
 
@@ -914,7 +914,7 @@ Phase rule:
 
 Current status note:
 - `CV1` is implemented and post-closeout live H4 evidence cleared the old missing-evidence blocker for `CV2`
-- `CV2` was explicitly activated on 2026-04-27 as a narrow H5 review/gate side-vertical; Step 1 `CV2-A`/`CV2-B` is complete and `CV2-C` advisory commit-gate is ready to start
+- `CV2` was explicitly activated on 2026-04-27 as a narrow H5 review/gate side-vertical; `CV2-A`/`CV2-B`/`CV2-C`/`CV2-D` are complete as a manual thin slice without native H5 runtime automation or provider-parity claims
 
 Near-term bias:
 - first improve packetization and operator transport
@@ -1124,6 +1124,7 @@ Entries:
 - `[2026-04-27][Meta] P4-F policy closeout completed - Track D technical routing notes and Meta rollout guidance now define current provider route guidance, model-tier usage, and no-claim boundaries; Wave 4 provider-expansion work is operationally closed under the OpenRouter-first exception, while `P4-B` live provider-parity evidence remains blocked/deferred until `OPENAI_API_KEY` exists.`
 - `[2026-04-27][Meta] CV2 explicitly activated - thin H5 review/gate side-vertical Step 1 is now open with `CV2-A` Track E findings-first review artifact and `CV2-B` Track D then Track E test-evidence capture/sufficiency path running in parallel; this does not introduce implementation automation or change Wave 4 provider-parity blockers.`
 - `[2026-04-27][Meta] CV2 Step 1 accepted - `CV2-A` and `CV2-B` artifacts are complete, Track D fixed `RF-2026-04-27-01` in `6fb49cf`, Track E sufficiency review allows `CV2-C` to start, and no provider-parity/live OpenAI claims are introduced.`
+- `[2026-04-30][Meta] CV2 thin H5 slice completed - `CV2-C` advisory commit-gate passed in `0cc3da5`, `CV2-D` private-learning closeout records cautious lessons without immediate policy/registry edits, and H4 Assist Cycle 1/2 both validated skip-first ROI behavior; provider parity remains blocked by `P4-B` live OpenAI evidence.`
 
 ---
 
