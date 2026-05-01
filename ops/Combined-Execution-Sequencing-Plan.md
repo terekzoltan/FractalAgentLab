@@ -1269,6 +1269,9 @@ Current exception / closeout note:
 **Primary value:** trace browsing, run management, easier demoability.  
 **Constraint:** presentation cannot outrun reliability.
 
+Detailed planning reference:
+- `docs/wave5/Wave5-Workbench-Detailed-Plan-v1.md`
+
 ### Wave 5 mandatory outputs
 - minimal web UI exists
 - trace browsing is no longer painful
