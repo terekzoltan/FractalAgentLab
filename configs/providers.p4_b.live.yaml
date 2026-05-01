@@ -1,0 +1,19 @@
+default_provider: openrouter
+
+routing:
+  selection_mode: explicit_v1
+  fallback_policy: none
+
+providers:
+  local:
+    enabled: false
+    endpoint_url: http://localhost:11434/fractal-agent-lab/v1/step
+  openai:
+    enabled: true
+    api_key_env: OPENAI_API_KEY
+  openrouter:
+    enabled: true
+    api_key_env: OPENROUTER_API_KEY
+    retry:
+      max_retries: 1
+      backoff_seconds: 0.0

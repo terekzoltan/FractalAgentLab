@@ -30,7 +30,7 @@ Accepted policy stance:
 - `mock` remains the safe default
 - real provider routes require a resolved model
 - `openrouter` is the operator-first real-provider path
-- `openai` remains adapter-boundary supported, but live evidence is deferred until `OPENAI_API_KEY` exists
+- `openai` now has bounded live `P4-B` smoke evidence for `h1.single.v1`, while broader provider-quality claims remain out of scope
 - `local` is an optional experimental route, disabled by default, with fake-transport proof only
 - `conservative_mock` remains bounded to `openrouter -> mock`
 - model-tier guidance remains role/tier guidance, not model-quality proof
