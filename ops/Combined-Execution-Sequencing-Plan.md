@@ -1283,7 +1283,7 @@ Detailed planning reference:
 #### Sprint W5-S1 — Minimal web shell
 
 Epics:
-- ⬜ **U5-A** web shell / local UI — **Owner: Track A**
+- ✅ **U5-A** web shell / local UI — **Owner: Track A**
 - ⬜ **U5-B** run listing and run detail page — **Owner: Track A**
 - ⬜ **U5-C** trace timeline page — **Owner: Track A**
 
@@ -1293,11 +1293,11 @@ Epics:
 
 ### Sprint W5-S1 — Execution Steps
 
-**⬜ Step 1 — Track A builds the web shell first**
+**✅ Step 1 — Track A builds the web shell first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track A agent session | U5-A | Wave 4 ✅ | Presentation starts only after the system deserves one |
+| Track A agent session | ✅ U5-A | Wave 4 ✅ | Delivered the fixture-backed local evidence-observatory shell with explicit no-claim boundaries, responsive smoke PASS, and U5-B/U5-C handoff; see `docs/wave5/Wave5-W5-S1-TrackA-U5-A-Web-Shell.md` |
 
 **⬜ Step 2 — run browsing and trace browsing consume the shell in parallel**
 

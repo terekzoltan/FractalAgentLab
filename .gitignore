@@ -9,5 +9,9 @@ __pycache__/
 /data/*
 !/data/.gitignore
 
+# UI generated outputs
+/ui/node_modules/
+/ui/dist/
+
 # Private local planning packs
 /fractalagentlab_coding_vertical_pack/

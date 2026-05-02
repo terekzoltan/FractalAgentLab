@@ -148,7 +148,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - trace is explorable enough to debug failures
 - CLI/export surfaces stay aligned with current runtime/eval semantics for exposed workflows
 
-**Status:** `🔄 in progress` (Wave 3 `W3-S3` Step 1 `R3-J`, Step 2 Track E evidence curation, and Step 3 Track A presentation packaging are complete in docs-first mode; next Track A mainline action follows Combined frontier)
+**Status:** `🔄 in progress` (Wave 3 `W3-S3` Step 1 `R3-J`, Step 2 Track E evidence curation, and Step 3 Track A presentation packaging are complete in docs-first mode; Wave 5 `U5-A` local evidence-observatory shell is complete with responsive smoke PASS; next Track A frontier is `U5-B` / `U5-C` per Combined sequencing)
 
 ---
 
@@ -1126,6 +1126,7 @@ Entries:
 - `[2026-04-27][Meta] CV2 explicitly activated - thin H5 review/gate side-vertical Step 1 is now open with `CV2-A` Track E findings-first review artifact and `CV2-B` Track D then Track E test-evidence capture/sufficiency path running in parallel; this does not introduce implementation automation or change Wave 4 provider-parity blockers.`
 - `[2026-04-27][Meta] CV2 Step 1 accepted - `CV2-A` and `CV2-B` artifacts are complete, Track D fixed `RF-2026-04-27-01` in `6fb49cf`, Track E sufficiency review allows `CV2-C` to start, and no provider-parity/live OpenAI claims are introduced.`
 - `[2026-04-30][Meta] CV2 thin H5 slice completed - `CV2-C` advisory commit-gate passed in `0cc3da5`, `CV2-D` private-learning closeout records cautious lessons without immediate policy/registry edits, and H4 Assist Cycle 1/2 both validated skip-first ROI behavior; provider parity remains blocked by `P4-B` live OpenAI evidence.`
+- `[2026-05-02][Track A] U5-A evidence-observatory shell completed - local Wave 5 UI shell is implemented under `ui/` with fixture/demo disclosure, explicit no-launch/no-automation boundaries, automated UI checks, and responsive smoke PASS - next: `U5-B` run listing/detail and `U5-C` trace timeline may open per Combined sequencing without starting `U5-D`.`
 
 ---
 
