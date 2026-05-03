@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { evidenceFixtures, pages } from "./fixtures";
 import { loadRunIndex, type RunIndexLoadState } from "./runIndexLoader";
 import type { RunIndex, RunIndexRow, TraceTarget } from "./runIndexModel";
+import { loadTraceDetail, type TraceDetailLoadState } from "./traceDetailLoader";
+import type { TraceDetail, TraceDetailEvent } from "./traceDetailModel";
 import type { WorkbenchPage, WorkbenchPageId, WorkbenchStatus } from "./workbenchModel";
 
 const statusDescriptions: Record<WorkbenchStatus, string> = {
@@ -30,13 +32,14 @@ function DisclosureBanner() {
   return (
     <section className="disclosure" aria-labelledby="disclosure-title">
       <div>
-        <p className="eyebrow">U5-A scope disclosure</p>
-        <h2 id="disclosure-title">Fixture-backed shell, not artifact browsing</h2>
+        <p className="eyebrow">Wave 5 scope disclosure</p>
+        <h2 id="disclosure-title">Derived browse surfaces, not launch automation</h2>
       </div>
       <p>
-        This workbench shell does not crawl local artifacts, render real trace timelines,
-        launch workflows, generate packets, or automate OpenCode. Canonical truth remains
-        in <code>data/runs/&lt;run_id&gt;.json</code>, <code>data/traces/&lt;run_id&gt;.jsonl</code>,
+        This workbench now exposes derived run browsing and strict-valid trace timelines
+        from canonical artifacts. It does not launch workflows, generate packets,
+        automate OpenCode, score outputs, or replace canonical truth in
+        <code> data/runs/&lt;run_id&gt;.json</code>, <code>data/traces/&lt;run_id&gt;.jsonl</code>,
         and <code>data/artifacts/&lt;run_id&gt;/...</code>.
       </p>
     </section>
@@ -105,7 +108,7 @@ function PlaceholderPage({ page, traceTarget }: { page: WorkbenchPage; traceTarg
   );
 }
 
-function RunsPage({ onTraceTarget }: { onTraceTarget: (target: TraceTarget) => void }) {
+function useGeneratedRunIndex() {
   const [loadState, setLoadState] = useState<RunIndexLoadState>({ status: "loading" });
 
   useEffect(() => {
@@ -120,6 +123,12 @@ function RunsPage({ onTraceTarget }: { onTraceTarget: (target: TraceTarget) => v
       cancelled = true;
     };
   }, []);
+
+  return loadState;
+}
+
+function RunsPage({ onTraceTarget }: { onTraceTarget: (target: TraceTarget) => void }) {
+  const loadState = useGeneratedRunIndex();
 
   if (loadState.status === "loading") {
     return <RunIndexMessage title="Loading generated run index" status="PARTIAL" />;
@@ -145,6 +154,118 @@ function RunsPage({ onTraceTarget }: { onTraceTarget: (target: TraceTarget) => v
   }
 
   return <RunBrowser index={loadState.index} onTraceTarget={onTraceTarget} />;
+}
+
+function TracePage({ traceTarget }: { traceTarget: TraceTarget | null }) {
+  const runIndexState = useGeneratedRunIndex();
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(traceTarget?.runId ?? null);
+  const [detailState, setDetailState] = useState<TraceDetailLoadState>({ status: "idle" });
+  const [eventTypeFilter, setEventTypeFilter] = useState("all");
+  const [laneFilter, setLaneFilter] = useState("all");
+  const [stepFilter, setStepFilter] = useState("all");
+  const [failureOnly, setFailureOnly] = useState(false);
+
+  useEffect(() => {
+    if (traceTarget !== null) {
+      setSelectedRunId(traceTarget.runId);
+    }
+  }, [traceTarget]);
+
+  useEffect(() => {
+    if (runIndexState.status !== "ready") {
+      return;
+    }
+    if (selectedRunId !== null) {
+      return;
+    }
+    const preferredRun = runIndexState.index.runs.find((run) => run.trace_state === "ok") ?? runIndexState.index.runs[0] ?? null;
+    if (preferredRun !== null) {
+      setSelectedRunId(preferredRun.run_id);
+    }
+  }, [runIndexState, selectedRunId]);
+
+  const selectedRun = runIndexState.status === "ready"
+    ? runIndexState.index.runs.find((run) => run.run_id === selectedRunId) ?? null
+    : null;
+
+  useEffect(() => {
+    setEventTypeFilter("all");
+    setLaneFilter("all");
+    setStepFilter("all");
+    setFailureOnly(false);
+  }, [selectedRun?.run_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (selectedRun === null) {
+      setDetailState({ status: "idle" });
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (selectedRun.trace_state === "missing") {
+      setDetailState({ status: "missing_trace_detail", message: "Trace artifact is missing for this run." });
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (selectedRun.trace_state === "invalid") {
+      setDetailState({ status: "invalid_trace_detail", message: "Strict-invalid traces must not render a timeline." });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setDetailState({ status: "loading" });
+    loadTraceDetail(selectedRun.run_id).then((nextState) => {
+      if (!cancelled) {
+        setDetailState(nextState);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRun]);
+
+  if (runIndexState.status === "loading") {
+    return <RunIndexMessage title="Loading generated trace index" status="PARTIAL" />;
+  }
+  if (runIndexState.status === "missing_index") {
+    return (
+      <RunIndexMessage title="Generated run index is missing" status="MISSING">
+        <p>{runIndexState.message}</p>
+        <p>Build the local run index first with <code>npm run build:index</code>.</p>
+      </RunIndexMessage>
+    );
+  }
+  if (runIndexState.status === "invalid_index") {
+    return (
+      <RunIndexMessage title="Generated run index is invalid" status="FAIL">
+        <p>{runIndexState.message}</p>
+        <p>The Trace page cannot safely resolve run targets until the generated index is valid.</p>
+      </RunIndexMessage>
+    );
+  }
+
+  return (
+    <TraceWorkspace
+      index={runIndexState.index}
+      selectedRun={selectedRun}
+      selectedRunId={selectedRunId}
+      setSelectedRunId={setSelectedRunId}
+      detailState={detailState}
+      eventTypeFilter={eventTypeFilter}
+      laneFilter={laneFilter}
+      stepFilter={stepFilter}
+      failureOnly={failureOnly}
+      setEventTypeFilter={setEventTypeFilter}
+      setLaneFilter={setLaneFilter}
+      setStepFilter={setStepFilter}
+      setFailureOnly={setFailureOnly}
+    />
+  );
 }
 
 function RunIndexMessage({
@@ -252,6 +373,265 @@ function RunBrowser({ index, onTraceTarget }: { index: RunIndex; onTraceTarget: 
   );
 }
 
+function TraceWorkspace({
+  index,
+  selectedRun,
+  selectedRunId,
+  setSelectedRunId,
+  detailState,
+  eventTypeFilter,
+  laneFilter,
+  stepFilter,
+  failureOnly,
+  setEventTypeFilter,
+  setLaneFilter,
+  setStepFilter,
+  setFailureOnly,
+}: {
+  index: RunIndex;
+  selectedRun: RunIndexRow | null;
+  selectedRunId: string | null;
+  setSelectedRunId: (runId: string) => void;
+  detailState: TraceDetailLoadState;
+  eventTypeFilter: string;
+  laneFilter: string;
+  stepFilter: string;
+  failureOnly: boolean;
+  setEventTypeFilter: (value: string) => void;
+  setLaneFilter: (value: string) => void;
+  setStepFilter: (value: string) => void;
+  setFailureOnly: (value: boolean) => void;
+}) {
+  const runs = index.runs;
+  const detail = detailState.status === "ready" && detailState.detail.run_id === selectedRun?.run_id
+    ? detailState.detail
+    : null;
+  const filteredEvents = detail === null
+    ? []
+    : detail.events.filter((event) => {
+      const matchesEventType = eventTypeFilter === "all" || event.event_type === eventTypeFilter;
+      const matchesLane = laneFilter === "all" || valueOrUnknown(event.lane) === laneFilter;
+      const matchesStep = stepFilter === "all" || valueOrUnknown(event.step_id) === stepFilter;
+      const matchesFailure = !failureOnly || event.is_failure;
+      return matchesEventType && matchesLane && matchesStep && matchesFailure;
+    });
+
+  const eventTypes = detail === null ? [] : sortedKeys(countValues(detail.events.map((event) => event.event_type)));
+  const lanes = detail === null ? [] : sortedKeys(countValues(detail.events.map((event) => valueOrUnknown(event.lane))));
+  const steps = detail === null ? [] : sortedKeys(countValues(detail.events.map((event) => valueOrUnknown(event.step_id))));
+
+  return (
+    <div className="trace-layout">
+      <section className="panel trace-sidebar" aria-labelledby="trace-sidebar-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">U5-C trace targets</p>
+            <h2 id="trace-sidebar-title">Trace runs</h2>
+          </div>
+          <StatusBadge status="PARTIAL" />
+        </div>
+        <div className="run-list" role="list" aria-label="Trace run targets">
+          {runs.map((run) => (
+            <button
+              key={run.run_id}
+              type="button"
+              className={run.run_id === selectedRunId ? "run-row run-row-active" : "run-row"}
+              onClick={() => setSelectedRunId(run.run_id)}
+            >
+              <span><strong>{run.run_id}</strong></span>
+              <span>workflow: {valueOrUnknown(run.workflow_id)}</span>
+              <span>trace: {run.trace_state}</span>
+              <span>row state: {run.row_state}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel panel-large trace-main" aria-labelledby="trace-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">U5-C trace timeline</p>
+            <h2 id="trace-title">Trace viewer</h2>
+          </div>
+          <StatusBadge status={traceStatusFor(selectedRun, detailState)} />
+        </div>
+        {selectedRun === null ? <p>Select a run to inspect its trace timeline.</p> : null}
+        {selectedRun !== null ? (
+          <>
+            <div className="artifact-paths" aria-label="Trace artifact references">
+              <p><strong>Run</strong> <code>{selectedRun.run_id}</code></p>
+              <p><strong>Workflow</strong> {valueOrUnknown(selectedRun.workflow_id)}</p>
+              <p><strong>Status</strong> {valueOrUnknown(selectedRun.status)}</p>
+              <p><strong>Trace artifact</strong> <code>{selectedRun.trace_artifact_path}</code></p>
+              <p><strong>Run artifact</strong> <code>{selectedRun.run_artifact_path}</code></p>
+            </div>
+            {selectedRun.trace_state === "missing" ? (
+              <TraceMessage title="Trace artifact missing" status="MISSING">
+                <p>No canonical trace file exists for this run. U5-C does not render a fake timeline.</p>
+              </TraceMessage>
+            ) : null}
+            {selectedRun.trace_state === "invalid" ? (
+              <TraceMessage title="Trace artifact invalid" status="FAIL">
+                <p>Strict-invalid traces must not render timeline events.</p>
+                <WarningList warnings={selectedRun.warnings} />
+              </TraceMessage>
+            ) : null}
+            {detailState.status === "loading" ? <TraceMessage title="Loading trace detail" status="PARTIAL" /> : null}
+            {detailState.status === "missing_trace_detail" && selectedRun.trace_state === "ok" ? (
+              <TraceMessage title="Generated trace detail missing" status="MISSING">
+                <p>{detailState.message}</p>
+                <p>Build local trace detail files with <code>npm run build:traces</code>.</p>
+              </TraceMessage>
+            ) : null}
+            {detailState.status === "invalid_trace_detail" && selectedRun.trace_state === "ok" ? (
+              <TraceMessage title="Generated trace detail invalid" status="FAIL">
+                <p>{detailState.message}</p>
+                <p>Timeline events are not rendered from invalid generated trace detail files.</p>
+              </TraceMessage>
+            ) : null}
+            {detail !== null ? (
+              <TraceTimeline
+                detail={detail}
+                filteredEvents={filteredEvents}
+                eventTypeFilter={eventTypeFilter}
+                laneFilter={laneFilter}
+                stepFilter={stepFilter}
+                failureOnly={failureOnly}
+                eventTypes={eventTypes}
+                lanes={lanes}
+                steps={steps}
+                setEventTypeFilter={setEventTypeFilter}
+                setLaneFilter={setLaneFilter}
+                setStepFilter={setStepFilter}
+                setFailureOnly={setFailureOnly}
+              />
+            ) : null}
+          </>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+function TraceTimeline({
+  detail,
+  filteredEvents,
+  eventTypeFilter,
+  laneFilter,
+  stepFilter,
+  failureOnly,
+  eventTypes,
+  lanes,
+  steps,
+  setEventTypeFilter,
+  setLaneFilter,
+  setStepFilter,
+  setFailureOnly,
+}: {
+  detail: TraceDetail;
+  filteredEvents: TraceDetailEvent[];
+  eventTypeFilter: string;
+  laneFilter: string;
+  stepFilter: string;
+  failureOnly: boolean;
+  eventTypes: string[];
+  lanes: string[];
+  steps: string[];
+  setEventTypeFilter: (value: string) => void;
+  setLaneFilter: (value: string) => void;
+  setStepFilter: (value: string) => void;
+  setFailureOnly: (value: boolean) => void;
+}) {
+  return (
+    <>
+      <div className="metric-grid" aria-label="Trace summary">
+        <Metric label="Total events" value={String(detail.summary.total_events)} />
+        <Metric label="Displayed" value={String(filteredEvents.length)} />
+        <Metric label="Warnings" value={String(detail.validation.warnings.length)} />
+        <Metric label="Linked events" value={String(detail.summary.linked_events.with_parent_event_id)} />
+      </div>
+      {detail.validation.warnings.length > 0 ? <WarningList warnings={detail.validation.warnings} /> : null}
+      <div className="filters" aria-label="Trace filters">
+        <label>
+          Event type
+          <select value={eventTypeFilter} onChange={(event) => setEventTypeFilter(event.target.value)}>
+            <option value="all">All event types</option>
+            {eventTypes.map((eventType) => <option key={eventType} value={eventType}>{eventType}</option>)}
+          </select>
+        </label>
+        <label>
+          Lane
+          <select value={laneFilter} onChange={(event) => setLaneFilter(event.target.value)}>
+            <option value="all">All lanes</option>
+            {lanes.map((lane) => <option key={lane} value={lane}>{lane}</option>)}
+          </select>
+        </label>
+        <label>
+          Step
+          <select value={stepFilter} onChange={(event) => setStepFilter(event.target.value)}>
+            <option value="all">All steps</option>
+            {steps.map((step) => <option key={step} value={step}>{step}</option>)}
+          </select>
+        </label>
+        <label className="toggle">
+          <input type="checkbox" checked={failureOnly} onChange={(event) => setFailureOnly(event.target.checked)} />
+          Failure events only
+        </label>
+      </div>
+      <ol className="event-list" aria-label="Trace events">
+        {filteredEvents.map((event) => (
+          <li key={`${detail.run_id}-${event.sequence}`} className={event.is_failure ? "event-card event-card-failure" : "event-card"}>
+            <div className="event-header">
+              <strong>#{event.sequence} {event.event_type}</strong>
+              <span>{valueOrUnknown(event.timestamp)}</span>
+            </div>
+            <p className="event-source">source: {valueOrUnknown(event.source)}</p>
+            <div className="event-meta">
+              <span>step: {valueOrUnknown(event.step_id)}</span>
+              <span>lane: {valueOrUnknown(event.lane)}</span>
+              <span>turn: {numberOrUnknown(event.turn_index)}</span>
+              <span>handoff: {numberOrUnknown(event.handoff_index)}</span>
+              <span>parent: {valueOrUnknown(event.parent_event_id)}</span>
+              <span>corr: {valueOrUnknown(event.correlation_id)}</span>
+            </div>
+            <p>{event.payload_summary}</p>
+            <details className="payload-details">
+              <summary>Raw payload</summary>
+              <pre>{JSON.stringify(event.payload, null, 2)}</pre>
+            </details>
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+}
+
+function TraceMessage({ title, status, children }: { title: string; status: WorkbenchStatus; children?: ReactNode }) {
+  return (
+    <section className="trace-message" aria-label={title}>
+      <div className="section-heading">
+        <h3>{title}</h3>
+        <StatusBadge status={status} />
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function WarningList({ warnings }: { warnings: string[] }) {
+  if (warnings.length === 0) {
+    return null;
+  }
+  return (
+    <div className="warnings" aria-label="Trace warnings">
+      <p className="eyebrow">Validation warnings</p>
+      <ul>
+        {warnings.map((warning) => <li key={warning}>{warning}</li>)}
+      </ul>
+    </div>
+  );
+}
+
 function RunDetail({ run, onTraceTarget }: { run: RunIndexRow | null; onTraceTarget: (target: TraceTarget) => void }) {
   if (run === null) {
     return (
@@ -306,9 +686,9 @@ function RunDetail({ run, onTraceTarget }: { run: RunIndexRow | null; onTraceTar
         className="trace-link"
         onClick={() => onTraceTarget({ runId: run.run_id, traceArtifactPath: run.trace_artifact_path, traceState: run.trace_state })}
       >
-        Send trace target to U5-C placeholder
+        Open trace timeline
       </button>
-      <p className="handoff-note">This handoff passes run id, trace path, and trace state only. Timeline rendering is U5-C scope.</p>
+      <p className="handoff-note">This action passes run id, trace path, and trace state into the Trace page.</p>
     </section>
   );
 }
@@ -345,6 +725,43 @@ function joinOrUnknown(values: string[]) {
 
 function yesNo(value: boolean) {
   return value ? "yes" : "no";
+}
+
+function numberOrUnknown(value: number | null) {
+  return value === null ? "unknown" : String(value);
+}
+
+function countValues(values: string[]) {
+  const counts: Record<string, number> = {};
+  for (const value of values) {
+    counts[value] = (counts[value] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function traceStatusFor(selectedRun: RunIndexRow | null, detailState: TraceDetailLoadState): WorkbenchStatus {
+  if (selectedRun === null) {
+    return "PARTIAL";
+  }
+  if (selectedRun.trace_state === "missing") {
+    return "MISSING";
+  }
+  if (selectedRun.trace_state === "invalid") {
+    return "FAIL";
+  }
+  if (detailState.status === "ready") {
+    return detailState.detail.validation.warnings.length > 0 ? "PARTIAL" : "PASS";
+  }
+  if (detailState.status === "loading") {
+    return "PARTIAL";
+  }
+  if (detailState.status === "missing_trace_detail") {
+    return "MISSING";
+  }
+  if (detailState.status === "invalid_trace_detail") {
+    return "FAIL";
+  }
+  return "PARTIAL";
 }
 
 function FixtureTable() {
@@ -399,7 +816,7 @@ export function App() {
     <main className="app-shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">Fractal Agent Lab / Wave 5 U5-A</p>
+          <p className="eyebrow">Fractal Agent Lab / Wave 5 Workbench</p>
           <h1>Local evidence observatory shell</h1>
           <p className="hero-copy">
             Workflow-intelligence and proof layer above operator-driven development,
@@ -430,7 +847,8 @@ export function App() {
         <div className="content-stack">
           {activePage.id === "overview" ? <OverviewPage /> : null}
           {activePage.id === "runs" ? <RunsPage onTraceTarget={handleTraceTarget} /> : null}
-          {activePage.id !== "overview" && activePage.id !== "runs" ? (
+          {activePage.id === "trace" ? <TracePage traceTarget={traceTarget} /> : null}
+          {activePage.id !== "overview" && activePage.id !== "runs" && activePage.id !== "trace" ? (
             <PlaceholderPage page={activePage} traceTarget={traceTarget} />
           ) : null}
           {activePage.id === "overview" ? <FixtureTable /> : null}

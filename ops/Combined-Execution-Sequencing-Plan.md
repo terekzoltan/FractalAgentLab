@@ -1284,8 +1284,8 @@ Detailed planning reference:
 
 Epics:
 - ✅ **U5-A** web shell / local UI — **Owner: Track A**
-- ⬜ **U5-B** run listing and run detail page — **Owner: Track A**
-- ⬜ **U5-C** trace timeline page — **Owner: Track A**
+- ✅ **U5-B** run listing and run detail page — **Owner: Track A**
+- ✅ **U5-C** trace timeline page — **Owner: Track A**
 
 **Sequential ordering:**
 1. U5-A first (web shell is the foundation)
@@ -1299,12 +1299,12 @@ Epics:
 |---------|---------|--------|-------|
 | Track A agent session | ✅ U5-A | Wave 4 ✅ | Delivered the fixture-backed local evidence-observatory shell with explicit no-claim boundaries, responsive smoke PASS, and U5-B/U5-C handoff; see `docs/wave5/Wave5-W5-S1-TrackA-U5-A-Web-Shell.md` |
 
-**⬜ Step 2 — run browsing and trace browsing consume the shell in parallel**
+**✅ Step 2 — run browsing and trace browsing consume the shell in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track A agent session | U5-B | U5-A ✅ | Build run listing/detail on top of the shell |
-| Track A agent session | U5-C | U5-A ✅ | Build the trace timeline page without hiding the underlying trace reality |
+| Track A agent session | ✅ U5-B | U5-A ✅ | Delivered generated-index-backed run listing/detail with honest artifact states and U5-C handoff; see `docs/wave5/Wave5-W5-S1-TrackA-U5-B-Run-Browser.md` |
+| Track A agent session | ✅ U5-C | U5-A ✅ | Delivered generated strict-valid trace detail files and a trace timeline page without hiding missing/invalid/degraded trace reality; see `docs/wave5/Wave5-W5-S1-TrackA-U5-C-Trace-Timeline.md` |
 
 #### Sprint W5-S2 — Workbench primitives
 

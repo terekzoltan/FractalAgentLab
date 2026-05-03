@@ -148,7 +148,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - trace is explorable enough to debug failures
 - CLI/export surfaces stay aligned with current runtime/eval semantics for exposed workflows
 
-**Status:** `🔄 in progress` (Wave 3 `W3-S3` Step 1 `R3-J`, Step 2 Track E evidence curation, and Step 3 Track A presentation packaging are complete in docs-first mode; Wave 5 `U5-A` local evidence-observatory shell is complete with responsive smoke PASS; next Track A frontier is `U5-B` / `U5-C` per Combined sequencing)
+**Status:** `🔄 in progress` (Wave 3 `W3-S3` Step 1 `R3-J`, Step 2 Track E evidence curation, and Step 3 Track A presentation packaging are complete in docs-first mode; Wave 5 `U5-A` local evidence-observatory shell, `U5-B` generated run browser, and `U5-C` generated strict-valid trace timeline are complete; next Track A frontier is `U5-D` per Combined sequencing)
 
 ---
 
@@ -1127,6 +1127,7 @@ Entries:
 - `[2026-04-27][Meta] CV2 Step 1 accepted - `CV2-A` and `CV2-B` artifacts are complete, Track D fixed `RF-2026-04-27-01` in `6fb49cf`, Track E sufficiency review allows `CV2-C` to start, and no provider-parity/live OpenAI claims are introduced.`
 - `[2026-04-30][Meta] CV2 thin H5 slice completed - `CV2-C` advisory commit-gate passed in `0cc3da5`, `CV2-D` private-learning closeout records cautious lessons without immediate policy/registry edits, and H4 Assist Cycle 1/2 both validated skip-first ROI behavior; provider parity remains blocked by `P4-B` live OpenAI evidence.`
 - `[2026-05-02][Track A] U5-A evidence-observatory shell completed - local Wave 5 UI shell is implemented under `ui/` with fixture/demo disclosure, explicit no-launch/no-automation boundaries, automated UI checks, and responsive smoke PASS - next: `U5-B` run listing/detail and `U5-C` trace timeline may open per Combined sequencing without starting `U5-D`.`
+- `[2026-05-03][Track A] U5-C trace timeline completed and W5-S1 Step 2 closed - U5-B generated run browsing plus U5-C strict-valid trace timeline are now complete with derived local/private generated data, missing/invalid/degraded trace truth preserved, and no replay/eval/launch claims - next: Meta may consider `U5-D` unblocked by W5-S1 prerequisites.`
 
 ---
 

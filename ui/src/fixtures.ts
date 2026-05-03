@@ -10,14 +10,14 @@ export const pages: WorkbenchPage[] = [
   {
     id: "runs",
     label: "Runs",
-    status: "NOT IMPLEMENTED",
-    summary: "Real run browsing lands in U5-B.",
+    status: "PASS",
+    summary: "Run browsing is active from the generated index.",
   },
   {
     id: "trace",
     label: "Trace",
-    status: "NOT IMPLEMENTED",
-    summary: "Real trace timelines land in U5-C.",
+    status: "PASS",
+    summary: "Trace timelines are active from generated trace details.",
   },
   {
     id: "evidence",

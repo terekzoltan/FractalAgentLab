@@ -396,6 +396,96 @@ code {
   background: rgba(14, 165, 233, 0.1);
 }
 
+.trace-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.4fr);
+  gap: 20px;
+}
+
+.trace-main {
+  display: grid;
+  gap: 18px;
+}
+
+.trace-message {
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.24);
+}
+
+.trace-message h3,
+.trace-sidebar h2 {
+  margin: 0;
+}
+
+.event-list {
+  display: grid;
+  gap: 14px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.event-card {
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.24);
+}
+
+.event-card-failure {
+  border-color: rgba(248, 113, 113, 0.44);
+  background: rgba(127, 29, 29, 0.18);
+}
+
+.event-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #e6edf7;
+}
+
+.event-source,
+.event-meta,
+.payload-details summary,
+.toggle {
+  color: #cbd5e1;
+}
+
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: 10px 0;
+  font-size: 0.92rem;
+}
+
+.payload-details {
+  margin-top: 10px;
+}
+
+.payload-details summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.payload-details pre {
+  margin: 10px 0 0;
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #cbd5e1;
+}
+
+.toggle {
+  align-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 table {
   width: 100%;
   min-width: 760px;
@@ -427,6 +517,7 @@ th {
   .workspace,
   .page-grid,
   .runs-layout,
+  .trace-layout,
   .metric-grid,
   .detail-grid {
     grid-template-columns: 1fr;
@@ -458,6 +549,10 @@ th {
   }
 
   .section-heading {
+    display: grid;
+  }
+
+  .event-header {
     display: grid;
   }
 }

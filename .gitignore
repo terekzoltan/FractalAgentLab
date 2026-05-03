@@ -16,3 +16,6 @@ __pycache__/
 
 # Private local planning packs
 /fractalagentlab_coding_vertical_pack/
+
+# Local OpenCode tool state
+/.opencode/
