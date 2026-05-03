@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
 import { evidenceFixtures, pages } from "./fixtures";
+import { loadRunIndex, type RunIndexLoadState } from "./runIndexLoader";
+import type { RunIndex, RunIndexRow, TraceTarget } from "./runIndexModel";
 import type { WorkbenchPage, WorkbenchPageId, WorkbenchStatus } from "./workbenchModel";
 
 const statusDescriptions: Record<WorkbenchStatus, string> = {
@@ -72,7 +75,7 @@ function OverviewPage() {
   );
 }
 
-function PlaceholderPage({ page }: { page: WorkbenchPage }) {
+function PlaceholderPage({ page, traceTarget }: { page: WorkbenchPage; traceTarget: TraceTarget | null }) {
   const messages: Record<WorkbenchPageId, string> = {
     overview: "This shell is active as U5-A.",
     runs: "No real run list or run detail page is implemented here. U5-B will define the artifact-backed browse model.",
@@ -88,8 +91,260 @@ function PlaceholderPage({ page }: { page: WorkbenchPage }) {
       <h2 id={`${page.id}-title`}>{page.label}</h2>
       <StatusBadge status={page.status} />
       <p>{messages[page.id]}</p>
+      {page.id === "trace" && traceTarget !== null ? (
+        <div className="trace-target" aria-label="U5-C trace target">
+          <p className="eyebrow">U5-C handoff target</p>
+          <p>
+            Selected run <code>{traceTarget.runId}</code> has trace state <strong>{traceTarget.traceState}</strong>.
+            Timeline rendering is intentionally deferred to U5-C.
+          </p>
+          <p><code>{traceTarget.traceArtifactPath}</code></p>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function RunsPage({ onTraceTarget }: { onTraceTarget: (target: TraceTarget) => void }) {
+  const [loadState, setLoadState] = useState<RunIndexLoadState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadState({ status: "loading" });
+    loadRunIndex().then((nextState) => {
+      if (!cancelled) {
+        setLoadState(nextState);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loadState.status === "loading") {
+    return <RunIndexMessage title="Loading generated run index" status="PARTIAL" />;
+  }
+  if (loadState.status === "missing_index") {
+    return (
+      <RunIndexMessage title="Generated run index is missing" status="MISSING">
+        <p>{loadState.message}</p>
+        <p>
+          Build the local derived index with <code>npm run build:index</code>. This index is a gitignored
+          browse accelerator, not canonical evidence truth.
+        </p>
+      </RunIndexMessage>
+    );
+  }
+  if (loadState.status === "invalid_index") {
+    return (
+      <RunIndexMessage title="Generated run index is invalid" status="FAIL">
+        <p>{loadState.message}</p>
+        <p>Rebuild with <code>npm run build:index</code> after checking local artifact warnings.</p>
+      </RunIndexMessage>
+    );
+  }
+
+  return <RunBrowser index={loadState.index} onTraceTarget={onTraceTarget} />;
+}
+
+function RunIndexMessage({
+  title,
+  status,
+  children,
+}: {
+  title: string;
+  status: WorkbenchStatus;
+  children?: ReactNode;
+}) {
+  return (
+    <section className="panel panel-large placeholder" aria-labelledby="run-index-message-title">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">U5-B run browser</p>
+          <h2 id="run-index-message-title">{title}</h2>
+        </div>
+        <StatusBadge status={status} />
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function RunBrowser({ index, onTraceTarget }: { index: RunIndex; onTraceTarget: (target: TraceTarget) => void }) {
+  const [workflowFilter, setWorkflowFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(index.runs[0]?.run_id ?? null);
+
+  const workflows = sortedKeys(index.summary.workflow_counts);
+  const statuses = sortedKeys(index.summary.status_counts);
+  const filteredRuns = index.runs.filter((run) => {
+    const workflow = valueOrUnknown(run.workflow_id);
+    const status = valueOrUnknown(run.status);
+    return (workflowFilter === "all" || workflow === workflowFilter) && (statusFilter === "all" || status === statusFilter);
+  });
+  const selectedRun = filteredRuns.find((run) => run.run_id === selectedRunId) ?? filteredRuns[0] ?? null;
+
+  return (
+    <div className="runs-layout">
+      <section className="panel panel-large" aria-labelledby="runs-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">U5-B generated index</p>
+            <h2 id="runs-title">Run browser</h2>
+          </div>
+          <StatusBadge status={index.summary.warnings_count > 0 ? "PARTIAL" : "PASS"} />
+        </div>
+        <p>
+          Derived index <code>{index.schema_version}</code> generated from <code>{index.data_dir}</code> at{" "}
+          <code>{index.generated_at}</code>. Canonical artifacts remain the source of truth.
+        </p>
+        <div className="metric-grid" aria-label="Run index summary">
+          <Metric label="Total runs" value={String(index.summary.total_runs)} />
+          <Metric label="Displayed" value={String(filteredRuns.length)} />
+          <Metric label="Warnings" value={String(index.summary.warnings_count)} />
+          <Metric label="Trace ok" value={String(index.summary.trace_state_counts.ok ?? 0)} />
+        </div>
+        <div className="filters" aria-label="Run filters">
+          <label>
+            Workflow
+            <select value={workflowFilter} onChange={(event) => setWorkflowFilter(event.target.value)}>
+              <option value="all">All workflows</option>
+              {workflows.map((workflow) => (
+                <option key={workflow} value={workflow}>{workflow}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Status
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="all">All statuses</option>
+              {statuses.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section className="panel run-list-panel" aria-labelledby="run-list-title">
+        <h2 id="run-list-title">Runs</h2>
+        {filteredRuns.length === 0 ? <p>No runs match the active filters.</p> : null}
+        <div className="run-list" role="list" aria-label="Run rows">
+          {filteredRuns.map((run) => (
+            <button
+              key={run.run_id}
+              type="button"
+              className={run.run_id === selectedRun?.run_id ? "run-row run-row-active" : "run-row"}
+              onClick={() => setSelectedRunId(run.run_id)}
+            >
+              <span><strong>{run.run_id}</strong></span>
+              <span>workflow: {valueOrUnknown(run.workflow_id)}</span>
+              <span>status: {valueOrUnknown(run.status)}</span>
+              <span>trace: {run.trace_state}</span>
+              <span>artifacts: run {yesNo(run.has_run_artifact)} / trace {yesNo(run.has_trace_artifact)}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <RunDetail run={selectedRun} onTraceTarget={onTraceTarget} />
+    </div>
+  );
+}
+
+function RunDetail({ run, onTraceTarget }: { run: RunIndexRow | null; onTraceTarget: (target: TraceTarget) => void }) {
+  if (run === null) {
+    return (
+      <section className="panel run-detail-panel" aria-labelledby="run-detail-title">
+        <h2 id="run-detail-title">Run detail</h2>
+        <p>No run selected.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="panel run-detail-panel" aria-labelledby="run-detail-title">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Run detail</p>
+          <h2 id="run-detail-title">{run.run_id}</h2>
+        </div>
+        <StatusBadge status={run.row_state === "ok" ? "PASS" : "PARTIAL"} />
+      </div>
+      <dl className="detail-grid">
+        <DetailTerm label="Workflow" value={valueOrUnknown(run.workflow_id)} />
+        <DetailTerm label="Status" value={valueOrUnknown(run.status)} />
+        <DetailTerm label="Started" value={valueOrUnknown(run.started_at)} />
+        <DetailTerm label="Completed" value={valueOrUnknown(run.completed_at)} />
+        <DetailTerm label="Row state" value={run.row_state} />
+        <DetailTerm label="Trace state" value={run.trace_state} />
+        <DetailTerm label="Trace events" value={run.trace_event_count === null ? "unknown" : String(run.trace_event_count)} />
+        <DetailTerm label="Trace schemas" value={joinOrUnknown(run.trace_schema_versions)} />
+        <DetailTerm label="Providers" value={joinOrUnknown(run.provider_names)} />
+        <DetailTerm label="Models" value={joinOrUnknown(run.model_names)} />
+        <DetailTerm label="Fallback" value={run.fallback_state} />
+      </dl>
+      <div className="artifact-paths" aria-label="Canonical artifact paths">
+        <p><strong>Run artifact</strong> <code>{run.run_artifact_path}</code></p>
+        <p><strong>Trace artifact</strong> <code>{run.trace_artifact_path}</code></p>
+        <p><strong>Sidecar directory</strong> <code>{run.artifact_dir_path}</code></p>
+      </div>
+      <div>
+        <p className="eyebrow">Sidecar files</p>
+        <p>{joinOrUnknown(run.sidecar_files)}</p>
+      </div>
+      {run.warnings.length > 0 ? (
+        <div className="warnings" aria-label="Run warnings">
+          <p className="eyebrow">Row warnings</p>
+          <ul>
+            {run.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      <button
+        type="button"
+        className="trace-link"
+        onClick={() => onTraceTarget({ runId: run.run_id, traceArtifactPath: run.trace_artifact_path, traceState: run.trace_state })}
+      >
+        Send trace target to U5-C placeholder
+      </button>
+      <p className="handoff-note">This handoff passes run id, trace path, and trace state only. Timeline rendering is U5-C scope.</p>
+    </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function DetailTerm({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function sortedKeys(record: Record<string, number>) {
+  return Object.keys(record).sort((left, right) => left.localeCompare(right));
+}
+
+function valueOrUnknown(value: string | null) {
+  return value ?? "unknown";
+}
+
+function joinOrUnknown(values: string[]) {
+  return values.length > 0 ? values.join(", ") : "unknown";
+}
+
+function yesNo(value: boolean) {
+  return value ? "yes" : "no";
 }
 
 function FixtureTable() {
@@ -132,7 +387,13 @@ function FixtureTable() {
 
 export function App() {
   const [activePageId, setActivePageId] = useState<WorkbenchPageId>("overview");
+  const [traceTarget, setTraceTarget] = useState<TraceTarget | null>(null);
   const activePage = pages.find((page) => page.id === activePageId) ?? pages[0];
+
+  function handleTraceTarget(target: TraceTarget) {
+    setTraceTarget(target);
+    setActivePageId("trace");
+  }
 
   return (
     <main className="app-shell">
@@ -167,8 +428,12 @@ export function App() {
         </nav>
 
         <div className="content-stack">
-          {activePage.id === "overview" ? <OverviewPage /> : <PlaceholderPage page={activePage} />}
-          <FixtureTable />
+          {activePage.id === "overview" ? <OverviewPage /> : null}
+          {activePage.id === "runs" ? <RunsPage onTraceTarget={handleTraceTarget} /> : null}
+          {activePage.id !== "overview" && activePage.id !== "runs" ? (
+            <PlaceholderPage page={activePage} traceTarget={traceTarget} />
+          ) : null}
+          {activePage.id === "overview" ? <FixtureTable /> : null}
         </div>
       </div>
     </main>

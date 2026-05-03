@@ -2,9 +2,12 @@
 
 Local Wave 5 workbench UI for Fractal Agent Lab.
 
-## U5-A Scope
+## Current Scope
 
-This first UI slice is a fixture-backed evidence observatory shell. It establishes:
+The UI started as the U5-A fixture-backed evidence observatory shell and now includes
+the U5-B run browser surface.
+
+U5-A established:
 
 - local web app scaffold
 - shell layout and navigation
@@ -12,18 +15,37 @@ This first UI slice is a fixture-backed evidence observatory shell. It establish
 - placeholder pages for later Wave 5 epics
 - fixture disclosure and no-claim boundaries
 
-It does not implement canonical artifact crawling, real run detail, real trace timelines,
-workflow launch, packet generation, backend/API design, public deployment, or OpenCode
-automation.
+U5-B adds:
+
+- generated run index loading from `/generated/run-index.json`
+- run list and run detail browsing
+- artifact existence indicators
+- row-level missing/invalid artifact visibility
+- workflow/status filters
+- U5-C trace-target handoff without timeline rendering
+
+It does not implement real trace timelines, workflow launch, packet generation,
+backend/API design, public deployment, OpenCode automation, eval scoring, provider
+ranking, artifact editing, or artifact repair.
 
 ## Commands
 
 ```bash
 npm install
+npm run build:index
 npm run typecheck
 npm run build
 npm test -- --run
 ```
+
+`npm run build:index` derives a local index from `../data` and writes:
+
+```text
+ui/public/generated/run-index.json
+```
+
+This generated file is local/private, served by Vite during development, and gitignored.
+It is not canonical evidence truth and should not be committed.
 
 ## Evidence Boundary
 
@@ -33,5 +55,10 @@ Canonical evidence remains in:
 - `data/traces/<run_id>.jsonl`
 - `data/artifacts/<run_id>/...`
 
-Any visible U5-A data is synthetic fixture/demo data and is not read from local runtime
-artifacts. Real run and trace browsing belong to U5-B and U5-C.
+The generated U5-B index has schema version `u5_b.run_index.v1`. It is a browse
+accelerator over canonical artifacts. Missing `data/runs` or `data/traces` directories
+produce warning-grade empty/partial indexes. Malformed run or trace artifacts stay
+visible as degraded rows where possible.
+
+Provider/model/fallback values are disclosure-only fields read from emitted artifacts.
+The UI does not infer them from config and does not rank provider/model quality.

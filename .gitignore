@@ -12,6 +12,7 @@ __pycache__/
 # UI generated outputs
 /ui/node_modules/
 /ui/dist/
+/ui/public/generated/
 
 # Private local planning packs
 /fractalagentlab_coding_vertical_pack/
