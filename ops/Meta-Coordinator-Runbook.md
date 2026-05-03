@@ -88,6 +88,59 @@ Standing side-vertical activation rule:
 
 ---
 
+## Context Compact / Refresh Policy
+
+Context compaction is a normal part of long Meta Coordinator operation.
+
+Working definition:
+
+- a compact is an intentional context refresh where the current long session is compressed into a durable handoff summary for a later restored session
+- compact is useful because the assistant context window is finite and long sessions can accumulate stale assumptions, hidden drift, and too much irrelevant local history
+- compact is also risky: it can cause intelligence loss, context loss, or regression-like behavior if done mid-step, with weak handoff notes, or before canonical sources are reloaded
+
+Default Meta rule:
+
+- whenever recommending next steps, explicitly consider whether a compact would be safer before the next major unit of work
+- because the assistant cannot know the exact current token count, phrase compact recommendations conditionally, for example: `if the session is already context-heavy`, `if token/context load feels high`, or `if we want a clean boundary before the next wave`
+- do not recommend compact as mandatory when the session is clearly fresh or the next step is tiny
+
+Good compact timing:
+
+- after a commit or closeout is complete and the worktree is clean or clearly understood
+- before starting a new wave, sprint, or large epic
+- before switching from review/coordination into implementation planning for a materially different target
+- before a high-risk plan review where stale context could bias the verdict
+- after a `full-sweep` or major status synchronization, when the next session can restore from stable canonical docs
+
+Poor compact timing:
+
+- mid-implementation
+- mid-review before findings/verdict are written
+- while tests are failing and root cause is not captured
+- while the worktree has unresolved ownership conflicts or unclear unrelated changes
+- immediately before committing, unless the exact staged scope and verification state are already recorded
+
+Before compacting, write a handoff summary that includes:
+
+- restored role and operating mode
+- current wave / sprint / step / target
+- latest relevant commits
+- current git status, including ignored/local-only caveats when relevant
+- what was completed and what was explicitly not completed
+- verification already run and its PASS/FAIL/BLOCKED result
+- unresolved findings, blockers, and open questions
+- next recommended step
+- explicit note: `Compact means context compression/refresh; it may lose nuance, so the next session must restore from canonical files rather than trusting memory alone.`
+
+After compacting, the first action should be a context restore:
+
+- use the `context-restore` skill when available
+- read only the minimal canonical/planning/handoff sources needed for the current target
+- verify actual repo state before continuing
+- do not continue from the compressed summary alone if canonical files disagree
+
+---
+
 ## Main Coordination Artifacts
 
 The Meta Coordinator works primarily with these files:
