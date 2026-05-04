@@ -148,7 +148,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - trace is explorable enough to debug failures
 - CLI/export surfaces stay aligned with current runtime/eval semantics for exposed workflows
 
-**Status:** `🔄 in progress` (Wave 3 `W3-S3` Step 1 `R3-J`, Step 2 Track E evidence curation, and Step 3 Track A presentation packaging are complete in docs-first mode; Wave 5 `U5-A` local evidence-observatory shell, `U5-B` generated run browser, and `U5-C` generated strict-valid trace timeline are complete; next Track A frontier is `U5-D` per Combined sequencing)
+**Status:** `🔄 in progress` (Wave 3 `W3-S3` Step 1 `R3-J`, Step 2 Track E evidence curation, and Step 3 Track A presentation packaging are complete in docs-first mode; Wave 5 `U5-A` local evidence-observatory shell, `U5-B` generated run browser, `U5-C` generated strict-valid trace timeline, `U5-D` launch preview / packet composer, and `U5-F` read-only memory/eval inventory are complete; current Track A frontier is `U5-E` comparison UX after accepted Track E semantics per Combined sequencing)
 
 ---
 
@@ -288,7 +288,7 @@ There are **5 coding tracks** + **1 Meta Coordinator**.
 - identity profile updates are sanity-checked (no runaway drift)
 - smoke/eval green should reflect structurally complete comparison output, not envelope presence alone
 
-**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, side-batch `R3-P` real-provider smoke/evidence closeout, and coding-vertical `CV1-D` thin H4 usefulness-check surface are complete; Wave 4 `P4-B` now has bounded live `PASS` evidence for `h1.single.v1` on real OpenRouter + OpenAI legs; `CV2-A`, `CV2-B`, and `CV2-C` are complete, and Meta `CV2-D` closes the manual thin H5 review/gate slice without provider-quality or native-H5-runtime claims)
+**Status:** `🔄 in progress` (Wave 1 core closeout is complete; Track E completed W2-S2 `H2-E` / `H2-F` / `H2-G` plus `H2-H` draft and W2-S3 Step 2 `H2-L` / `H2-O`; in Wave 3, `W3-S1` `R3-D`, `W3-S2` `R3-H`, `W3-S3` `R3-K` + `R3-L`, side-batch `R3-P` real-provider smoke/evidence closeout, and coding-vertical `CV1-D` thin H4 usefulness-check surface are complete; Wave 4 `P4-B` now has bounded live `PASS` evidence for `h1.single.v1` on real OpenRouter + OpenAI legs; `CV2-A`, `CV2-B`, and `CV2-C` are complete, Meta `CV2-D` closes the manual thin H5 review/gate slice, and Wave 5 `U5-E` comparison semantics plus `U5-F` eval wording check are accepted without provider-quality or native-H5-runtime claims)
 
 ---
 
@@ -1157,6 +1157,8 @@ Entries:
 - `[2026-04-30][Meta] CV2 thin H5 slice completed - `CV2-C` advisory commit-gate passed in `0cc3da5`, `CV2-D` private-learning closeout records cautious lessons without immediate policy/registry edits, and H4 Assist Cycle 1/2 both validated skip-first ROI behavior; provider parity remains blocked by `P4-B` live OpenAI evidence.`
 - `[2026-05-02][Track A] U5-A evidence-observatory shell completed - local Wave 5 UI shell is implemented under `ui/` with fixture/demo disclosure, explicit no-launch/no-automation boundaries, automated UI checks, and responsive smoke PASS - next: `U5-B` run listing/detail and `U5-C` trace timeline may open per Combined sequencing without starting `U5-D`.`
 - `[2026-05-03][Track A] U5-C trace timeline completed and W5-S1 Step 2 closed - U5-B generated run browsing plus U5-C strict-valid trace timeline are now complete with derived local/private generated data, missing/invalid/degraded trace truth preserved, and no replay/eval/launch claims - next: Meta may consider `U5-D` unblocked by W5-S1 prerequisites.`
+- `[2026-05-04][Track A] U5-D launch preview accepted - generated workflow catalog, OpenCode/bash command preview, and operator-mediated packet skeleton are complete as a bounded `PARTIAL` surface without browser-side execution, OpenCode automation, commit action, bridge, or session bus - next: W5-S2 Step 2 remains in review with `U5-E` semantics and `U5-F` memory/eval inspection pending wording/no-claim checks.`
+- `[2026-05-04][Meta] W5-S2 Step 2 accepted - Track E `U5-E` docs-only comparison semantics and Track A `U5-F` read-only memory/eval inventory are accepted after Track C memory wording, Track E eval wording/report-version semantics, and Meta no-claim checks; full `U5-E` remains open for Track A Step 3 comparison UX.`
 
 ---
 

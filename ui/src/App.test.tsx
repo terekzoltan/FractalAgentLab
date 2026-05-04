@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { App } from "./App";
+import { MEMORY_EVAL_INDEX_SCHEMA_VERSION, type MemoryEvalIndex } from "./memoryEvalIndexModel";
 import { RUN_INDEX_SCHEMA_VERSION, type RunIndex } from "./runIndexModel";
 import { TRACE_DETAIL_SCHEMA_VERSION, type TraceDetail } from "./traceDetailModel";
 import { WORKFLOW_CATALOG_SCHEMA_VERSION, type WorkflowCatalog } from "./workflowCatalogModel";
@@ -235,6 +236,82 @@ function sampleWorkflowCatalog(): WorkflowCatalog {
     ],
     warnings: [],
   };
+}
+
+function sampleMemoryEvalIndex(overrides: Partial<MemoryEvalIndex> = {}): MemoryEvalIndex {
+  const index: MemoryEvalIndex = {
+    schema_version: MEMORY_EVAL_INDEX_SCHEMA_VERSION,
+    generated_at: "2026-05-04T12:00:00+00:00",
+    data_dir: "../data",
+    summary: {
+      project_memory_store_state: "available",
+      memory_project_count: 1,
+      memory_artifact_count: 2,
+      eval_summary_count: 1,
+      warnings_count: 0,
+    },
+    memory_projects: [
+      {
+        project_id: "fal",
+        source_path: "data/memory/projects/fal.json",
+        schema_version: "project_memory.v1",
+        updated_at: "2026-05-04T12:00:00+00:00",
+        stable_decision_count: 1,
+        workflow_learning_count: 2,
+        prompt_observation_count: 0,
+      },
+    ],
+    memory_artifacts: [
+      {
+        run_id: "run-h1",
+        source_path: "data/artifacts/run-h1/memory_candidates.json",
+        artifact_kind: "memory_candidates",
+        artifact_version: "1.0",
+        schema_version: "memory.candidate.v1",
+        workflow_id: "h1.manager.v1",
+        session_id: "session-1",
+        project_id: null,
+        generated_at: "2026-05-04T12:00:00+00:00",
+        item_count: 3,
+      },
+      {
+        run_id: "run-h2",
+        source_path: "data/artifacts/run-h2/project_memory_update.json",
+        artifact_kind: "project_memory_update",
+        artifact_version: "1.0",
+        schema_version: "project_memory.v1",
+        workflow_id: "h2.manager.v1",
+        session_id: null,
+        project_id: "fal",
+        generated_at: "2026-05-04T12:00:00+00:00",
+        item_count: 1,
+      },
+    ],
+    eval_summaries: [
+      {
+        label: "cv1 d h4 usefulness check v1",
+        source_path: "data/artifacts/run-eval/h4_usefulness.json",
+        report_version: "cv1_d.h4_usefulness_check.v1",
+        generated_at: "2026-05-04T12:00:00+00:00",
+        source_reported_outcome: "eval_outcome: PASS",
+        source_reported_summary: {
+          track_e_evidence_ready: true,
+          eval_outcome: "PASS",
+        },
+        known_limits: ["Source report only."],
+      },
+    ],
+    curated_references: [
+      {
+        label: "R3-L historical curated evidence reference",
+        source_path: "docs/wave3/Wave3-W3-S3-TrackE-R3-L-Evidence-Curation-v1.md",
+        evidence_label: "historical_curated_reference",
+        note: "Linked source reference only; U5-F does not parse it into live metrics.",
+      },
+    ],
+    warnings: [],
+  };
+  return { ...index, ...overrides };
 }
 
 beforeEach(() => {
@@ -482,14 +559,84 @@ describe("U5-A workbench shell", () => {
     expect(screen.queryByText(/PYTHONPATH=src python -m fractal_agent_lab.cli run/i)).not.toBeInTheDocument();
   });
 
-  it("keeps evidence and memory pages bounded to later Wave 5 work", async () => {
+  it("keeps evidence page bounded to Track E-defined comparison semantics", async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.click(screen.getByRole("button", { name: /evidence/i }));
     expect(screen.getByText(/track e must define comparison semantics/i)).toBeInTheDocument();
+  });
+
+  it("shows missing memory/eval index guidance without fixture fallback", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({});
+    render(<App />);
 
     await user.click(screen.getByRole("button", { name: /memory \/ eval/i }));
-    expect(screen.getByText(/no memory inspection or editing is implemented here/i)).toBeInTheDocument();
+    expect(await screen.findByText(/generated memory\/eval index is missing/i)).toBeInTheDocument();
+    expect(screen.getByText(/npm run build:memory-eval/i)).toBeInTheDocument();
+    expect(screen.queryByText(/future evidence rows/i)).not.toBeInTheDocument();
+  });
+
+  it("shows invalid memory/eval index without fixture fallback", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({ "/generated/memory-eval-index.json": { payload: {} } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /memory \/ eval/i }));
+    expect(await screen.findByText(/generated memory\/eval index is invalid/i)).toBeInTheDocument();
+    expect(screen.queryByText(/memory \/ eval inspection/i)).not.toBeInTheDocument();
+  });
+
+  it("renders empty memory/eval index as not demonstrated instead of failure", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({
+      "/generated/memory-eval-index.json": {
+        payload: sampleMemoryEvalIndex({
+          summary: {
+            project_memory_store_state: "no_local_project_memory_store_found",
+            memory_project_count: 0,
+            memory_artifact_count: 0,
+            eval_summary_count: 0,
+            warnings_count: 0,
+          },
+          memory_projects: [],
+          memory_artifacts: [],
+          eval_summaries: [],
+        }),
+      },
+    });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /memory \/ eval/i }));
+    expect(await screen.findByRole("heading", { name: /memory \/ eval inspection/i })).toBeInTheDocument();
+    expect(screen.getByText(/not demonstrated in the generated local index/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/no local project memory store found/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/PARTIAL/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/FAIL/i)).not.toBeInTheDocument();
+  });
+
+  it("renders memory/eval inventory as read-only source-reported evidence", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({ "/generated/memory-eval-index.json": { payload: sampleMemoryEvalIndex() } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /memory \/ eval/i }));
+
+    expect(await screen.findByRole("heading", { name: /memory \/ eval inspection/i })).toBeInTheDocument();
+    expect(screen.getByText("data/memory/projects/fal.json")).toBeInTheDocument();
+    expect(screen.getByText("data/artifacts/run-h1/memory_candidates.json")).toBeInTheDocument();
+    expect(screen.getByText("data/artifacts/run-h2/project_memory_update.json")).toBeInTheDocument();
+    expect(screen.getByText("data/artifacts/run-eval/h4_usefulness.json")).toBeInTheDocument();
+    expect(screen.getAllByText(/source-reported outcome/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/eval_outcome: PASS/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/historical_curated_reference/i)).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /edit/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /merge/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/leaderboard/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/winner/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/benchmark dashboard/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/score/i)).not.toBeInTheDocument();
   });
 });

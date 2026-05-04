@@ -5,8 +5,9 @@ Local Wave 5 workbench UI for Fractal Agent Lab.
 ## Current Scope
 
 The UI started as the U5-A fixture-backed evidence observatory shell and now includes
-the U5-B run browser surface, the U5-C trace timeline surface, and the U5-D first-pass
-operator command/packet preparation surface.
+the U5-B run browser surface, the U5-C trace timeline surface, the U5-D first-pass
+operator command/packet preparation surface, and the U5-F read-only memory/eval
+inventory surface.
 
 U5-A established:
 
@@ -42,15 +43,26 @@ U5-D adds:
 - structured operator-mediated packet skeletons
 - explicit no-bridge/no-OpenCode-control/no-commit boundaries
 
+U5-F adds:
+
+- generated memory/eval index loading from `/generated/memory-eval-index.json`
+- read-only project memory inventory
+- read-only memory candidate/update sidecar inventory
+- source-reported eval summary display for allowlisted report shapes
+- historical curated evidence references as links only, not parsed live metrics
+- explicit no-edit/no-rating/no-run-comparison/no-Wave-6-ledger boundaries
+
 It does not implement browser-triggered local execution, a local Python bridge,
-backend/API design, public deployment, OpenCode automation, eval scoring, provider
-ranking, artifact editing, commit actions, or artifact repair.
+backend/API design, public deployment, OpenCode automation, provider ranking,
+artifact editing, commit actions, artifact repair, memory editing, run-pair
+comparison UX, or Wave 6 evidence-ledger behavior.
 
 ## Commands
 
 ```bash
 npm install
 npm run build:workflows
+npm run build:memory-eval
 npm run build:index
 npm run build:traces
 npm run typecheck
@@ -67,6 +79,18 @@ ui/public/generated/workflows.json
 
 The generated catalog has schema version `u5_d.workflow_catalog.v1`. It includes only
 allowlisted display metadata and does not dump arbitrary workflow metadata into the UI.
+
+`npm run build:memory-eval` derives a local memory/eval inventory from `../data` and writes:
+
+```text
+ui/public/generated/memory-eval-index.json
+```
+
+The generated memory/eval index has schema version `u5_f.memory_eval_index.v1`. It scans
+allowlisted memory sidecars and allowlisted eval report shapes only. Missing local memory
+or eval data is rendered as `not demonstrated` / `no local project memory store found`,
+not as failure. JSON sidecars without `report_version` are treated as non-report sidecars
+and ignored; unsupported `report_version` values are warnings.
 
 `npm run build:index` derives a local index from `../data` and writes:
 
@@ -113,3 +137,9 @@ The U5-D command preview targets an OpenCode/bash terminal command using the est
 `PYTHONPATH=src python -m fractal_agent_lab.cli run ...` shape. The packet composer is
 advisory/operator-mediated only: it does not launch OpenCode, control sessions, perform
 commits, or act as a review/gate artifact.
+
+The U5-F memory/eval page is read-only. It displays stored project memory, memory
+candidate/update sidecars, source-reported eval summaries, and historical curated
+references where available. It does not edit memory, rewrite memory, define memory
+meaning, define eval readiness, rank model/provider outputs, implement U5-E run-pair
+comparison, or open Wave 6 evidence-ledger scope.

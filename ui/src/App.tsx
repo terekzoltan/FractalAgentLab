@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 import { evidenceFixtures, pages } from "./fixtures";
 import { buildLaunchCommand } from "./launchCommandBuilder";
+import { loadMemoryEvalIndex, type MemoryEvalIndexLoadState } from "./memoryEvalIndexLoader";
+import type { EvalSummaryRow, MemoryArtifactRow, MemoryEvalIndex, MemoryProjectRow } from "./memoryEvalIndexModel";
 import { buildLaunchPacket } from "./packetComposer";
 import { loadRunIndex, type RunIndexLoadState } from "./runIndexLoader";
 import type { RunIndex, RunIndexRow, TraceTarget } from "./runIndexModel";
@@ -49,7 +51,7 @@ function DisclosureBanner() {
       <p>
         This workbench exposes derived run browsing, strict-valid trace timelines, and
         operator-mediated command/packet preparation. It does not execute browser-side
-        launches, control OpenCode, commit changes, score outputs, or replace canonical truth in
+        launches, control OpenCode, commit changes, produce eval ratings, or replace canonical truth in
         <code> data/runs/&lt;run_id&gt;.json</code>, <code>data/traces/&lt;run_id&gt;.jsonl</code>,
         and <code>data/artifacts/&lt;run_id&gt;/...</code>.
       </p>
@@ -145,6 +147,25 @@ function useGeneratedWorkflowCatalog() {
     let cancelled = false;
     setLoadState({ status: "loading" });
     loadWorkflowCatalog().then((nextState) => {
+      if (!cancelled) {
+        setLoadState(nextState);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return loadState;
+}
+
+function useGeneratedMemoryEvalIndex() {
+  const [loadState, setLoadState] = useState<MemoryEvalIndexLoadState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadState({ status: "loading" });
+    loadMemoryEvalIndex().then((nextState) => {
       if (!cancelled) {
         setLoadState(nextState);
       }
@@ -486,6 +507,249 @@ function LaunchPage() {
         )}
       </section>
     </div>
+  );
+}
+
+function MemoryEvalPage() {
+  const indexState = useGeneratedMemoryEvalIndex();
+
+  if (indexState.status === "loading") {
+    return <MemoryEvalMessage title="Loading generated memory/eval index" status="PARTIAL" />;
+  }
+  if (indexState.status === "missing_index") {
+    return (
+      <MemoryEvalMessage title="Generated memory/eval index is missing" status="MISSING">
+        <p>{indexState.message}</p>
+        <p>
+          Build the local derived index with <code>npm run build:memory-eval</code>. This index is a
+          gitignored inventory over available local evidence, not memory or eval authority.
+        </p>
+      </MemoryEvalMessage>
+    );
+  }
+  if (indexState.status === "invalid_index") {
+    return (
+      <MemoryEvalMessage title="Generated memory/eval index is invalid" status="FAIL">
+        <p>{indexState.message}</p>
+        <p>Rebuild with <code>npm run build:memory-eval</code> after checking local artifact warnings.</p>
+      </MemoryEvalMessage>
+    );
+  }
+
+  return <MemoryEvalWorkspace index={indexState.index} />;
+}
+
+function MemoryEvalWorkspace({ index }: { index: MemoryEvalIndex }) {
+  const hasAnyLocalEvidence =
+    index.memory_projects.length > 0 || index.memory_artifacts.length > 0 || index.eval_summaries.length > 0;
+
+  return (
+    <div className="memory-layout">
+      <section className="panel panel-large" aria-labelledby="memory-eval-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">U5-F read-only inventory</p>
+            <h2 id="memory-eval-title">Memory / Eval inspection</h2>
+          </div>
+          <StatusBadge status="PARTIAL" />
+        </div>
+        <p>
+          Derived index <code>{index.schema_version}</code> generated from <code>{index.data_dir}</code> at{" "}
+          <code>{index.generated_at}</code>. U5-F displays available local evidence only; it does not edit
+          memory, create eval ratings, compare run pairs, or open a Wave 6 evidence ledger.
+        </p>
+        <div className="metric-grid" aria-label="Memory and eval inventory summary">
+          <Metric label="Project memory" value={index.summary.project_memory_store_state.replace(/_/g, " ")} />
+          <Metric label="Projects" value={String(index.summary.memory_project_count)} />
+          <Metric label="Memory sidecars" value={String(index.summary.memory_artifact_count)} />
+          <Metric label="Eval summaries" value={String(index.summary.eval_summary_count)} />
+        </div>
+        {!hasAnyLocalEvidence ? (
+          <div className="trace-message" aria-label="No local memory or eval evidence">
+            <h3>Not demonstrated in the generated local index</h3>
+            <p>No local project memory store, memory sidecars, or allowlisted eval summary reports were found.</p>
+          </div>
+        ) : null}
+      </section>
+
+      <MemoryProjectsTable projects={index.memory_projects} />
+      <MemoryArtifactsTable artifacts={index.memory_artifacts} />
+      <EvalSummariesTable summaries={index.eval_summaries} />
+      <CuratedReferences references={index.curated_references} />
+      {index.warnings.length > 0 ? <MemoryWarningList warnings={index.warnings} /> : null}
+    </div>
+  );
+}
+
+function MemoryProjectsTable({ projects }: { projects: MemoryProjectRow[] }) {
+  return (
+    <section className="panel" aria-labelledby="memory-projects-title">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Stored project memory</p>
+          <h2 id="memory-projects-title">Project memory store</h2>
+        </div>
+        <span className="source-label">available local evidence</span>
+      </div>
+      {projects.length === 0 ? <p>No local project memory store found.</p> : null}
+      {projects.length > 0 ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Stored counts</th>
+                <th>Updated</th>
+                <th>Source path</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projects.map((project) => (
+                <tr key={project.source_path}>
+                  <td>{project.project_id}</td>
+                  <td>
+                    stable decisions: {project.stable_decision_count}<br />
+                    workflow learnings: {project.workflow_learning_count}<br />
+                    prompt observations: {project.prompt_observation_count}
+                  </td>
+                  <td>{valueOrUnknown(project.updated_at)}</td>
+                  <td><code>{project.source_path}</code></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function MemoryArtifactsTable({ artifacts }: { artifacts: MemoryArtifactRow[] }) {
+  return (
+    <section className="panel" aria-labelledby="memory-artifacts-title">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Candidate/update sidecars</p>
+          <h2 id="memory-artifacts-title">Memory sidecars</h2>
+        </div>
+        <span className="source-label">read-only inventory</span>
+      </div>
+      {artifacts.length === 0 ? <p>No memory candidate or project memory update sidecars found.</p> : null}
+      {artifacts.length > 0 ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Run</th>
+                <th>Kind</th>
+                <th>Workflow</th>
+                <th>Scope ref</th>
+                <th>Items</th>
+                <th>Source path</th>
+              </tr>
+            </thead>
+            <tbody>
+              {artifacts.map((artifact) => (
+                <tr key={`${artifact.run_id}-${artifact.artifact_kind}-${artifact.source_path}`}>
+                  <td>{artifact.run_id}</td>
+                  <td>{artifact.artifact_kind.replace(/_/g, " ")}</td>
+                  <td>{valueOrUnknown(artifact.workflow_id)}</td>
+                  <td>{artifact.project_id ?? artifact.session_id ?? "unknown"}</td>
+                  <td>{artifact.item_count}</td>
+                  <td><code>{artifact.source_path}</code></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function EvalSummariesTable({ summaries }: { summaries: EvalSummaryRow[] }) {
+  return (
+    <section className="panel panel-large" aria-labelledby="eval-summaries-title">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Eval summaries</p>
+          <h2 id="eval-summaries-title">Source-reported eval artifacts</h2>
+        </div>
+        <span className="source-label">source-reported outcome</span>
+      </div>
+      {summaries.length === 0 ? <p>No allowlisted eval summary reports found in local sidecars.</p> : null}
+      {summaries.length > 0 ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Report</th>
+                <th>Source-reported outcome</th>
+                <th>Summary fields</th>
+                <th>Source path</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summaries.map((summary) => (
+                <tr key={summary.source_path}>
+                  <td>
+                    {summary.label}<br />
+                    <code>{summary.report_version}</code>
+                  </td>
+                  <td>{summary.source_reported_outcome ?? "not reported"}</td>
+                  <td>{formatSummaryFields(summary.source_reported_summary)}</td>
+                  <td><code>{summary.source_path}</code></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function CuratedReferences({ references }: { references: MemoryEvalIndex["curated_references"] }) {
+  return (
+    <section className="panel" aria-labelledby="curated-references-title">
+      <p className="eyebrow">Historical curated reference</p>
+      <h2 id="curated-references-title">Source references</h2>
+      <div className="artifact-paths">
+        {references.map((reference) => (
+          <p key={reference.source_path}>
+            <strong>{reference.label}</strong><br />
+            <span>{reference.evidence_label}: {reference.note}</span><br />
+            <code>{reference.source_path}</code>
+          </p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MemoryWarningList({ warnings }: { warnings: string[] }) {
+  return (
+    <section className="panel panel-large warnings" aria-label="Memory and eval index warnings">
+      <p className="eyebrow">Generated index warnings</p>
+      <ul>
+        {warnings.map((warning) => <li key={warning}>{warning}</li>)}
+      </ul>
+    </section>
+  );
+}
+
+function MemoryEvalMessage({ title, status, children }: { title: string; status: WorkbenchStatus; children?: ReactNode }) {
+  return (
+    <section className="panel panel-large placeholder" aria-labelledby="memory-eval-message-title">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">U5-F memory/eval inspection</p>
+          <h2 id="memory-eval-message-title">{title}</h2>
+        </div>
+        <StatusBadge status={status} />
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -972,6 +1236,14 @@ function joinOrUnknown(values: string[]) {
   return values.length > 0 ? values.join(", ") : "unknown";
 }
 
+function formatSummaryFields(values: Record<string, string | boolean | number | null>) {
+  const entries = Object.entries(values);
+  if (entries.length === 0) {
+    return "not reported";
+  }
+  return entries.map(([key, value]) => `${key}: ${String(value)}`).join(", ");
+}
+
 function yesNo(value: boolean) {
   return value ? "yes" : "no";
 }
@@ -1098,7 +1370,8 @@ export function App() {
           {activePage.id === "runs" ? <RunsPage onTraceTarget={handleTraceTarget} /> : null}
           {activePage.id === "trace" ? <TracePage traceTarget={traceTarget} /> : null}
           {activePage.id === "packets" ? <LaunchPage /> : null}
-          {activePage.id !== "overview" && activePage.id !== "runs" && activePage.id !== "trace" && activePage.id !== "packets" ? (
+          {activePage.id === "memory" ? <MemoryEvalPage /> : null}
+          {activePage.id !== "overview" && activePage.id !== "runs" && activePage.id !== "trace" && activePage.id !== "packets" && activePage.id !== "memory" ? (
             <PlaceholderPage page={activePage} traceTarget={traceTarget} />
           ) : null}
           {activePage.id === "overview" ? <FixtureTable /> : null}

@@ -424,6 +424,12 @@ code {
   gap: 20px;
 }
 
+.memory-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
 .launch-config {
   display: grid;
   gap: 18px;
@@ -443,6 +449,18 @@ code {
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 16px;
   background: rgba(2, 6, 23, 0.48);
+}
+
+.source-label {
+  display: inline-block;
+  max-width: max-content;
+  padding: 8px 10px;
+  border: 1px solid rgba(125, 211, 252, 0.32);
+  border-radius: 999px;
+  color: #bae6fd;
+  background: rgba(14, 165, 233, 0.1);
+  font-size: 0.75rem;
+  font-weight: 800;
 }
 
 .trace-main {
@@ -561,6 +579,7 @@ th {
   .page-grid,
   .runs-layout,
   .launch-layout,
+  .memory-layout,
   .trace-layout,
   .metric-grid,
   .detail-grid,

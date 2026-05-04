@@ -1309,9 +1309,9 @@ Epics:
 #### Sprint W5-S2 — Workbench primitives
 
 Epics:
-- ⬜ **U5-D** workflow launch form — **Owner: Track A**
-- ⬜ **U5-E** compare two runs — **Owner: Track A + Track E**
-- ⬜ **U5-F** inspect stored project memory and eval summary — **Owner: Track A**
+- ✅ **U5-D** workflow launch form — **Owner: Track A**
+- 🔄 **U5-E** compare two runs — **Owner: Track A + Track E**
+- ✅ **U5-F** inspect stored project memory and eval summary — **Owner: Track A**
 
 **Sequential ordering:**
 1. U5-D first (launch form is prerequisite for useful comparison)
@@ -1325,18 +1325,18 @@ Epics:
 
 ### Sprint W5-S2 — Execution Steps
 
-**⬜ Step 1 — Track A lands the workflow launch primitive first**
+**✅ Step 1 — Track A lands the workflow launch primitive first**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track A agent session | U5-D | U5-A ✅ + U5-B ✅ + U5-C ✅ | Launching workflows through the UI should come after basic browsing already works |
+| Track A agent session | ✅ U5-D | U5-A ✅ + U5-B ✅ + U5-C ✅ | Delivered generated registry-derived workflow catalog, command preview, and operator-mediated packet composer as a `PARTIAL` surface without browser-side execution, OpenCode automation, commit action, bridge, or session bus; see `docs/wave5/Wave5-W5-S2-TrackA-U5-D-Workflow-Launch.md` and commit `3331eaa` |
 
-**⬜ Step 2 — Track E defines comparison semantics while Track A can build memory/eval inspection in parallel**
+**✅ Step 2 — Track E defines comparison semantics while Track A can build memory/eval inspection in parallel**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track E agent session | U5-E (comparison spec/metrics) | U5-D ✅ | Define comparison semantics before UI implementation guesses |
-| Track A agent session | U5-F | U5-D ✅ | Memory/eval inspection depends on the workbench shell, not on comparison semantics |
+| Track E agent session | ✅ U5-E (comparison spec/metrics) | U5-D ✅ | Accepted docs-only comparison semantics artifact; full `U5-E` stays open until Track A UX implementation is accepted in Step 3 |
+| Track A agent session | ✅ U5-F | U5-D ✅ | Delivered generated read-only memory/eval inventory with narrowed canonical-memory wording, source-reported eval display, Track C/Track E wording checks, and Meta no-claim closeout; see `docs/wave5/Wave5-W5-S2-TrackA-U5-F-Memory-Eval-Inspection.md` |
 
 **⬜ Step 3 — Track A implements comparison UX on top of Track E's comparison semantics**
 

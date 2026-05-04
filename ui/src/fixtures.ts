@@ -34,8 +34,8 @@ export const pages: WorkbenchPage[] = [
   {
     id: "memory",
     label: "Memory / Eval",
-    status: "NOT IMPLEMENTED",
-    summary: "Read-only memory and eval inspection land later.",
+    status: "PARTIAL",
+    summary: "Read-only memory and eval inventory is active from the generated index.",
   },
 ];
 
