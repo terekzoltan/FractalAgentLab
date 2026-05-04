@@ -392,18 +392,73 @@ Outputs:
 
 ---
 
-## `CV3` — Later orchestration expansion and harder delivery chaining
+## `CV3-lite` / Wave 6 — Evidence-backed OpenCode orchestration layer
+
+**Type:** post-Wave-5 evidence/control-plane expansion
+
+**Primary owners:** Track B, Track D, Track E, with Meta Coordinator sequencing/gate ownership
+
+### Goal
+
+Make OpenCode-driven Meta/Track development measurable, auditable, replayable, safer, and better over time.
+
+This is the strategic correction after OpenCode command/skill/server capabilities mature:
+
+- OpenCode remains the execution hand / shell / session runtime
+- Fractal Agent Lab owns workflow intelligence, packet/state contracts, audit, evidence, replay, and private learning
+
+`CV3-lite` should not begin as a full orchestration platform.
+It starts evidence-ledger-first.
+
+### Scope
+
+First slice:
+
+- Meta/Track packet-loop evidence ledger
+- packet state machine for the real plan/review/implementation/review-fix cycle
+- evidence recorder for changed files, tests, findings, fixes, friction, and gate correctness
+- usefulness eval comparing manual OpenCode, command-assisted OpenCode, packet-assisted OpenCode server flow, and FAL evidence-backed flow
+- target-repo trial after readiness check, with WorldSim as the default candidate if available
+
+Out of first slice:
+
+- full session bus
+- general-purpose packet platform
+- autonomous commit/push
+- hidden OpenCode storage mutation
+- UI packet/launch/reminder expansion
+- broad swarm/autopilot claims
+
+### Acceptance
+
+`CV3-lite` is accepted only if:
+
+- at least one real Meta/Track loop is captured as structured evidence
+- state-machine validation prevents false-green transitions
+- usefulness evaluation can say where FAL helps and where OpenCode alone is enough
+- private raw evidence remains private by default
+- a target-repo trial produces sanitized evidence or a clear blocker
+
+### References
+
+- `docs/private/OpenCode-Orchestration-Layer-v01.md`
+- `docs/private/Coordination-Layer-Packet-Bus-v02.md`
+- `docs/private/Coding-Vertical-Usefulness-Eval-v01.md`
+
+---
+
+## `CV3-full` — Later orchestration expansion and harder delivery chaining
 
 **Type:** later vertical expansion  
 **Primary owners:** mixed by scope
 
 ### Goal
 
-Extend the coding vertical beyond the first thin slices without turning it into an opaque delivery fantasy.
+Extend the coding vertical beyond `CV3-lite` without turning it into an opaque delivery fantasy.
 
 Practical focus:
 
-- keep `CV1` and `CV2` useful and inspectable
+- keep `CV1`, `CV2`, and `CV3-lite` useful and inspectable
 - only then explore richer orchestration shapes where evidence says they help
 
 ### Possible later scope
@@ -427,6 +482,7 @@ Important current bias:
 ### Blockers before entry
 
 - H4/H5 artifacts must already be trustworthy
+- `CV3-lite` evidence ledger must show real usefulness rather than extra transport theater
 - the private learning loop must contain real evidence, not only speculation
 - the project must still remain legible as a layered engine/research-OS system
 - richer orchestration should be justified by measured usefulness, not by agent-count aesthetics
@@ -442,7 +498,8 @@ The intended order is:
 3. finish enough of Wave 2 to support honest artifact/replay/smoke discipline
 4. run `CV1`
 5. only later run `CV2`
-6. treat `CV3` as earned expansion, not a promise
+6. after Wave 5, run `CV3-lite` / Wave 6 only as evidence-backed OpenCode loop capture
+7. treat `CV3-full` as earned expansion, not a promise
 
 More explicit evolution ladder:
 

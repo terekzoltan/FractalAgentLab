@@ -168,6 +168,9 @@ The Meta Coordinator works primarily with these files:
 - `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md` (when CV0-C review decisions must be reconciled before CV0-D closeout)
 - `docs/private/Coding-Vertical-Learning-Loop-v01.md` (when private coding heuristics are being distilled)
 - `docs/private/Coordination-Layer-Packet-Bus-v01.md` (when packet law, transport semantics, or guarded dispatch boundaries are in scope)
+- `docs/private/Coordination-Layer-Packet-Bus-v02.md` (when Wave 6 MVP packet/state schema and evidence-ledger transitions are in scope)
+- `docs/private/OpenCode-Orchestration-Layer-v01.md` (when Wave 6 / CV3-lite positioning against OpenCode server/API automation is in scope)
+- `docs/private/Coding-Vertical-Usefulness-Eval-v01.md` (when deciding whether the OpenCode/FAL workflow layer earns its complexity)
 - future track-specific notes or plans
 - future risk, audit, or benchmark documents
 

@@ -1344,10 +1344,241 @@ Epics:
 |---------|---------|--------|-------|
 | Track A agent session | U5-E (UX implementation) | U5-E comparison spec ✅ + U5-D ✅ | Run comparison UX should consume Track E's validation semantics instead of guessing them |
 
-### Wave 5 gate to close the wave:**
+### Wave 5 gate to close the wave
 - system is presentable without manually spelunking folders
 - portfolio/demo narrative is supported by the UI
 - UI does not hide key trace/eval realities
+
+---
+
+## Wave 6 — Evidence-backed OpenCode Orchestration Layer
+
+**Wave goal:** make OpenCode-driven Meta/Track development measurable, auditable, replayable, safer, and better over time.
+
+**Primary value:** evidence-backed coordination loops, not another command/skill wrapper.
+
+**Strategic correction:** OpenCode is the execution hand / agent shell / session runtime; Fractal Agent Lab owns workflow intelligence, coordination policy, audit, replay, evidence, and private learning loops.
+
+Alternative internal label:
+- `CV3-lite` — OpenCode Execution + FAL Evidence / Coordination / Learning Layer
+
+Status:
+- ⬜ post-Wave-5 direction only
+- docs/prep may happen now
+- implementation waits until Wave 5 closes unless explicitly re-sequenced by Meta
+
+### Why Wave 6 exists
+
+OpenCode now provides commands, skills, tools, permissions, and server/API automation.
+If Fractal Agent Lab only mirrors OpenCode command workflows, it becomes redundant.
+
+Wave 6 keeps Fractal Agent Lab above OpenCode:
+
+- OpenCode runs sessions and touches repos.
+- Fractal Agent Lab records what happened, why decisions were made, which gates worked, which reviews caught real issues, and whether the workflow actually improved development.
+
+The standard changes from:
+
+> how do we automate OpenCode?
+
+to:
+
+> how do we make OpenCode-driven development measurable, auditable, replayable, safer, and better over time?
+
+### Wave 6 anti-goals
+
+Wave 6 must not implement or claim:
+
+- autonomous push
+- autonomous commit by default
+- unattended swarm execution
+- hidden OpenCode session mutation
+- direct mutation of OpenCode storage internals
+- unvalidated raw-output forwarding between sessions
+- broad session bus / queue autonomy before evidence proves usefulness
+- another abstract workflow family without usefulness proof
+- public exposure of raw private learning-loop evidence
+
+### Wave 6 mandatory outputs
+
+- minimal Meta/Track packet-loop evidence ledger
+- explicit packet state machine for the real OpenCode development loop
+- private-by-default evidence recorder
+- usefulness evaluation comparing manual, command-assisted, packet-assisted, and FAL evidence-backed workflows
+- at least one external target-repo trial after readiness check, with WorldSim as the default candidate if available
+- sanitized case study or report that separates public architecture from private operating heuristics
+
+### Wave 6 sprint breakdown
+
+#### Sprint W6-S1 — Evidence-first OpenCode loop capture
+
+Epics:
+- ⬜ **W6-A** OpenCode Bridge MVP / evidence-ledger-first slice — **Owner: Track D + Track B**
+- ⬜ **W6-B** Packet State Machine — **Owner: Track B**
+- ⬜ **W6-C** Evidence Recorder — **Owner: Track E + Track B**
+
+Sequential ordering:
+1. W6-A starts with evidence-ledger-first capture, not full API automation.
+2. W6-B defines the allowed state transitions before packet routing generalizes.
+3. W6-C records useful workflow evidence from real Meta/Track loops.
+
+#### Sprint W6-S2 — Usefulness and external proof
+
+Epics:
+- ⬜ **W6-D** Usefulness Eval — **Owner: Track E**
+- ⬜ **W6-E** Target Repo Trial — **Owner: Meta Coordinator + Track E, with Track roles as needed**
+
+Sequential ordering:
+1. W6-D defines evaluation semantics before claims are made.
+2. W6-E runs only after a target-repo readiness brief is accepted.
+3. WorldSim is the preferred first candidate, but not assumed ready without a target brief.
+
+### W6-A — OpenCode Bridge MVP
+
+Goal:
+- create the thinnest bridge between OpenCode Meta/Track sessions and Fractal Agent Lab evidence artifacts.
+
+Initial interpretation:
+- evidence ledger first
+- API/session delivery second
+- no full session bus in MVP
+
+MVP packet scope is limited to the real Meta/Track loop:
+
+- `plan_ready_for_meta_review`
+- `meta_plan_review_done`
+- `plan_review_acknowledged`
+- `implementation_done`
+- `step_review_done`
+- `step_review_acknowledged`
+- `review_fix_done`
+
+MVP decisions are limited to:
+
+- `greenlit`
+- `changes_requested`
+- `blocked`
+- `pass`
+- `fix_required`
+- `hold`
+- `deep_review_needed`
+
+Required boundaries:
+
+- no direct OpenCode storage mutation
+- no hidden background autonomy
+- no auto-commit
+- no auto-push
+- no launch/reminder/UI packet expansion in MVP
+- all forwarded packets must be structured and validated before recording or delivery
+
+### W6-B — Packet State Machine
+
+Goal:
+- model the Meta/Track workflow as explicit, auditable state transitions.
+
+Required behavior:
+
+- require explicit `greenlit` before implementation
+- stop on `blocked`
+- stop or require approval on high-risk transitions
+- require `pass` or `hold` before commit-readiness
+- record every transition as a traceable decision
+- treat `deep_review_needed` as an extension route, not the default path
+
+### W6-C — Evidence Recorder
+
+Goal:
+- record useful workflow evidence, not just messages.
+
+For each loop, capture:
+
+- originating Track
+- Meta reviewer session
+- sequence item
+- plan summary
+- review verdict
+- implementation summary
+- changed files
+- tests/checks run
+- missing tests
+- review findings
+- whether findings were accepted or rejected
+- whether fixes were required
+- whether the Meta gate was correct in hindsight
+- manual intervention count
+- copy-paste avoided count
+- final status: `pass`, `pass_with_warnings`, `hold`, or `blocked`
+
+Privacy rule:
+
+- raw workflow evidence, prompt heuristics, failure corpora, and gate-quality notes remain private by default
+- public output, if any, is sanitized and partial
+
+### W6-D — Usefulness Eval
+
+Goal:
+- prove whether the workflow earns its complexity.
+
+Compare:
+
+- manual OpenCode workflow
+- command-assisted OpenCode workflow
+- packet-assisted OpenCode server workflow
+- FAL evidence-backed workflow
+
+Metrics:
+
+- manual copy-paste steps reduced
+- total loop friction
+- real issues caught by review
+- false-positive findings
+- avoidable rework cycles
+- plan adherence
+- test sufficiency
+- scope drift
+- gate correctness
+- time-to-greenlit
+- time-to-pass
+- operator interruptions required
+
+Expected output:
+
+- where FAL genuinely helps
+- where OpenCode alone is enough
+- where automation is dangerous
+- where more policy is not worth it
+
+### W6-E — Target Repo Trial
+
+Goal:
+- prove the workflow outside Fractal Agent Lab.
+
+Default candidate:
+- WorldSim, only after a target-brief/readiness check.
+
+Required target brief:
+
+- repo location
+- current architecture summary
+- active workflow need
+- safe first sequence item
+- expected evidence
+- boundaries and non-goals
+
+Fallback:
+- if WorldSim is unavailable or not ready, choose another suitable target repo instead of falling back to FAL-only validation.
+
+### Wave 6 gate to close the wave
+
+Wave 6 can close only if:
+
+- at least one real Meta/Track loop is captured as structured evidence
+- the packet state machine prevents false-green transitions
+- usefulness evaluation distinguishes real value from extra meta-work
+- private evidence remains private
+- sanitized external-target evidence exists or a clear blocker is documented
+- FAL is demonstrably acting as the evidence/control layer above OpenCode, not competing with OpenCode execution features
 
 ---
 
@@ -1361,6 +1592,7 @@ Epics:
 | 3 | Research OS usefulness | schema authority | lead | late MVP side batch | co-lead | visibility uplift |
 | 4 | Provider expansion | protect core | minor | lead parity/hardening | compare co-lead | optional UI support |
 | 5 | Workbench | support | support | support | support | lead |
+| 6 | OpenCode evidence/control layer | packet/state boundary | payload semantics | bridge/router MVP | usefulness/evidence scoring | later visibility only |
 
 ---
 
@@ -1505,12 +1737,14 @@ Wave 1 core closeout is complete, `CV0` is closed, and `CV1` is implemented.
 The original `CV1-META1` closeout kept `CV2` blocked because local `h4.seq_next.v1` evidence was missing at that time.
 Post-closeout live hardening later produced a canonically complete `h4.seq_next.v1` evidence run, so the missing-evidence blocker is now cleared.
 `CV2` was explicitly activated on 2026-04-27 as a narrow H5 review/gate side-vertical; it remains subordinate to the main wave spine and does not imply implementation automation.
+Wave 6 / `CV3-lite` is documented as a post-Wave-5 strategic correction: Fractal Agent Lab should become the evidence/control layer above OpenCode, not a wrapper around OpenCode commands or a hidden session bus.
 
 Use this in the following order:
 
 1. Meta-led `CV0` design/policy batch after `W1-S2-FIX-META1` and `L1-J` / `L1-K` / `L1-L` / `L1-M`
 2. thin `CV1` (`H4`) pilot only after `H2-A` through `H2-H`
 3. thin `CV2` (`H5`) review/gate slice only after `CV1` is accepted and coding artifacts are stable enough to judge honestly
+4. Wave 6 / `CV3-lite` evidence-backed OpenCode orchestration only after Wave 5 closes, starting evidence-ledger-first rather than OpenCode API/session-bus-first
 
 References:
 - `docs/Coding-Vertical-Adopt-Adapt-Defer-v01.md`
@@ -1518,6 +1752,9 @@ References:
 - `docs/private/Coding-Vertical-Human-Workflow-Mapping-v01.md`
 - `docs/private/Coding-Vertical-H4-H5-Workflow-Family-v01.md`
 - `docs/private/Coding-Vertical-Rollout-Plan-v01.md`
+- `docs/private/OpenCode-Orchestration-Layer-v01.md`
+- `docs/private/Coordination-Layer-Packet-Bus-v02.md`
+- `docs/private/Coding-Vertical-Usefulness-Eval-v01.md`
 
 ### Post-Wave-1 side vertical — Software Delivery Loop (`CV0` / `CV1` / `CV2`)
 

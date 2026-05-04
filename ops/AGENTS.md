@@ -903,6 +903,31 @@ Primary track emphasis:
 
 ---
 
+## Wave 6 — Evidence-backed OpenCode Orchestration Layer
+**Goal:** make OpenCode-driven Meta/Track development measurable, auditable, replayable, safer, and better over time.
+
+Target outcomes:
+- minimal Meta/Track packet-loop evidence ledger
+- explicit packet state machine for plan/review/implementation/review-fix loops
+- private-by-default evidence recorder
+- usefulness evaluation that can say where FAL helps, where OpenCode alone is enough, and where automation is dangerous
+- at least one external target-repo trial after readiness check, with WorldSim as the default candidate if available
+
+Strategic stance:
+- OpenCode remains the execution hand / agent shell / session runtime
+- Fractal Agent Lab owns workflow intelligence, coordination policy, audit, replay, evidence, and private learning loops
+- Wave 6 is not an OpenCode replacement, command factory, or autonomous swarm
+
+Primary track emphasis:
+- B + D + E, with Meta sequencing/gate ownership
+- C supports payload semantics
+- A stays deferred until evidence exists for visibility/dashboard work
+
+Status:
+- ⬜ post-Wave-5 direction only; docs/prep may exist now, but implementation waits until Wave 5 closes unless explicitly re-sequenced by Meta
+
+---
+
 ## Future side vertical — Software Delivery Loop
 
 This is a planned side vertical, not a replacement for the main wave spine.
@@ -911,21 +936,25 @@ Phase rule:
 - post-Wave-1 closeout: docs-only `CV0` design/policy batch
 - after Wave 2 contract/replay/smoke hardening: thin `CV1` (`H4`) pilot
 - only later: thin `CV2` (`H5`) review/gate slice
+- post-Wave-5: Wave 6 / `CV3-lite` evidence-backed OpenCode orchestration layer, starting evidence-ledger-first rather than session-bus-first
 
 Current status note:
 - `CV1` is implemented and post-closeout live H4 evidence cleared the old missing-evidence blocker for `CV2`
 - `CV2` was explicitly activated on 2026-04-27 as a narrow H5 review/gate side-vertical; `CV2-A`/`CV2-B`/`CV2-C`/`CV2-D` are complete as a manual thin slice without native H5 runtime automation or provider-parity claims
+- Wave 6 / `CV3-lite` is now documented as a post-Wave-5 strategic correction: FAL should become the evidence/control layer above OpenCode, not a wrapper around OpenCode commands
 
 Near-term bias:
 - first improve packetization and operator transport
 - aim for near `enter-only` coordination before stronger session-to-session automation
 - keep richer dispatch/session-bus behavior as later guarded expansion
+- prefer evidence-ledger usefulness proof before OpenCode API/session delivery automation
 
 Control rule:
 - do not let coding-vertical implementation steal focus from the current main wave
 - treat repo-aware software delivery as an earned extension of the engine, not a reset of project identity
 - treat the coding vertical's strongest review/gate/planning heuristics as private learning-loop assets by default
 - keep OpenCode as the practical command/shell surface and Combined as the live control surface
+- keep raw Wave 6 evidence private by default; public output should be sanitized architecture/case-study material only
 
 ---
 
@@ -1370,6 +1399,20 @@ Use when:
 - coding-vertical sequencing or ownership is unclear
 - repeated coding-review evidence should feed private heuristics
 
+### Session: OpenCode Orchestration Evidence Lab
+Focus:
+- Wave 6 / `CV3-lite` evidence-backed OpenCode Meta/Track loop capture
+- packet state-machine validation
+- review/gate usefulness evaluation
+- private evidence-ledger and sanitized case-study boundaries
+- external target-repo trial readiness, especially WorldSim if available
+
+Use when:
+- OpenCode server/API packet forwarding is being considered
+- Meta/Track handoff packets need schema or transition review
+- usefulness evidence is needed before expanding automation
+- target-repo trial scope or privacy boundaries are unclear
+
 ---
 
 ## 22. Initial acceptance gates
@@ -1434,9 +1477,12 @@ These are not the active implementation frontier, but they are now canonical fut
 7. `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md`
 8. `docs/private/Coding-Vertical-Learning-Loop-v01.md`
 9. `docs/private/Coordination-Layer-Packet-Bus-v01.md`
-10. `docs/private/Coding-Vertical-H4-Planning-Prompt-Review-v01.md`
-11. `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md`
-12. `docs/private/Model-Reasoning-Effort-Policy-Note-v01.md`
+10. `docs/private/Coordination-Layer-Packet-Bus-v02.md`
+11. `docs/private/OpenCode-Orchestration-Layer-v01.md`
+12. `docs/private/Coding-Vertical-Usefulness-Eval-v01.md`
+13. `docs/private/Coding-Vertical-H4-Planning-Prompt-Review-v01.md`
+14. `docs/private/Coding-Vertical-H5-Review-Gate-Policy-Review-v01.md`
+15. `docs/private/Model-Reasoning-Effort-Policy-Note-v01.md`
 
 **CV0 execution status:** complete; `CV0-A`/`CV0-B`/`CV0-C`/`CV0-D` are now closed, and `CV1` is ready by named prerequisites but remains subordinate to the active mainline frontier in Combined.
 
@@ -1444,6 +1490,7 @@ Rule:
 - CV0 runs alongside Wave 2 mainline as docs-only design work
 - CV0 may start CV0-1 in parallel with W2-S1, but Track C/E involvement waits for mainline bandwidth availability
 - treat these docs as the input/output surface for CV0, not as permission to skip W2 mainline priorities
+- Wave 6 / `CV3-lite` docs are post-Wave-5 prep only until Combined explicitly opens implementation
 
 ---
 

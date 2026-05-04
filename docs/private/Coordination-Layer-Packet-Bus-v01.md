@@ -347,5 +347,7 @@ Main companions:
 - `docs/private/Coding-Vertical-Human-Workflow-Mapping-v01.md`
 - `docs/private/Coding-Vertical-H4-H5-Workflow-Family-v01.md`
 - `docs/private/Coding-Vertical-Rollout-Plan-v01.md`
+- `docs/private/Coordination-Layer-Packet-Bus-v02.md` for the Wave 6 MVP Meta/Track packet-state subset
+- `docs/private/OpenCode-Orchestration-Layer-v01.md` for the OpenCode execution-hand / FAL evidence-layer strategic correction
 - `ops/Meta-Coordinator-Runbook.md`
 - `ops/Combined-Execution-Sequencing-Plan.md`
