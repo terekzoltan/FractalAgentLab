@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { App } from "./App";
 import { RUN_INDEX_SCHEMA_VERSION, type RunIndex } from "./runIndexModel";
 import { TRACE_DETAIL_SCHEMA_VERSION, type TraceDetail } from "./traceDetailModel";
+import { WORKFLOW_CATALOG_SCHEMA_VERSION, type WorkflowCatalog } from "./workflowCatalogModel";
 
 function mockFetchWith(payload: unknown, status = 200) {
   vi.stubGlobal(
@@ -204,6 +205,38 @@ function sampleTraceDetail(): TraceDetail {
   };
 }
 
+function sampleWorkflowCatalog(): WorkflowCatalog {
+  return {
+    schema_version: WORKFLOW_CATALOG_SCHEMA_VERSION,
+    generated_at: "2026-05-04T12:00:00+00:00",
+    workflows: [
+      {
+        workflow_id: "h1.single.v1",
+        name: "H1 Single Agent Baseline",
+        version: "1.0.0",
+        execution_mode: "linear",
+        input_schema_ref: "h1.input.v1",
+        output_schema_ref: "h1.single.output.v1",
+        step_count: 1,
+        steps: [{ step_id: "single", agent_id: "h1_single_agent", description: "Single-agent baseline." }],
+        metadata: { hero_workflow: "H1", variant: "single", schema_contract: "h1.single.workflow.v1" },
+      },
+      {
+        workflow_id: "h4.seq_next.v1",
+        name: "H4 Seq Next Planning Manager Baseline",
+        version: "1.0.0",
+        execution_mode: "manager",
+        input_schema_ref: "h4.seq_next.input.v1",
+        output_schema_ref: "h4.seq_next.output.v1",
+        step_count: 4,
+        steps: [{ step_id: "synthesizer", agent_id: "h4_synthesizer_agent", description: "Manager and finalizer." }],
+        metadata: { hero_workflow: "H4", variant: "seq_next", schema_contract: "h4.seq_next.workflow.v1" },
+      },
+    ],
+    warnings: [],
+  };
+}
+
 beforeEach(() => {
   vi.unstubAllGlobals();
 });
@@ -363,6 +396,7 @@ describe("U5-A workbench shell", () => {
 
     await user.click(screen.getByRole("button", { name: /trace/i }));
     await screen.findByRole("heading", { name: /trace viewer/i });
+    await screen.findByText(/#1 run_started/i);
 
     await user.click(screen.getByLabelText(/failure events only/i));
     expect(screen.getByText(/#2 step_failed/i)).toBeInTheDocument();
@@ -384,17 +418,68 @@ describe("U5-A workbench shell", () => {
     expect(screen.queryByText(/#3 run_completed/i)).not.toBeInTheDocument();
   });
 
-  it("states launch and OpenCode automation are inactive", async () => {
+  it("shows missing workflow catalog guidance without fixture fallback", async () => {
     const user = userEvent.setup();
+    mockFetchByPath({});
     render(<App />);
 
     await user.click(screen.getByRole("button", { name: /packets \/ launch/i }));
 
-    expect(screen.getByText(/not active/i)).toBeInTheDocument();
-    expect(screen.getByText(/no workflow launch/i)).toBeInTheDocument();
-    expect(screen.getByText(/opencode automation/i)).toBeInTheDocument();
+    expect(await screen.findByText(/generated workflow catalog is missing/i)).toBeInTheDocument();
+    expect(screen.getByText(/npm run build:workflows/i)).toBeInTheDocument();
+    expect(screen.queryByText(/future evidence rows/i)).not.toBeInTheDocument();
+  });
+
+  it("shows invalid workflow catalog without fixture fallback", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({ "/generated/workflows.json": { payload: {} } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /packets \/ launch/i }));
+
+    expect(await screen.findByText(/generated workflow catalog is invalid/i)).toBeInTheDocument();
+    expect(screen.queryByText(/operator command and packet composer/i)).not.toBeInTheDocument();
+  });
+
+  it("prepares command preview and structured packet from a valid workflow catalog", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({ "/generated/workflows.json": { payload: sampleWorkflowCatalog() } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /packets \/ launch/i }));
+    expect(await screen.findByRole("heading", { name: /operator command and packet composer/i })).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: /^workflow$/i }), "h4.seq_next.v1");
+    await user.selectOptions(screen.getByLabelText(/provider override/i), "mock");
+    fireEvent.change(screen.getByLabelText(/input json object/i), { target: { value: '{"goal":"Plan U5-D"}' } });
+
+    expect(screen.getAllByText(/PYTHONPATH=src python -m fractal_agent_lab.cli run 'h4.seq_next.v1'/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/--providers-config 'configs\/providers.example.yaml'/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/--provider 'mock'/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Target role\/Track: Track A/i)).toBeInTheDocument();
+    expect(screen.getByText(/Workflow id: h4.seq_next.v1/i)).toBeInTheDocument();
+    expect(screen.getByText(/This packet is not a gate/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not launch OpenCode/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not perform commits/i)).toBeInTheDocument();
     expect(screen.queryByText(/provider leaderboard/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/provider ranking/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Run OpenCode/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/auto commit/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/autonomous dispatch enabled/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/session bus active/i)).not.toBeInTheDocument();
+  });
+
+  it.each(["not-json", "[]", "\"text\"", "123", "null"])("blocks non-object or invalid input JSON: %s", async (payload) => {
+    const user = userEvent.setup();
+    mockFetchByPath({ "/generated/workflows.json": { payload: sampleWorkflowCatalog() } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /packets \/ launch/i }));
+    await screen.findByRole("heading", { name: /operator command and packet composer/i });
+    fireEvent.change(screen.getByLabelText(/input json object/i), { target: { value: payload } });
+
+    expect(screen.getByText(/command is not ready/i)).toBeInTheDocument();
+    expect(screen.queryByText(/PYTHONPATH=src python -m fractal_agent_lab.cli run/i)).not.toBeInTheDocument();
   });
 
   it("keeps evidence and memory pages bounded to later Wave 5 work", async () => {

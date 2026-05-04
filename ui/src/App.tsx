@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { evidenceFixtures, pages } from "./fixtures";
+import { buildLaunchCommand } from "./launchCommandBuilder";
+import { buildLaunchPacket } from "./packetComposer";
 import { loadRunIndex, type RunIndexLoadState } from "./runIndexLoader";
 import type { RunIndex, RunIndexRow, TraceTarget } from "./runIndexModel";
 import { loadTraceDetail, type TraceDetailLoadState } from "./traceDetailLoader";
 import type { TraceDetail, TraceDetailEvent } from "./traceDetailModel";
+import { loadWorkflowCatalog, type WorkflowCatalogLoadState } from "./workflowCatalogLoader";
+import type { WorkflowCatalogEntry } from "./workflowCatalogModel";
 import type { WorkbenchPage, WorkbenchPageId, WorkbenchStatus } from "./workbenchModel";
 
 const statusDescriptions: Record<WorkbenchStatus, string> = {
@@ -18,6 +22,13 @@ const statusDescriptions: Record<WorkbenchStatus, string> = {
   FIXTURE: "fixture/demo data",
   "NOT IMPLEMENTED": "future Wave 5 surface",
 };
+
+const defaultLaunchInputJson = JSON.stringify({ idea: "Describe the workflow input here." }, null, 2);
+const defaultRuntimeConfigPath = "configs/runtime.example.yaml";
+const defaultProvidersConfigPath = "configs/providers.example.yaml";
+const defaultModelPolicyConfigPath = "configs/model_policy.example.yaml";
+const providerOptions = ["", "mock", "openai", "openrouter", "local"];
+const targetRoleOptions = ["Track A", "Track B", "Track C", "Track D", "Track E", "Meta Coordinator"];
 
 function StatusBadge({ status }: { status: WorkbenchStatus }) {
   return (
@@ -36,9 +47,9 @@ function DisclosureBanner() {
         <h2 id="disclosure-title">Derived browse surfaces, not launch automation</h2>
       </div>
       <p>
-        This workbench now exposes derived run browsing and strict-valid trace timelines
-        from canonical artifacts. It does not launch workflows, generate packets,
-        automate OpenCode, score outputs, or replace canonical truth in
+        This workbench exposes derived run browsing, strict-valid trace timelines, and
+        operator-mediated command/packet preparation. It does not execute browser-side
+        launches, control OpenCode, commit changes, score outputs, or replace canonical truth in
         <code> data/runs/&lt;run_id&gt;.json</code>, <code>data/traces/&lt;run_id&gt;.jsonl</code>,
         and <code>data/artifacts/&lt;run_id&gt;/...</code>.
       </p>
@@ -115,6 +126,25 @@ function useGeneratedRunIndex() {
     let cancelled = false;
     setLoadState({ status: "loading" });
     loadRunIndex().then((nextState) => {
+      if (!cancelled) {
+        setLoadState(nextState);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return loadState;
+}
+
+function useGeneratedWorkflowCatalog() {
+  const [loadState, setLoadState] = useState<WorkflowCatalogLoadState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadState({ status: "loading" });
+    loadWorkflowCatalog().then((nextState) => {
       if (!cancelled) {
         setLoadState(nextState);
       }
@@ -265,6 +295,225 @@ function TracePage({ traceTarget }: { traceTarget: TraceTarget | null }) {
       setStepFilter={setStepFilter}
       setFailureOnly={setFailureOnly}
     />
+  );
+}
+
+function LaunchPage() {
+  const catalogState = useGeneratedWorkflowCatalog();
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState("");
+  const [inputJson, setInputJson] = useState(defaultLaunchInputJson);
+  const [outputFormat, setOutputFormat] = useState<"text" | "json">("json");
+  const [showTrace, setShowTrace] = useState(true);
+  const [runtimeConfigPath, setRuntimeConfigPath] = useState(defaultRuntimeConfigPath);
+  const [providersConfigPath, setProvidersConfigPath] = useState(defaultProvidersConfigPath);
+  const [modelPolicyConfigPath, setModelPolicyConfigPath] = useState(defaultModelPolicyConfigPath);
+  const [providerOverride, setProviderOverride] = useState("");
+  const [targetRole, setTargetRole] = useState("Track A");
+  const [sourceArtifactRefs, setSourceArtifactRefs] = useState("");
+
+  useEffect(() => {
+    if (catalogState.status !== "ready") {
+      return;
+    }
+    const workflowIds = catalogState.catalog.workflows.map((workflow) => workflow.workflow_id);
+    if (!workflowIds.includes(selectedWorkflowId)) {
+      setSelectedWorkflowId(workflowIds[0] ?? "");
+    }
+  }, [catalogState, selectedWorkflowId]);
+
+  if (catalogState.status === "loading") {
+    return <RunIndexMessage title="Loading generated workflow catalog" status="PARTIAL" />;
+  }
+  if (catalogState.status === "missing_catalog") {
+    return (
+      <RunIndexMessage title="Generated workflow catalog is missing" status="MISSING">
+        <p>{catalogState.message}</p>
+        <p>
+          Build the local derived catalog with <code>npm run build:workflows</code>. This catalog is
+          generated from the CLI workflow registry and is not runtime launch authority.
+        </p>
+      </RunIndexMessage>
+    );
+  }
+  if (catalogState.status === "invalid_catalog") {
+    return (
+      <RunIndexMessage title="Generated workflow catalog is invalid" status="FAIL">
+        <p>{catalogState.message}</p>
+        <p>Rebuild with <code>npm run build:workflows</code> before preparing commands or packets.</p>
+      </RunIndexMessage>
+    );
+  }
+
+  const workflows = catalogState.catalog.workflows;
+  const selectedWorkflow = workflows.find((workflow) => workflow.workflow_id === selectedWorkflowId) ?? workflows[0] ?? null;
+  const commandResult = buildLaunchCommand({
+    workflowId: selectedWorkflow?.workflow_id ?? selectedWorkflowId,
+    knownWorkflowIds: workflows.map((workflow) => workflow.workflow_id),
+    inputJson,
+    outputFormat,
+    showTrace,
+    runtimeConfigPath,
+    providersConfigPath,
+    modelPolicyConfigPath,
+    providerOverride,
+  });
+  const sourceRefs = sourceArtifactRefs
+    .split("\n")
+    .map((ref) => ref.trim())
+    .filter(Boolean);
+  const packetText = commandResult.ready && selectedWorkflow !== null
+    ? buildLaunchPacket({
+      targetRole,
+      workflowId: selectedWorkflow.workflow_id,
+      inputJson: commandResult.normalizedInputJson,
+      commandPreview: commandResult.command,
+      runtimeConfigPath: runtimeConfigPath.trim(),
+      providersConfigPath: providersConfigPath.trim(),
+      modelPolicyConfigPath: modelPolicyConfigPath.trim(),
+      providerOverride: providerOverride.trim(),
+      sourceArtifactRefs: sourceRefs,
+    })
+    : null;
+
+  return (
+    <div className="launch-layout">
+      <section className="panel panel-large" aria-labelledby="launch-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">U5-D first pass</p>
+            <h2 id="launch-title">Operator command and packet composer</h2>
+          </div>
+          <StatusBadge status="PARTIAL" />
+        </div>
+        <p>
+          This page prepares an OpenCode/bash terminal command and a structured operator handoff packet.
+          It does not run local Python from the browser, launch OpenCode, control a session bus, or perform commits.
+        </p>
+      </section>
+
+      <section className="panel launch-config" aria-labelledby="command-config-title">
+        <p className="eyebrow">Command preview inputs</p>
+        <h2 id="command-config-title">Registry-derived workflow</h2>
+        <div className="form-grid">
+          <label>
+            Workflow
+            <select value={selectedWorkflow?.workflow_id ?? ""} onChange={(event) => setSelectedWorkflowId(event.target.value)}>
+              {workflows.map((workflow) => (
+                <option key={workflow.workflow_id} value={workflow.workflow_id}>{workflow.workflow_id}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Output format
+            <select value={outputFormat} onChange={(event) => setOutputFormat(event.target.value as "text" | "json")}>
+              <option value="json">json</option>
+              <option value="text">text</option>
+            </select>
+          </label>
+          <label>
+            Provider override
+            <select value={providerOverride} onChange={(event) => setProviderOverride(event.target.value)}>
+              {providerOptions.map((provider) => (
+                <option key={provider || "none"} value={provider}>{provider || "none"}</option>
+              ))}
+            </select>
+          </label>
+          <label className="toggle">
+            <input type="checkbox" checked={showTrace} onChange={(event) => setShowTrace(event.target.checked)} />
+            Include <code>--show-trace</code>
+          </label>
+        </div>
+        {selectedWorkflow !== null ? <WorkflowSummary workflow={selectedWorkflow} /> : null}
+      </section>
+
+      <section className="panel launch-config" aria-labelledby="json-config-title">
+        <p className="eyebrow">Input and config paths</p>
+        <h2 id="json-config-title">Visible execution envelope</h2>
+        <label className="stacked-field">
+          Input JSON object
+          <textarea value={inputJson} onChange={(event) => setInputJson(event.target.value)} rows={9} />
+        </label>
+        <div className="form-grid">
+          <label>
+            Runtime config
+            <input value={runtimeConfigPath} onChange={(event) => setRuntimeConfigPath(event.target.value)} />
+          </label>
+          <label>
+            Providers config
+            <input value={providersConfigPath} onChange={(event) => setProvidersConfigPath(event.target.value)} />
+          </label>
+          <label>
+            Model policy config
+            <input value={modelPolicyConfigPath} onChange={(event) => setModelPolicyConfigPath(event.target.value)} />
+          </label>
+        </div>
+      </section>
+
+      <section className="panel panel-large" aria-labelledby="command-preview-title">
+        <p className="eyebrow">OpenCode/bash terminal command</p>
+        <h2 id="command-preview-title">Exact command preview</h2>
+        {commandResult.ready ? (
+          <pre className="preview-block"><code>{commandResult.command}</code></pre>
+        ) : (
+          <div className="warnings" role="alert">
+            <strong>Command is not ready.</strong>
+            <ul>
+              {commandResult.errors.map((error) => <li key={error}>{error}</li>)}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      <section className="panel panel-large" aria-labelledby="packet-preview-title">
+        <p className="eyebrow">Structured operator packet</p>
+        <h2 id="packet-preview-title">Packet skeleton</h2>
+        <div className="form-grid">
+          <label>
+            Target role/Track
+            <select value={targetRole} onChange={(event) => setTargetRole(event.target.value)}>
+              {targetRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+            </select>
+          </label>
+          <label className="stacked-field">
+            Optional source run/artifact refs
+            <textarea value={sourceArtifactRefs} onChange={(event) => setSourceArtifactRefs(event.target.value)} rows={4} />
+          </label>
+        </div>
+        {packetText !== null ? (
+          <pre className="preview-block"><code>{packetText}</code></pre>
+        ) : (
+          <p>Fix command readiness before the packet skeleton can cite the exact command.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function WorkflowSummary({ workflow }: { workflow: WorkflowCatalogEntry }) {
+  const metadata = workflow.metadata;
+  return (
+    <div className="trace-target" aria-label="Selected workflow metadata">
+      <p className="eyebrow">Selected workflow metadata</p>
+      <dl className="detail-grid">
+        <div>
+          <dt>Name</dt>
+          <dd>{workflow.name}</dd>
+        </div>
+        <div>
+          <dt>Execution mode</dt>
+          <dd>{workflow.execution_mode}</dd>
+        </div>
+        <div>
+          <dt>Input schema</dt>
+          <dd>{workflow.input_schema_ref ?? "none"}</dd>
+        </div>
+        <div>
+          <dt>Schema contract</dt>
+          <dd>{metadata.schema_contract ?? "none"}</dd>
+        </div>
+      </dl>
+      <p>{workflow.step_count} registry-derived steps are visible for operator context, not editable launch semantics.</p>
+    </div>
   );
 }
 
@@ -848,7 +1097,8 @@ export function App() {
           {activePage.id === "overview" ? <OverviewPage /> : null}
           {activePage.id === "runs" ? <RunsPage onTraceTarget={handleTraceTarget} /> : null}
           {activePage.id === "trace" ? <TracePage traceTarget={traceTarget} /> : null}
-          {activePage.id !== "overview" && activePage.id !== "runs" && activePage.id !== "trace" ? (
+          {activePage.id === "packets" ? <LaunchPage /> : null}
+          {activePage.id !== "overview" && activePage.id !== "runs" && activePage.id !== "trace" && activePage.id !== "packets" ? (
             <PlaceholderPage page={activePage} traceTarget={traceTarget} />
           ) : null}
           {activePage.id === "overview" ? <FixtureTable /> : null}

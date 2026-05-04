@@ -7,6 +7,7 @@
     "dev": "vite",
     "build:index": "python ../scripts/build_u5_b_run_index.py",
     "build:traces": "python ../scripts/build_u5_c_trace_details.py",
+    "build:workflows": "python ../scripts/build_u5_d_workflow_catalog.py",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

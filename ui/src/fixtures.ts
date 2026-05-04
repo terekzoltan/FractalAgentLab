@@ -28,8 +28,8 @@ export const pages: WorkbenchPage[] = [
   {
     id: "packets",
     label: "Packets / Launch",
-    status: "BLOCKED",
-    summary: "Launch and packet generation are inactive until U5-D.",
+    status: "PARTIAL",
+    summary: "Operator-mediated command previews and packet skeletons are active.",
   },
   {
     id: "memory",

@@ -28,6 +28,13 @@ select {
   font: inherit;
 }
 
+input,
+textarea,
+select {
+  color: #e6edf7;
+  background: #0f172a;
+}
+
 code {
   color: #a7f3d0;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -291,20 +298,29 @@ code {
   gap: 14px;
 }
 
-.filters label {
+.filters label,
+.form-grid label,
+.stacked-field {
   display: grid;
   gap: 8px;
   color: #cbd5e1;
   font-weight: 800;
 }
 
-.filters select {
+.filters select,
+.form-grid select,
+.form-grid input,
+.stacked-field textarea {
   min-width: 220px;
   padding: 10px 12px;
   border: 1px solid rgba(148, 163, 184, 0.36);
   border-radius: 12px;
-  color: #e6edf7;
-  background: #0f172a;
+}
+
+.stacked-field textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
 }
 
 .run-list {
@@ -400,6 +416,33 @@ code {
   display: grid;
   grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.4fr);
   gap: 20px;
+}
+
+.launch-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.launch-config {
+  display: grid;
+  gap: 18px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.preview-block {
+  margin: 16px 0 0;
+  padding: 16px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.48);
 }
 
 .trace-main {
@@ -517,9 +560,11 @@ th {
   .workspace,
   .page-grid,
   .runs-layout,
+  .launch-layout,
   .trace-layout,
   .metric-grid,
-  .detail-grid {
+  .detail-grid,
+  .form-grid {
     grid-template-columns: 1fr;
   }
 
