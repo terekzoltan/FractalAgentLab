@@ -1,5 +1,8 @@
 # Private lab repo policy:
-# ops/ and docs/ markdown stay versioned here.
+# ops/ is local-only; docs/ markdown stays versioned here.
+
+# Local coordination state
+/ops/
 
 # Python cache / bytecode
 __pycache__/
