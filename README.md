@@ -142,37 +142,37 @@ This is a future-facing direction, but it is being grounded as an engineering pr
 
 ## Current Focus
 
-The project is in Wave 3 mainline closeout (`W3-S3`) with docs-first presentation packaging
-on top of already delivered memory/viewer/comparison foundations.
+The project has completed the Wave 5 local workbench slice. The current surface is a
+bounded operator workbench for browsing and acting on workflow evidence while canonical
+artifacts remain the source of truth.
 
-Current packaging posture:
+Current workbench posture:
 
-- H1 evidence is replay-backed historical evidence
-- H2 current corpus is explicitly not comparison-ready (`comparison_ready: false`)
-- H3 evidence is single-run validated/manual-rubric-backed evidence
-- M2 project-memory evidence is not demonstrated on the current curated run set
+- run browsing is generated from local/private `data/` artifacts
+- strict-valid trace timelines render only when generated trace-detail files are valid
+- launch/packet surfaces are operator-mediated command previews, not browser-side execution
+- run comparison displays structural/evidence-readiness facts, not quality scoring or provider/model ranking
+- memory/eval inspection is read-only and source-reported
 
-Current presentation layer remains CLI-first:
+The workbench does not control OpenCode sessions, perform commits, publish a public demo,
+rank providers/models, or replace canonical evidence artifacts.
 
-- `trace list` supports multi-run browse/navigation
-- `trace show` supports strict single-run drill-down
-
-These trace commands are explanatory visibility surfaces, not canonical evidence truth by
-themselves.
+Wave 6 is the next documented direction, but implementation should start only through an
+explicit evidence-ledger-first sequencing decision.
 
 ---
 
 ## Repository Structure
 
 ```text
-ops/        coordination and project-operating documents
+ops/        local/private coordination and project-operating documents
 docs/       architecture and subsystem design docs
 src/        main Python implementation
 tests/      replay / eval / validation
 configs/    runtime and provider configuration
 examples/   small committed examples
 data/       local runtime artifacts (gitignored)
-ui/         early trace viewer / future workbench
+ui/         local Wave 5 workbench UI
 ```
 
 Canonical runtime artifact paths:
