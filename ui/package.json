@@ -8,6 +8,7 @@
     "build:index": "python ../scripts/build_u5_b_run_index.py",
     "build:traces": "python ../scripts/build_u5_c_trace_details.py",
     "build:workflows": "python ../scripts/build_u5_d_workflow_catalog.py",
+    "build:comparisons": "python ../scripts/build_u5_e_comparison_index.py",
     "build:memory-eval": "python ../scripts/build_u5_f_memory_eval_index.py",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
+import { loadComparisonIndex, type ComparisonIndexLoadState } from "./comparisonIndexLoader";
+import type { ComparisonIndex, ComparisonRunCandidate, KnownEvidencePair, SuggestedComparisonPair } from "./comparisonIndexModel";
 import { evidenceFixtures, pages } from "./fixtures";
 import { buildLaunchCommand } from "./launchCommandBuilder";
 import { loadMemoryEvalIndex, type MemoryEvalIndexLoadState } from "./memoryEvalIndexLoader";
@@ -166,6 +168,25 @@ function useGeneratedMemoryEvalIndex() {
     let cancelled = false;
     setLoadState({ status: "loading" });
     loadMemoryEvalIndex().then((nextState) => {
+      if (!cancelled) {
+        setLoadState(nextState);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return loadState;
+}
+
+function useGeneratedComparisonIndex() {
+  const [loadState, setLoadState] = useState<ComparisonIndexLoadState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadState({ status: "loading" });
+    loadComparisonIndex().then((nextState) => {
       if (!cancelled) {
         setLoadState(nextState);
       }
@@ -506,6 +527,358 @@ function LaunchPage() {
           <p>Fix command readiness before the packet skeleton can cite the exact command.</p>
         )}
       </section>
+    </div>
+  );
+}
+
+function EvidencePage() {
+  const indexState = useGeneratedComparisonIndex();
+
+  if (indexState.status === "loading") {
+    return <ComparisonIndexMessage title="Loading generated comparison index" status="PARTIAL" />;
+  }
+  if (indexState.status === "missing_index") {
+    return (
+      <ComparisonIndexMessage title="Generated comparison index is missing" status="MISSING">
+        <p>{indexState.message}</p>
+        <p>
+          Build the local derived index with <code>npm run build:comparisons</code>. This index is a
+          bounded display surface over Track E-defined comparison facts, not canonical eval truth.
+        </p>
+      </ComparisonIndexMessage>
+    );
+  }
+  if (indexState.status === "invalid_index") {
+    return (
+      <ComparisonIndexMessage title="Generated comparison index is invalid" status="FAIL">
+        <p>{indexState.message}</p>
+        <p>Rebuild with <code>npm run build:comparisons</code> after checking local artifact warnings.</p>
+      </ComparisonIndexMessage>
+    );
+  }
+
+  return <ComparisonWorkspace index={indexState.index} />;
+}
+
+function ComparisonWorkspace({ index }: { index: ComparisonIndex }) {
+  const firstPair = index.suggested_pairs[0] ?? null;
+  const firstCandidate = index.run_candidates[0] ?? null;
+  const [selectedPairId, setSelectedPairId] = useState(firstPair?.pair_id ?? "manual");
+  const [leftRunId, setLeftRunId] = useState(firstPair?.left_run_id ?? firstCandidate?.run_id ?? "");
+  const [rightRunId, setRightRunId] = useState(firstPair?.right_run_id ?? index.run_candidates[1]?.run_id ?? firstCandidate?.run_id ?? "");
+
+  useEffect(() => {
+    if (selectedPairId === "manual") {
+      return;
+    }
+    const pair = index.suggested_pairs.find((candidatePair) => candidatePair.pair_id === selectedPairId);
+    if (pair !== undefined) {
+      setLeftRunId(pair.left_run_id);
+      setRightRunId(pair.right_run_id);
+    }
+  }, [index.suggested_pairs, selectedPairId]);
+
+  const left = index.run_candidates.find((candidate) => candidate.run_id === leftRunId) ?? null;
+  const right = index.run_candidates.find((candidate) => candidate.run_id === rightRunId) ?? null;
+  const selectedPair = index.suggested_pairs.find((pair) => (
+    (pair.left_run_id === leftRunId && pair.right_run_id === rightRunId)
+    || (pair.left_run_id === rightRunId && pair.right_run_id === leftRunId)
+  )) ?? null;
+  const hasLocalComparisonEvidence = index.run_candidates.length > 0 || index.suggested_pairs.length > 0;
+
+  return (
+    <div className="comparison-layout">
+      <section className="panel panel-large" aria-labelledby="comparison-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">U5-E structural display</p>
+            <h2 id="comparison-title">Run comparison evidence</h2>
+          </div>
+          <StatusBadge status="PARTIAL" />
+        </div>
+        <p>
+          Derived index <code>{index.schema_version}</code> generated from <code>{index.data_dir}</code> at{" "}
+          <code>{index.generated_at}</code>. U5-E shows Track E-defined structural preflight facts and
+          source-reported evidence states only; it does not produce ratings, rankings, or provider/model quality claims.
+        </p>
+        <div className="metric-grid" aria-label="Comparison index summary">
+          <Metric label="Run candidates" value={String(index.summary.run_candidate_count)} />
+          <Metric label="Suggested pairs" value={String(index.summary.suggested_pair_count)} />
+          <Metric label="Known evidence" value={String(index.summary.known_evidence_pair_count)} />
+          <Metric label="Warnings" value={String(index.summary.warnings_count)} />
+        </div>
+        {!hasLocalComparisonEvidence ? (
+          <div className="trace-message" aria-label="No local comparison evidence">
+            <h3>Not demonstrated in the generated local index</h3>
+            <p>No local run candidates or bounded suggested comparison pairs were found.</p>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="panel" aria-labelledby="pair-selection-title">
+        <p className="eyebrow">Bounded pair selection</p>
+        <h2 id="pair-selection-title">Select display pair</h2>
+        <div className="form-grid">
+          <label>
+            Suggested pair
+            <select value={selectedPairId} onChange={(event) => setSelectedPairId(event.target.value)}>
+              <option value="manual">Manual run ids</option>
+              {index.suggested_pairs.map((pair) => (
+                <option key={pair.pair_id} value={pair.pair_id}>{pair.left_run_id} vs {pair.right_run_id}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Run A
+            <select value={leftRunId} onChange={(event) => { setSelectedPairId("manual"); setLeftRunId(event.target.value); }}>
+              {index.run_candidates.map((candidate) => (
+                <option key={candidate.run_id} value={candidate.run_id}>{candidate.run_id}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Run B
+            <select value={rightRunId} onChange={(event) => { setSelectedPairId("manual"); setRightRunId(event.target.value); }}>
+              {index.run_candidates.map((candidate) => (
+                <option key={candidate.run_id} value={candidate.run_id}>{candidate.run_id}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="handoff-note">
+          Suggested pairs are deterministically capped by the generator. Manual selections outside the bounded list do not get a new Track A verdict.
+        </p>
+      </section>
+
+      <ComparisonStatusPanel pair={selectedPair} left={left} right={right} />
+      <RunCandidatePanel title="Run A facts" candidate={left} />
+      <RunCandidatePanel title="Run B facts" candidate={right} />
+      <ComparableFieldsTable left={left} right={right} />
+      <ProviderDisclosurePanel left={left} right={right} />
+      <KnownEvidencePairs pairs={index.known_evidence_pairs} />
+      <UnsupportedTargets targets={index.unsupported_targets} />
+      {index.warnings.length > 0 ? <ComparisonWarningList warnings={index.warnings} /> : null}
+    </div>
+  );
+}
+
+function ComparisonStatusPanel({ pair, left, right }: { pair: SuggestedComparisonPair | null; left: ComparisonRunCandidate | null; right: ComparisonRunCandidate | null }) {
+  const status = pair?.structural_preflight_status ?? "BLOCKED";
+  const reasons = pair?.status_reasons ?? [left === null || right === null ? "selected_run_missing" : "selected_pair_not_in_bounded_generated_suggestions"];
+  return (
+    <section className="panel" aria-labelledby="comparison-status-title">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Display-only structural preflight</p>
+          <h2 id="comparison-status-title">Selected pair state</h2>
+        </div>
+        <StructuralStatusChip status={status} />
+      </div>
+      <p>
+        Status labels normalize Track E-defined preflight facts for display. They are not ratings and are not output-quality judgments.
+      </p>
+      <dl className="detail-grid">
+        <DetailTerm label="Run A" value={left?.run_id ?? "unknown"} />
+        <DetailTerm label="Run B" value={right?.run_id ?? "unknown"} />
+        <DetailTerm label="Target class" value={pair?.target_class ?? "not generated"} />
+        <DetailTerm label="Matched input" value={pair?.matched_input === null || pair === null ? "unknown" : yesNo(pair.matched_input)} />
+      </dl>
+      {reasons.length > 0 ? <ReasonList reasons={reasons} /> : <p>No blocking structural preflight reasons were generated.</p>}
+    </section>
+  );
+}
+
+function RunCandidatePanel({ title, candidate }: { title: string; candidate: ComparisonRunCandidate | null }) {
+  return (
+    <section className="panel" aria-labelledby={`${title.toLowerCase().replace(/\s+/g, "-")}-title`}>
+      <p className="eyebrow">Canonical/source links</p>
+      <h2 id={`${title.toLowerCase().replace(/\s+/g, "-")}-title`}>{title}</h2>
+      {candidate === null ? <p>No run selected.</p> : null}
+      {candidate !== null ? (
+        <>
+          <dl className="detail-grid">
+            <DetailTerm label="Run" value={candidate.run_id} />
+            <DetailTerm label="Workflow" value={valueOrUnknown(candidate.workflow_id)} />
+            <DetailTerm label="Support" value={candidate.comparison_support} />
+            <DetailTerm label="Trace" value={candidate.preflight.trace_state} />
+            <DetailTerm label="Input keys" value={joinOrUnknown(candidate.input.keys)} />
+            <DetailTerm label="Comparable complete" value={yesNo(candidate.comparable_output.complete)} />
+          </dl>
+          <div className="artifact-paths">
+            <p><strong>Run artifact</strong> <code>{candidate.run_artifact_path}</code></p>
+            <p><strong>Trace artifact</strong> <code>{candidate.trace_artifact_path}</code></p>
+            <p><strong>Sidecar directory</strong> <code>{candidate.artifact_dir_path}</code></p>
+          </div>
+          {candidate.target_class === "h2_structural" ? <H2GateFacts gates={candidate.h2_gates} /> : null}
+          {candidate.comparable_output.missing_keys.length > 0 ? <ReasonList reasons={candidate.comparable_output.missing_keys.map((key) => `missing comparable key: ${key}`)} /> : null}
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function H2GateFacts({ gates }: { gates: ComparisonRunCandidate["h2_gates"] }) {
+  return (
+    <div className="trace-message" aria-label="H2 gate facts">
+      <p className="eyebrow">H2 gate facts</p>
+      <dl className="detail-grid">
+        <DetailTerm label="Key order" value={booleanFact(gates.key_order_matches)} />
+        <DetailTerm label="Implementation waves valid" value={booleanFact(gates.implementation_waves_valid)} />
+        <DetailTerm label="Recommended starting slice present" value={booleanFact(gates.recommended_starting_slice_present)} />
+        <DetailTerm label="Delegate order" value={booleanFact(gates.delegate_order_matches)} />
+        <DetailTerm label="Delegate targets" value={joinOrUnknown(gates.delegate_targets)} />
+      </dl>
+    </div>
+  );
+}
+
+function ComparableFieldsTable({ left, right }: { left: ComparisonRunCandidate | null; right: ComparisonRunCandidate | null }) {
+  const fields = left?.comparable_output.fields.length ? left.comparable_output.fields : right?.comparable_output.fields ?? [];
+  return (
+    <section className="panel panel-large" aria-labelledby="comparable-fields-title">
+      <p className="eyebrow">Comparable key display</p>
+      <h2 id="comparable-fields-title">Structural field presence</h2>
+      <p>Previews are bounded and fingerprinted for local inspection; this is not a quality review pane.</p>
+      {fields.length === 0 ? <p>No accepted comparable key set applies to the selected runs.</p> : null}
+      {fields.length > 0 ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Run A</th>
+                <th>Run B</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fields.map((field) => (
+                <tr key={field.key}>
+                  <td>{field.key}</td>
+                  <td>{fieldSummary(left, field.key)}</td>
+                  <td>{fieldSummary(right, field.key)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function ProviderDisclosurePanel({ left, right }: { left: ComparisonRunCandidate | null; right: ComparisonRunCandidate | null }) {
+  return (
+    <section className="panel panel-large" aria-labelledby="provider-disclosure-title">
+      <p className="eyebrow">Provider/model/fallback disclosure</p>
+      <h2 id="provider-disclosure-title">Disclosure-only routing facts</h2>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Run</th>
+              <th>Providers</th>
+              <th>Models</th>
+              <th>Fallback</th>
+              <th>Attempts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[left, right].map((candidate, index) => (
+              <tr key={candidate?.run_id ?? `missing-${index}`}>
+                <td>{candidate?.run_id ?? "unknown"}</td>
+                <td>{joinOrUnknown(candidate?.provider_disclosure.provider_names ?? [])}</td>
+                <td>{joinOrUnknown(candidate?.provider_disclosure.model_names ?? [])}</td>
+                <td>{candidate?.provider_disclosure.fallback_state ?? "unknown"}</td>
+                <td>{candidate?.provider_disclosure.provider_attempt_count ?? 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="handoff-note">Provider/model differences are disclosure facts only. U5-E does not rank or rate providers or models.</p>
+    </section>
+  );
+}
+
+function KnownEvidencePairs({ pairs }: { pairs: KnownEvidencePair[] }) {
+  return (
+    <section className="panel" aria-labelledby="known-evidence-title">
+      <p className="eyebrow">Source-reported evidence</p>
+      <h2 id="known-evidence-title">Known evidence pairs</h2>
+      {pairs.map((pair) => (
+        <div className="trace-message" key={pair.pair_id}>
+          <div className="section-heading">
+            <h3>{pair.pair_id}</h3>
+            <StructuralStatusChip status={pair.local_preflight_status} />
+          </div>
+          <p>Source-reported status: <strong>{pair.source_reported_status}</strong></p>
+          <p>Local state: {pair.local_state}</p>
+          <p><code>{pair.source_report_path}</code></p>
+          <ReasonList reasons={pair.status_reasons} />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function UnsupportedTargets({ targets }: { targets: ComparisonIndex["unsupported_targets"] }) {
+  return (
+    <section className="panel" aria-labelledby="unsupported-targets-title">
+      <p className="eyebrow">Unsupported / deferred</p>
+      <h2 id="unsupported-targets-title">Non-comparison targets</h2>
+      {targets.length === 0 ? <p>No unsupported or deferred run targets were present in the generated index.</p> : null}
+      <div className="artifact-paths">
+        {targets.map((target) => (
+          <p key={`${target.run_id}-${target.target_class}`}>
+            <strong>{target.run_id}</strong> ({valueOrUnknown(target.workflow_id)})<br />
+            <span>{target.evidence_label}{target.future_state ? ` / ${target.future_state}` : ""}: {target.note}</span>
+          </p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ComparisonWarningList({ warnings }: { warnings: string[] }) {
+  return (
+    <section className="panel panel-large warnings" aria-label="Comparison index warnings">
+      <p className="eyebrow">Generated index warnings</p>
+      <ul>
+        {warnings.map((warning) => <li key={warning}>{warning}</li>)}
+      </ul>
+    </section>
+  );
+}
+
+function ComparisonIndexMessage({ title, status, children }: { title: string; status: WorkbenchStatus; children?: ReactNode }) {
+  return (
+    <section className="panel panel-large placeholder" aria-labelledby="comparison-index-message-title">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">U5-E run comparison UX</p>
+          <h2 id="comparison-index-message-title">{title}</h2>
+        </div>
+        <StatusBadge status={status} />
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function StructuralStatusChip({ status }: { status: string }) {
+  return <span className={`source-label structural-${status.toLowerCase()}`}>{status}</span>;
+}
+
+function ReasonList({ reasons }: { reasons: string[] }) {
+  if (reasons.length === 0) {
+    return null;
+  }
+  return (
+    <div className="warnings" aria-label="Structural preflight reasons">
+      <p className="eyebrow">Preflight reasons</p>
+      <ul>
+        {reasons.map((reason) => <li key={reason}>{reason}</li>)}
+      </ul>
     </div>
   );
 }
@@ -1244,12 +1617,27 @@ function formatSummaryFields(values: Record<string, string | boolean | number | 
   return entries.map(([key, value]) => `${key}: ${String(value)}`).join(", ");
 }
 
+function fieldSummary(candidate: ComparisonRunCandidate | null, key: string) {
+  const field = candidate?.comparable_output.fields.find((candidateField) => candidateField.key === key) ?? null;
+  if (field === null || !field.present) {
+    return "missing";
+  }
+  return `${field.value_kind}: ${field.preview ?? "present"} (${field.fingerprint ?? "no fingerprint"})`;
+}
+
 function yesNo(value: boolean) {
   return value ? "yes" : "no";
 }
 
 function numberOrUnknown(value: number | null) {
   return value === null ? "unknown" : String(value);
+}
+
+function booleanFact(value: boolean | null) {
+  if (value === null) {
+    return "not applicable";
+  }
+  return value ? "yes" : "no";
 }
 
 function countValues(values: string[]) {
@@ -1369,9 +1757,10 @@ export function App() {
           {activePage.id === "overview" ? <OverviewPage /> : null}
           {activePage.id === "runs" ? <RunsPage onTraceTarget={handleTraceTarget} /> : null}
           {activePage.id === "trace" ? <TracePage traceTarget={traceTarget} /> : null}
+          {activePage.id === "evidence" ? <EvidencePage /> : null}
           {activePage.id === "packets" ? <LaunchPage /> : null}
           {activePage.id === "memory" ? <MemoryEvalPage /> : null}
-          {activePage.id !== "overview" && activePage.id !== "runs" && activePage.id !== "trace" && activePage.id !== "packets" && activePage.id !== "memory" ? (
+          {activePage.id !== "overview" && activePage.id !== "runs" && activePage.id !== "trace" && activePage.id !== "evidence" && activePage.id !== "packets" && activePage.id !== "memory" ? (
             <PlaceholderPage page={activePage} traceTarget={traceTarget} />
           ) : null}
           {activePage.id === "overview" ? <FixtureTable /> : null}

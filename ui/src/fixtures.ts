@@ -22,8 +22,8 @@ export const pages: WorkbenchPage[] = [
   {
     id: "evidence",
     label: "Evidence",
-    status: "NOT IMPLEMENTED",
-    summary: "Comparison and eval semantics require Track E-defined surfaces later.",
+    status: "PARTIAL",
+    summary: "Structural comparison display is active from the generated index.",
   },
   {
     id: "packets",

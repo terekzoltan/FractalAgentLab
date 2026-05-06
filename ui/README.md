@@ -6,8 +6,8 @@ Local Wave 5 workbench UI for Fractal Agent Lab.
 
 The UI started as the U5-A fixture-backed evidence observatory shell and now includes
 the U5-B run browser surface, the U5-C trace timeline surface, the U5-D first-pass
-operator command/packet preparation surface, and the U5-F read-only memory/eval
-inventory surface.
+operator command/packet preparation surface, the U5-E bounded run-comparison display,
+and the U5-F read-only memory/eval inventory surface.
 
 U5-A established:
 
@@ -43,6 +43,15 @@ U5-D adds:
 - structured operator-mediated packet skeletons
 - explicit no-bridge/no-OpenCode-control/no-commit boundaries
 
+U5-E adds:
+
+- generated comparison index loading from `/generated/comparison-index.json`
+- bounded suggested run pairs, never unbounded all-vs-all pair generation
+- structural preflight display from Track E-defined facts and helper outputs
+- source-reported known evidence pair display where local run ids are present
+- H3/H4/H5 unsupported/deferred/not-demonstrated display boundaries
+- explicit no-score/no-winner/no-ranking/no-provider-quality boundaries
+
 U5-F adds:
 
 - generated memory/eval index loading from `/generated/memory-eval-index.json`
@@ -55,13 +64,14 @@ U5-F adds:
 It does not implement browser-triggered local execution, a local Python bridge,
 backend/API design, public deployment, OpenCode automation, provider ranking,
 artifact editing, commit actions, artifact repair, memory editing, run-pair
-comparison UX, or Wave 6 evidence-ledger behavior.
+quality scoring, or Wave 6 evidence-ledger behavior.
 
 ## Commands
 
 ```bash
 npm install
 npm run build:workflows
+npm run build:comparisons
 npm run build:memory-eval
 npm run build:index
 npm run build:traces
@@ -79,6 +89,21 @@ ui/public/generated/workflows.json
 
 The generated catalog has schema version `u5_d.workflow_catalog.v1`. It includes only
 allowlisted display metadata and does not dump arbitrary workflow metadata into the UI.
+
+`npm run build:comparisons` derives a local bounded comparison display index from `../data` and writes:
+
+```text
+ui/public/generated/comparison-index.json
+```
+
+The generated comparison index has schema version `u5_e.comparison_index.v1`. It creates
+run candidates and capped suggested pairs from accepted Track E H1/H2 comparison facts.
+It does not create a new Track A eval policy, does not recompute P4-B provider-path smoke
+PASS semantics, and does not generate unbounded all-vs-all pairs. H3 is displayed only as
+single-run/manual-rubric-backed reference context; H4/H5 comparison support remains
+`not_demonstrated` / `deferred` until Track E defines a later contract. For H2, Track E
+confirmed that unknown intended comparable corpus state renders as `WARNING` with reason
+`h2_intended_comparable_corpus_unknown`; missing or invalid artifacts still outrank that warning.
 
 `npm run build:memory-eval` derives a local memory/eval inventory from `../data` and writes:
 
@@ -132,6 +157,11 @@ warnings and do not reorder the event list.
 
 Provider/model/fallback values are disclosure-only fields read from emitted artifacts.
 The UI does not infer them from config and does not rank provider/model quality.
+
+The U5-E Evidence page displays structural preflight facts and bounded source-reported
+evidence states only. It does not identify winners, assign quality scores, create provider
+or model leaderboards, claim provider/model quality parity, or normalize unsupported
+cross-workflow pairs into green comparison views.
 
 The U5-D command preview targets an OpenCode/bash terminal command using the established
 `PYTHONPATH=src python -m fractal_agent_lab.cli run ...` shape. The packet composer is

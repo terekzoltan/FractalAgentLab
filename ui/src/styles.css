@@ -424,6 +424,12 @@ code {
   gap: 20px;
 }
 
+.comparison-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
 .memory-layout {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -461,6 +467,20 @@ code {
   background: rgba(14, 165, 233, 0.1);
   font-size: 0.75rem;
   font-weight: 800;
+}
+
+.structural-pass {
+  border-color: rgba(52, 211, 153, 0.55);
+}
+
+.structural-fail,
+.structural-invalid {
+  border-color: rgba(248, 113, 113, 0.65);
+}
+
+.structural-blocked,
+.structural-warning {
+  border-color: rgba(251, 191, 36, 0.65);
 }
 
 .trace-main {
@@ -579,6 +599,7 @@ th {
   .page-grid,
   .runs-layout,
   .launch-layout,
+  .comparison-layout,
   .memory-layout,
   .trace-layout,
   .metric-grid,

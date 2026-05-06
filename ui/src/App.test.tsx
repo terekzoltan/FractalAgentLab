@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { App } from "./App";
+import { COMPARISON_INDEX_SCHEMA_VERSION, type ComparisonIndex } from "./comparisonIndexModel";
 import { MEMORY_EVAL_INDEX_SCHEMA_VERSION, type MemoryEvalIndex } from "./memoryEvalIndexModel";
 import { RUN_INDEX_SCHEMA_VERSION, type RunIndex } from "./runIndexModel";
 import { TRACE_DETAIL_SCHEMA_VERSION, type TraceDetail } from "./traceDetailModel";
@@ -314,6 +315,209 @@ function sampleMemoryEvalIndex(overrides: Partial<MemoryEvalIndex> = {}): Memory
   return { ...index, ...overrides };
 }
 
+function sampleComparisonIndex(overrides: Partial<ComparisonIndex> = {}): ComparisonIndex {
+  const runA = sampleComparisonRun("h1-single", "h1.single.v1", "baseline_anchor");
+  const runB = sampleComparisonRun("h1-manager", "h1.manager.v1", "default_multi_agent_reference");
+  const index: ComparisonIndex = {
+    schema_version: COMPARISON_INDEX_SCHEMA_VERSION,
+    generated_at: "2026-05-05T12:00:00+00:00",
+    data_dir: "../data",
+    summary: {
+      run_candidate_count: 2,
+      suggested_pair_count: 1,
+      known_evidence_pair_count: 1,
+      unsupported_target_count: 1,
+      warnings_count: 0,
+      max_suggested_pairs: 25,
+    },
+    run_candidates: [runA, runB],
+    suggested_pairs: [
+      {
+        pair_id: "h1_structural_variant:h1-single:h1-manager",
+        target_class: "h1_structural_variant",
+        left_run_id: "h1-single",
+        right_run_id: "h1-manager",
+        selection_reason: "bounded_recent_valid_runs_first",
+        structural_preflight_status: "PASS",
+        status_reasons: [],
+        matched_input: true,
+        source_reported_status: null,
+        display_only: true,
+      },
+    ],
+    known_evidence_pairs: [
+      {
+        pair_id: "p4_b.accepted_h1_provider_path_smoke",
+        target_class: "h1_provider_path_smoke",
+        left_run_id: "4771b058-97b6-4164-b060-40b381acd2b4",
+        right_run_id: "308ac05a-7f2e-4985-99dc-11d547557a98",
+        source_reported_status: "PASS",
+        source_report_path: "docs/wave4/Wave4-W4-S1-TrackE-P4-B-Live-Evidence-Closeout-v1.md",
+        local_state: "not_demonstrated",
+        local_preflight_status: "BLOCKED",
+        status_reasons: ["missing_local_run_ids"],
+        display_only: true,
+      },
+    ],
+    unsupported_targets: [
+      {
+        run_id: "h4-run",
+        workflow_id: "h4.seq_next.v1",
+        target_class: "h4_deferred",
+        evidence_label: "not_demonstrated",
+        future_state: "deferred",
+        note: "Comparison support is deferred until a later Track E contract defines keys, labels, and gates.",
+      },
+    ],
+    warnings: [],
+  };
+  return { ...index, ...overrides };
+}
+
+function sampleH2ComparisonIndex(): ComparisonIndex {
+  const runA = sampleComparisonRun("h2-a", "h2.manager.v1", null, {
+    target_class: "h2_structural",
+    h2_gates: {
+      key_order_matches: true,
+      implementation_waves_valid: true,
+      recommended_starting_slice_present: true,
+      delegate_order_matches: true,
+      delegate_targets: ["intake", "planner", "architect", "critic"],
+    },
+    input: { available: true, fingerprint: "h2-input", keys: ["goal"] },
+  });
+  const runB = sampleComparisonRun("h2-b", "h2.manager.v1", null, {
+    target_class: "h2_structural",
+    h2_gates: {
+      key_order_matches: true,
+      implementation_waves_valid: true,
+      recommended_starting_slice_present: true,
+      delegate_order_matches: true,
+      delegate_targets: ["intake", "planner", "architect", "critic"],
+    },
+    input: { available: true, fingerprint: "h2-input", keys: ["goal"] },
+  });
+  return {
+    schema_version: COMPARISON_INDEX_SCHEMA_VERSION,
+    generated_at: "2026-05-05T12:00:00+00:00",
+    data_dir: "../data",
+    summary: {
+      run_candidate_count: 2,
+      suggested_pair_count: 1,
+      known_evidence_pair_count: 0,
+      unsupported_target_count: 0,
+      warnings_count: 0,
+      max_suggested_pairs: 25,
+    },
+    run_candidates: [runA, runB],
+    suggested_pairs: [
+      {
+        pair_id: "h2_structural:h2-a:h2-b",
+        target_class: "h2_structural",
+        left_run_id: "h2-a",
+        right_run_id: "h2-b",
+        selection_reason: "bounded_recent_valid_runs_first",
+        structural_preflight_status: "WARNING",
+        status_reasons: ["h2_intended_comparable_corpus_unknown"],
+        matched_input: true,
+        source_reported_status: null,
+        display_only: true,
+      },
+    ],
+    known_evidence_pairs: [],
+    unsupported_targets: [],
+    warnings: [],
+  };
+}
+
+function sampleManualOnlyComparisonIndex(): ComparisonIndex {
+  const runA = sampleComparisonRun("h1-a", "h1.single.v1", "baseline_anchor", { input: { available: true, fingerprint: "manual-input-a", keys: ["idea"] } });
+  const runB = sampleComparisonRun("h1-b", "h1.manager.v1", "default_multi_agent_reference", { input: { available: true, fingerprint: "manual-input-b", keys: ["idea"] } });
+  const runC = sampleComparisonRun("h1-c", "h1.handoff.v1", "reference_variant", { input: { available: true, fingerprint: "manual-input-c", keys: ["idea"] } });
+  return {
+    schema_version: COMPARISON_INDEX_SCHEMA_VERSION,
+    generated_at: "2026-05-05T12:00:00+00:00",
+    data_dir: "../data",
+    summary: {
+      run_candidate_count: 3,
+      suggested_pair_count: 1,
+      known_evidence_pair_count: 0,
+      unsupported_target_count: 0,
+      warnings_count: 0,
+      max_suggested_pairs: 25,
+    },
+    run_candidates: [runA, runB, runC],
+    suggested_pairs: [
+      {
+        pair_id: "h1_structural_variant:h1-a:h1-b",
+        target_class: "h1_structural_variant",
+        left_run_id: "h1-a",
+        right_run_id: "h1-b",
+        selection_reason: "bounded_recent_valid_runs_first",
+        structural_preflight_status: "PASS",
+        status_reasons: [],
+        matched_input: false,
+        source_reported_status: null,
+        display_only: true,
+      },
+    ],
+    known_evidence_pairs: [],
+    unsupported_targets: [],
+    warnings: [],
+  };
+}
+
+function sampleComparisonRun(runId: string, workflowId: string, role: string | null, overrides: Record<string, unknown> = {}) {
+  const run = {
+    run_id: runId,
+    workflow_id: workflowId,
+    status: "succeeded",
+    started_at: "2026-05-05T10:00:01+00:00",
+    completed_at: "2026-05-05T10:00:02+00:00",
+    target_class: "h1_structural_variant",
+    comparison_support: "supported",
+    comparison_role: role,
+    run_artifact_path: `data/runs/${runId}.json`,
+    trace_artifact_path: `data/traces/${runId}.jsonl`,
+    artifact_dir_path: `data/artifacts/${runId}`,
+    artifact_validation: { passed: true, errors: [], warnings: [] },
+    preflight: {
+      run_artifact_exists: true,
+      trace_artifact_exists: true,
+      artifact_validation_passed: true,
+      trace_state: "available",
+    },
+    input: { available: true, fingerprint: "input-fingerprint", keys: ["idea"] },
+    comparable_output: {
+      present: true,
+      complete: true,
+      missing_keys: [],
+      fields: [
+        { key: "clarified_idea", present: true, value_kind: "string", preview: "Bounded display", fingerprint: "field-a" },
+        { key: "recommended_mvp_direction", present: true, value_kind: "string", preview: "Show structural facts", fingerprint: "field-b" },
+      ],
+    },
+    h2_gates: {
+      key_order_matches: null,
+      implementation_waves_valid: null,
+      recommended_starting_slice_present: null,
+      delegate_order_matches: null,
+      delegate_targets: [],
+    },
+    provider_disclosure: {
+      provider_names: ["openrouter"],
+      model_names: ["test-model"],
+      selected_provider: "openrouter",
+      executed_provider: "openrouter",
+      selected_model: "test-model",
+      executed_model: "test-model",
+      fallback_state: "not_observed",
+      provider_attempt_count: 1,
+    },
+  };
+  return { ...run, ...overrides };
+}
+
 beforeEach(() => {
   vi.unstubAllGlobals();
 });
@@ -559,12 +763,131 @@ describe("U5-A workbench shell", () => {
     expect(screen.queryByText(/PYTHONPATH=src python -m fractal_agent_lab.cli run/i)).not.toBeInTheDocument();
   });
 
-  it("keeps evidence page bounded to Track E-defined comparison semantics", async () => {
+  it("shows missing comparison index guidance without fixture fallback", async () => {
     const user = userEvent.setup();
+    mockFetchByPath({});
     render(<App />);
 
     await user.click(screen.getByRole("button", { name: /evidence/i }));
-    expect(screen.getByText(/track e must define comparison semantics/i)).toBeInTheDocument();
+    expect(await screen.findByText(/generated comparison index is missing/i)).toBeInTheDocument();
+    expect(screen.getByText(/npm run build:comparisons/i)).toBeInTheDocument();
+    expect(screen.queryByText(/future evidence rows/i)).not.toBeInTheDocument();
+  });
+
+  it("rejects wrong comparison index schema version", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({ "/generated/comparison-index.json": { payload: { ...sampleComparisonIndex(), schema_version: "wrong.schema" } } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /evidence/i }));
+    expect(await screen.findByText(/generated comparison index is invalid/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not match u5_e.comparison_index.v1/i)).toBeInTheDocument();
+    expect(screen.queryByText(/run comparison evidence/i)).not.toBeInTheDocument();
+  });
+
+  it("rejects same-version comparison index when nested rendered fields are malformed", async () => {
+    const user = userEvent.setup();
+    const malformed = sampleComparisonIndex();
+    malformed.run_candidates[0] = {
+      ...malformed.run_candidates[0],
+      comparable_output: {
+        ...malformed.run_candidates[0].comparable_output,
+        fields: [{ key: "clarified_idea", present: true, value_kind: "string", preview: "ok", fingerprint: 42 } as never],
+      },
+    };
+    mockFetchByPath({ "/generated/comparison-index.json": { payload: malformed } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /evidence/i }));
+    expect(await screen.findByText(/generated comparison index is invalid/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /run comparison evidence/i })).not.toBeInTheDocument();
+  });
+
+  it("renders empty comparison index as not demonstrated instead of failure", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({
+      "/generated/comparison-index.json": {
+        payload: sampleComparisonIndex({
+          summary: {
+            run_candidate_count: 0,
+            suggested_pair_count: 0,
+            known_evidence_pair_count: 1,
+            unsupported_target_count: 0,
+            warnings_count: 0,
+            max_suggested_pairs: 25,
+          },
+          run_candidates: [],
+          suggested_pairs: [],
+          unsupported_targets: [],
+        }),
+      },
+    });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /evidence/i }));
+    expect(await screen.findByRole("heading", { name: /run comparison evidence/i })).toBeInTheDocument();
+    expect(screen.getByText(/not demonstrated in the generated local index/i)).toBeInTheDocument();
+    expect(screen.queryByText(/FAIL/i)).not.toBeInTheDocument();
+  });
+
+  it("renders structural comparison facts without ranking or quality wording", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({ "/generated/comparison-index.json": { payload: sampleComparisonIndex() } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /evidence/i }));
+
+    expect(await screen.findByRole("heading", { name: /run comparison evidence/i })).toBeInTheDocument();
+    expect(screen.getByText(/display-only structural preflight/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/h1-single/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/h1-manager/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/clarified_idea/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/source-reported status/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/not_demonstrated.*deferred/i)).toBeInTheDocument();
+    expect(screen.queryAllByText(/winner/i)).toHaveLength(0);
+    expect(screen.queryAllByText(/leaderboard/i)).toHaveLength(0);
+    expect(screen.queryAllByText(/score/i)).toHaveLength(0);
+    expect(screen.queryAllByText(/better provider/i)).toHaveLength(0);
+    expect(screen.queryAllByText(/better model/i)).toHaveLength(0);
+    expect(screen.queryAllByText(/quality ranking/i)).toHaveLength(0);
+  });
+
+  it("shows H2 warning and gate facts in the Evidence UI", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({ "/generated/comparison-index.json": { payload: sampleH2ComparisonIndex() } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /evidence/i }));
+
+    expect(await screen.findByRole("heading", { name: /selected pair state/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/WARNING/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/h2_intended_comparable_corpus_unknown/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/H2 gate facts/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Key order/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Implementation waves valid/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Recommended starting slice present/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Delegate order/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/intake, planner, architect, critic/i).length).toBeGreaterThan(0);
+  });
+
+  it("keeps manual non-suggested pair selection blocked and not PASS", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({ "/generated/comparison-index.json": { payload: sampleManualOnlyComparisonIndex() } });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /evidence/i }));
+    await screen.findByRole("heading", { name: /run comparison evidence/i });
+
+    const runASelect = screen.getByRole("combobox", { name: /^Run A$/i });
+    const runBSelect = screen.getByRole("combobox", { name: /^Run B$/i });
+    await user.selectOptions(runASelect, "h1-a");
+    await user.selectOptions(runBSelect, "h1-c");
+
+    expect(screen.getByText(/selected_pair_not_in_bounded_generated_suggestions/i)).toBeInTheDocument();
+    const statusPanel = screen.getByRole("heading", { name: /selected pair state/i }).closest("section");
+    expect(statusPanel).not.toBeNull();
+    expect(within(statusPanel as HTMLElement).queryByText(/^PASS$/)).not.toBeInTheDocument();
+    expect(within(statusPanel as HTMLElement).getByText(/BLOCKED/i)).toBeInTheDocument();
   });
 
   it("shows missing memory/eval index guidance without fixture fallback", async () => {
