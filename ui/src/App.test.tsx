@@ -555,6 +555,29 @@ describe("U5-A workbench shell", () => {
     expect(screen.getByText(/npm run build:index/i)).toBeInTheDocument();
   });
 
+  it("rejects same-version run index when nested rendered fields are malformed", async () => {
+    const user = userEvent.setup();
+    const malformed = {
+      ...sampleIndex(),
+      summary: {
+        ...sampleIndex().summary,
+        trace_state_counts: { ok: "1" },
+      },
+      runs: [
+        {
+          ...sampleIndex().runs[0],
+          trace_event_count: "2",
+        },
+      ],
+    };
+    mockFetchWith(malformed);
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /runs/i }));
+    expect(await screen.findByText(/generated run index is invalid/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /run browser/i })).not.toBeInTheDocument();
+  });
+
   it("renders generated run rows, filters, and run detail paths", async () => {
     const user = userEvent.setup();
     mockFetchWith(sampleIndex());

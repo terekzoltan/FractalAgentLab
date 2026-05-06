@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import scripts.build_u5_c_trace_details as trace_details
 from scripts.build_u5_c_trace_details import SCHEMA_VERSION, build_trace_detail, write_trace_details
 
 
@@ -119,6 +120,7 @@ class U5CTraceDetailTests(unittest.TestCase):
             data_dir = Path(temp_dir_raw) / "data"
             out_dir = Path(temp_dir_raw) / "ui" / "public" / "generated" / "traces"
             out_dir.mkdir(parents=True, exist_ok=True)
+            _write_trace_detail_sentinel(out_dir)
             stale_path = out_dir / "invalid-run.json"
             stale_path.write_text("{}", encoding="utf-8")
 
@@ -139,6 +141,90 @@ class U5CTraceDetailTests(unittest.TestCase):
             self.assertTrue((out_dir / "valid-run.json").exists())
             self.assertEqual(1, summary["generated_count"])
 
+    def test_write_trace_details_initializes_missing_output_dir_with_sentinel(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw) / "data"
+            out_dir = Path(temp_dir_raw) / "generated" / "traces"
+            _write_trace_pair(data_dir, run_id="valid-run")
+
+            summary = write_trace_details(data_dir=data_dir, out_dir=out_dir)
+
+            self.assertTrue((out_dir / trace_details.GENERATED_TRACE_DETAILS_SENTINEL).exists())
+            self.assertTrue((out_dir / "valid-run.json").exists())
+            self.assertEqual(1, summary["generated_count"])
+
+    def test_write_trace_details_initializes_empty_output_dir_with_sentinel(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw) / "data"
+            out_dir = Path(temp_dir_raw) / "generated" / "traces"
+            out_dir.mkdir(parents=True)
+            _write_trace_pair(data_dir, run_id="valid-run")
+
+            write_trace_details(data_dir=data_dir, out_dir=out_dir)
+
+            sentinel = out_dir / trace_details.GENERATED_TRACE_DETAILS_SENTINEL
+            self.assertEqual(trace_details.GENERATED_TRACE_DETAILS_SENTINEL_CONTENT, sentinel.read_text(encoding="utf-8"))
+
+    def test_write_trace_details_refuses_non_empty_custom_dir_without_sentinel(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw) / "data"
+            out_dir = Path(temp_dir_raw) / "custom-output"
+            out_dir.mkdir(parents=True)
+            existing_json = out_dir / "canonical-looking-run.json"
+            existing_content = '{"run_id":"do-not-delete"}'
+            existing_json.write_text(existing_content, encoding="utf-8")
+            _write_trace_pair(data_dir, run_id="valid-run")
+
+            with self.assertRaises(OSError):
+                write_trace_details(data_dir=data_dir, out_dir=out_dir)
+
+            self.assertEqual(existing_content, existing_json.read_text(encoding="utf-8"))
+            self.assertFalse((out_dir / "valid-run.json").exists())
+
+    def test_write_trace_details_refuses_canonical_data_dir_even_with_sentinel(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            original_canonical_data_dir = trace_details.CANONICAL_DATA_DIR
+            try:
+                temp_root = Path(temp_dir_raw)
+                trace_details.CANONICAL_DATA_DIR = temp_root / "data"
+                data_dir = temp_root / "source-data"
+                out_dir = trace_details.CANONICAL_DATA_DIR / "runs"
+                out_dir.mkdir(parents=True)
+                _write_trace_detail_sentinel(out_dir)
+                existing_json = out_dir / "canonical-run.json"
+                existing_content = '{"run_id":"canonical"}'
+                existing_json.write_text(existing_content, encoding="utf-8")
+                _write_trace_pair(data_dir, run_id="valid-run")
+
+                with self.assertRaises(OSError):
+                    write_trace_details(data_dir=data_dir, out_dir=out_dir)
+
+                self.assertEqual(existing_content, existing_json.read_text(encoding="utf-8"))
+                self.assertFalse((out_dir / "valid-run.json").exists())
+            finally:
+                trace_details.CANONICAL_DATA_DIR = original_canonical_data_dir
+
+    def test_write_trace_details_bootstraps_exact_default_trace_output_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            original_default_dir = trace_details.DEFAULT_GENERATED_TRACE_DETAILS_DIR
+            try:
+                data_dir = Path(temp_dir_raw) / "data"
+                out_dir = Path(temp_dir_raw) / "ui" / "public" / "generated" / "traces"
+                trace_details.DEFAULT_GENERATED_TRACE_DETAILS_DIR = out_dir
+                out_dir.mkdir(parents=True)
+                stale_path = out_dir / "stale-run.json"
+                stale_path.write_text("{}", encoding="utf-8")
+                _write_trace_pair(data_dir, run_id="valid-run")
+
+                summary = write_trace_details(data_dir=data_dir, out_dir=out_dir)
+
+                self.assertFalse(stale_path.exists())
+                self.assertTrue((out_dir / trace_details.GENERATED_TRACE_DETAILS_SENTINEL).exists())
+                self.assertTrue((out_dir / "valid-run.json").exists())
+                self.assertEqual(1, summary["generated_count"])
+            finally:
+                trace_details.DEFAULT_GENERATED_TRACE_DETAILS_DIR = original_default_dir
+
     def test_payload_summary_and_raw_payload_are_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_raw:
             data_dir = Path(temp_dir_raw)
@@ -155,6 +241,13 @@ class U5CTraceDetailTests(unittest.TestCase):
 def _write_trace_pair(data_dir: Path, *, run_id: str) -> None:
     _write_run_only(data_dir, run_id=run_id, workflow_id="h1.single.v1", status="succeeded")
     _write_trace_events(data_dir, run_id=run_id, events=[_event(run_id, 1, "run_started"), _event(run_id, 2, "run_completed")])
+
+
+def _write_trace_detail_sentinel(out_dir: Path) -> None:
+    (out_dir / trace_details.GENERATED_TRACE_DETAILS_SENTINEL).write_text(
+        trace_details.GENERATED_TRACE_DETAILS_SENTINEL_CONTENT,
+        encoding="utf-8",
+    )
 
 
 def _write_run_only(data_dir: Path, *, run_id: str, workflow_id: str, status: str) -> None:

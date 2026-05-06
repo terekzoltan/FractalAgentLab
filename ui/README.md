@@ -133,6 +133,12 @@ ui/public/generated/traces/<run_id>.json
 These generated files are local/private, served by Vite during development, and
 gitignored. They are not canonical evidence truth and should not be committed.
 
+The U5-C trace-detail generator protects cleanup with a generated-directory sentinel
+file, `.fal-u5-c-trace-details-generated`. It refuses non-empty custom trace-detail
+output directories that do not have the sentinel, and it refuses all canonical `data/`
+paths even if a sentinel is present. The exact default `ui/public/generated/traces`
+path may bootstrap older ignored generated files by writing the sentinel before cleanup.
+
 ## Evidence Boundary
 
 Canonical evidence remains in:
@@ -150,7 +156,8 @@ The generated U5-C trace detail files use schema version `u5_c.trace_detail.v1`.
 Strict-invalid traces do not produce renderable timeline detail files. The UI shows the
 invalid state from the run index and warnings instead of rendering a fake timeline.
 Each `build:traces` run cleans previously generated `ui/public/generated/traces/*.json`
-files before writing the fresh strict-valid set, so stale trace details are not kept.
+files only after the generated-directory safety checks pass, so stale trace details are
+not kept and canonical evidence directories are not endangered.
 
 Trace events are displayed in canonical `sequence` order. Timestamp problems only create
 warnings and do not reorder the event list.

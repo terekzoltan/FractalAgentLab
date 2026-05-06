@@ -111,7 +111,7 @@ H3, H4, and H5 remain intentionally minimal in this first pass:
 
 ## Verification
 
-Planned and executed verification commands:
+Track A local verification commands recorded for this implementation:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.scripts.test_u5_e_comparison_index
@@ -131,4 +131,4 @@ git status --short --ignored ui/public/generated
 - Empty local data renders as not demonstrated, not failure.
 - Suggested pairs are intentionally capped and may not include every possible local pair.
 - Comparable field previews are bounded and fingerprinted; canonical artifacts remain the source for full content.
-- Full U5-E closeout still requires Track E semantics review and Meta no-claim review.
+- Full U5-E coordination closeout remains a Meta decision; this document records Track A's local implementation handoff and generated/private evidence boundaries.

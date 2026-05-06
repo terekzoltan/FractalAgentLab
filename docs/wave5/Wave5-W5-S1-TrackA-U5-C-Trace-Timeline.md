@@ -169,7 +169,7 @@ PYTHONPATH=src python -m unittest tests.cli.test_r3_j_trace_browser
 Results:
 
 - U5-C generator tests passed: `7` tests.
-- Generated trace detail smoke passed: `92` detail files, `0` skipped, `0` warnings on the current local corpus.
+- Local generated trace detail smoke result recorded during Track A implementation: `92` detail files, `0` skipped, `0` warnings on the current local corpus.
 - Typecheck passed.
 - Targeted UI trace/run test file passed: `12` tests.
 - Production build passed.

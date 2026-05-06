@@ -19,6 +19,10 @@ from fractal_agent_lab.cli.trace_reader import (  # noqa: E402
 
 SCHEMA_VERSION = "u5_c.trace_detail.v1"
 DEFAULT_LIMIT = 500
+GENERATED_TRACE_DETAILS_SENTINEL = ".fal-u5-c-trace-details-generated"
+GENERATED_TRACE_DETAILS_SENTINEL_CONTENT = "u5_c.trace_detail.generated_dir.v1\n"
+DEFAULT_GENERATED_TRACE_DETAILS_DIR = REPO_ROOT / "ui" / "public" / "generated" / "traces"
+CANONICAL_DATA_DIR = REPO_ROOT / "data"
 FAILURE_EVENT_TYPES = {
     "run_failed",
     "run_cancelled",
@@ -58,8 +62,7 @@ def write_trace_details(
 ) -> dict[str, Any]:
     rows, row_warnings = list_trace_browser_rows(data_dir=data_dir, limit=limit)
     resolved_out_dir = Path(out_dir)
-    resolved_out_dir.mkdir(parents=True, exist_ok=True)
-    _remove_existing_trace_details(resolved_out_dir)
+    _prepare_generated_trace_details_dir(resolved_out_dir)
 
     generated = 0
     skipped = 0
@@ -89,6 +92,58 @@ def write_trace_details(
         "warnings_count": len(warnings),
         "warnings": warnings,
     }
+
+
+def _prepare_generated_trace_details_dir(directory: Path) -> None:
+    resolved_directory = directory.resolve()
+    _raise_if_canonical_data_output(resolved_directory)
+
+    if not directory.exists():
+        directory.mkdir(parents=True, exist_ok=True)
+        _write_generated_trace_details_sentinel(directory)
+        return
+
+    if not directory.is_dir():
+        raise OSError(f"Trace detail output path is not a directory: {directory}")
+
+    sentinel_path = directory / GENERATED_TRACE_DETAILS_SENTINEL
+    entries = list(directory.iterdir())
+    if not entries:
+        _write_generated_trace_details_sentinel(directory)
+        return
+
+    if _has_valid_generated_trace_details_sentinel(sentinel_path):
+        _remove_existing_trace_details(directory)
+        return
+
+    if resolved_directory == DEFAULT_GENERATED_TRACE_DETAILS_DIR.resolve():
+        _write_generated_trace_details_sentinel(directory)
+        _remove_existing_trace_details(directory)
+        return
+
+    raise OSError(
+        "Refusing to clean non-empty trace detail output directory without "
+        f"{GENERATED_TRACE_DETAILS_SENTINEL}: {directory}",
+    )
+
+
+def _raise_if_canonical_data_output(resolved_directory: Path) -> None:
+    try:
+        resolved_directory.relative_to(CANONICAL_DATA_DIR.resolve())
+    except ValueError:
+        return
+    raise OSError(f"Refusing to write generated trace details under canonical data directory: {resolved_directory}")
+
+
+def _write_generated_trace_details_sentinel(directory: Path) -> None:
+    (directory / GENERATED_TRACE_DETAILS_SENTINEL).write_text(GENERATED_TRACE_DETAILS_SENTINEL_CONTENT, encoding="utf-8")
+
+
+def _has_valid_generated_trace_details_sentinel(path: Path) -> bool:
+    try:
+        return path.is_file() and path.read_text(encoding="utf-8") == GENERATED_TRACE_DETAILS_SENTINEL_CONTENT
+    except OSError:
+        return False
 
 
 def _remove_existing_trace_details(directory: Path) -> None:

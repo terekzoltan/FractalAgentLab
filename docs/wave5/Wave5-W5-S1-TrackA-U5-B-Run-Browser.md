@@ -173,7 +173,7 @@ Results:
 
 - U5-B generator tests passed: `7` tests.
 - UI component tests passed: `7` tests.
-- Generated index smoke passed: `92` local run rows, `0` warnings.
+- Local generated index smoke result recorded during Track A implementation: `92` local run rows, `0` warnings.
 - Typecheck passed.
 - Production build passed.
 - CLI trace-browser regression passed with `PYTHONPATH=src`: `3` tests.

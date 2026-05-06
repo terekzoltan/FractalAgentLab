@@ -97,7 +97,7 @@ Expected next seam:
 
 - No real local artifact index exists yet.
 - No route URLs exist yet because U5-A intentionally avoids router dependency.
-- Responsive behavior is CSS-based and should receive a live browser/operator smoke before Meta closeout.
+- Responsive behavior is CSS-based and should receive a live browser/operator smoke before any Meta closeout decision.
 - The visual system is intentionally small and may need refinement after real run/trace data lands.
 
 ## Validation Commands
@@ -112,7 +112,7 @@ npm run build
 npm test -- --run
 ```
 
-Results:
+Track A local verification results:
 
 - `npm install` completed and generated `ui/package-lock.json`.
 - `npm audit --audit-level=moderate` passed with `0` vulnerabilities using lockfile-resolved compatible Vite/Vitest versions.
@@ -124,9 +124,9 @@ Results:
 
 Responsive CSS is implemented for desktop and narrow widths.
 
-Meta/operator responsive smoke result: `PASS`.
+Track A/operator responsive smoke observation recorded locally: desktop and narrow/mobile layouts loaded as expected.
 
-Evidence reviewed during closeout:
+Local screenshots reviewed during the Track A implementation handoff:
 
 - iPhone XR narrow viewport screenshot
 - iPhone 12 narrow viewport screenshot
@@ -144,16 +144,16 @@ Observed:
 - `Runs` and `Trace` placeholders clearly state that real U5-B/U5-C functionality is not implemented yet
 - no launch/OpenCode automation surface appears active
 
-Closeout conclusion: responsive smoke satisfies the U5-A acceptance requirement.
+Track A implementation handoff conclusion: responsive behavior was locally checked for the U5-A shell; Meta closeout remains a separate coordination decision.
 
 ## Handoff To U5-B / U5-C
 
 Track A handoff notes:
 
-- U5-B can build the run list/detail UX on this shell after Meta accepts U5-A.
-- U5-C can build the trace timeline page on this shell after Meta accepts U5-A.
+- U5-B can build the run list/detail UX on this shell after Meta sequences that work.
+- U5-C can build the trace timeline page on this shell after Meta sequences that work.
 - U5-B and U5-C should preserve explicit missing/invalid/partial states and avoid hiding degraded artifacts.
-- U5-D launch and packet behavior must remain blocked until U5-A, U5-B, and U5-C are accepted.
+- U5-D launch and packet behavior must remain blocked until Meta confirms the U5-A, U5-B, and U5-C prerequisites.
 
 ## Non-Goals Preserved
 

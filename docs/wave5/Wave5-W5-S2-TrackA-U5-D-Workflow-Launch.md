@@ -112,7 +112,7 @@ The packet is advisory and operator-mediated. It is not a gate, not a completed 
 
 ## Validation Commands
 
-Planned validation for implementation closeout:
+Track A local implementation verification command checklist:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.scripts.test_u5_d_workflow_catalog

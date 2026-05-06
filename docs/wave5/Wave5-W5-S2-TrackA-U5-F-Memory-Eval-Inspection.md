@@ -85,7 +85,7 @@ It does not treat every JSON sidecar as an eval summary. JSON sidecars without a
 warnings. JSON sidecars with a non-allowlisted `report_version` are skipped with warnings.
 Malformed local files create warnings and do not create fake rows.
 
-Track E confirmed this report-version behavior as no-claim-safe before U5-F closeout.
+Track E's wording-check artifact records this report-version behavior as no-claim-safe for Track A's U5-F handoff wording.
 
 ## Memory Display Boundary
 
@@ -132,9 +132,9 @@ does not parse it into live metrics.
 
 ## Wording Check Status
 
-- Track C memory wording check: satisfied after canonical-memory wording was narrowed.
-- Track E eval wording and report-version semantics check: satisfied by `docs/wave5/Wave5-W5-S2-TrackE-U5-F-Eval-Wording-Check-v1.md`.
-- Meta no-claim boundary review: satisfied for U5-F closeout.
+- Track C memory wording check: local Track A wording narrowed after review feedback.
+- Track E eval wording and report-version semantics check: documented by `docs/wave5/Wave5-W5-S2-TrackE-U5-F-Eval-Wording-Check-v1.md`.
+- Meta no-claim boundary review and closeout remain coordination-surface decisions outside this Track A delivery note.
 
 ## Known Limits
 
@@ -146,7 +146,7 @@ does not parse it into live metrics.
 
 ## Validation Commands
 
-Implementation closeout validation:
+Track A local implementation verification commands:
 
 ```bash
 PYTHONPATH=src python -m unittest tests.scripts.test_u5_f_memory_eval_index
