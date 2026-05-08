@@ -14,10 +14,31 @@ from fractal_agent_lab.core.contracts.workflow_spec import (
     WorkflowSpec,
     WorkflowStepSpec,
 )
+from fractal_agent_lab.core.contracts.w6_ledger import (
+    W6_LEDGER_SCHEMA_VERSION,
+    W6LedgerDocument,
+    W6LedgerEntry,
+    ledger_entry_from_validated_packet,
+)
+from fractal_agent_lab.core.contracts.w6_packet import (
+    W6_PACKET_SCHEMA_VERSION,
+    W6ArtifactRef,
+    W6Packet,
+    W6PacketActor,
+    W6PacketDecision,
+    W6PacketStage,
+    W6PacketValidationResult,
+    W6PrivacyClassification,
+    W6TrackLabel,
+    W6ValidationStatus,
+    validate_w6_packet,
+)
 
 __all__ = [
     "AGENT_SPEC_SCHEMA_VERSION",
     "WORKFLOW_SPEC_SCHEMA_VERSION",
+    "W6_LEDGER_SCHEMA_VERSION",
+    "W6_PACKET_SCHEMA_VERSION",
     "AgentKind",
     "AgentSpec",
     "HandoffAction",
@@ -28,4 +49,17 @@ __all__ = [
     "WorkflowExecutionMode",
     "WorkflowSpec",
     "WorkflowStepSpec",
+    "W6ArtifactRef",
+    "W6LedgerDocument",
+    "W6LedgerEntry",
+    "W6Packet",
+    "W6PacketActor",
+    "W6PacketDecision",
+    "W6PacketStage",
+    "W6PacketValidationResult",
+    "W6PrivacyClassification",
+    "W6TrackLabel",
+    "W6ValidationStatus",
+    "ledger_entry_from_validated_packet",
+    "validate_w6_packet",
 ]
