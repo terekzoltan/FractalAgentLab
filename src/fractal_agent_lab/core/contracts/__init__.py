@@ -33,6 +33,11 @@ from fractal_agent_lab.core.contracts.w6_packet import (
     W6ValidationStatus,
     validate_w6_packet,
 )
+from fractal_agent_lab.core.contracts.w6_state_machine import (
+    W6LoopFinalState,
+    W6StateMachineValidationResult,
+    validate_w6_packet_history,
+)
 
 __all__ = [
     "AGENT_SPEC_SCHEMA_VERSION",
@@ -52,14 +57,17 @@ __all__ = [
     "W6ArtifactRef",
     "W6LedgerDocument",
     "W6LedgerEntry",
+    "W6LoopFinalState",
     "W6Packet",
     "W6PacketActor",
     "W6PacketDecision",
     "W6PacketStage",
     "W6PacketValidationResult",
     "W6PrivacyClassification",
+    "W6StateMachineValidationResult",
     "W6TrackLabel",
     "W6ValidationStatus",
     "ledger_entry_from_validated_packet",
     "validate_w6_packet",
+    "validate_w6_packet_history",
 ]
