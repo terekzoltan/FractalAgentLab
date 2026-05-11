@@ -75,7 +75,7 @@ For each evaluated loop, capture:
 - `target_repo`
 - `sequence_ref`
 - `task_type`
-- `complexity_class`: `simple` | `medium` | `high` | `shared_boundary`
+- `complexity_class`: `simple` | `medium` | `high` | `shared_boundary` | `governance_context_continuity`
 - `mode`: `manual_opencode` | `command_assisted` | `packet_assisted` | `fal_evidence_backed`
 - `manual_copy_paste_steps`
 - `copy_paste_avoided_count`
