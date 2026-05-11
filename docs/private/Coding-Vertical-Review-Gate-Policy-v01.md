@@ -40,6 +40,7 @@ Reference:
 Control-surface clarification:
 
 - repository reality is the factual base
+- `ops/PROJECT_STATE.md` is the Hungarian-language compact bootloader for current wave/sprint/step/epic, workflow phase, next action, and next expected role
 - `ops/Combined-Execution-Sequencing-Plan.md` is authoritative for readiness/order/frontier
 - `ops/AGENTS.md` is authoritative for ownership/guardrails
 
@@ -211,6 +212,22 @@ When review/gate semantics expand, run one explicit consistency pass across:
 - sequencing/readiness wording
 
 This is a lightweight consistency check, not a heavy governance process.
+
+---
+
+## Project-state gate rule
+
+Before a review/gate can recommend step completion or next-step greenlight, it must check:
+
+- `ops/PROJECT_STATE.md` was read or its absence/staleness was explicitly called out
+- the state file is written in Hungarian, except for paths, commands, commits, field names, enum values, or quoted artifact text
+- the state file points to the same current wave/sprint/step/epic, workflow phase, and next expected role/action as the review conclusion
+- the completed step updated `ops/PROJECT_STATE.md` or explicitly recorded `Nincs state változás ebből a lépésből.`
+- the state file remains compact bootloader context, not a long review log
+
+Reference:
+
+- `docs/private/Project-State-Continuity-Protocol-v01.md`
 
 ---
 
