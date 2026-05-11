@@ -168,6 +168,17 @@ class W6ManualEvidenceRecorderTests(unittest.TestCase):
             self.assertTrue(result["transition_validation"]["commit_ready_candidate"])
             self.assertEqual([], result["clean_pass_blockers"])
 
+    def test_governance_context_continuity_complexity_class_is_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            payload = _closed_pass_input()
+            payload["complexity_class"] = "governance_context_continuity"
+
+            result = record_w6_manual_evidence(payload, data_dir=Path(temp_dir_raw)).as_dict()
+
+            usefulness_path = Path(result["output_paths"]["usefulness_row"])
+            usefulness = json.loads(usefulness_path.read_text(encoding="utf-8"))
+            self.assertEqual("governance_context_continuity", usefulness["complexity_class"])
+
 
 def _sample_input(*, missing_tests: list[str] | None = None) -> dict[str, object]:
     missing_tests = ["ui smoke not rerun"] if missing_tests is None else missing_tests

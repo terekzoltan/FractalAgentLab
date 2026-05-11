@@ -33,7 +33,7 @@ W6_MANUAL_EVIDENCE_INPUT_SCHEMA_VERSION = "w6.manual_evidence_input.v1"
 W6_REVIEW_FINDINGS_SCHEMA_VERSION = "w6.review_findings.v1"
 W6_USEFULNESS_SEED_ROW_SCHEMA_VERSION = "w6.usefulness_seed_row.v1"
 
-ALLOWED_COMPLEXITY_CLASSES = {"simple", "medium", "high", "shared_boundary"}
+ALLOWED_COMPLEXITY_CLASSES = {"simple", "medium", "high", "shared_boundary", "governance_context_continuity"}
 ALLOWED_FINAL_STATUSES = {"pass", "pass_with_warnings", "hold", "blocked"}
 ALLOWED_FINDING_SEVERITIES = {"low", "medium", "high", "critical"}
 ALLOWED_FINDING_STATUSES = {"accepted", "rejected", "fixed", "deferred"}
