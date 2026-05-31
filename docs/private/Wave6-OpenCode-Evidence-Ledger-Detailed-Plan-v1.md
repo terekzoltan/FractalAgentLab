@@ -14,10 +14,12 @@ Authority:
 
 Current Meta decision:
 
-- Wave 6 / W6-S1 is open for active sequencing.
-- The first implementation epic is `READY`, not already in progress.
-- Track implementation still requires a Track-authored implementation plan and Meta review before code changes.
-- The first implementation slice is a manual or semi-manual evidence ledger MVP, not OpenCode API automation.
+- Wave 6 / W6-S3 Step 3 is complete after `W6-J` public-safety / no-release review.
+- `W6-I` is accepted with warnings as one external docs-only merge-readiness loop under Combined-only canonical verification.
+- `W6-J` is accepted as `accepted_no_release` after Track E returned `APPROVE_NO_RELEASE` and `privacy_verdict: PASS`.
+- No public output, public mirror, `docs/public/` artifact, Track A presentation task, or bridge/API/session delivery work is authorized by the current evidence set.
+- Wave 6 closeout / post-closeout usefulness synthesis is accepted as `narrow_continue` after Track E returned `APPROVE_NARROW_CONTINUE` with `confidence: medium_low`.
+- W6.5/Ringfall may open only as readiness/adoption planning; no implementation automation, public output, HUB work, Track A presentation, or bridge/API/session delivery is authorized.
 
 ## Purpose
 
@@ -105,6 +107,65 @@ Epics:
 | W6-J Sanitized case-study / release review | Meta + Track E | Track A only if presentation is needed | public-safe summary or explicit no-release decision | W6-I evidence or blocker |
 
 WorldSim is the preferred candidate, not an active trial target. It must pass W6-H before W6-I starts.
+
+Current W6-I prompt package:
+
+```text
+docs/private/Wave6-W6-S3-Meta-W6-I-Prompt-Package-v1.md
+```
+
+This package prepares the isolated WorldSim docs-only loop owner prompt, handoff template, FAL Meta review checklist, and Track E evidence/privacy review prompt. It does not authorize work outside the accepted W6-H Candidate A docs-only scope.
+
+W6-I closeout:
+
+```text
+docs/private/Wave6-W6-S3-Meta-W6-I-Step-Review-Closeout.md
+```
+
+W6-I was accepted with warnings as one external docs-only merge-readiness review/fix loop. The accepted canonical scope is Combined-only verification because WorldSim did not contain `ops/PROJECT_STATE.md`. Private W6-C recorder evidence was written under `data/evidence/wave6/loops/w6i-worldsim-docs-only-20260528/`.
+
+W6-J no-release decision:
+
+```text
+docs/private/Wave6-W6-S3-Meta-W6-J-Public-Safety-No-Release-Decision-v1.md
+```
+
+W6-J accepted `no_public_release_now`: no public case study, public mirror artifact, sanitized report, `docs/public/` output, or Track A presentation task is approved. Track E returned `APPROVE_NO_RELEASE` with `privacy_verdict: PASS`; any future public artifact must start from a separate export-candidate draft and pass a new Track E review.
+
+Wave 6 closeout usefulness synthesis:
+
+```text
+docs/private/Wave6-Post-Closeout-Usefulness-Synthesis-v01.md
+```
+
+Final recommendation: `narrow_continue`. Wave 6 is useful as a private evidence/control layer and external-readiness pattern, but does not support broad automation, public claims, bridge/API/session delivery, HUB work, or Track A presentation. Track E accepted this direction with `confidence: medium_low`.
+
+### Conditional Post-Wave-6 Direction
+
+Post-Wave-6 strategy is anchored separately in:
+
+```text
+docs/private/Wave6-Post-Closeout-Ringfall-HUB-Strategy-v01.md
+```
+
+Key integration decisions:
+
+- active W6-S3 execution must not be disrupted or restarted by post-Wave-6 planning
+- WorldSim remains the accepted W6-I external target unless a later explicit Meta blocker/resequence decision changes it
+- Ringfall is a conditional Wave 6.5 adoption/readiness target after Wave 6 closeout, not a replacement for W6-I
+- the long-term HUB is a separate future cross-project command center, not a FAL feature
+- Wave 7, if opened, starts docs-first as a HUB compatibility/status/export/control-boundary contract, not as HUB implementation
+- no OpenCode bridge/API/session delivery, automatic commit/push, dashboard, or autonomous swarm work is authorized by this post-Wave-6 planning note
+
+Immediate W6.5 artifacts after Meta opened readiness/adoption planning:
+
+```text
+docs/private/FAL-External-Project-Usage-Runbook-v01.md
+docs/private/External-Project-Packet-Fields-v01.md
+docs/private/Ringfall-Target-Readiness-Brief-v01.md
+```
+
+These artifacts must remain readiness/adoption planning only and should go through Track E readiness/evidence review before any RingFall sequence item is executed. The initial RingFall target-local private runbook is `C:\EGYETEM\FUNSTUFF\RingFall\.fal\FAL-Target-Project-Local-Runbook-v01.md` and is not public/canonical RingFall design.
 
 ## Proposed Artifact Surfaces
 
