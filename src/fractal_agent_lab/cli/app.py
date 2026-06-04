@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tempfile
+from pathlib import Path
 from typing import Any
 
 from fractal_agent_lab.adapters import build_step_runner
@@ -30,6 +32,7 @@ from fractal_agent_lab.cli.workflow_registry import (
 )
 from fractal_agent_lab.core.models import RunStatus
 from fractal_agent_lab.identity import run_post_run_identity_update
+from fractal_agent_lab.ingest import W7OpenCodeLoopIngestError, write_w7_opencode_loop_artifacts
 from fractal_agent_lab.memory import (
     load_project_memory_context,
     load_session_memory_context,
@@ -139,6 +142,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Trace browser output format",
     )
 
+    ingest_parser = subparsers.add_parser("ingest", help="Ingest OpenCode-backed loop evidence")
+    ingest_subparsers = ingest_parser.add_subparsers(dest="ingest_command", required=True)
+    router_loop_parser = ingest_subparsers.add_parser(
+        "router-loop",
+        help="Validate or write a normalized W7 router-loop payload",
+    )
+    router_loop_parser.add_argument("--payload-path", required=True, help="Path to normalized W7 loop JSON payload")
+    router_loop_parser.add_argument(
+        "--data-dir",
+        default="data",
+        help="Target data directory for write mode",
+    )
+    router_loop_parser.add_argument(
+        "--mode",
+        choices=["preview", "write"],
+        default="preview",
+        help="Preview validates using a temporary writer path; write emits canonical artifacts",
+    )
+    router_loop_parser.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        help="Ingest report output format",
+    )
+
     subparsers.add_parser("list-workflows", help="List available workflows")
     return parser
 
@@ -157,6 +185,9 @@ def run_cli(argv: list[str] | None = None) -> int:
 
     if args.command == "trace":
         return _handle_trace(args)
+
+    if args.command == "ingest":
+        return _handle_ingest(args)
 
     parser.error(f"Unsupported command: {args.command}")
     return 2
@@ -335,6 +366,19 @@ def _parse_input_payload(raw_input: str) -> dict[str, Any]:
     return value
 
 
+def _load_json_object_from_path(path: str) -> dict[str, Any]:
+    try:
+        value = json.loads(Path(path).read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ValueError(f"failed to read JSON payload: {error}") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(f"payload JSON is invalid: {error.msg}.") from error
+
+    if not isinstance(value, dict):
+        raise ValueError("payload JSON must decode to an object.")
+    return value
+
+
 def _inject_h1_prompt_tags(
     *,
     run_state,
@@ -352,6 +396,105 @@ def _inject_h1_prompt_tags(
     payload = dict(run_state.output_payload or {})
     payload["prompt_tags"] = prompt_tags
     run_state.output_payload = payload
+
+
+def _handle_ingest(args: argparse.Namespace) -> int:
+    if args.ingest_command == "router-loop":
+        return _handle_ingest_router_loop(args)
+
+    print(f"Error: unsupported ingest command '{args.ingest_command}'.")
+    return 2
+
+
+def _handle_ingest_router_loop(args: argparse.Namespace) -> int:
+    try:
+        payload = _load_json_object_from_path(args.payload_path)
+        if args.mode == "preview":
+            with tempfile.TemporaryDirectory() as temp_data_dir:
+                result = write_w7_opencode_loop_artifacts(payload, data_dir=temp_data_dir)
+                report = _build_ingest_router_loop_report(
+                    mode="preview",
+                    payload=payload,
+                    result=result,
+                    data_dir=args.data_dir,
+                    paths=None,
+                )
+        else:
+            result = write_w7_opencode_loop_artifacts(payload, data_dir=args.data_dir)
+            report = _build_ingest_router_loop_report(
+                mode="write",
+                payload=payload,
+                result=result,
+                data_dir=args.data_dir,
+                paths=result.output_paths,
+            )
+    except (ValueError, W7OpenCodeLoopIngestError, OSError) as error:
+        print(f"Error: {error}")
+        return 2
+
+    if args.format == "json":
+        print(json.dumps(report, indent=2, ensure_ascii=True))
+    else:
+        print(_format_ingest_router_loop_report(report))
+    return 0
+
+
+def _build_ingest_router_loop_report(
+    *,
+    mode: str,
+    payload: dict[str, Any],
+    result,
+    data_dir: str,
+    paths: dict[str, str] | None,
+) -> dict[str, Any]:
+    return {
+        "mode": mode,
+        "run_id": result.run_id,
+        "validation_state": result.validation_state,
+        "clean_pass_eligible": result.clean_pass_eligible,
+        "warnings": list(result.warnings),
+        "data_dir": data_dir,
+        "privacy_retention_mode": _privacy_retention_mode(payload),
+        "paths": paths or {},
+    }
+
+
+def _privacy_retention_mode(payload: dict[str, Any]) -> str | None:
+    privacy_audit_state = payload.get("privacy_audit_state")
+    if not isinstance(privacy_audit_state, dict):
+        return None
+    retention_mode = privacy_audit_state.get("retention_mode")
+    return retention_mode if isinstance(retention_mode, str) else None
+
+
+def _format_ingest_router_loop_report(report: dict[str, Any]) -> str:
+    lines = [
+        "W7 Router Loop Ingest",
+        f"Mode: {report['mode']}",
+        f"Run ID: {report['run_id']}",
+        f"Validation state: {report['validation_state']}",
+        f"Clean-pass eligible: {report['clean_pass_eligible']} (writer-derived)",
+        f"Warnings: {len(report['warnings'])}",
+        f"Data dir: {report['data_dir']}",
+        f"Privacy retention mode: {report['privacy_retention_mode']}",
+        "FAL ingest success is not OpenCode task success.",
+    ]
+    if report["mode"] == "preview":
+        lines.extend(
+            [
+                "Preview temp validation only; no target data-dir writes were performed.",
+                "Target overwrite risk is proven only by write mode.",
+            ]
+        )
+    else:
+        lines.append("Canonical paths written:")
+        for name, path in sorted(report["paths"].items()):
+            lines.append(f"- {name}: {path}")
+    if report["warnings"]:
+        lines.append("Warning codes:")
+        for warning in report["warnings"]:
+            lines.append(f"- {warning}")
+    return "\n".join(lines)
 
 
 def _handle_trace(args: argparse.Namespace) -> int:
