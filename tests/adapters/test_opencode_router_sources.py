@@ -213,3 +213,63 @@ class OpenCodeRouterSourcesTests(unittest.TestCase):
             after_data = sorted(path.relative_to(data_root).as_posix() for path in data_root.rglob("*"))
             self.assertEqual(before_router, after_router)
             self.assertEqual(before_data, after_data)
+
+    def test_w7_c1_rejects_missing_source_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_path = Path(tmp_dir) / "missing.json"
+
+            with self.assertRaises(OpenCodeRouterSourceError) as raised:
+                load_selected_output(source_path, router_root=tmp_dir)
+
+            self.assertIn("does not exist", str(raised.exception))
+
+    def test_w7_c1_rejects_directory_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_path = Path(tmp_dir) / "selected-output.json"
+            source_path.mkdir()
+
+            with self.assertRaises(OpenCodeRouterSourceError) as raised:
+                load_selected_output(source_path, router_root=tmp_dir)
+
+            self.assertIn("must be a file", str(raised.exception))
+
+    def test_w7_c1_rejects_unsupported_json_source_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_path = Path(tmp_dir) / "selected-output.json"
+            source_path.write_text(
+                json.dumps(
+                    {
+                        "stage": "track_seq_next",
+                        "source_kind": "raw_transcript",
+                        "summary": "Unsupported source kind",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(OpenCodeRouterSourceError) as raised:
+                load_selected_output(source_path, router_root=tmp_dir)
+
+            self.assertIn("unsupported source_kind", str(raised.exception))
+
+    def test_w7_c1_nested_reasoning_fields_are_warning_grade_not_retained(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_path = Path(tmp_dir) / "selected-output.json"
+            source_path.write_text(
+                json.dumps(
+                    {
+                        "stage": "meta_step_review_phase1",
+                        "source_kind": "router_selected_output",
+                        "summary": "Review summary",
+                        "selected_text": "Selected public review text",
+                        "metadata": {"thoughts": "private reasoning must not be retained"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = load_selected_output(source_path, router_root=tmp_dir)
+
+            self.assertIn(WARNING_THOUGHT_OMITTED, result.warnings)
+            self.assertNotIn("thoughts", result.to_dict())
+            self.assertEqual("Selected public review text", result.selected_text_excerpt)

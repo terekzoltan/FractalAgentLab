@@ -171,7 +171,11 @@ def _validate_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     _validate_privacy_audit_state(validated["privacy_audit_state"], errors)
 
     step_results = _require_mapping(payload, "step_results", errors)
-    validated["step_results"] = _validate_step_results(step_results, errors)
+    validated["step_results"] = _validate_step_results(
+        step_results,
+        validated["privacy_audit_state"].get("excerpt_max_chars"),
+        errors,
+    )
 
     packet_ledger = _require_mapping(payload, "packet_ledger", errors)
     validated["packet_ledger"] = _validate_packet_ledger(packet_ledger, errors)
@@ -219,7 +223,11 @@ def _validate_privacy_audit_state(payload: Mapping[str, Any], errors: list[str])
         errors.append("Field 'privacy_audit_state.public_export_state' has unsupported value.")
 
 
-def _validate_step_results(payload: Mapping[str, Any] | None, errors: list[str]) -> dict[str, Any]:
+def _validate_step_results(
+    payload: Mapping[str, Any] | None,
+    excerpt_max_chars: Any,
+    errors: list[str],
+) -> dict[str, Any]:
     if not isinstance(payload, Mapping) or not payload:
         errors.append("Field 'step_results' must be a non-empty object.")
         return {}
@@ -243,6 +251,19 @@ def _validate_step_results(payload: Mapping[str, Any] | None, errors: list[str])
                         + ", ".join(extra_raw_keys)
                         + "."
                     )
+        output = value.get("output")
+        if isinstance(output, Mapping) and "selected_text_excerpt" in output:
+            selected_text_excerpt = output.get("selected_text_excerpt")
+            if not isinstance(selected_text_excerpt, str):
+                errors.append(f"Field 'step_results.{step_id}.output.selected_text_excerpt' must be a string when present.")
+            elif (
+                isinstance(excerpt_max_chars, int)
+                and not isinstance(excerpt_max_chars, bool)
+                and len(selected_text_excerpt) > excerpt_max_chars
+            ):
+                errors.append(
+                    f"Field 'step_results.{step_id}.output.selected_text_excerpt' exceeds privacy_audit_state.excerpt_max_chars."
+                )
         _reject_forbidden_fields(value, f"step_results.{step_id}", errors)
         normalized[step_id] = dict(value)
     return normalized

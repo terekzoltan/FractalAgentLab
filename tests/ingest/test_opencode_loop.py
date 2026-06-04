@@ -192,6 +192,105 @@ class W7OpenCodeLoopIngestTests(unittest.TestCase):
             with self.assertRaises(W7OpenCodeLoopIngestError):
                 write_w7_opencode_loop_artifacts(payload, data_dir=tmp_dir)
 
+    def test_w7_c1_rejects_unsafe_external_loop_id(self) -> None:
+        payload = _valid_payload(external_loop_id="../bad")
+
+        with self.assertRaises(W7OpenCodeLoopIngestError):
+            write_w7_opencode_loop_artifacts(payload, data_dir="data")
+
+    def test_w7_c1_rejects_unsafe_packet_selected_output_and_approval_refs(self) -> None:
+        ref_overrides = {
+            "packet_ref": "../packet",
+            "selected_output_ref": "../selected-output",
+            "approval_ref": "../approval",
+        }
+
+        for ref_name, ref_value in ref_overrides.items():
+            with self.subTest(ref_name=ref_name):
+                payload = _valid_payload()
+                packet_ledger = copy.deepcopy(payload["packet_ledger"])
+                packet_ledger["entries"][0][ref_name] = ref_value
+                payload["packet_ledger"] = packet_ledger
+
+                with self.assertRaises(W7OpenCodeLoopIngestError):
+                    write_w7_opencode_loop_artifacts(payload, data_dir="data")
+
+    def test_w7_c1_rejects_public_export_approved_at_ingest_time(self) -> None:
+        payload = _valid_payload()
+        privacy_audit_state = copy.deepcopy(payload["privacy_audit_state"])
+        privacy_audit_state["public_export_state"] = "approved"
+        payload["privacy_audit_state"] = privacy_audit_state
+
+        with self.assertRaises(W7OpenCodeLoopIngestError):
+            write_w7_opencode_loop_artifacts(payload, data_dir="data")
+
+    def test_w7_c1_rejects_raw_transcript_retention(self) -> None:
+        payload = _valid_payload()
+        privacy_audit_state = copy.deepcopy(payload["privacy_audit_state"])
+        privacy_audit_state["raw_transcript_retained"] = True
+        payload["privacy_audit_state"] = privacy_audit_state
+
+        with self.assertRaises(W7OpenCodeLoopIngestError):
+            write_w7_opencode_loop_artifacts(payload, data_dir="data")
+
+    def test_w7_c1_rejects_thought_or_reasoning_retention(self) -> None:
+        payload = _valid_payload()
+        privacy_audit_state = copy.deepcopy(payload["privacy_audit_state"])
+        privacy_audit_state["thought_or_reasoning_retained"] = True
+        payload["privacy_audit_state"] = privacy_audit_state
+
+        with self.assertRaises(W7OpenCodeLoopIngestError):
+            write_w7_opencode_loop_artifacts(payload, data_dir="data")
+
+    def test_w7_c1_rejects_selected_output_excerpt_over_limit(self) -> None:
+        payload = _valid_payload()
+        selected_outputs = copy.deepcopy(payload["selected_outputs"])
+        selected_outputs["outputs"][0]["excerpt_max_chars"] = 10
+        selected_outputs["outputs"][0]["excerpt"] = "x" * 11
+        payload["selected_outputs"] = selected_outputs
+
+        with self.assertRaises(W7OpenCodeLoopIngestError):
+            write_w7_opencode_loop_artifacts(payload, data_dir="data")
+
+    def test_w7_c1_rejects_step_result_selected_text_excerpt_over_privacy_limit(self) -> None:
+        payload = _valid_payload()
+        privacy_audit_state = copy.deepcopy(payload["privacy_audit_state"])
+        privacy_audit_state["excerpt_max_chars"] = 10
+        payload["privacy_audit_state"] = privacy_audit_state
+        step_results = copy.deepcopy(payload["step_results"])
+        step_results["meta_plan_review"]["output"]["selected_text_excerpt"] = "x" * 11
+        payload["step_results"] = step_results
+
+        with self.assertRaises(W7OpenCodeLoopIngestError):
+            write_w7_opencode_loop_artifacts(payload, data_dir="data")
+
+    def test_w7_c1_rejects_non_string_step_result_selected_text_excerpt(self) -> None:
+        payload = _valid_payload()
+        step_results = copy.deepcopy(payload["step_results"])
+        step_results["meta_plan_review"]["output"]["selected_text_excerpt"] = 123
+        payload["step_results"] = step_results
+
+        with self.assertRaises(W7OpenCodeLoopIngestError):
+            write_w7_opencode_loop_artifacts(payload, data_dir="data")
+
+    def test_w7_c1_warning_outcome_is_not_clean_pass_eligible(self) -> None:
+        payload = _valid_payload(
+            validation_state="warning",
+            final_output={
+                **_valid_payload()["final_output"],
+                "overall_outcome": "yellow",
+                "final_decision": "accepted_with_warnings",
+            },
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = write_w7_opencode_loop_artifacts(payload, data_dir=tmp_dir)
+            summary_payload = json.loads(Path(result.sidecar_paths["opencode_loop_summary"]).read_text(encoding="utf-8"))
+
+        self.assertEqual("warning", result.validation_state)
+        self.assertFalse(result.clean_pass_eligible)
+        self.assertFalse(summary_payload["clean_pass_eligible"])
+
 
 def _valid_payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {

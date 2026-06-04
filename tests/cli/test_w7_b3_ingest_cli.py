@@ -173,6 +173,66 @@ class W7B3IngestCliTests(unittest.TestCase):
             self.assertEqual(2, second_code)
             self.assertIn("does not support overwrite", out.getvalue())
 
+    def test_w7_c1_preview_report_preserves_non_success_claim_boundaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            data_dir = root / "target-data"
+            payload_path = root / "payload.json"
+            payload_path.write_text(json.dumps(_valid_payload(), ensure_ascii=True), encoding="utf-8")
+
+            out = io.StringIO()
+            with redirect_stdout(out):
+                code = run_cli(
+                    [
+                        "ingest",
+                        "router-loop",
+                        "--payload-path",
+                        payload_path.as_posix(),
+                        "--data-dir",
+                        data_dir.as_posix(),
+                        "--mode",
+                        "preview",
+                    ]
+                )
+
+            rendered = out.getvalue()
+            self.assertEqual(0, code)
+            self.assertIn("Mode: preview", rendered)
+            self.assertIn("Preview temp validation only; no target data-dir writes were performed", rendered)
+            self.assertIn("Target overwrite risk is proven only by write mode", rendered)
+            self.assertIn("FAL ingest success is not OpenCode task success", rendered)
+            self.assertFalse(data_dir.exists())
+
+    def test_w7_c1_write_report_preserves_non_success_claim_boundaries(self) -> None:
+        payload = _valid_payload()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            data_dir = root / "target-data"
+            payload_path = root / "payload.json"
+            payload_path.write_text(json.dumps(payload, ensure_ascii=True), encoding="utf-8")
+
+            out = io.StringIO()
+            with redirect_stdout(out):
+                code = run_cli(
+                    [
+                        "ingest",
+                        "router-loop",
+                        "--payload-path",
+                        payload_path.as_posix(),
+                        "--data-dir",
+                        data_dir.as_posix(),
+                        "--mode",
+                        "write",
+                    ]
+                )
+
+            rendered = out.getvalue()
+            self.assertEqual(0, code)
+            self.assertIn("Mode: write", rendered)
+            self.assertIn("Canonical paths written", rendered)
+            self.assertIn("FAL ingest success is not OpenCode task success", rendered)
+            self.assertTrue((data_dir / "runs" / f"{payload['run_id']}.json").exists())
+
 
 def _valid_payload() -> dict[str, object]:
     return {
