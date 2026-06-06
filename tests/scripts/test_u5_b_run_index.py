@@ -37,6 +37,7 @@ class U5BRunIndexTests(unittest.TestCase):
             self.assertEqual(["test-model"], row["model_names"])
             self.assertEqual("not_observed", row["fallback_state"])
             self.assertEqual(["summary.json"], row["sidecar_files"])
+            self.assertEqual("fal_native", row["run_origin"])
 
     def test_keeps_run_only_and_trace_only_rows_visible(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_raw:
@@ -115,6 +116,131 @@ class U5BRunIndexTests(unittest.TestCase):
             payload = json.loads(out_path.read_text(encoding="utf-8"))
             self.assertEqual(SCHEMA_VERSION, payload["schema_version"])
 
+    def test_builds_opencode_backed_run_fields_from_w7_summary_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_run_trace_pair(
+                data_dir,
+                run_id="ocloop-valid",
+                workflow_id="opencode.meta_track.loop.v1",
+                status="succeeded",
+            )
+            _write_w7_summary_sidecar(data_dir, run_id="ocloop-valid")
+
+            index = build_run_index(data_dir=data_dir)
+
+            row = index["runs"][0]
+            self.assertEqual("opencode_backed", row["run_origin"])
+            self.assertEqual("ringfall", row["target_project_id"])
+            self.assertEqual("W7-D", row["sequence_ref"])
+            self.assertEqual("accepted", row["final_decision"])
+            self.assertEqual("green", row["overall_outcome"])
+            self.assertTrue(row["clean_pass_eligible"])
+            self.assertEqual(2, row["packet_count"])
+            self.assertEqual(1, row["approval_count"])
+            self.assertEqual(1, row["selected_output_count"])
+            self.assertEqual("structured_extracts_only", row["privacy_retention_mode"])
+            self.assertEqual("blocked", row["public_export_state"])
+            self.assertEqual(3, row["required_followup_count"])
+            self.assertEqual({"opencode_backed": 1}, index["summary"]["run_origin_counts"])
+            self.assertEqual({"ringfall": 1}, index["summary"]["target_project_counts"])
+            self.assertEqual({"accepted": 1}, index["summary"]["final_decision_counts"])
+
+    def test_malformed_w7_summary_keeps_opencode_row_visible_with_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_run_trace_pair(
+                data_dir,
+                run_id="ocloop-bad-sidecar",
+                workflow_id="opencode.meta_track.loop.v1",
+                status="succeeded",
+            )
+            sidecar_dir = data_dir / "artifacts" / "ocloop-bad-sidecar"
+            sidecar_dir.mkdir(parents=True)
+            (sidecar_dir / "opencode_loop_summary.json").write_text("{not-json", encoding="utf-8")
+
+            index = build_run_index(data_dir=data_dir)
+
+            row = index["runs"][0]
+            self.assertEqual("opencode_backed", row["run_origin"])
+            self.assertIsNone(row["clean_pass_eligible"])
+            self.assertIsNone(row["target_project_id"])
+            self.assertTrue(row["warnings"])
+            self.assertIn("Invalid W7 sidecar", row["warnings"][0])
+
+    def test_wrong_schema_w7_summary_keeps_row_visible_without_source_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_run_trace_pair(
+                data_dir,
+                run_id="ocloop-wrong-schema",
+                workflow_id="opencode.meta_track.loop.v1",
+                status="succeeded",
+            )
+            sidecar_dir = data_dir / "artifacts" / "ocloop-wrong-schema"
+            sidecar_dir.mkdir(parents=True)
+            (sidecar_dir / "opencode_loop_summary.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "w7.other_summary.v1",
+                        "run_id": "ocloop-wrong-schema",
+                        "target_project_id": "ringfall",
+                        "clean_pass_eligible": True,
+                    },
+                    ensure_ascii=True,
+                ),
+                encoding="utf-8",
+            )
+
+            index = build_run_index(data_dir=data_dir)
+
+            row = index["runs"][0]
+            self.assertEqual("opencode_backed", row["run_origin"])
+            self.assertIsNone(row["target_project_id"])
+            self.assertIsNone(row["clean_pass_eligible"])
+            self.assertTrue(any("schema_version" in warning for warning in row["warnings"]))
+
+    def test_wrong_run_id_w7_summary_keeps_row_visible_without_source_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_run_trace_pair(
+                data_dir,
+                run_id="ocloop-wrong-run",
+                workflow_id="opencode.meta_track.loop.v1",
+                status="succeeded",
+            )
+            sidecar_dir = data_dir / "artifacts" / "ocloop-wrong-run"
+            sidecar_dir.mkdir(parents=True)
+            (sidecar_dir / "opencode_loop_summary.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "w7.opencode_loop_summary.v1",
+                        "run_id": "other-run",
+                        "target_project_id": "ringfall",
+                        "clean_pass_eligible": True,
+                    },
+                    ensure_ascii=True,
+                ),
+                encoding="utf-8",
+            )
+
+            index = build_run_index(data_dir=data_dir)
+
+            row = index["runs"][0]
+            self.assertEqual("opencode_backed", row["run_origin"])
+            self.assertIsNone(row["target_project_id"])
+            self.assertIsNone(row["clean_pass_eligible"])
+            self.assertTrue(any("run_id mismatch" in warning for warning in row["warnings"]))
+
+    def test_trace_only_row_has_unknown_origin(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_valid_trace(data_dir, run_id="trace-only")
+
+            index = build_run_index(data_dir=data_dir)
+
+            self.assertEqual("unknown", index["runs"][0]["run_origin"])
+
 
 def _write_run_trace_pair(
     data_dir: Path,
@@ -169,6 +295,35 @@ def _write_run_only(
         "schema_version": "run_state.v1",
     }
     (runs_dir / f"{run_id}.json").write_text(json.dumps(payload, ensure_ascii=True), encoding="utf-8")
+
+
+def _write_w7_summary_sidecar(data_dir: Path, *, run_id: str) -> None:
+    sidecar_dir = data_dir / "artifacts" / run_id
+    sidecar_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "w7.opencode_loop_summary.v1",
+        "run_id": run_id,
+        "workflow_id": "opencode.meta_track.loop.v1",
+        "target_project_id": "ringfall",
+        "target_project_name": "RingFall",
+        "external_loop_id": run_id,
+        "sequence_ref": "W7-D",
+        "overall_outcome": "green",
+        "terminal_stage": "step_review_done",
+        "final_decision": "accepted",
+        "packet_count": 2,
+        "approval_count": 1,
+        "selected_output_count": 1,
+        "review_synthesis_present": True,
+        "validation_state": "ok",
+        "clean_pass_eligible": True,
+        "required_followup_count": 3,
+        "privacy_audit_state": {
+            "retention_mode": "structured_extracts_only",
+            "public_export_state": "blocked",
+        },
+    }
+    (sidecar_dir / "opencode_loop_summary.json").write_text(json.dumps(payload, ensure_ascii=True), encoding="utf-8")
 
 
 def _write_valid_trace(data_dir: Path, *, run_id: str) -> None:

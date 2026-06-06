@@ -9,11 +9,16 @@ export type RowState =
   | "missing_trace_artifact"
   | "invalid_trace_artifact";
 
+export type RunOrigin = "fal_native" | "opencode_backed" | "unknown";
+
 export interface RunIndexSummary {
   total_runs: number;
   workflow_counts: Record<string, number>;
   status_counts: Record<string, number>;
   trace_state_counts: Record<string, number>;
+  run_origin_counts: Record<string, number>;
+  target_project_counts: Record<string, number>;
+  final_decision_counts: Record<string, number>;
   warnings_count: number;
 }
 
@@ -38,6 +43,21 @@ export interface RunIndexRow {
   fallback_state: "observed" | "not_observed" | "unknown";
   row_state: RowState;
   warnings: string[];
+  run_origin: RunOrigin;
+  target_project_id: string | null;
+  target_project_name: string | null;
+  sequence_ref: string | null;
+  final_decision: string | null;
+  overall_outcome: string | null;
+  validation_state: string | null;
+  clean_pass_eligible: boolean | null;
+  packet_count: number | null;
+  approval_count: number | null;
+  selected_output_count: number | null;
+  review_synthesis_present: boolean | null;
+  privacy_retention_mode: string | null;
+  public_export_state: string | null;
+  required_followup_count: number | null;
 }
 
 export interface RunIndex {

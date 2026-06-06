@@ -1,4 +1,4 @@
-import { RUN_INDEX_SCHEMA_VERSION, type RowState, type RunIndex, type TraceState } from "./runIndexModel";
+import { RUN_INDEX_SCHEMA_VERSION, type RowState, type RunIndex, type RunOrigin, type TraceState } from "./runIndexModel";
 
 export type RunIndexLoadState =
   | { status: "loading" }
@@ -34,11 +34,50 @@ export async function loadRunIndex(fetchImpl: typeof fetch = fetch): Promise<Run
     };
   }
 
-  if (!isRunIndex(payload)) {
+  const normalizedPayload = normalizeRunIndex(payload);
+  if (!isRunIndex(normalizedPayload)) {
     return { status: "invalid_index", message: "Generated run index does not match u5_b.run_index.v1." };
   }
 
-  return { status: "ready", index: payload };
+  return { status: "ready", index: normalizedPayload };
+}
+
+function normalizeRunIndex(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  const summary = isRecord(value.summary)
+    ? {
+      ...value.summary,
+      run_origin_counts: isRecord(value.summary.run_origin_counts) ? value.summary.run_origin_counts : {},
+      target_project_counts: isRecord(value.summary.target_project_counts) ? value.summary.target_project_counts : {},
+      final_decision_counts: isRecord(value.summary.final_decision_counts) ? value.summary.final_decision_counts : {},
+    }
+    : value.summary;
+  const runs = Array.isArray(value.runs)
+    ? value.runs.map((row) => isRecord(row) ? { ...defaultW7RunFields(), ...row } : row)
+    : value.runs;
+  return { ...value, summary, runs };
+}
+
+function defaultW7RunFields() {
+  return {
+    run_origin: "unknown",
+    target_project_id: null,
+    target_project_name: null,
+    sequence_ref: null,
+    final_decision: null,
+    overall_outcome: null,
+    validation_state: null,
+    clean_pass_eligible: null,
+    packet_count: null,
+    approval_count: null,
+    selected_output_count: null,
+    review_synthesis_present: null,
+    privacy_retention_mode: null,
+    public_export_state: null,
+    required_followup_count: null,
+  };
 }
 
 function isRunIndex(value: unknown): value is RunIndex {
@@ -66,6 +105,9 @@ function isRunIndexSummary(value: unknown): boolean {
     isNumericRecord(value.workflow_counts) &&
     isNumericRecord(value.status_counts) &&
     isNumericRecord(value.trace_state_counts) &&
+    isNumericRecord(value.run_origin_counts) &&
+    isNumericRecord(value.target_project_counts) &&
+    isNumericRecord(value.final_decision_counts) &&
     isNonNegativeInteger(value.warnings_count)
   );
 }
@@ -94,7 +136,22 @@ function isRunIndexRow(value: unknown): boolean {
     isStringArray(value.model_names) &&
     isFallbackState(value.fallback_state) &&
     isRowState(value.row_state) &&
-    isStringArray(value.warnings)
+    isStringArray(value.warnings) &&
+    isRunOrigin(value.run_origin) &&
+    isNullableString(value.target_project_id) &&
+    isNullableString(value.target_project_name) &&
+    isNullableString(value.sequence_ref) &&
+    isNullableString(value.final_decision) &&
+    isNullableString(value.overall_outcome) &&
+    isNullableString(value.validation_state) &&
+    isBooleanOrNull(value.clean_pass_eligible) &&
+    isNonNegativeIntegerOrNull(value.packet_count) &&
+    isNonNegativeIntegerOrNull(value.approval_count) &&
+    isNonNegativeIntegerOrNull(value.selected_output_count) &&
+    isBooleanOrNull(value.review_synthesis_present) &&
+    isNullableString(value.privacy_retention_mode) &&
+    isNullableString(value.public_export_state) &&
+    isNonNegativeIntegerOrNull(value.required_followup_count)
   );
 }
 
@@ -106,12 +163,24 @@ function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value >= 0;
 }
 
+function isNonNegativeIntegerOrNull(value: unknown): value is number | null {
+  return isNonNegativeInteger(value) || value === null;
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 function isNullableString(value: unknown): value is string | null {
   return typeof value === "string" || value === null;
+}
+
+function isBooleanOrNull(value: unknown): value is boolean | null {
+  return typeof value === "boolean" || value === null;
+}
+
+function isRunOrigin(value: unknown): value is RunOrigin {
+  return value === "fal_native" || value === "opencode_backed" || value === "unknown";
 }
 
 function isTraceState(value: unknown): value is TraceState {

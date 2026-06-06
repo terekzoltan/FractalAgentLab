@@ -496,8 +496,39 @@ code {
 }
 
 .trace-message h3,
+.trace-message h4,
 .trace-sidebar h2 {
   margin: 0;
+}
+
+.opencode-loop-panel {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 18px;
+  background: rgba(2, 6, 23, 0.24);
+}
+
+.opencode-loop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.compact-list {
+  display: grid;
+  gap: 10px;
+  padding-left: 20px;
+}
+
+.compact-list li {
+  display: grid;
+  gap: 4px;
+}
+
+.detail-grid-compact {
+  grid-template-columns: 1fr;
 }
 
 .event-list {

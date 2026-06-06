@@ -17,6 +17,9 @@ from fractal_agent_lab.tracing.artifact_layout import run_artifact_dir_path  # n
 
 SCHEMA_VERSION = "u5_b.run_index.v1"
 DEFAULT_LIMIT = 500
+W7_OPENCODE_LOOP_WORKFLOW_ID = "opencode.meta_track.loop.v1"
+W7_OPENCODE_LOOP_SUMMARY_SCHEMA_VERSION = "w7.opencode_loop_summary.v1"
+W7_OPENCODE_LOOP_SUMMARY_FILE = "opencode_loop_summary.json"
 
 
 def build_run_index(*, data_dir: str | Path, limit: int | None = DEFAULT_LIMIT) -> dict[str, Any]:
@@ -55,6 +58,8 @@ def _enrich_row(*, row: dict[str, Any], data_dir: Path, global_warnings: list[st
     if len(run_warnings) > warnings_before_run_load:
         global_warnings.extend(run_warnings[warnings_before_run_load:])
     provider_names, model_names, fallback_state = _extract_provider_model_disclosure(run_payload)
+    sidecar_files = _list_sidecar_files(artifact_dir)
+    w7_summary = _load_w7_loop_summary(sidecar_dir=artifact_dir, run_id=run_id, row_warnings=run_warnings, global_warnings=global_warnings)
 
     row_state = "ok"
     if row.get("has_run_artifact") is False:
@@ -70,12 +75,87 @@ def _enrich_row(*, row: dict[str, Any], data_dir: Path, global_warnings: list[st
         **row,
         "artifact_dir_path": artifact_dir.as_posix(),
         "has_artifact_dir": artifact_dir.exists(),
-        "sidecar_files": _list_sidecar_files(artifact_dir),
+        "sidecar_files": sidecar_files,
         "provider_names": provider_names,
         "model_names": model_names,
         "fallback_state": fallback_state,
         "row_state": row_state,
         "warnings": run_warnings,
+        **_w7_run_fields(run_payload=run_payload, w7_summary=w7_summary, sidecar_files=sidecar_files),
+    }
+
+
+def _load_w7_loop_summary(
+    *,
+    sidecar_dir: Path,
+    run_id: str,
+    row_warnings: list[str],
+    global_warnings: list[str],
+) -> dict[str, Any] | None:
+    summary_path = sidecar_dir / W7_OPENCODE_LOOP_SUMMARY_FILE
+    if not summary_path.exists():
+        return None
+    try:
+        value = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        warning = f"{run_id}: Invalid W7 sidecar {summary_path.as_posix()} ({error})"
+        row_warnings.append(warning)
+        global_warnings.append(warning)
+        return None
+    if not isinstance(value, dict):
+        warning = f"{run_id}: Invalid W7 sidecar {summary_path.as_posix()} (root is not a JSON object)"
+        row_warnings.append(warning)
+        global_warnings.append(warning)
+        return None
+    if value.get("schema_version") != W7_OPENCODE_LOOP_SUMMARY_SCHEMA_VERSION:
+        warning = (
+            f"{run_id}: Invalid W7 sidecar {summary_path.as_posix()} "
+            f"(schema_version must be {W7_OPENCODE_LOOP_SUMMARY_SCHEMA_VERSION!r})"
+        )
+        row_warnings.append(warning)
+        global_warnings.append(warning)
+        return None
+    if value.get("run_id") != run_id:
+        warning = f"{run_id}: Invalid W7 sidecar {summary_path.as_posix()} (run_id mismatch)"
+        row_warnings.append(warning)
+        global_warnings.append(warning)
+        return None
+    return value
+
+
+def _w7_run_fields(
+    *,
+    run_payload: dict[str, Any] | None,
+    w7_summary: dict[str, Any] | None,
+    sidecar_files: list[str],
+) -> dict[str, Any]:
+    workflow_id = _str_or_none(run_payload.get("workflow_id")) if run_payload is not None else None
+    has_w7_sidecar = W7_OPENCODE_LOOP_SUMMARY_FILE in sidecar_files
+    if workflow_id == W7_OPENCODE_LOOP_WORKFLOW_ID or has_w7_sidecar:
+        run_origin = "opencode_backed"
+    elif run_payload is None:
+        run_origin = "unknown"
+    else:
+        run_origin = "fal_native"
+
+    privacy_audit_state = w7_summary.get("privacy_audit_state") if isinstance(w7_summary, dict) else None
+    required_followup_count = w7_summary.get("required_followup_count") if isinstance(w7_summary, dict) else None
+    return {
+        "run_origin": run_origin,
+        "target_project_id": _str_or_none(w7_summary.get("target_project_id")) if isinstance(w7_summary, dict) else None,
+        "target_project_name": _str_or_none(w7_summary.get("target_project_name")) if isinstance(w7_summary, dict) else None,
+        "sequence_ref": _str_or_none(w7_summary.get("sequence_ref")) if isinstance(w7_summary, dict) else None,
+        "final_decision": _str_or_none(w7_summary.get("final_decision")) if isinstance(w7_summary, dict) else None,
+        "overall_outcome": _str_or_none(w7_summary.get("overall_outcome")) if isinstance(w7_summary, dict) else None,
+        "validation_state": _str_or_none(w7_summary.get("validation_state")) if isinstance(w7_summary, dict) else None,
+        "clean_pass_eligible": w7_summary.get("clean_pass_eligible") if isinstance(w7_summary, dict) and isinstance(w7_summary.get("clean_pass_eligible"), bool) else None,
+        "packet_count": _non_negative_int_or_none(w7_summary.get("packet_count")) if isinstance(w7_summary, dict) else None,
+        "approval_count": _non_negative_int_or_none(w7_summary.get("approval_count")) if isinstance(w7_summary, dict) else None,
+        "selected_output_count": _non_negative_int_or_none(w7_summary.get("selected_output_count")) if isinstance(w7_summary, dict) else None,
+        "review_synthesis_present": w7_summary.get("review_synthesis_present") if isinstance(w7_summary, dict) and isinstance(w7_summary.get("review_synthesis_present"), bool) else None,
+        "privacy_retention_mode": _str_or_none(privacy_audit_state.get("retention_mode")) if isinstance(privacy_audit_state, dict) else None,
+        "public_export_state": _str_or_none(privacy_audit_state.get("public_export_state")) if isinstance(privacy_audit_state, dict) else None,
+        "required_followup_count": _non_negative_int_or_none(required_followup_count),
     }
 
 
@@ -172,6 +252,9 @@ def _build_summary(rows: list[dict[str, Any]], warnings: list[str]) -> dict[str,
         "workflow_counts": _counts_for(rows, "workflow_id"),
         "status_counts": _counts_for(rows, "status"),
         "trace_state_counts": _counts_for(rows, "trace_state"),
+        "run_origin_counts": _counts_for(rows, "run_origin"),
+        "target_project_counts": _counts_for(rows, "target_project_id"),
+        "final_decision_counts": _counts_for(rows, "final_decision"),
         "warnings_count": len(warnings),
     }
 
@@ -186,6 +269,12 @@ def _counts_for(rows: list[dict[str, Any]], key: str) -> dict[str, int]:
 
 def _str_or_none(value: Any) -> str | None:
     if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def _non_negative_int_or_none(value: Any) -> int | None:
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
         return value
     return None
 

@@ -11,7 +11,7 @@ import { buildLaunchPacket } from "./packetComposer";
 import { loadRunIndex, type RunIndexLoadState } from "./runIndexLoader";
 import type { RunIndex, RunIndexRow, TraceTarget } from "./runIndexModel";
 import { loadTraceDetail, type TraceDetailLoadState } from "./traceDetailLoader";
-import type { TraceDetail, TraceDetailEvent } from "./traceDetailModel";
+import type { OpenCodeLoopDetail, TraceDetail, TraceDetailEvent } from "./traceDetailModel";
 import { loadWorkflowCatalog, type WorkflowCatalogLoadState } from "./workflowCatalogLoader";
 import type { WorkflowCatalogEntry } from "./workflowCatalogModel";
 import type { WorkbenchPage, WorkbenchPageId, WorkbenchStatus } from "./workbenchModel";
@@ -1180,14 +1180,24 @@ function RunIndexMessage({
 function RunBrowser({ index, onTraceTarget }: { index: RunIndex; onTraceTarget: (target: TraceTarget) => void }) {
   const [workflowFilter, setWorkflowFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [originFilter, setOriginFilter] = useState("all");
+  const [targetProjectFilter, setTargetProjectFilter] = useState("all");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(index.runs[0]?.run_id ?? null);
 
   const workflows = sortedKeys(index.summary.workflow_counts);
   const statuses = sortedKeys(index.summary.status_counts);
+  const origins = sortedKeys(index.summary.run_origin_counts);
+  const targetProjects = sortedKeys(index.summary.target_project_counts);
   const filteredRuns = index.runs.filter((run) => {
     const workflow = valueOrUnknown(run.workflow_id);
     const status = valueOrUnknown(run.status);
-    return (workflowFilter === "all" || workflow === workflowFilter) && (statusFilter === "all" || status === statusFilter);
+    const targetProject = valueOrUnknown(run.target_project_id);
+    return (
+      (workflowFilter === "all" || workflow === workflowFilter) &&
+      (statusFilter === "all" || status === statusFilter) &&
+      (originFilter === "all" || run.run_origin === originFilter) &&
+      (targetProjectFilter === "all" || targetProject === targetProjectFilter)
+    );
   });
   const selectedRun = filteredRuns.find((run) => run.run_id === selectedRunId) ?? filteredRuns[0] ?? null;
 
@@ -1210,6 +1220,8 @@ function RunBrowser({ index, onTraceTarget }: { index: RunIndex; onTraceTarget: 
           <Metric label="Displayed" value={String(filteredRuns.length)} />
           <Metric label="Warnings" value={String(index.summary.warnings_count)} />
           <Metric label="Trace ok" value={String(index.summary.trace_state_counts.ok ?? 0)} />
+          <Metric label="OpenCode-backed" value={String(index.summary.run_origin_counts.opencode_backed ?? 0)} />
+          <Metric label="Targets" value={String(targetProjects.filter((target) => target !== "unknown").length)} />
         </div>
         <div className="filters" aria-label="Run filters">
           <label>
@@ -1230,6 +1242,24 @@ function RunBrowser({ index, onTraceTarget }: { index: RunIndex; onTraceTarget: 
               ))}
             </select>
           </label>
+          <label>
+            Origin
+            <select value={originFilter} onChange={(event) => setOriginFilter(event.target.value)}>
+              <option value="all">All origins</option>
+              {origins.map((origin) => (
+                <option key={origin} value={origin}>{origin}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Target project
+            <select value={targetProjectFilter} onChange={(event) => setTargetProjectFilter(event.target.value)}>
+              <option value="all">All target projects</option>
+              {targetProjects.map((targetProject) => (
+                <option key={targetProject} value={targetProject}>{targetProject}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </section>
 
@@ -1246,6 +1276,9 @@ function RunBrowser({ index, onTraceTarget }: { index: RunIndex; onTraceTarget: 
             >
               <span><strong>{run.run_id}</strong></span>
               <span>workflow: {valueOrUnknown(run.workflow_id)}</span>
+              <span>origin: {run.run_origin}</span>
+              <span>target: {valueOrUnknown(run.target_project_id)} / sequence: {valueOrUnknown(run.sequence_ref)}</span>
+              <span>decision: {valueOrUnknown(run.final_decision)} / outcome: {valueOrUnknown(run.overall_outcome)}</span>
               <span>status: {valueOrUnknown(run.status)}</span>
               <span>trace: {run.trace_state}</span>
               <span>artifacts: run {yesNo(run.has_run_artifact)} / trace {yesNo(run.has_trace_artifact)}</span>
@@ -1392,6 +1425,7 @@ function TraceWorkspace({
                 setFailureOnly={setFailureOnly}
               />
             ) : null}
+            {detail?.opencode_loop ? <OpenCodeLoopPanel opencodeLoop={detail.opencode_loop} /> : null}
           </>
         ) : null}
       </section>
@@ -1518,6 +1552,104 @@ function WarningList({ warnings }: { warnings: string[] }) {
   );
 }
 
+function OpenCodeLoopPanel({ opencodeLoop }: { opencodeLoop: OpenCodeLoopDetail }) {
+  const summary = opencodeLoop.summary;
+  return (
+    <section className="opencode-loop-panel" aria-labelledby="opencode-loop-title">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">W7 source-reported loop evidence</p>
+          <h3 id="opencode-loop-title">OpenCode-backed loop drill-down</h3>
+        </div>
+        <StatusBadge status={opencodeLoop.warnings.length > 0 ? "PARTIAL" : "PASS"} />
+      </div>
+      <p>
+        This read-only panel displays structured W7 ingest sidecars. It does not control OpenCode,
+        execute browser-side actions, perform commits, or infer OpenCode task success.
+      </p>
+      {opencodeLoop.warnings.length > 0 ? <WarningList warnings={opencodeLoop.warnings} /> : null}
+      {summary !== null ? (
+        <dl className="detail-grid">
+          <DetailTerm label="Target project" value={valueOrUnknown(summary.target_project_id)} />
+          <DetailTerm label="Sequence" value={valueOrUnknown(summary.sequence_ref)} />
+          <DetailTerm label="Final decision" value={valueOrUnknown(summary.final_decision)} />
+          <DetailTerm label="Outcome" value={valueOrUnknown(summary.overall_outcome)} />
+          <DetailTerm label="Validation" value={valueOrUnknown(summary.validation_state)} />
+          <DetailTerm label="Clean pass eligible" value={`${booleanFact(summary.clean_pass_eligible)} (source-reported ingest field)`} />
+          <DetailTerm label="Packet count" value={numberOrUnknown(summary.packet_count)} />
+          <DetailTerm label="Approval count" value={numberOrUnknown(summary.approval_count)} />
+          <DetailTerm label="Selected outputs" value={numberOrUnknown(summary.selected_output_count)} />
+          <DetailTerm label="Privacy retention" value={`${valueOrUnknown(summary.privacy_retention_mode)} (display metadata only)`} />
+          <DetailTerm label="Public export state" value={`${valueOrUnknown(summary.public_export_state)} (not a release gate)`} />
+        </dl>
+      ) : (
+        <p>W7 summary sidecar is unavailable or malformed. Packet, approval, and selected-output data is not fabricated.</p>
+      )}
+      <div className="opencode-loop-grid">
+        <section className="trace-message" aria-label="Packet ledger">
+          <h4>Packet / order ledger</h4>
+          {opencodeLoop.packet_ledger_entries.length === 0 ? <p>No valid packet ledger entries are available.</p> : null}
+          <ol className="compact-list">
+            {opencodeLoop.packet_ledger_entries.map((entry, index) => (
+              <li key={`${entry.sequence ?? index}-${entry.stage ?? "stage"}`}>
+                <strong>#{entry.sequence ?? index + 1} {valueOrUnknown(entry.stage)}</strong>
+                <span>{valueOrUnknown(entry.producer)} -&gt; {valueOrUnknown(entry.consumer)}</span>
+                <span>decision: {valueOrUnknown(entry.decision)} / validation: {valueOrUnknown(entry.validation_state)}</span>
+                <span>{valueOrUnknown(entry.summary)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <section className="trace-message" aria-label="Selected outputs">
+          <h4>Selected outputs</h4>
+          <p>Bounded structured sidecar excerpts only; raw body/body_path content is never rendered here.</p>
+          {opencodeLoop.selected_outputs.length === 0 ? <p>No valid selected outputs are available.</p> : null}
+          <ol className="compact-list">
+            {opencodeLoop.selected_outputs.map((output, index) => (
+              <li key={output.output_id ?? String(index)}>
+                <strong>{valueOrUnknown(output.output_id)} / {valueOrUnknown(output.stage)}</strong>
+                <span>{valueOrUnknown(output.summary)}</span>
+                <span>excerpt: {valueOrUnknown(output.excerpt)}</span>
+                <span>privacy: {valueOrUnknown(output.privacy_classification)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <section className="trace-message" aria-label="Approval checkpoints">
+          <h4>Approval checkpoints</h4>
+          {opencodeLoop.approval_checkpoints.length === 0 ? <p>No valid approval checkpoints are available.</p> : null}
+          <ol className="compact-list">
+            {opencodeLoop.approval_checkpoints.map((checkpoint, index) => (
+              <li key={checkpoint.checkpoint_id ?? String(index)}>
+                <strong>{valueOrUnknown(checkpoint.checkpoint_id)} / approved: {booleanFact(checkpoint.approved)}</strong>
+                <span>stage: {valueOrUnknown(checkpoint.stage)}</span>
+                <span>target: {valueOrUnknown(checkpoint.target_session)}</span>
+                <span>mode: {valueOrUnknown(checkpoint.approval_mode)}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <section className="trace-message" aria-label="Review synthesis">
+          <h4>Review synthesis</h4>
+          {opencodeLoop.review_synthesis === null ? <p>No valid review synthesis sidecar is available.</p> : (
+            <dl className="detail-grid detail-grid-compact">
+              <DetailTerm label="Plan verdict" value={valueOrUnknown(opencodeLoop.review_synthesis.plan_verdict)} />
+              <DetailTerm label="Plan summary" value={valueOrUnknown(opencodeLoop.review_synthesis.plan_summary)} />
+              <DetailTerm label="Step verdict" value={valueOrUnknown(opencodeLoop.review_synthesis.step_final_verdict)} />
+              <DetailTerm label="Step summary" value={valueOrUnknown(opencodeLoop.review_synthesis.step_final_summary)} />
+            </dl>
+          )}
+        </section>
+      </div>
+      <div className="artifact-paths" aria-label="W7 sidecar paths">
+        {Object.entries(opencodeLoop.sidecar_paths).map(([label, path]) => (
+          <p key={label}><strong>{label}</strong> <code>{path}</code></p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function RunDetail({ run, onTraceTarget }: { run: RunIndexRow | null; onTraceTarget: (target: TraceTarget) => void }) {
   if (run === null) {
     return (
@@ -1549,6 +1681,14 @@ function RunDetail({ run, onTraceTarget }: { run: RunIndexRow | null; onTraceTar
         <DetailTerm label="Providers" value={joinOrUnknown(run.provider_names)} />
         <DetailTerm label="Models" value={joinOrUnknown(run.model_names)} />
         <DetailTerm label="Fallback" value={run.fallback_state} />
+        <DetailTerm label="Run origin" value={run.run_origin} />
+        <DetailTerm label="Target project" value={valueOrUnknown(run.target_project_id)} />
+        <DetailTerm label="Sequence" value={valueOrUnknown(run.sequence_ref)} />
+        <DetailTerm label="Final decision" value={valueOrUnknown(run.final_decision)} />
+        <DetailTerm label="Overall outcome" value={valueOrUnknown(run.overall_outcome)} />
+        <DetailTerm label="Clean pass eligible" value={`${booleanFact(run.clean_pass_eligible)} (source-reported ingest field)`} />
+        <DetailTerm label="Packets / approvals / selected" value={`${numberOrUnknown(run.packet_count)} / ${numberOrUnknown(run.approval_count)} / ${numberOrUnknown(run.selected_output_count)}`} />
+        <DetailTerm label="Privacy metadata" value={`${valueOrUnknown(run.privacy_retention_mode)} / ${valueOrUnknown(run.public_export_state)} (display metadata only)`} />
       </dl>
       <div className="artifact-paths" aria-label="Canonical artifact paths">
         <p><strong>Run artifact</strong> <code>{run.run_artifact_path}</code></p>

@@ -31,6 +31,7 @@ class U5CTraceDetailTests(unittest.TestCase):
             self.assertEqual(3, detail["summary"]["total_events"])
             self.assertEqual("ok", detail["validation"]["trace_state"])
             self.assertEqual("manager", detail["events"][0]["lane"])
+            self.assertIsNone(detail["opencode_loop"])
 
     def test_marks_failure_events_and_preserves_unknown_event_type(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir_raw:
@@ -237,6 +238,136 @@ class U5CTraceDetailTests(unittest.TestCase):
             self.assertIn("alpha=beta", detail["events"][0]["payload_summary"])
             self.assertEqual(payload, detail["events"][0]["payload"])
 
+    def test_builds_opencode_loop_drilldown_from_w7_sidecars(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_run_only(data_dir, run_id="ocloop-valid", workflow_id="opencode.meta_track.loop.v1", status="succeeded")
+            _write_trace_events(data_dir, run_id="ocloop-valid", events=[_event("ocloop-valid", 1, "run_started")])
+            _write_w7_sidecars(data_dir, run_id="ocloop-valid")
+
+            detail = build_trace_detail(run_id="ocloop-valid", data_dir=data_dir)
+
+            opencode_loop = detail["opencode_loop"]
+            self.assertIsNotNone(opencode_loop)
+            self.assertEqual("ringfall", opencode_loop["summary"]["target_project_id"])
+            self.assertTrue(opencode_loop["summary"]["clean_pass_eligible"])
+            self.assertEqual(1, len(opencode_loop["packet_ledger_entries"]))
+            self.assertEqual("greenlit", opencode_loop["packet_ledger_entries"][0]["decision"])
+            self.assertEqual(1, len(opencode_loop["selected_outputs"]))
+            self.assertEqual("Bounded accepted excerpt.", opencode_loop["selected_outputs"][0]["excerpt"])
+            self.assertEqual(1, len(opencode_loop["approval_checkpoints"]))
+            self.assertTrue(opencode_loop["approval_checkpoints"][0]["approved"])
+            self.assertEqual("greenlit", opencode_loop["review_synthesis"]["plan_verdict"])
+            self.assertEqual([], opencode_loop["warnings"])
+
+    def test_malformed_w7_summary_keeps_trace_detail_visible_with_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_run_only(data_dir, run_id="ocloop-bad-sidecar", workflow_id="opencode.meta_track.loop.v1", status="succeeded")
+            _write_trace_events(data_dir, run_id="ocloop-bad-sidecar", events=[_event("ocloop-bad-sidecar", 1, "run_started")])
+            sidecar_dir = data_dir / "artifacts" / "ocloop-bad-sidecar"
+            sidecar_dir.mkdir(parents=True)
+            (sidecar_dir / "opencode_loop_summary.json").write_text("{not-json", encoding="utf-8")
+
+            detail = build_trace_detail(run_id="ocloop-bad-sidecar", data_dir=data_dir)
+
+            self.assertEqual(1, detail["summary"]["total_events"])
+            opencode_loop = detail["opencode_loop"]
+            self.assertIsNotNone(opencode_loop)
+            self.assertIsNone(opencode_loop["summary"])
+            self.assertEqual([], opencode_loop["packet_ledger_entries"])
+            self.assertEqual([], opencode_loop["selected_outputs"])
+            self.assertEqual([], opencode_loop["approval_checkpoints"])
+            self.assertIn("Invalid W7 sidecar", opencode_loop["warnings"][0])
+
+    def test_wrong_run_id_w7_summary_does_not_render_structured_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_run_only(data_dir, run_id="ocloop-wrong-summary-run", workflow_id="opencode.meta_track.loop.v1", status="succeeded")
+            _write_trace_events(data_dir, run_id="ocloop-wrong-summary-run", events=[_event("ocloop-wrong-summary-run", 1, "run_started")])
+            _write_w7_sidecars(data_dir, run_id="ocloop-wrong-summary-run")
+            sidecar_dir = data_dir / "artifacts" / "ocloop-wrong-summary-run"
+            _write_json(
+                sidecar_dir / "opencode_loop_summary.json",
+                {
+                    "schema_version": "w7.opencode_loop_summary.v1",
+                    "run_id": "other-run",
+                    "target_project_id": "ringfall",
+                    "clean_pass_eligible": True,
+                },
+            )
+
+            detail = build_trace_detail(run_id="ocloop-wrong-summary-run", data_dir=data_dir)
+
+            opencode_loop = detail["opencode_loop"]
+            self.assertIsNotNone(opencode_loop)
+            self.assertIsNone(opencode_loop["summary"])
+            self.assertEqual([], opencode_loop["packet_ledger_entries"])
+            self.assertEqual([], opencode_loop["selected_outputs"])
+            self.assertEqual([], opencode_loop["approval_checkpoints"])
+            self.assertIsNone(opencode_loop["review_synthesis"])
+            self.assertTrue(any("run_id mismatch" in warning for warning in opencode_loop["warnings"]))
+
+    def test_wrong_schema_packet_ledger_does_not_render_packet_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_run_only(data_dir, run_id="ocloop-wrong-packet-schema", workflow_id="opencode.meta_track.loop.v1", status="succeeded")
+            _write_trace_events(data_dir, run_id="ocloop-wrong-packet-schema", events=[_event("ocloop-wrong-packet-schema", 1, "run_started")])
+            _write_w7_sidecars(data_dir, run_id="ocloop-wrong-packet-schema")
+            sidecar_dir = data_dir / "artifacts" / "ocloop-wrong-packet-schema"
+            _write_json(
+                sidecar_dir / "packet_ledger.json",
+                {
+                    "schema_version": "w7.other_packet_ledger.v1",
+                    "entries": [{"sequence": 1, "decision": "should-not-render"}],
+                },
+            )
+
+            detail = build_trace_detail(run_id="ocloop-wrong-packet-schema", data_dir=data_dir)
+
+            opencode_loop = detail["opencode_loop"]
+            self.assertIsNotNone(opencode_loop)
+            self.assertEqual("ringfall", opencode_loop["summary"]["target_project_id"])
+            self.assertEqual([], opencode_loop["packet_ledger_entries"])
+            self.assertEqual(1, len(opencode_loop["selected_outputs"]))
+            self.assertTrue(any("packet_ledger.json" in warning and "schema_version" in warning for warning in opencode_loop["warnings"]))
+
+    def test_wrong_run_id_selected_outputs_do_not_render_selected_output_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir_raw:
+            data_dir = Path(temp_dir_raw)
+            _write_run_only(data_dir, run_id="ocloop-wrong-output-run", workflow_id="opencode.meta_track.loop.v1", status="succeeded")
+            _write_trace_events(data_dir, run_id="ocloop-wrong-output-run", events=[_event("ocloop-wrong-output-run", 1, "run_started")])
+            _write_w7_sidecars(data_dir, run_id="ocloop-wrong-output-run")
+            sidecar_dir = data_dir / "artifacts" / "ocloop-wrong-output-run"
+            _write_json(
+                sidecar_dir / "selected_outputs.json",
+                {
+                    "schema_version": "w7.selected_outputs.v1",
+                    "run_id": "other-run",
+                    "outputs": [
+                        {
+                            "output_id": "output1",
+                            "stage": "meta_plan_review_done",
+                            "source_session": "meta-session",
+                            "message_id": "message1",
+                            "capture_mode": "latest_output_selected",
+                            "summary": "Should not render.",
+                            "excerpt": "Should not render.",
+                            "excerpt_truncated": False,
+                            "privacy_classification": "private_coordination",
+                        }
+                    ],
+                },
+            )
+
+            detail = build_trace_detail(run_id="ocloop-wrong-output-run", data_dir=data_dir)
+
+            opencode_loop = detail["opencode_loop"]
+            self.assertIsNotNone(opencode_loop)
+            self.assertEqual(1, len(opencode_loop["packet_ledger_entries"]))
+            self.assertEqual([], opencode_loop["selected_outputs"])
+            self.assertTrue(any("selected_outputs.json" in warning and "run_id mismatch" in warning for warning in opencode_loop["warnings"]))
+
 
 def _write_trace_pair(data_dir: Path, *, run_id: str) -> None:
     _write_run_only(data_dir, run_id=run_id, workflow_id="h1.single.v1", status="succeeded")
@@ -264,6 +395,106 @@ def _write_run_only(data_dir: Path, *, run_id: str, workflow_id: str, status: st
         "schema_version": "run_state.v1",
     }
     (runs_dir / f"{run_id}.json").write_text(json.dumps(payload, ensure_ascii=True), encoding="utf-8")
+
+
+def _write_w7_sidecars(data_dir: Path, *, run_id: str) -> None:
+    sidecar_dir = data_dir / "artifacts" / run_id
+    sidecar_dir.mkdir(parents=True, exist_ok=True)
+    _write_json(
+        sidecar_dir / "opencode_loop_summary.json",
+        {
+            "schema_version": "w7.opencode_loop_summary.v1",
+            "run_id": run_id,
+            "workflow_id": "opencode.meta_track.loop.v1",
+            "target_project_id": "ringfall",
+            "target_project_name": "RingFall",
+            "external_loop_id": run_id,
+            "sequence_ref": "W7-D",
+            "overall_outcome": "green",
+            "terminal_stage": "step_review_done",
+            "final_decision": "accepted",
+            "packet_count": 1,
+            "approval_count": 1,
+            "selected_output_count": 1,
+            "review_synthesis_present": True,
+            "validation_state": "ok",
+            "clean_pass_eligible": True,
+            "privacy_audit_state": {
+                "retention_mode": "structured_extracts_only",
+                "public_export_state": "blocked",
+            },
+        },
+    )
+    _write_json(
+        sidecar_dir / "packet_ledger.json",
+        {
+            "schema_version": "w7.packet_ledger.v1",
+            "entries": [
+                {
+                    "sequence": 1,
+                    "stage": "meta_plan_review_done",
+                    "producer": "meta",
+                    "consumer": "track_a",
+                    "source_command": "/seq-next",
+                    "decision": "greenlit",
+                    "summary": "Approved W7-D plan.",
+                    "validation_state": "ok",
+                    "packet_ref": "packet1",
+                    "selected_output_ref": "output1",
+                    "approval_ref": "approval1",
+                }
+            ],
+        },
+    )
+    _write_json(
+        sidecar_dir / "selected_outputs.json",
+        {
+            "schema_version": "w7.selected_outputs.v1",
+            "outputs": [
+                {
+                    "output_id": "output1",
+                    "stage": "meta_plan_review_done",
+                    "source_session": "meta-session",
+                    "message_id": "message1",
+                    "capture_mode": "latest_output_selected",
+                    "summary": "Meta accepted the plan.",
+                    "excerpt": "Bounded accepted excerpt.",
+                    "excerpt_truncated": False,
+                    "body_path": None,
+                    "privacy_classification": "private_coordination",
+                }
+            ],
+        },
+    )
+    _write_json(
+        sidecar_dir / "approval_log.json",
+        {
+            "schema_version": "w7.approval_log.v1",
+            "checkpoints": [
+                {
+                    "checkpoint_id": "approval1",
+                    "action_kind": "packet_route",
+                    "target_session": "track-a-session",
+                    "stage": "meta_plan_review_done",
+                    "approved": True,
+                    "approved_at": "2026-06-05T12:00:00+00:00",
+                    "approval_mode": "explicit_user_checkpoint",
+                }
+            ],
+        },
+    )
+    _write_json(
+        sidecar_dir / "review_synthesis.json",
+        {
+            "schema_version": "w7.review_synthesis.v1",
+            "plan_review": {"verdict": "greenlit", "summary": "Plan approved."},
+            "step_review": {"final_verdict": "accepted", "final_summary": "Implementation accepted.", "swarm_verdict": "approve"},
+        },
+    )
+
+
+def _write_json(path: Path, payload: dict[str, object]) -> None:
+    path.write_text(json.dumps(payload, ensure_ascii=True), encoding="utf-8")
 
 
 def _write_trace_events(data_dir: Path, *, run_id: str, events: list[dict[str, object]]) -> None:

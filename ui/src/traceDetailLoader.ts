@@ -35,18 +35,29 @@ export async function loadTraceDetail(runId: string, fetchImpl: typeof fetch = f
     };
   }
 
-  if (!isTraceDetail(payload)) {
+  const normalizedPayload = normalizeTraceDetail(payload);
+  if (!isTraceDetail(normalizedPayload)) {
     return { status: "invalid_trace_detail", message: "Generated trace detail does not match u5_c.trace_detail.v1." };
   }
 
-  if (payload.run_id !== runId) {
+  if (normalizedPayload.run_id !== runId) {
     return {
       status: "invalid_trace_detail",
       message: `Generated trace detail run_id mismatch for requested run ${runId}.`,
     };
   }
 
-  return { status: "ready", detail: payload };
+  return { status: "ready", detail: normalizedPayload };
+}
+
+function normalizeTraceDetail(value: unknown): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+  return {
+    ...value,
+    opencode_loop: value.opencode_loop === undefined ? null : value.opencode_loop,
+  };
 }
 
 function isTraceDetail(value: unknown): value is TraceDetail {
@@ -64,7 +75,12 @@ function isTraceDetail(value: unknown): value is TraceDetail {
   if (!isRecord(value.summary) || !isRecord(value.validation) || !Array.isArray(value.events)) {
     return false;
   }
-  return isTraceDetailSummary(value.summary) && isTraceDetailValidation(value.validation) && value.events.every(isTraceDetailEvent);
+  return (
+    isTraceDetailSummary(value.summary) &&
+    isTraceDetailValidation(value.validation) &&
+    value.events.every(isTraceDetailEvent) &&
+    isOpenCodeLoopDetailOrNull(value.opencode_loop)
+  );
 }
 
 function isTraceDetailSummary(value: Record<string, unknown>): boolean {
@@ -113,12 +129,137 @@ function isTraceDetailEvent(value: unknown): boolean {
   );
 }
 
+function isOpenCodeLoopDetailOrNull(value: unknown): boolean {
+  if (value === null) {
+    return true;
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isOpenCodeSummaryOrNull(value.summary) &&
+    Array.isArray(value.packet_ledger_entries) &&
+    value.packet_ledger_entries.every(isPacketLedgerEntry) &&
+    Array.isArray(value.selected_outputs) &&
+    value.selected_outputs.every(isSelectedOutput) &&
+    Array.isArray(value.approval_checkpoints) &&
+    value.approval_checkpoints.every(isApprovalCheckpoint) &&
+    isReviewSynthesisOrNull(value.review_synthesis) &&
+    isStringRecord(value.sidecar_paths) &&
+    Array.isArray(value.warnings) &&
+    value.warnings.every((warning) => typeof warning === "string")
+  );
+}
+
+function isOpenCodeSummaryOrNull(value: unknown): boolean {
+  if (value === null) {
+    return true;
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isStringOrNull(value.run_id) &&
+    isStringOrNull(value.workflow_id) &&
+    isStringOrNull(value.target_project_id) &&
+    isStringOrNull(value.target_project_name) &&
+    isStringOrNull(value.external_loop_id) &&
+    isStringOrNull(value.sequence_ref) &&
+    isStringOrNull(value.overall_outcome) &&
+    isStringOrNull(value.terminal_stage) &&
+    isStringOrNull(value.final_decision) &&
+    isStringOrNull(value.validation_state) &&
+    isBooleanOrNull(value.clean_pass_eligible) &&
+    isNumberOrNull(value.packet_count) &&
+    isNumberOrNull(value.approval_count) &&
+    isNumberOrNull(value.selected_output_count) &&
+    isBooleanOrNull(value.review_synthesis_present) &&
+    isStringOrNull(value.privacy_retention_mode) &&
+    isStringOrNull(value.public_export_state)
+  );
+}
+
+function isPacketLedgerEntry(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isNumberOrNull(value.sequence) &&
+    isStringOrNull(value.stage) &&
+    isStringOrNull(value.producer) &&
+    isStringOrNull(value.consumer) &&
+    isStringOrNull(value.source_command) &&
+    isStringOrNull(value.decision) &&
+    isStringOrNull(value.summary) &&
+    isStringOrNull(value.validation_state) &&
+    isStringOrNull(value.packet_ref) &&
+    isStringOrNull(value.selected_output_ref) &&
+    isStringOrNull(value.approval_ref)
+  );
+}
+
+function isSelectedOutput(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isStringOrNull(value.output_id) &&
+    isStringOrNull(value.stage) &&
+    isStringOrNull(value.source_session) &&
+    isStringOrNull(value.message_id) &&
+    isStringOrNull(value.capture_mode) &&
+    isStringOrNull(value.summary) &&
+    isStringOrNull(value.excerpt) &&
+    isBooleanOrNull(value.excerpt_truncated) &&
+    isStringOrNull(value.privacy_classification)
+  );
+}
+
+function isApprovalCheckpoint(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isStringOrNull(value.checkpoint_id) &&
+    isStringOrNull(value.action_kind) &&
+    isStringOrNull(value.target_session) &&
+    isStringOrNull(value.stage) &&
+    isBooleanOrNull(value.approved) &&
+    isStringOrNull(value.approved_at) &&
+    isStringOrNull(value.approval_mode)
+  );
+}
+
+function isReviewSynthesisOrNull(value: unknown): boolean {
+  if (value === null) {
+    return true;
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    isStringOrNull(value.plan_verdict) &&
+    isStringOrNull(value.plan_summary) &&
+    isStringOrNull(value.step_final_verdict) &&
+    isStringOrNull(value.step_final_summary) &&
+    isStringOrNull(value.swarm_verdict)
+  );
+}
+
+function isStringRecord(value: unknown): boolean {
+  return isRecord(value) && Object.values(value).every((item) => typeof item === "string");
+}
+
 function isStringOrNull(value: unknown): boolean {
   return typeof value === "string" || value === null;
 }
 
 function isNumberOrNull(value: unknown): boolean {
   return typeof value === "number" || value === null;
+}
+
+function isBooleanOrNull(value: unknown): boolean {
+  return typeof value === "boolean" || value === null;
 }
 
 function isRecord(value: unknown): value is Record<string, any> {

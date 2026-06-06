@@ -23,6 +23,16 @@ GENERATED_TRACE_DETAILS_SENTINEL = ".fal-u5-c-trace-details-generated"
 GENERATED_TRACE_DETAILS_SENTINEL_CONTENT = "u5_c.trace_detail.generated_dir.v1\n"
 DEFAULT_GENERATED_TRACE_DETAILS_DIR = REPO_ROOT / "ui" / "public" / "generated" / "traces"
 CANONICAL_DATA_DIR = REPO_ROOT / "data"
+W7_OPENCODE_LOOP_SUMMARY_FILE = "opencode_loop_summary.json"
+W7_PACKET_LEDGER_FILE = "packet_ledger.json"
+W7_SELECTED_OUTPUTS_FILE = "selected_outputs.json"
+W7_REVIEW_SYNTHESIS_FILE = "review_synthesis.json"
+W7_APPROVAL_LOG_FILE = "approval_log.json"
+W7_OPENCODE_LOOP_SUMMARY_SCHEMA_VERSION = "w7.opencode_loop_summary.v1"
+W7_PACKET_LEDGER_SCHEMA_VERSION = "w7.packet_ledger.v1"
+W7_SELECTED_OUTPUTS_SCHEMA_VERSION = "w7.selected_outputs.v1"
+W7_REVIEW_SYNTHESIS_SCHEMA_VERSION = "w7.review_synthesis.v1"
+W7_APPROVAL_LOG_SCHEMA_VERSION = "w7.approval_log.v1"
 FAILURE_EVENT_TYPES = {
     "run_failed",
     "run_cancelled",
@@ -51,6 +61,225 @@ def build_trace_detail(*, run_id: str, data_dir: str | Path) -> dict[str, Any]:
         "summary": _build_summary(trace_events),
         "validation": validation,
         "events": events,
+        "opencode_loop": _build_opencode_loop_detail(run_id=run_id, data_dir=Path(data_dir)),
+    }
+
+
+def _build_opencode_loop_detail(*, run_id: str, data_dir: Path) -> dict[str, Any] | None:
+    artifact_dir = data_dir / "artifacts" / run_id
+    summary_path = artifact_dir / W7_OPENCODE_LOOP_SUMMARY_FILE
+    if not summary_path.exists():
+        return None
+
+    warnings: list[str] = []
+    summary = _load_optional_sidecar(
+        summary_path,
+        W7_OPENCODE_LOOP_SUMMARY_FILE,
+        warnings,
+        expected_schema_version=W7_OPENCODE_LOOP_SUMMARY_SCHEMA_VERSION,
+        run_id=run_id,
+        require_run_id=True,
+    )
+    if summary is None:
+        return {
+            "summary": None,
+            "packet_ledger_entries": [],
+            "selected_outputs": [],
+            "approval_checkpoints": [],
+            "review_synthesis": None,
+            "sidecar_paths": {"opencode_loop_summary": summary_path.as_posix()},
+            "warnings": warnings,
+        }
+
+    packet_ledger = _load_optional_sidecar(
+        artifact_dir / W7_PACKET_LEDGER_FILE,
+        W7_PACKET_LEDGER_FILE,
+        warnings,
+        expected_schema_version=W7_PACKET_LEDGER_SCHEMA_VERSION,
+        run_id=run_id,
+    )
+    selected_outputs = _load_optional_sidecar(
+        artifact_dir / W7_SELECTED_OUTPUTS_FILE,
+        W7_SELECTED_OUTPUTS_FILE,
+        warnings,
+        expected_schema_version=W7_SELECTED_OUTPUTS_SCHEMA_VERSION,
+        run_id=run_id,
+    )
+    approval_log = _load_optional_sidecar(
+        artifact_dir / W7_APPROVAL_LOG_FILE,
+        W7_APPROVAL_LOG_FILE,
+        warnings,
+        expected_schema_version=W7_APPROVAL_LOG_SCHEMA_VERSION,
+        run_id=run_id,
+    )
+    review_synthesis = _load_optional_sidecar(
+        artifact_dir / W7_REVIEW_SYNTHESIS_FILE,
+        W7_REVIEW_SYNTHESIS_FILE,
+        warnings,
+        expected_schema_version=W7_REVIEW_SYNTHESIS_SCHEMA_VERSION,
+        run_id=run_id,
+    )
+
+    return {
+        "summary": _compact_opencode_summary(summary),
+        "packet_ledger_entries": _packet_ledger_entries(packet_ledger),
+        "selected_outputs": _selected_output_rows(selected_outputs),
+        "approval_checkpoints": _approval_checkpoint_rows(approval_log),
+        "review_synthesis": _compact_review_synthesis(review_synthesis),
+        "sidecar_paths": _w7_sidecar_paths(artifact_dir),
+        "warnings": warnings,
+    }
+
+
+def _load_optional_sidecar(
+    path: Path,
+    label: str,
+    warnings: list[str],
+    *,
+    expected_schema_version: str,
+    run_id: str,
+    require_run_id: bool = False,
+) -> dict[str, Any] | None:
+    if not path.exists():
+        warnings.append(f"Missing W7 sidecar {label}: {path.as_posix()}")
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        warnings.append(f"Invalid W7 sidecar {label}: {path.as_posix()} ({error})")
+        return None
+    if not isinstance(value, dict):
+        warnings.append(f"Invalid W7 sidecar {label}: {path.as_posix()} (root is not a JSON object)")
+        return None
+    if value.get("schema_version") != expected_schema_version:
+        warnings.append(f"Invalid W7 sidecar {label}: {path.as_posix()} (schema_version must be {expected_schema_version!r})")
+        return None
+    sidecar_run_id = value.get("run_id")
+    if require_run_id and sidecar_run_id != run_id:
+        warnings.append(f"Invalid W7 sidecar {label}: {path.as_posix()} (run_id mismatch)")
+        return None
+    if sidecar_run_id is not None and sidecar_run_id != run_id:
+        warnings.append(f"Invalid W7 sidecar {label}: {path.as_posix()} (run_id mismatch)")
+        return None
+    return value
+
+
+def _compact_opencode_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    privacy_audit_state = payload.get("privacy_audit_state") if isinstance(payload.get("privacy_audit_state"), dict) else {}
+    return {
+        "run_id": _str_or_none(payload.get("run_id")),
+        "workflow_id": _str_or_none(payload.get("workflow_id")),
+        "target_project_id": _str_or_none(payload.get("target_project_id")),
+        "target_project_name": _str_or_none(payload.get("target_project_name")),
+        "external_loop_id": _str_or_none(payload.get("external_loop_id")),
+        "sequence_ref": _str_or_none(payload.get("sequence_ref")),
+        "overall_outcome": _str_or_none(payload.get("overall_outcome")),
+        "terminal_stage": _str_or_none(payload.get("terminal_stage")),
+        "final_decision": _str_or_none(payload.get("final_decision")),
+        "validation_state": _str_or_none(payload.get("validation_state")),
+        "clean_pass_eligible": payload.get("clean_pass_eligible") if isinstance(payload.get("clean_pass_eligible"), bool) else None,
+        "packet_count": _non_negative_int_or_none(payload.get("packet_count")),
+        "approval_count": _non_negative_int_or_none(payload.get("approval_count")),
+        "selected_output_count": _non_negative_int_or_none(payload.get("selected_output_count")),
+        "review_synthesis_present": payload.get("review_synthesis_present") if isinstance(payload.get("review_synthesis_present"), bool) else None,
+        "privacy_retention_mode": _str_or_none(privacy_audit_state.get("retention_mode")),
+        "public_export_state": _str_or_none(privacy_audit_state.get("public_export_state")),
+    }
+
+
+def _packet_ledger_entries(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+    entries = payload.get("entries") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        rows.append(
+            {
+                "sequence": _non_negative_int_or_none(entry.get("sequence")),
+                "stage": _str_or_none(entry.get("stage")),
+                "producer": _str_or_none(entry.get("producer")),
+                "consumer": _str_or_none(entry.get("consumer")),
+                "source_command": _str_or_none(entry.get("source_command")),
+                "decision": _str_or_none(entry.get("decision")),
+                "summary": _str_or_none(entry.get("summary")),
+                "validation_state": _str_or_none(entry.get("validation_state")),
+                "packet_ref": _str_or_none(entry.get("packet_ref")),
+                "selected_output_ref": _str_or_none(entry.get("selected_output_ref")),
+                "approval_ref": _str_or_none(entry.get("approval_ref")),
+            }
+        )
+    return rows
+
+
+def _selected_output_rows(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+    outputs = payload.get("outputs") if isinstance(payload, dict) else None
+    if not isinstance(outputs, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for output in outputs:
+        if not isinstance(output, dict):
+            continue
+        rows.append(
+            {
+                "output_id": _str_or_none(output.get("output_id")),
+                "stage": _str_or_none(output.get("stage")),
+                "source_session": _str_or_none(output.get("source_session")),
+                "message_id": _str_or_none(output.get("message_id")),
+                "capture_mode": _str_or_none(output.get("capture_mode")),
+                "summary": _str_or_none(output.get("summary")),
+                "excerpt": _str_or_none(output.get("excerpt")),
+                "excerpt_truncated": output.get("excerpt_truncated") if isinstance(output.get("excerpt_truncated"), bool) else None,
+                "privacy_classification": _str_or_none(output.get("privacy_classification")),
+            }
+        )
+    return rows
+
+
+def _approval_checkpoint_rows(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+    checkpoints = payload.get("checkpoints") if isinstance(payload, dict) else None
+    if not isinstance(checkpoints, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for checkpoint in checkpoints:
+        if not isinstance(checkpoint, dict):
+            continue
+        rows.append(
+            {
+                "checkpoint_id": _str_or_none(checkpoint.get("checkpoint_id")),
+                "action_kind": _str_or_none(checkpoint.get("action_kind")),
+                "target_session": _str_or_none(checkpoint.get("target_session")),
+                "stage": _str_or_none(checkpoint.get("stage")),
+                "approved": checkpoint.get("approved") if isinstance(checkpoint.get("approved"), bool) else None,
+                "approved_at": _str_or_none(checkpoint.get("approved_at")),
+                "approval_mode": _str_or_none(checkpoint.get("approval_mode")),
+            }
+        )
+    return rows
+
+
+def _compact_review_synthesis(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    if payload is None:
+        return None
+    plan_review = payload.get("plan_review") if isinstance(payload.get("plan_review"), dict) else {}
+    step_review = payload.get("step_review") if isinstance(payload.get("step_review"), dict) else {}
+    return {
+        "plan_verdict": _str_or_none(plan_review.get("verdict")),
+        "plan_summary": _str_or_none(plan_review.get("summary")),
+        "step_final_verdict": _str_or_none(step_review.get("final_verdict")),
+        "step_final_summary": _str_or_none(step_review.get("final_summary")),
+        "swarm_verdict": _str_or_none(step_review.get("swarm_verdict")),
+    }
+
+
+def _w7_sidecar_paths(artifact_dir: Path) -> dict[str, str]:
+    return {
+        "opencode_loop_summary": (artifact_dir / W7_OPENCODE_LOOP_SUMMARY_FILE).as_posix(),
+        "packet_ledger": (artifact_dir / W7_PACKET_LEDGER_FILE).as_posix(),
+        "selected_outputs": (artifact_dir / W7_SELECTED_OUTPUTS_FILE).as_posix(),
+        "review_synthesis": (artifact_dir / W7_REVIEW_SYNTHESIS_FILE).as_posix(),
+        "approval_log": (artifact_dir / W7_APPROVAL_LOG_FILE).as_posix(),
     }
 
 
@@ -285,6 +514,12 @@ def _parse_iso_timestamp(value: str | None) -> datetime | None:
 
 def _str_or_none(value: Any) -> str | None:
     if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def _non_negative_int_or_none(value: Any) -> int | None:
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
         return value
     return None
 

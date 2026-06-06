@@ -52,6 +52,9 @@ function sampleIndex(): RunIndex {
       workflow_counts: { "h1.single.v1": 1, "h3.manager.v1": 1, unknown: 1 },
       status_counts: { failed: 1, succeeded: 1, unknown: 1 },
       trace_state_counts: { invalid: 1, missing: 1, ok: 1 },
+      run_origin_counts: { fal_native: 2, unknown: 1 },
+      target_project_counts: { unknown: 3 },
+      final_decision_counts: { unknown: 3 },
       warnings_count: 1,
     },
     runs: [
@@ -76,6 +79,7 @@ function sampleIndex(): RunIndex {
         fallback_state: "not_observed",
         row_state: "ok",
         warnings: [],
+        ...baseW7RunFields("fal_native"),
       },
       {
         run_id: "run-missing-trace",
@@ -98,6 +102,7 @@ function sampleIndex(): RunIndex {
         fallback_state: "unknown",
         row_state: "missing_trace_artifact",
         warnings: [],
+        ...baseW7RunFields("fal_native"),
       },
       {
         run_id: "trace-only",
@@ -120,9 +125,74 @@ function sampleIndex(): RunIndex {
         fallback_state: "unknown",
         row_state: "missing_run_artifact",
         warnings: ["trace-only: Trace artifact sequence is not strictly increasing"],
+        ...baseW7RunFields("unknown"),
       },
     ],
     warnings: ["trace-only: Trace artifact sequence is not strictly increasing"],
+  };
+}
+
+function baseW7RunFields(run_origin: "fal_native" | "opencode_backed" | "unknown") {
+  return {
+    run_origin,
+    target_project_id: null,
+    target_project_name: null,
+    sequence_ref: null,
+    final_decision: null,
+    overall_outcome: null,
+    validation_state: null,
+    clean_pass_eligible: null,
+    packet_count: null,
+    approval_count: null,
+    selected_output_count: null,
+    review_synthesis_present: null,
+    privacy_retention_mode: null,
+    public_export_state: null,
+    required_followup_count: null,
+  };
+}
+
+function sampleOpenCodeIndex(): RunIndex {
+  const index = sampleIndex();
+  return {
+    ...index,
+    summary: {
+      ...index.summary,
+      total_runs: 4,
+      workflow_counts: { ...index.summary.workflow_counts, "opencode.meta_track.loop.v1": 1 },
+      status_counts: { ...index.summary.status_counts, succeeded: 2 },
+      trace_state_counts: { ...index.summary.trace_state_counts, ok: 2 },
+      run_origin_counts: { fal_native: 2, opencode_backed: 1, unknown: 1 },
+      target_project_counts: { ringfall: 1, unknown: 3 },
+      final_decision_counts: { accepted: 1, unknown: 3 },
+    },
+    runs: [
+      {
+        ...index.runs[0],
+        run_id: "ocloop-ringfall",
+        workflow_id: "opencode.meta_track.loop.v1",
+        run_artifact_path: "data/runs/ocloop-ringfall.json",
+        trace_artifact_path: "data/traces/ocloop-ringfall.jsonl",
+        artifact_dir_path: "data/artifacts/ocloop-ringfall",
+        sidecar_files: ["opencode_loop_summary.json", "packet_ledger.json", "selected_outputs.json", "approval_log.json"],
+        run_origin: "opencode_backed",
+        target_project_id: "ringfall",
+        target_project_name: "RingFall",
+        sequence_ref: "W7-D",
+        final_decision: "accepted",
+        overall_outcome: "green",
+        validation_state: "ok",
+        clean_pass_eligible: true,
+        packet_count: 2,
+        approval_count: 1,
+        selected_output_count: 1,
+        review_synthesis_present: true,
+        privacy_retention_mode: "structured_extracts_only",
+        public_export_state: "blocked",
+        required_followup_count: null,
+      },
+      ...index.runs,
+    ],
   };
 }
 
@@ -204,6 +274,91 @@ function sampleTraceDetail(): TraceDetail {
         payload: {},
       },
     ],
+    opencode_loop: null,
+  };
+}
+
+function sampleOpenCodeTraceDetail(): TraceDetail {
+  return {
+    ...sampleTraceDetail(),
+    run_id: "ocloop-ringfall",
+    workflow_id: "opencode.meta_track.loop.v1",
+    run_artifact_path: "data/runs/ocloop-ringfall.json",
+    trace_artifact_path: "data/traces/ocloop-ringfall.jsonl",
+    opencode_loop: {
+      summary: {
+        run_id: "ocloop-ringfall",
+        workflow_id: "opencode.meta_track.loop.v1",
+        target_project_id: "ringfall",
+        target_project_name: "RingFall",
+        external_loop_id: "ocloop-ringfall",
+        sequence_ref: "W7-D",
+        overall_outcome: "green",
+        terminal_stage: "step_review_done",
+        final_decision: "accepted",
+        validation_state: "ok",
+        clean_pass_eligible: true,
+        packet_count: 2,
+        approval_count: 1,
+        selected_output_count: 1,
+        review_synthesis_present: true,
+        privacy_retention_mode: "structured_extracts_only",
+        public_export_state: "blocked",
+      },
+      packet_ledger_entries: [
+        {
+          sequence: 1,
+          stage: "meta_plan_review_done",
+          producer: "meta",
+          consumer: "track_a",
+          source_command: "/seq-next",
+          decision: "greenlit",
+          summary: "Approved W7-D plan.",
+          validation_state: "ok",
+          packet_ref: "packet1",
+          selected_output_ref: "output1",
+          approval_ref: "approval1",
+        },
+      ],
+      selected_outputs: [
+        {
+          output_id: "output1",
+          stage: "meta_plan_review_done",
+          source_session: "meta-session",
+          message_id: "message1",
+          capture_mode: "latest_output_selected",
+          summary: "Meta accepted the plan.",
+          excerpt: "Bounded accepted excerpt.",
+          excerpt_truncated: false,
+          privacy_classification: "private_coordination",
+        },
+      ],
+      approval_checkpoints: [
+        {
+          checkpoint_id: "approval1",
+          action_kind: "packet_route",
+          target_session: "track-a-session",
+          stage: "meta_plan_review_done",
+          approved: true,
+          approved_at: "2026-06-05T12:00:00+00:00",
+          approval_mode: "explicit_user_checkpoint",
+        },
+      ],
+      review_synthesis: {
+        plan_verdict: "greenlit",
+        plan_summary: "Plan approved.",
+        step_final_verdict: "accepted",
+        step_final_summary: "Implementation accepted.",
+        swarm_verdict: "approve",
+      },
+      sidecar_paths: {
+        opencode_loop_summary: "data/artifacts/ocloop-ringfall/opencode_loop_summary.json",
+        packet_ledger: "data/artifacts/ocloop-ringfall/packet_ledger.json",
+        selected_outputs: "data/artifacts/ocloop-ringfall/selected_outputs.json",
+        approval_log: "data/artifacts/ocloop-ringfall/approval_log.json",
+      },
+      warnings: [],
+    },
   };
 }
 
@@ -596,6 +751,42 @@ describe("U5-A workbench shell", () => {
     expect(screen.queryByText(/run-valid/i)).not.toBeInTheDocument();
   });
 
+  it("renders OpenCode-backed run rows with source-reported fields and filters", async () => {
+    const user = userEvent.setup();
+    mockFetchWith(sampleOpenCodeIndex());
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /runs/i }));
+    expect(await screen.findByRole("heading", { name: /run browser/i })).toBeInTheDocument();
+
+    expect(screen.getAllByText(/ocloop-ringfall/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/origin: opencode_backed/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/target: ringfall/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/yes \(source-reported ingest field\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/structured_extracts_only \/ blocked \(display metadata only\)/i)).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/origin/i), "opencode_backed");
+    expect(screen.getAllByText(/ocloop-ringfall/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/run-valid/i)).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/target project/i), "ringfall");
+    expect(screen.getAllByText(/ocloop-ringfall/i).length).toBeGreaterThan(0);
+  });
+
+  it("keeps FAL-native run browser behavior without W7 claims", async () => {
+    const user = userEvent.setup();
+    mockFetchWith(sampleIndex());
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /runs/i }));
+    expect(await screen.findByRole("heading", { name: /run browser/i })).toBeInTheDocument();
+
+    expect(screen.getAllByText(/run-valid/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/origin: fal_native/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/OpenCode-backed loop drill-down/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/OpenCode task success/i)).not.toBeInTheDocument();
+  });
+
   it("renders a valid trace timeline from the U5-B handoff target", async () => {
     const user = userEvent.setup();
     mockFetchByPath({
@@ -614,6 +805,61 @@ describe("U5-A workbench shell", () => {
     expect(screen.getByText(/reason=network-timeout/i)).toBeInTheDocument();
     expect(screen.getAllByText(/raw payload/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/run comparison/i)).not.toBeInTheDocument();
+  });
+
+  it("renders OpenCode packet selected-output and approval drill-down without control claims", async () => {
+    const user = userEvent.setup();
+    mockFetchByPath({
+      "/generated/run-index.json": { payload: sampleOpenCodeIndex() },
+      "/generated/traces/ocloop-ringfall.json": { payload: sampleOpenCodeTraceDetail() },
+    });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /trace/i }));
+
+    expect(await screen.findByRole("heading", { name: /OpenCode-backed loop drill-down/i })).toBeInTheDocument();
+    expect(screen.getByText(/read-only panel displays structured W7 ingest sidecars/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not control OpenCode/i)).toBeInTheDocument();
+    expect(screen.getByText(/perform commits/i)).toBeInTheDocument();
+    expect(screen.getByText(/infer OpenCode task success/i)).toBeInTheDocument();
+    expect(screen.getByText(/Packet \/ order ledger/i)).toBeInTheDocument();
+    expect(screen.getByText(/meta -/i)).toBeInTheDocument();
+    expect(screen.getByText(/Bounded accepted excerpt\./i)).toBeInTheDocument();
+    expect(screen.getByText(/raw body\/body_path content is never rendered/i)).toBeInTheDocument();
+    expect(screen.getByText(/approval1 \/ approved: yes/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Run OpenCode/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/auto commit/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/browser-side execution/i)).not.toBeInTheDocument();
+  });
+
+  it("renders malformed OpenCode sidecar detail as warning without fake rows", async () => {
+    const user = userEvent.setup();
+    const malformedDetail: TraceDetail = {
+      ...sampleOpenCodeTraceDetail(),
+      opencode_loop: {
+        summary: null,
+        packet_ledger_entries: [],
+        selected_outputs: [],
+        approval_checkpoints: [],
+        review_synthesis: null,
+        sidecar_paths: { opencode_loop_summary: "data/artifacts/ocloop-ringfall/opencode_loop_summary.json" },
+        warnings: ["Invalid W7 sidecar opencode_loop_summary.json"],
+      },
+    };
+    mockFetchByPath({
+      "/generated/run-index.json": { payload: sampleOpenCodeIndex() },
+      "/generated/traces/ocloop-ringfall.json": { payload: malformedDetail },
+    });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /trace/i }));
+
+    expect(await screen.findByRole("heading", { name: /OpenCode-backed loop drill-down/i })).toBeInTheDocument();
+    expect(screen.getByText(/Invalid W7 sidecar/i)).toBeInTheDocument();
+    expect(screen.getByText(/Packet, approval, and selected-output data is not fabricated/i)).toBeInTheDocument();
+    expect(screen.getByText(/No valid packet ledger entries are available/i)).toBeInTheDocument();
+    expect(screen.getByText(/No valid selected outputs are available/i)).toBeInTheDocument();
+    expect(screen.getByText(/No valid approval checkpoints are available/i)).toBeInTheDocument();
   });
 
   it("shows invalid generated detail when run_id mismatches the requested target", async () => {

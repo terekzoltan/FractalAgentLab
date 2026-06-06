@@ -37,6 +37,80 @@ export interface TraceDetailEvent {
   payload: Record<string, unknown>;
 }
 
+export interface OpenCodeLoopSummary {
+  run_id: string | null;
+  workflow_id: string | null;
+  target_project_id: string | null;
+  target_project_name: string | null;
+  external_loop_id: string | null;
+  sequence_ref: string | null;
+  overall_outcome: string | null;
+  terminal_stage: string | null;
+  final_decision: string | null;
+  validation_state: string | null;
+  clean_pass_eligible: boolean | null;
+  packet_count: number | null;
+  approval_count: number | null;
+  selected_output_count: number | null;
+  review_synthesis_present: boolean | null;
+  privacy_retention_mode: string | null;
+  public_export_state: string | null;
+}
+
+export interface OpenCodePacketLedgerEntry {
+  sequence: number | null;
+  stage: string | null;
+  producer: string | null;
+  consumer: string | null;
+  source_command: string | null;
+  decision: string | null;
+  summary: string | null;
+  validation_state: string | null;
+  packet_ref: string | null;
+  selected_output_ref: string | null;
+  approval_ref: string | null;
+}
+
+export interface OpenCodeSelectedOutput {
+  output_id: string | null;
+  stage: string | null;
+  source_session: string | null;
+  message_id: string | null;
+  capture_mode: string | null;
+  summary: string | null;
+  excerpt: string | null;
+  excerpt_truncated: boolean | null;
+  privacy_classification: string | null;
+}
+
+export interface OpenCodeApprovalCheckpoint {
+  checkpoint_id: string | null;
+  action_kind: string | null;
+  target_session: string | null;
+  stage: string | null;
+  approved: boolean | null;
+  approved_at: string | null;
+  approval_mode: string | null;
+}
+
+export interface OpenCodeReviewSynthesis {
+  plan_verdict: string | null;
+  plan_summary: string | null;
+  step_final_verdict: string | null;
+  step_final_summary: string | null;
+  swarm_verdict: string | null;
+}
+
+export interface OpenCodeLoopDetail {
+  summary: OpenCodeLoopSummary | null;
+  packet_ledger_entries: OpenCodePacketLedgerEntry[];
+  selected_outputs: OpenCodeSelectedOutput[];
+  approval_checkpoints: OpenCodeApprovalCheckpoint[];
+  review_synthesis: OpenCodeReviewSynthesis | null;
+  sidecar_paths: Record<string, string>;
+  warnings: string[];
+}
+
 export interface TraceDetail {
   schema_version: typeof TRACE_DETAIL_SCHEMA_VERSION;
   generated_at: string;
@@ -48,4 +122,5 @@ export interface TraceDetail {
   summary: TraceDetailSummary;
   validation: TraceDetailValidation;
   events: TraceDetailEvent[];
+  opencode_loop: OpenCodeLoopDetail | null;
 }
