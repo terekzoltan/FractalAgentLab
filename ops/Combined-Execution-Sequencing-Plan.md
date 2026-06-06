@@ -1925,7 +1925,7 @@ Parallelism rule: only `2.1a` and `2.1b` may run in parallel, and only if their 
 | 2.3 | Track E session | ✅ W7-C1 ingest validation/privacy sufficiency | W7-B1 ✅ + W7-B2 ✅ + W7-B3 ✅ | Accepted after Track B fixed `RF-2026-06-04-01` and Track E reran sufficiency. Privacy/false-green PASS; partial-write remains accepted LOW residual with downstream validation constraint. |
 | 2.4 | Meta Coordinator session | ✅ W7-B/C closeout | W7-C1 ✅ | Accepted artifact shape as stable enough for W7-D workbench and W7-E1 learning-input consumers, provided downstream consumers rely on canonical acceptance validation rather than artifact directory presence. |
 
-**🔄 Step 3 — Browse and learning consumers after accepted ingest shape**
+**✅ Step 3 — Browse and learning consumers after accepted ingest shape**
 
 Parallelism rule: `3.1a` and `3.1b` may run in parallel only after W7-B/C closeout accepts the artifact shape. Track E validation remains sequential after Track C learning semantics.
 
@@ -1933,7 +1933,7 @@ Parallelism rule: `3.1a` and `3.1b` may run in parallel only after W7-B/C closeo
 |---|---|---|---|---|
 | 3.1a | Track A session | ✅ W7-D workbench/index support | W7-B/C closeout ✅ | Accepted and committed in `ca1167d`. Read-only loop browser rows, packet/order drill-down, selected output visibility, approval log visibility, and project filters are implemented with accepted-artifact sidecar validation; no W7-E1 consumption. |
 | 3.1b | Track C session | ✅ W7-E1 project/global learning input semantics | W7-B/C closeout ✅ | Accepted and committed in `9d1ff9f`. Standalone learning-input helper separates repo-specific project memory from de-identified global lessons and fail-closes on invalid sidecar `schema_version` or mismatched `run_id`. |
-| 3.2 | Track E session | ⬜ READY W7-E2 learning/privacy validation | W7-E1 ✅ | Validate de-identification, non-public defaults, memory candidate quality, and no identity-driven routing authority |
+| 3.2 | Track E session | ✅ W7-E2 learning/privacy validation | W7-E1 ✅ | Accepted with residual risk in `docs/private/Wave7-W7-E2-TrackE-Learning-Privacy-Validation-v1.md`. Validated de-identification, non-public defaults, memory candidate quality, no identity-driven routing authority, and preserved `track_e_validation_claim: false` on W7-E1 sidecar evidence. |
 
 **⬜ Step 4 — Wave 7 closeout and optional suggestions gate**
 
@@ -1941,7 +1941,7 @@ Parallelism rule: closeout is serial. Optional suggestions work starts only if M
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 4.1 | Track E session | ⬜ W7-F usefulness evaluation | W7-D ✅ + W7-E2 ✅ | Decide whether evidence ingest reduced manual bookkeeping, improved audit/replay, and produced trustworthy learning inputs |
+| 4.1 | Track E session | ⬜ READY W7-F usefulness evaluation | W7-D ✅ + W7-E2 ✅ | Decide whether evidence ingest reduced manual bookkeeping, improved audit/replay, and produced trustworthy learning inputs. Must explicitly classify the W7-E2 residual semantic non-leakage risk as `in-scope now`, `not-yet-in-scope`, or `already resolved`. |
 | 4.2 | Meta Coordinator session | ⬜ W7-F-META closeout | W7-F ✅ | Decide `continue`, `narrow_continue`, `hold`, or `stop`; decide whether Wave 8 docs-first work is unblocked |
 | 4.3 | Track C session | ⏸ W7-G1 advisory suggestion semantics | W7-F-META explicitly opens it | Docs-only suggestion semantics; no automatic routing, dispatch, commit, or authoritative control |
 | 4.4 | Track E session | ⏸ W7-G2 advisory suggestion safety review | W7-G1 ✅ | Review suggestion wording, false-authority risk, privacy, and gate-honesty boundaries |
@@ -2122,12 +2122,13 @@ The immediate mainline frontier is now Wave 7:
 - ✅ `W7-B/C` Meta closeout accepted the artifact shape for downstream consumers.
 - ✅ `W7-D` Track A workbench/index support is accepted and committed in `ca1167d`.
 - ✅ `W7-E1` Track C project/global learning input semantics is accepted and committed in `9d1ff9f`.
-- ⬜ READY `W7-E2` Track E learning/privacy validation may open next.
+- ✅ `W7-E2` Track E learning/privacy validation is accepted with residual semantic non-leakage risk documented.
+- ⬜ READY `W7-F` Track E usefulness evaluation may open next and must explicitly classify the W7-E2 residual risk.
 - ⏸ Wave 8 HUB compatibility remains parked until W7 evidence artifacts stabilize or Meta explicitly opens docs-first work.
 
 Current blocker summary:
 
-- no blocker to start W7-E2 learning/privacy validation
+- no blocker to start W7-F usefulness evaluation after W7-D and W7-E2 acceptance
 - RingFall feature implementation remains blocked before a later readiness gate
 - public release, public mirror, `docs/public/` output, and Track A presentation remain blocked
 - OpenCode bridge/API/session delivery remains blocked
@@ -2135,11 +2136,10 @@ Current blocker summary:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. Track E opens `W7-E2` learning/privacy validation against committed `W7-E1` learning-input semantics.
-2. Meta reviews `W7-E2` outcome before any W7-F usefulness work starts.
-3. Track E opens `W7-F` usefulness evaluation only after W7-D ✅ and W7-E2 ✅.
-4. Meta runs `W7-F-META` closeout after W7-F.
-5. Wave 8 remains `⏸` unless W7-F closeout, or a later explicit Meta exception, opens docs-first compatibility work.
+1. Track E opens `W7-F` usefulness evaluation using W7-D workbench evidence and W7-E2 learning/privacy validation.
+2. W7-F explicitly classifies the W7-E2 residual semantic non-leakage risk as `in-scope now`, `not-yet-in-scope`, or `already resolved`.
+3. Meta runs `W7-F-META` closeout after W7-F.
+4. Wave 8 remains `⏸` unless W7-F closeout, or a later explicit Meta exception, opens docs-first compatibility work.
 
 Reference:
 - `docs/private/Wave7-OpenCode-Evidence-Learning-Layer-Plan-v1.md`
