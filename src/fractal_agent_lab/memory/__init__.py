@@ -5,6 +5,15 @@ from fractal_agent_lab.memory.candidate_extraction import (
     write_memory_candidates_artifact,
 )
 from fractal_agent_lab.memory.json_store import JSONProjectMemoryStore, JSONSessionMemoryStore
+from fractal_agent_lab.memory.opencode_learning import (
+    GLOBAL_LEARNING_ENTRY_SCHEMA_VERSION,
+    GLOBAL_LEARNING_TOPIC_SCHEMA_VERSION,
+    W7_OPENCODE_LEARNING_UPDATE_ARTIFACT_VERSION,
+    GlobalLearningEntry,
+    JSONGlobalLearningStore,
+    W7OpenCodeLearningUpdateResult,
+    run_w7_opencode_learning_update,
+)
 from fractal_agent_lab.memory.project_context import load_project_memory_context
 from fractal_agent_lab.memory.project_memory import (
     PROJECT_MEMORY_ENTRY_SCHEMA_VERSION,
@@ -29,8 +38,14 @@ __all__ = [
     "PROJECT_MEMORY_ENTRY_SCHEMA_VERSION",
     "PROJECT_MEMORY_SCHEMA_VERSION",
     "PROJECT_MEMORY_UPDATE_ARTIFACT_VERSION",
+    "GLOBAL_LEARNING_ENTRY_SCHEMA_VERSION",
+    "GLOBAL_LEARNING_TOPIC_SCHEMA_VERSION",
+    "W7_OPENCODE_LEARNING_UPDATE_ARTIFACT_VERSION",
+    "GlobalLearningEntry",
+    "JSONGlobalLearningStore",
     "ProjectMemory",
     "ProjectMemoryEntry",
+    "W7OpenCodeLearningUpdateResult",
     "JSONProjectMemoryStore",
     "JSONSessionMemoryStore",
     "SESSION_MEMORY_SCHEMA_VERSION",
@@ -39,6 +54,7 @@ __all__ = [
     "load_project_memory_context",
     "load_session_memory_context",
     "run_post_run_project_memory_update",
+    "run_w7_opencode_learning_update",
     "write_memory_candidates_artifact",
     "write_project_memory_update_artifact",
     "write_session_memory_snapshot_artifact",
