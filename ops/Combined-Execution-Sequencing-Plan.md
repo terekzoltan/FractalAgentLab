@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-06-06
+**Last updated:** 2026-06-07
 
 ---
 
@@ -1935,16 +1935,16 @@ Parallelism rule: `3.1a` and `3.1b` may run in parallel only after W7-B/C closeo
 | 3.1b | Track C session | ✅ W7-E1 project/global learning input semantics | W7-B/C closeout ✅ | Accepted and committed in `9d1ff9f`. Standalone learning-input helper separates repo-specific project memory from de-identified global lessons and fail-closes on invalid sidecar `schema_version` or mismatched `run_id`. |
 | 3.2 | Track E session | ✅ W7-E2 learning/privacy validation | W7-E1 ✅ | Accepted with residual risk in `docs/private/Wave7-W7-E2-TrackE-Learning-Privacy-Validation-v1.md`. Validated de-identification, non-public defaults, memory candidate quality, no identity-driven routing authority, and preserved `track_e_validation_claim: false` on W7-E1 sidecar evidence. |
 
-**⬜ Step 4 — Wave 7 closeout and optional suggestions gate**
+**🔄 Step 4 — Wave 7 closeout accepted; W7-G suggestions gate opened docs-only**
 
-Parallelism rule: closeout is serial. Optional suggestions work starts only if Meta explicitly opens it after W7-F-META.
+Parallelism rule: W7-F closeout is serial and accepted. W7-G starts sequentially: W7-G1 docs-only semantics first, then W7-G2 safety review. No suggestion implementation, automatic routing, dispatch, commit/push automation, OpenCode bridge/API/session delivery, browser control, or public export is authorized.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 4.1 | Track E session | ⬜ READY W7-F usefulness evaluation | W7-D ✅ + W7-E2 ✅ | Decide whether evidence ingest reduced manual bookkeeping, improved audit/replay, and produced trustworthy learning inputs. Must explicitly classify the W7-E2 residual semantic non-leakage risk as `in-scope now`, `not-yet-in-scope`, or `already resolved`. |
-| 4.2 | Meta Coordinator session | ⬜ W7-F-META closeout | W7-F ✅ | Decide `continue`, `narrow_continue`, `hold`, or `stop`; decide whether Wave 8 docs-first work is unblocked |
-| 4.3 | Track C session | ⏸ W7-G1 advisory suggestion semantics | W7-F-META explicitly opens it | Docs-only suggestion semantics; no automatic routing, dispatch, commit, or authoritative control |
-| 4.4 | Track E session | ⏸ W7-G2 advisory suggestion safety review | W7-G1 ✅ | Review suggestion wording, false-authority risk, privacy, and gate-honesty boundaries |
+| 4.1 | Track E session | ✅ W7-F usefulness evaluation | W7-D ✅ + W7-E2 ✅ | Accepted GREEN after strict review. Usefulness recommendation is `narrow_continue`; residual semantic non-leakage risk classified as `in-scope now`. W7-specific evaluator/tests are accepted; private report remains local-only unless explicitly force-added later. |
+| 4.2 | Meta Coordinator session | ✅ W7-F-META closeout | W7-F ✅ | Closed with `narrow_continue`. W7-G is opened only for docs-only / review-planning work; implementation and automation remain blocked. Wave 8 HUB/docs-first compatibility remains parked unless separately opened by Meta. |
+| 4.3 | Track C session | ⬜ READY W7-G1 advisory suggestion semantics | W7-F-META ✅ | Docs-only suggestion semantics may start. Must preserve no automatic routing, dispatch, commit/push automation, authoritative control, public export, bridge/API/session delivery, or browser-side OpenCode control. |
+| 4.4 | Track E session | ⏸ W7-G2 advisory suggestion safety review | W7-G1 ✅ | Review suggestion wording, false-authority risk, privacy, and gate-honesty boundaries after W7-G1. |
 
 Non-goals:
 - no HUB implementation in FAL
@@ -2123,12 +2123,13 @@ The immediate mainline frontier is now Wave 7:
 - ✅ `W7-D` Track A workbench/index support is accepted and committed in `ca1167d`.
 - ✅ `W7-E1` Track C project/global learning input semantics is accepted and committed in `9d1ff9f`.
 - ✅ `W7-E2` Track E learning/privacy validation is accepted with residual semantic non-leakage risk documented.
-- ⬜ READY `W7-F` Track E usefulness evaluation may open next and must explicitly classify the W7-E2 residual risk.
+- ✅ `W7-F` Track E usefulness evaluation and `W7-F-META` closeout are accepted with recommendation `narrow_continue`; residual semantic non-leakage risk carries forward as `in-scope now`.
+- ⬜ READY `W7-G1` Track C docs-only advisory suggestion semantics may open next; `W7-G2` remains parked until W7-G1 is accepted.
 - ⏸ Wave 8 HUB compatibility remains parked until W7 evidence artifacts stabilize or Meta explicitly opens docs-first work.
 
 Current blocker summary:
 
-- no blocker to start W7-F usefulness evaluation after W7-D and W7-E2 acceptance
+- no blocker to start W7-G1 docs-only advisory suggestion semantics after W7-F-META closeout
 - RingFall feature implementation remains blocked before a later readiness gate
 - public release, public mirror, `docs/public/` output, and Track A presentation remain blocked
 - OpenCode bridge/API/session delivery remains blocked
@@ -2136,10 +2137,10 @@ Current blocker summary:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. Track E opens `W7-F` usefulness evaluation using W7-D workbench evidence and W7-E2 learning/privacy validation.
-2. W7-F explicitly classifies the W7-E2 residual semantic non-leakage risk as `in-scope now`, `not-yet-in-scope`, or `already resolved`.
-3. Meta runs `W7-F-META` closeout after W7-F.
-4. Wave 8 remains `⏸` unless W7-F closeout, or a later explicit Meta exception, opens docs-first compatibility work.
+1. Track C opens `W7-G1` docs-only advisory suggestion semantics.
+2. Track E runs `W7-G2` advisory suggestion safety review after W7-G1 is accepted.
+3. Meta closes W7-G and decides whether any later suggestion implementation, Wave 8 docs-first compatibility, or HUB-related planning may open.
+4. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.
 
 Reference:
 - `docs/private/Wave7-OpenCode-Evidence-Learning-Layer-Plan-v1.md`
