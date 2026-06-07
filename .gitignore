@@ -1,8 +1,11 @@
 # Private lab repo policy:
-# ops/ is local-only; docs/ markdown stays versioned here.
+# ops/ and private docs are local-only.
 
 # Local coordination state
 /ops/
+
+# Private coordination docs
+/docs/private/
 
 # Python cache / bytecode
 __pycache__/
@@ -20,5 +23,13 @@ __pycache__/
 # Private local planning packs
 /fractalagentlab_coding_vertical_pack/
 
-# Local OpenCode tool state
+# Local OpenCode/swarm/tooling state
 /.opencode/
+/.swarm/
+/.opencode-router/
+/.opencode-toolbox/
+/.opencode-tooling-snapshot/
+/tools/oc-session-router/
+
+# Local generated architecture intelligence outputs
+/docs/architecture/
