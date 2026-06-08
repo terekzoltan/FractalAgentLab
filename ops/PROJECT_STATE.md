@@ -6,12 +6,12 @@ Wave 6 lezárva `narrow_continue` döntéssel; Wave 6.5 RingFall readiness/adopt
 
 - Wave: Wave 7 — OpenCode-Backed Evidence Learning Layer
 - Sprint: W7-S1 — thin ingest implementation and validation
-- Step: W7-G1 Track C advisory suggestion semantics ready
-- Epic: W7-F-META accepted `narrow_continue`; W7-G1 docs-only suggestion semantics opened
+- Step: W7-G1 Track C advisory suggestion semantics accepted; W7-G2 ready
+- Epic: W7-G1 accepted by Meta step-review; W7-G2 Track E safety review may start
 
 # Jelenlegi workflow fázis
 
-W7-F Track E usefulness evaluation és W7-F-META closeout elfogadva. Döntés: `narrow_continue`. W7-G1 docs-only advisory suggestion semantics indulhat Track C-vel; W7-G2 csak W7-G1 elfogadás után indulhat Track E safety review-ként. A W7-E2 residual semantic non-leakage risk továbbvitt státusza: `in-scope now`.
+W7-F Track E usefulness evaluation és W7-F-META closeout elfogadva. Döntés: `narrow_continue`. Track C elkészítette a W7-G1 docs-only advisory suggestion semantics briefet helyi/private evidence-ként; Meta step-review és Swarm review után W7-G1 accepted. W7-G2 Track E safety review indulhat. A W7-E2 residual semantic non-leakage risk továbbvitt státusza: `in-scope now`.
 
 # Utolsó aktor / szerep
 
@@ -19,21 +19,21 @@ Meta Coordinator
 
 # Utolsó döntés
 
-W7-D committed (`ca1167d`), W7-E1 committed (`9d1ff9f`), Combined sync committed (`bf13189`). W7-E2 committed (`227fd11`). W7-F Track E evaluator/test changes accepted GREEN; W7-F-META closeout accepted `narrow_continue`. W7-G1 is opened only as docs-only / review-planning suggestion semantics; implementation and automation remain blocked.
+W7-D committed (`ca1167d`), W7-E1 committed (`9d1ff9f`), Combined sync committed (`bf13189`). W7-E2 committed (`227fd11`). W7-F Track E evaluator/test changes accepted GREEN; W7-F-META closeout accepted `narrow_continue`. W7-G1 Track C docs-only advisory suggestion semantics brief accepted by Meta step-review after clean Swarm review. Implementation, automation, routing, dispatch, commit/push automation, bridge/API/session delivery, browser-side control and public export remain blocked.
 
 # Utolsó befejezett akció
 
-Meta owner-grill után elkészítette, Track E review után javította, majd elfogadta a W6.5 csomagot (`67f66e1`). RingFallban public-safe Wave 0 skeleton root commit készült és GitHubra felment `08732d5 init` message-dzsel. W7-A lezárult `accepted_with_contract_revisions` döntéssel. W7-B1/W7-B2 closeout accepted lett (`de0240d`), W7-B3 Track A CLI UX accepted lett (`ce40fbd`), W7-C1 Track E negatív gate feltárta a Track B privacy gapet, Track B javította, Track E rerunolta, Meta pedig W7-B/C closeoutot elfogadta. W7-D, W7-E1 és W7-E2 committed. W7-F Track E usefulness evaluation accepted GREEN, W7-F-META closeout `narrow_continue`. Nem történt OpenCode bridge/API/session delivery, browser control, commit/push automation vagy public evidence release.
+Meta owner-grill után elkészítette, Track E review után javította, majd elfogadta a W6.5 csomagot (`67f66e1`). RingFallban public-safe Wave 0 skeleton root commit készült és GitHubra felment `08732d5 init` message-dzsel. W7-A lezárult `accepted_with_contract_revisions` döntéssel. W7-B1/W7-B2 closeout accepted lett (`de0240d`), W7-B3 Track A CLI UX accepted lett (`ce40fbd`), W7-C1 Track E negatív gate feltárta a Track B privacy gapet, Track B javította, Track E rerunolta, Meta pedig W7-B/C closeoutot elfogadta. W7-D, W7-E1 és W7-E2 committed. W7-F Track E usefulness evaluation accepted GREEN, W7-F-META closeout `narrow_continue`. Track C elkészítette a W7-G1 advisory semantics briefet docs-only scope-ban, Meta pedig W7-G1-et step-review alapján elfogadta. Nem történt suggestion implementation, OpenCode bridge/API/session delivery, browser control, commit/push automation vagy public evidence release.
 
 Automatizációs tudnivaló változatlan: `fractalagentlab-architecture-intelligence-refresh` 72 óránként fut ebben a workspace-ben, csak `docs/architecture/**` diagnosztikai/architektúra artefaktumokat frissíthet, implementation kódhoz nem nyúlhat, és `ops/PROJECT_STATE.md`-t csak blocking/major architektúra-probléma esetén módosíthatja.
 
 # Következő akció
 
-Track C nyissa meg W7-G1 docs-only advisory suggestion semantics tervét/briefjét. Tartsa blokkolva a suggestion implementationt, automatic routingot, dispatchot, commit/push automationt, bridge/API/session deliveryt, browser-side OpenCode controlt és public exportot.
+Track E nyissa meg W7-G2 advisory suggestion safety review-t a W7-G1 brief alapján. Tartsa blokkolva a suggestion implementationt, automatic routingot, dispatchot, commit/push automationt, bridge/API/session deliveryt, browser-side OpenCode controlt és public exportot.
 
 # Következő elvárt szerep
 
-Track C W7-G1 advisory suggestion semantics
+Track E W7-G2 advisory suggestion safety review
 
 # Most ne gondolkodj ezen
 
@@ -50,7 +50,7 @@ Track C W7-G1 advisory suggestion semantics
 - Ne alakítsd az `ops/PROJECT_STATE.md` fájlt hosszú naplóvá.
 - Ne commitold a raw `data/evidence/wave6/**` evidence-t.
 - Ne kezeld a RingFall `.fal/**` local/private runbookot public vagy canonical RingFall design artifactként.
-- Ne kezdd el W7-G suggestion implementationt; W7-G1 csak docs-only semantics/review-planning. Ne stage-eld `.gitignore`, Wave6/W6.5 docs vagy unrelated fájlokat W7 closeout commit prep során.
+- Ne kezdd el W7-G suggestion implementationt; W7-G2 csak safety review. Ne stage-eld `.gitignore`, Wave6/W6.5 docs vagy unrelated fájlokat W7 closeout commit prep során.
 
 # Nyitott kérdések / blokkolók
 
@@ -58,7 +58,7 @@ Track C W7-G1 advisory suggestion semantics
 - `RF-2026-06-04-01` fixed locally; Track E rerun privacy/false-green sufficiency PASS.
 - W7-D `RF-2026-06-05-01` accepted and committed in `ca1167d`.
 - W7-E1 `RF-2026-06-06-01` accepted and committed in `9d1ff9f`; `RF-2026-06-05-02` no-op-brief drift route-olva.
-- W7-E2 Track E learning/privacy validation accepted; `w7_f_unblocked: true`. W7-F és W7-F-META accepted; `narrow_continue`, residual semantic non-leakage risk `in-scope now`. W7-G1 docs-only semantics READY, W7-G2 W7-G1 után.
+- W7-E2 Track E learning/privacy validation accepted; `w7_f_unblocked: true`. W7-F és W7-F-META accepted; `narrow_continue`, residual semantic non-leakage risk `in-scope now`. W7-G1 docs-only semantics brief accepted; W7-G2 Track E safety review READY.
 - W7-B partial-write risk elfogadott LOW residual marad, ha downstream consumers acceptance validationre támaszkodnak és nem artifact directory presence-re.
 - RingFall már git repo, public-safe első commit: `08732d5 init`; GitHub remote: `https://github.com/terekzoltan/RingFall.git`, `origin/main` is `08732d5`.
 - RingFall feature implementation továbbra is blokkolt későbbi readiness gate előtt.
@@ -109,6 +109,7 @@ Track C W7-G1 advisory suggestion semantics
 - `docs/private/Wave7-W7-E1-TrackC-Project-Global-Learning-Input-Semantics-v1.md`
 - `docs/private/Wave7-W7-E2-TrackE-Learning-Privacy-Validation-v1.md`
 - `docs/private/Wave7-W7-F-TrackE-Usefulness-Evaluation-v1.md`
+- `docs/private/Wave7-W7-G1-TrackC-Advisory-Suggestion-Semantics-v1.md`
 - `C:\EGYETEM\FUNSTUFF\RingFall\.fal\FAL-Target-Project-Local-Runbook-v01.md`
 - W6-I loop output: `data/evidence/wave6/loops/w6i-worldsim-docs-only-20260528/`
 - W6-F eval output: `data/evidence/wave6/eval/w6f-usefulness-evaluation-v1/`
