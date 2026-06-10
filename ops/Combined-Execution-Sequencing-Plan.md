@@ -97,8 +97,11 @@ The sequencing rule is:
 - When multiple epics are listed on one row, the default meaning is: run them as one focused batch in the same session unless the notes say otherwise
 
 ### Execution-step structuring rule
-- if two or more tracks can work in parallel safely, keep them in the same numbered step
-- if one item must wait for another, move it to the next numbered step
+- one execution-table row must name exactly one session/owner; do not merge roles in the `Session` column with `/`, `+`, or vague combined labels
+- if two or more sessions appear in the same numbered step, the default meaning is that they may run in parallel, provided dependencies, ownership boundaries, and evidence gates are safe
+- if one item must wait for another, split it into a later numbered step or explicit substep instead of relying on row order inside one table
+- if parallel work would blur responsibility, sequence, proof source-of-truth, or closeout ownership, serialize it behind an explicit gate
+- parallelism is throughput optimization, not the workflow source of truth; sequential clarity wins when in doubt
 - use a separate later step only for true dependency, true gating, or explicit optional/conditional work
 
 ### Project State Continuity Protocol
@@ -1935,7 +1938,7 @@ Parallelism rule: `3.1a` and `3.1b` may run in parallel only after W7-B/C closeo
 | 3.1b | Track C session | ✅ W7-E1 project/global learning input semantics | W7-B/C closeout ✅ | Accepted and committed in `9d1ff9f`. Standalone learning-input helper separates repo-specific project memory from de-identified global lessons and fail-closes on invalid sidecar `schema_version` or mismatched `run_id`. |
 | 3.2 | Track E session | ✅ W7-E2 learning/privacy validation | W7-E1 ✅ | Accepted with residual risk in `docs/private/Wave7-W7-E2-TrackE-Learning-Privacy-Validation-v1.md`. Validated de-identification, non-public defaults, memory candidate quality, no identity-driven routing authority, and preserved `track_e_validation_claim: false` on W7-E1 sidecar evidence. |
 
-**🔄 Step 4 — Wave 7 closeout accepted; W7-G suggestions gate opened docs-only**
+**✅ Step 4 — W7-G advisory suggestion policy accepted; W7.5 hardening opens next**
 
 Parallelism rule: W7-F closeout is serial and accepted. W7-G starts sequentially: W7-G1 docs-only semantics first, then W7-G2 safety review. No suggestion implementation, automatic routing, dispatch, commit/push automation, OpenCode bridge/API/session delivery, browser control, or public export is authorized.
 
@@ -1952,10 +1955,131 @@ Non-goals:
 - no automatic dispatch, repo/session mutation, commit, or push
 - no public export of private raw evidence or private learning-loop heuristics
 
+#### Wave 7.5 — Measurement & Context Continuity Hardening
+
+Activation gate:
+- W7-G1 and W7-G2 accepted as docs-only advisory suggestion policy/safety review
+- W7.5 starts before Wave 8/HUB unless Meta explicitly overrides after closeout
+- first posture is measurement, testability, context hydration, and pilot planning; no OpenCode bridge/API/session delivery, automatic dispatch, commit/push automation, HUB implementation, or public evidence release is authorized
+- canonical planning inputs are `docs/private/FAL_Post_Wave7_Workflow_Plan.md` and `docs/private/Wave7_5-Measurement-Continuity-Hardening-Plan-v1.md`
+
+Planned deliverables:
+- `docs/private/Wave7_5-Measurement-Continuity-Hardening-Plan-v1.md`
+- `docs/private/Wave7-W7-G-Meta-Closeout-W7_5-Activation-v1.md`
+- W7 targeted sanity/testability closeout notes
+- `workflow_metrics.json` MVP support
+- `review_findings_ledger.json` MVP support
+- context hydration contract / `context_digest.json` / target `.fal/ACTIVE_CONTEXT.*` guidance
+- learning candidate backlog design
+- RingFall pilot protocol
+- public-safe methodology/showcase prep only after privacy review
+- later HUB compatibility revisit after evidence exists
+
+Track ownership model:
+
+| Track | Wave 7.5 role | First allowed posture |
+|---|---|---|
+| Meta Coordinator | activation/scope lock, compact-hydration policy, closeout | docs/planning and sequencing only |
+| Track E | metrics, review findings ledger, evidence quality, pilot measurement | eval/support code only after W7.5-A sanity |
+| Track B | sidecar/contract compatibility for metrics and context digest | contract review before schema law |
+| Track C | learning candidate semantics and safe improvement lifecycle | no automatic prompt rewrite/routing |
+| Track A | public-safe/readability support only if explicitly opened | no UI/dashboard by default |
+| Track D | router/tool evidence compatibility only if explicitly needed | no OpenCode session control |
+
+Epics:
+
+| Epic | Owner | Support | Core output | Prereq |
+|---|---|---|---|---|
+| W7.5-A Repo/test sanity closeout | Track E | Meta; Track B/D only if blocker found | targeted W7 testability and import sanity result | W7-G accepted |
+| W7.5-B Workflow metrics MVP | Track E | Track B | `workflow_metrics.json` MVP | W7.5-A accepted |
+| W7.5-C Review findings ledger | Track E | Meta | `review_findings_ledger.json` MVP and human-label fields | W7.5-B accepted or explicit parallel-safe exception |
+| W7.5-D Context hydration contract | Meta | Track B/C/E through explicitly sequenced follow-up rows | `context_digest.json` and `.fal/ACTIVE_CONTEXT.*` policy | W7.5-A accepted |
+| W7.5-E Learning candidate backlog | Track C | Track E + Meta | controlled self-improvement queue lifecycle | W7.5-B/C draft evidence |
+| W7.5-F RingFall pilot protocol | Meta | Track E + target project | 5-task measurement pilot protocol | W7.5-B/D accepted |
+| W7.5-G Public-safe methodology/showcase prep | Meta | Track E; Track A optional only if opened | sanitized methodology candidates | W7.5-F evidence + public-safety review |
+| W7.5-H HUB compatibility revisit | Meta | Track B/E/C optional | decide whether Wave 8 starts or remains parked | W7.5 closeout |
+
+### Wave 7.5 — Execution Steps
+
+**✅ Step 1 — W7-G closeout and W7.5 activation/scope lock**
+
+Parallelism rule: no parallel implementation before W7.5-A. Meta first confirms W7-G closeout and W7.5 scope; then Track E can run targeted sanity/testability review in the next step.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 1.1 | Meta Coordinator session | ✅ W7-G closeout + W7.5 activation/scope lock | W7-G2 ✅ | Accepted W7-G docs-only evidence, adopted W7.5 measurement/context-continuity as the next frontier, and kept HUB, public export, OpenCode bridge/API/session delivery, RingFall feature execution, automation, dispatch, and commit/push automation blocked. |
+
+**⬜ Step 2 — W7.5-A repo/test sanity closeout**
+
+Parallelism rule: no parallel work. This step proves the real repo can run targeted W7 tests before new metrics or context surfaces are opened.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 2.1 | Track E session | ⬜ READY W7.5-A repo/test sanity closeout | W7.5 scope ✅ | Verify real repo import/testability state, run targeted W7 tests, and route README/public drift as follow-up rather than release work. |
+
+**⏸ Step 3 — Measurement and review-quality surfaces**
+
+Parallelism rule: one Track E session owns the measurement batch. Do W7.5-B first, then W7.5-C in the same session unless Meta later splits the work.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 3.1 | Track E session | ⏸ W7.5-B workflow metrics MVP, then W7.5-C review findings ledger | W7.5-A ✅ | Create multi-axis workflow metrics first; then add human-label-ready review findings ledger without raw transcript retention. Avoid fake single quality score. |
+
+**⏸ Step 4 — Context hydration policy**
+
+Parallelism rule: no parallel work. Meta defines hydration policy before Track B/C consume it.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 4.1 | Meta Coordinator session | ⏸ W7.5-D context hydration policy lock | W7.5-A ✅ | Define hot/warm/cold context policy, `context_digest.json` intent, and `.fal/ACTIVE_CONTEXT.*` restore rules; do not bulk-load private docs by default after compact. |
+
+**⏸ Step 5 — Parallel-safe contract and learning backlog work**
+
+Parallelism rule: Track B and Track C may run in parallel only after W7.5-D policy lock and W7.5-B/C measurement fields are stable enough, and only if file scopes are disjoint.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 5.1a | Track B session | ⏸ W7.5-D context digest contract support | W7.5-D policy ✅ + W7.5-B/C ✅ | Define contract/sidecar compatibility for `context_digest.json`; no broad runtime or OpenCode control. |
+| 5.1b | Track C session | ⏸ W7.5-E learning candidate backlog semantics | W7.5-B/C ✅ | Define controlled candidate lifecycle; no automatic prompt rewrite, routing, commit/push, or public export. |
+
+**⏸ Step 6 — RingFall pilot protocol**
+
+Parallelism rule: no parallel work. Meta defines pilot scope before Track E validates measurement sufficiency.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 6.1 | Meta Coordinator session | ⏸ W7.5-F RingFall pilot protocol | W7.5-B/C ✅ + W7.5-D policy ✅ | Define 5-task measured pilot and target-project boundaries; no large RingFall feature push before pilot readiness. |
+| 6.2 | Track E session | ⏸ W7.5-F measurement sufficiency review | W7.5-F protocol ✅ | Review pilot capture template, manual labels, metrics sidecars, and post-pilot synthesis requirements. |
+
+**⏸ Step 7 — Public-safe methodology prep**
+
+Parallelism rule: no parallel work. Public-facing artifacts require Track E safety review before any release or mirror action.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 7.1 | Meta Coordinator session | ⏸ W7.5-G public-safe methodology candidate scope | W7.5-F evidence ✅ | Prepare sanitized methodology candidates only; no raw selected outputs, private paths, prompt/gate moat, or RingFall strategy. |
+| 7.2 | Track E session | ⏸ W7.5-G public-safety review | W7.5-G candidate scope ✅ | Review candidate public material before any `docs/public/**`, example, or mirror action is accepted. |
+
+**⏸ Step 8 — HUB compatibility revisit**
+
+Parallelism rule: no parallel work. HUB remains parked unless Meta explicitly opens a docs/contract-first compatibility step.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 8.1 | Meta Coordinator session | ⏸ W7.5-H HUB compatibility revisit | W7.5 closeout ✅ | Decide whether Wave 8 starts, stays parked, or narrows to read-only compatibility only. |
+
+Non-goals:
+- no OpenCode bridge/API/session delivery
+- no automatic routing, dispatch, commit, push, or workflow triggering
+- no HUB implementation before W7.5 closeout
+- no broad RingFall feature execution before pilot/readiness acceptance
+- no public export without dedicated Track E/public-safety review
+- no claim that semantic non-leakage is proven
+
 #### Wave 8 or later — HUB Compatibility Layer / External Control Surface Contract
 
 Activation gate:
-- Wave 7 produces stable OpenCode-backed loop artifact conventions, or Meta explicitly opens docs-only compatibility work after W7-A/W7-B acceptance
+- Wave 7 produces stable OpenCode-backed loop artifact conventions and W7.5 either closes or Meta explicitly defers measurement/continuity work with rationale
 - future HUB remains a separate project and FAL only defines safe status/export/control boundaries
 - Wave 8 must remain docs/contract-first until Meta separately approves implementation; no HUB code, bridge delivery, or dashboard implementation is implied
 
@@ -2047,6 +2171,7 @@ Non-goals:
 | 6 | OpenCode evidence/control layer | packet/state boundary | payload semantics | bridge readiness only until later Meta-opened step | usefulness/evidence scoring | later visibility only |
 | 6.5 | Ringfall adoption/readiness | external-project packet-field compatibility | target-project language and room semantics | bridge remains deferred unless Wave 6 supports it | usefulness synthesis and evidence sufficiency | no UI by default |
 | 7 | OpenCode-backed evidence learning layer | loop/run/trace/artifact contract | learning/identity semantics support | router ingest support only after contract | evidence/privacy validation | browse support after ingest shape stabilizes |
+| 7.5 | Measurement and context continuity hardening | metrics/context contract review | learning candidate semantics | evidence compatibility only if needed | metrics, review ledger, pilot measurement | public-safe/readability only if opened |
 | 8 | HUB compatibility contract | status/export and approval-state contract | room taxonomy semantics | future bridge/API feasibility only if gated | privacy/export and evidence boundary | display-needs review only |
 
 ---
