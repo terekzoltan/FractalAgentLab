@@ -1944,7 +1944,7 @@ Parallelism rule: W7-F closeout is serial and accepted. W7-G starts sequentially
 | 4.1 | Track E session | ✅ W7-F usefulness evaluation | W7-D ✅ + W7-E2 ✅ | Accepted GREEN after strict review. Usefulness recommendation is `narrow_continue`; residual semantic non-leakage risk classified as `in-scope now`. W7-specific evaluator/tests are accepted; private report remains local-only unless explicitly force-added later. |
 | 4.2 | Meta Coordinator session | ✅ W7-F-META closeout | W7-F ✅ | Closed with `narrow_continue`. W7-G is opened only for docs-only / review-planning work; implementation and automation remain blocked. Wave 8 HUB/docs-first compatibility remains parked unless separately opened by Meta. |
 | 4.3 | Track C session | ✅ W7-G1 advisory suggestion semantics | W7-F-META ✅ | Accepted by Meta step-review after clean Swarm review. Docs-only/private suggestion semantics brief preserves no automatic routing, dispatch, commit/push automation, authoritative control, public export, bridge/API/session delivery, browser-side OpenCode control, schema, UI, or implementation authorization. |
-| 4.4 | Track E session | ⬜ READY W7-G2 advisory suggestion safety review | W7-G1 ✅ | Review suggestion wording, false-authority risk, privacy, and gate-honesty boundaries after W7-G1 acceptance. |
+| 4.4 | Track E session | ✅ W7-G2 advisory suggestion safety review | W7-G1 ✅ | Accepted by Meta step-review as `APPROVE_WITH_GUARDRAILS`. W7-G1 wording, false-authority risk, privacy, gate-honesty, confidence, and residual semantic non-leakage boundaries reviewed; implementation and automation remain blocked. |
 
 Non-goals:
 - no HUB implementation in FAL
