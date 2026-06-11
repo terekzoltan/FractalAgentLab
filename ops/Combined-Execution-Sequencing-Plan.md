@@ -2009,21 +2009,21 @@ Parallelism rule: no parallel implementation before W7.5-A. Meta first confirms 
 |---|---|---|---|---|
 | 1.1 | Meta Coordinator session | ✅ W7-G closeout + W7.5 activation/scope lock | W7-G2 ✅ | Accepted W7-G docs-only evidence, adopted W7.5 measurement/context-continuity as the next frontier, and kept HUB, public export, OpenCode bridge/API/session delivery, RingFall feature execution, automation, dispatch, and commit/push automation blocked. |
 
-**⬜ Step 2 — W7.5-A repo/test sanity closeout**
+**✅ Step 2 — W7.5-A repo/test sanity closeout**
 
 Parallelism rule: no parallel work. This step proves the real repo can run targeted W7 tests before new metrics or context surfaces are opened.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 2.1 | Track E session | ⬜ READY W7.5-A repo/test sanity closeout | W7.5 scope ✅ | Verify real repo import/testability state, run targeted W7 tests, and route README/public drift as follow-up rather than release work. |
+| 2.1 | Track E session | ✅ W7.5-A repo/test sanity closeout | W7.5 scope ✅ | Accepted by Meta step-review after clean Swarm review. Import sanity PASS, targeted W7 test batch PASS (`70 tests`), supplemental `compileall` PASS without full-repo-health claim, and README/public drift routed as follow-up rather than release work. |
 
-**⏸ Step 3 — Measurement and review-quality surfaces**
+**⬜ Step 3 — Measurement and review-quality surfaces**
 
 Parallelism rule: one Track E session owns the measurement batch. Do W7.5-B first, then W7.5-C in the same session unless Meta later splits the work.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 3.1 | Track E session | ⏸ W7.5-B workflow metrics MVP, then W7.5-C review findings ledger | W7.5-A ✅ | Create multi-axis workflow metrics first; then add human-label-ready review findings ledger without raw transcript retention. Avoid fake single quality score. |
+| 3.1 | Track E session | ⬜ READY W7.5-B workflow metrics MVP, then W7.5-C review findings ledger | W7.5-A ✅ | Create multi-axis workflow metrics first; then add human-label-ready review findings ledger without raw transcript retention. Avoid fake single quality score. |
 
 **⏸ Step 4 — Context hydration policy**
 
