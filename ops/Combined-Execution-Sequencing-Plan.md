@@ -2025,22 +2025,22 @@ Parallelism rule: one Track E session owns the measurement batch. Do W7.5-B firs
 |---|---|---|---|---|
 | 3.1 | Track E session | ✅ W7.5-B workflow metrics MVP, then W7.5-C review findings ledger | W7.5-A ✅ | Accepted after Meta step-review and review-fix. Added direct-import `workflow_metrics.json` and `review_findings_ledger.json` sidecar surfaces with W7 sidecar validation, no-overwrite policy, no fake quality score, no raw transcript/body retention, and path-safe `run_id` validation. |
 
-**⬜ Step 4 — Context hydration policy**
+**✅ Step 4 — Context hydration policy**
 
 Parallelism rule: no parallel work. Meta defines hydration policy before Track B/C consume it.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 4.1 | Meta Coordinator session | ⬜ READY W7.5-D context hydration policy lock | W7.5-A ✅, W7.5-B/C ✅ | Define hot/warm/cold context policy, `context_digest.json` intent, and `.fal/ACTIVE_CONTEXT.*` restore rules; do not bulk-load private docs by default after compact. |
+| 4.1 | Meta Coordinator session | ✅ W7.5-D context hydration policy lock | W7.5-A ✅, W7.5-B/C ✅ | Accepted policy artifact: `docs/private/Wave7_5-W7_5_D-Meta-Context-Hydration-Policy-Lock-v1.md`. Locks L0/L1/L2/L3 hydration, hot/warm/cold/frozen context policy, `context_digest.json` sidecar intent, and `.fal/ACTIVE_CONTEXT.*` restore rules; private docs are not bulk-loaded by default after compact. |
 
-**⏸ Step 5 — Parallel-safe contract and learning backlog work**
+**⬜ Step 5 — Parallel-safe contract and learning backlog work**
 
 Parallelism rule: Track B and Track C may run in parallel only after W7.5-D policy lock and W7.5-B/C measurement fields are stable enough, and only if file scopes are disjoint.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 5.1a | Track B session | ⏸ W7.5-D context digest contract support | W7.5-D policy ✅ + W7.5-B/C ✅ | Define contract/sidecar compatibility for `context_digest.json`; no broad runtime or OpenCode control. |
-| 5.1b | Track C session | ⏸ W7.5-E learning candidate backlog semantics | W7.5-B/C ✅ | Define controlled candidate lifecycle; no automatic prompt rewrite, routing, commit/push, or public export. |
+| 5.1a | Track B session | ⬜ READY W7.5-D context digest contract support | W7.5-D policy ✅ + W7.5-B/C ✅ | Define contract/sidecar compatibility for `context_digest.json`; no broad runtime, OpenCode control, bridge/API/session delivery, routing, dispatch, commit/push automation, or public export. |
+| 5.1b | Track C session | ⬜ READY W7.5-E learning candidate backlog semantics | W7.5-B/C ✅ | Define controlled candidate lifecycle; no automatic prompt rewrite, routing, commit/push, or public export. |
 
 **⏸ Step 6 — RingFall pilot protocol**
 
