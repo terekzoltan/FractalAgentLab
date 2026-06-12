@@ -2042,14 +2042,19 @@ Parallelism rule: Track B and Track C may run in parallel only after W7.5-D poli
 | 5.1a | Track B session | ✅ W7.5-D context digest contract support | W7.5-D policy ✅ + W7.5-B/C ✅ | Added Track B-owned direct-import `context_digest.json` contract builder/writer under `core/contracts`, with path-safe `run_id`, no-overwrite writes, deterministic JSON, privacy/claim fields, and no broad runtime, OpenCode control, bridge/API/session delivery, routing, dispatch, commit/push automation, or public export. |
 | 5.1b | Track C session | ✅ W7.5-E learning candidate backlog semantics | W7.5-B/C ✅ | Added controlled local/private learning-candidate backlog semantics under `memory/**`, including lifecycle, owner-decision, confidence, validation, merge, store path-safety, and non-execution invariants; no automatic prompt rewrite, routing, commit/push, or public export. |
 
-**⬜ Step 6 — RingFall pilot protocol**
+**🔄 Step 6 — RingFall pilot protocol and measured pilot execution**
 
 Parallelism rule: no parallel work. Meta defines pilot scope before Track E validates measurement sufficiency.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 6.1 | Meta Coordinator session | ⬜ READY W7.5-F RingFall pilot protocol | W7.5-B/C ✅ + W7.5-D policy ✅ | Define 5-task measured pilot and target-project boundaries; no large RingFall feature push before pilot readiness. |
-| 6.2 | Track E session | ⏸ W7.5-F measurement sufficiency review | W7.5-F protocol ✅ | Review pilot capture template, manual labels, metrics sidecars, and post-pilot synthesis requirements. |
+| 6.1 | Meta Coordinator session | ✅ W7.5-F RingFall pilot protocol draft | W7.5-B/C ✅ + W7.5-D policy ✅ | Drafted `docs/private/Ringfall-FAL-Pilot-Protocol-v01.md`: five measured readiness/planning tasks, capture template, sidecar/label/context expectations, and target-project boundaries; no large RingFall feature push before pilot readiness. |
+| 6.2 | Track E session | ✅ W7.5-F measurement sufficiency review | W7.5-F protocol draft ✅ | Returned YELLOW with accepted fixes; Meta tightened required sidecar fail-loud handling, auditable learning-candidate refs, and pilot hydration override against bulk target-doc loading. |
+| 6.3 | Meta Coordinator session | ✅ W7.5-F P1 current RingFall state refresh | W7.5-F protocol + Track E review fixes ✅ | Completed read-only P1 capture in `docs/private/Ringfall-FAL-Pilot-P1-Current-State-Refresh-v01.md`; generated local/private sidecars under `data/artifacts/w75f-p1-ringfall-state-refresh-20260612/`; RingFall status stayed clean and target mutation count stayed 0. |
+| 6.4 | Meta Coordinator session | ⬜ READY W7.5-F P2 Combined vs wave-plan consistency review | W7.5-F P1 ✅ | Compare RingFall `docs/plans/Combined-Execution-Sequencing-Plan.md` with `docs/plans/Ringfall-Implementation-Wave-Plan-v01.md`; return consistency findings and next safe step only. No target doc rewrite without a separate approved task. |
+| 6.5 | Meta Coordinator session | ⏸ W7.5-F P3 risk-gate mapping review | W7.5-F P2 ✅ | Map RingFall G1-G10 and automatic hold triggers into FAL pilot gate language; do not weaken direct-mutation, hidden-truth, or replay/eval holds. |
+| 6.6 | Meta Coordinator session | ⏸ W7.5-F P4 implementation-readiness brief draft | W7.5-F P3 ✅ | Define evidence still needed before RingFall Wave 1 implementation planning; do not approve implementation execution. |
+| 6.7 | Meta Coordinator session | ⏸ W7.5-F P5 pilot synthesis and learning candidate review | W7.5-F P1-P4 evidence ✅ | Aggregate pilot metrics, review labels, context digests, and learning candidates; public methodology/showcase remains blocked until W7.5-G review. |
 
 **⏸ Step 7 — Public-safe methodology prep**
 
