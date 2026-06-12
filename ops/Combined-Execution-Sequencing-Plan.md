@@ -2042,7 +2042,7 @@ Parallelism rule: Track B and Track C may run in parallel only after W7.5-D poli
 | 5.1a | Track B session | ✅ W7.5-D context digest contract support | W7.5-D policy ✅ + W7.5-B/C ✅ | Added Track B-owned direct-import `context_digest.json` contract builder/writer under `core/contracts`, with path-safe `run_id`, no-overwrite writes, deterministic JSON, privacy/claim fields, and no broad runtime, OpenCode control, bridge/API/session delivery, routing, dispatch, commit/push automation, or public export. |
 | 5.1b | Track C session | ✅ W7.5-E learning candidate backlog semantics | W7.5-B/C ✅ | Added controlled local/private learning-candidate backlog semantics under `memory/**`, including lifecycle, owner-decision, confidence, validation, merge, store path-safety, and non-execution invariants; no automatic prompt rewrite, routing, commit/push, or public export. |
 
-**🔄 Step 6 — RingFall pilot protocol and measured pilot execution**
+**✅ Step 6 — RingFall pilot protocol and measured pilot execution**
 
 Parallelism rule: no parallel work. Meta defines pilot scope before Track E validates measurement sufficiency.
 
@@ -2054,15 +2054,15 @@ Parallelism rule: no parallel work. Meta defines pilot scope before Track E vali
 | 6.4 | Meta Coordinator session | ✅ W7.5-F P2 Combined vs wave-plan consistency review | W7.5-F P1 ✅ | Completed read-only P2 capture in `docs/private/Ringfall-FAL-Pilot-P2-Combined-vs-Wave-Plan-Consistency-Review-v01.md`; plans align on Wave 0-11 and guardrails, with one true-positive status-sync gap: actual RingFall skeleton commit `08732d5` exists while planning status still reads pre-implementation. No target doc rewrite occurred. |
 | 6.5 | Meta Coordinator session | ✅ W7.5-F P3 risk-gate mapping review | W7.5-F P2 ✅ | Completed read-only P3 capture in `docs/private/Ringfall-FAL-Pilot-P3-Risk-Gate-Mapping-Review-v01.md`; mapped G1-G10 and automatic holds into FAL pilot gate language without weakening direct-mutation, hidden-truth, replay/eval, or FAL-dependency holds. One true-positive source-doc issue remains: executive G1-G10 does not match detailed G1-G9 guardrail headings. |
 | 6.6 | Meta Coordinator session | ✅ W7.5-F P4 implementation-readiness brief draft | W7.5-F P3 ✅ | Completed read-only P4 capture in `docs/private/Ringfall-FAL-Pilot-P4-Implementation-Readiness-Brief-v01.md`; defined evidence still needed before RingFall Wave 1 planning/execution and explicitly did not approve implementation. RingFall remains not ready for Wave 1 planning/execution until P5 plus separate target-doc/status-sync or Wave 0 closeout. |
-| 6.7 | Meta Coordinator session | ⬜ READY W7.5-F P5 pilot synthesis and learning candidate review | W7.5-F P1-P4 evidence ✅ | Aggregate pilot metrics, review labels, context digests, and learning candidates; public methodology/showcase remains blocked until W7.5-G review. P5 must not create new project work or approve RingFall implementation. |
+| 6.7 | Meta Coordinator session | ✅ W7.5-F P5 pilot synthesis and learning candidate review | W7.5-F P1-P4 evidence ✅ | Completed read-only P5 capture in `docs/private/Ringfall-FAL-Pilot-P5-Synthesis-and-Learning-Candidate-Review-v01.md`; P1-P4 sidecars complete, target mutation count 0, context digests restored, 2 true-positive findings, 2 proposed doc-cleanup candidates. Recommendation: `narrow`; no RingFall implementation or public output approval. |
 
-**⏸ Step 7 — Public-safe methodology prep**
+**⬜ Step 7 — Public-safe methodology prep**
 
 Parallelism rule: no parallel work. Public-facing artifacts require Track E safety review before any release or mirror action.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 7.1 | Meta Coordinator session | ⏸ W7.5-G public-safe methodology candidate scope | W7.5-F evidence ✅ | Prepare sanitized methodology candidates only; no raw selected outputs, private paths, prompt/gate moat, or RingFall strategy. |
+| 7.1 | Meta Coordinator session | ⬜ READY W7.5-G public-safe methodology candidate scope | W7.5-F evidence ✅ | Prepare private sanitized methodology candidates only; no raw selected outputs, private paths, prompt/gate moat, RingFall strategy, `docs/public/**`, mirror, or release. Must carry P5 `narrow` recommendation and require Track E public-safety review before any public material. |
 | 7.2 | Track E session | ⏸ W7.5-G public-safety review | W7.5-G candidate scope ✅ | Review candidate public material before any `docs/public/**`, example, or mirror action is accepted. |
 
 **⏸ Step 8 — HUB compatibility revisit**
