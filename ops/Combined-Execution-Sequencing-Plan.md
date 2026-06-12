@@ -2033,22 +2033,22 @@ Parallelism rule: no parallel work. Meta defines hydration policy before Track B
 |---|---|---|---|---|
 | 4.1 | Meta Coordinator session | ✅ W7.5-D context hydration policy lock | W7.5-A ✅, W7.5-B/C ✅ | Accepted policy artifact: `docs/private/Wave7_5-W7_5_D-Meta-Context-Hydration-Policy-Lock-v1.md`. Locks L0/L1/L2/L3 hydration, hot/warm/cold/frozen context policy, `context_digest.json` sidecar intent, and `.fal/ACTIVE_CONTEXT.*` restore rules; private docs are not bulk-loaded by default after compact. |
 
-**⬜ Step 5 — Parallel-safe contract and learning backlog work**
+**✅ Step 5 — Parallel-safe contract and learning backlog work**
 
 Parallelism rule: Track B and Track C may run in parallel only after W7.5-D policy lock and W7.5-B/C measurement fields are stable enough, and only if file scopes are disjoint.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 5.1a | Track B session | ⬜ READY W7.5-D context digest contract support | W7.5-D policy ✅ + W7.5-B/C ✅ | Define contract/sidecar compatibility for `context_digest.json`; no broad runtime, OpenCode control, bridge/API/session delivery, routing, dispatch, commit/push automation, or public export. |
-| 5.1b | Track C session | ⬜ READY W7.5-E learning candidate backlog semantics | W7.5-B/C ✅ | Define controlled candidate lifecycle; no automatic prompt rewrite, routing, commit/push, or public export. |
+| 5.1a | Track B session | ✅ W7.5-D context digest contract support | W7.5-D policy ✅ + W7.5-B/C ✅ | Added Track B-owned direct-import `context_digest.json` contract builder/writer under `core/contracts`, with path-safe `run_id`, no-overwrite writes, deterministic JSON, privacy/claim fields, and no broad runtime, OpenCode control, bridge/API/session delivery, routing, dispatch, commit/push automation, or public export. |
+| 5.1b | Track C session | ✅ W7.5-E learning candidate backlog semantics | W7.5-B/C ✅ | Added controlled local/private learning-candidate backlog semantics under `memory/**`, including lifecycle, owner-decision, confidence, validation, merge, store path-safety, and non-execution invariants; no automatic prompt rewrite, routing, commit/push, or public export. |
 
-**⏸ Step 6 — RingFall pilot protocol**
+**⬜ Step 6 — RingFall pilot protocol**
 
 Parallelism rule: no parallel work. Meta defines pilot scope before Track E validates measurement sufficiency.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 6.1 | Meta Coordinator session | ⏸ W7.5-F RingFall pilot protocol | W7.5-B/C ✅ + W7.5-D policy ✅ | Define 5-task measured pilot and target-project boundaries; no large RingFall feature push before pilot readiness. |
+| 6.1 | Meta Coordinator session | ⬜ READY W7.5-F RingFall pilot protocol | W7.5-B/C ✅ + W7.5-D policy ✅ | Define 5-task measured pilot and target-project boundaries; no large RingFall feature push before pilot readiness. |
 | 6.2 | Track E session | ⏸ W7.5-F measurement sufficiency review | W7.5-F protocol ✅ | Review pilot capture template, manual labels, metrics sidecars, and post-pilot synthesis requirements. |
 
 **⏸ Step 7 — Public-safe methodology prep**
