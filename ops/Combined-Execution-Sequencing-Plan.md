@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-06-07
+**Last updated:** 2026-06-14
 
 ---
 
@@ -2056,22 +2056,22 @@ Parallelism rule: no parallel work. Meta defines pilot scope before Track E vali
 | 6.6 | Meta Coordinator session | ✅ W7.5-F P4 implementation-readiness brief draft | W7.5-F P3 ✅ | Completed read-only P4 capture in `docs/private/Ringfall-FAL-Pilot-P4-Implementation-Readiness-Brief-v01.md`; defined evidence still needed before RingFall Wave 1 planning/execution and explicitly did not approve implementation. RingFall remains not ready for Wave 1 planning/execution until P5 plus separate target-doc/status-sync or Wave 0 closeout. |
 | 6.7 | Meta Coordinator session | ✅ W7.5-F P5 pilot synthesis and learning candidate review | W7.5-F P1-P4 evidence ✅ | Completed read-only P5 capture in `docs/private/Ringfall-FAL-Pilot-P5-Synthesis-and-Learning-Candidate-Review-v01.md`; P1-P4 sidecars complete, target mutation count 0, context digests restored, 2 true-positive findings, 2 proposed doc-cleanup candidates. Recommendation: `narrow`; no RingFall implementation or public output approval. |
 
-**⬜ Step 7 — Public-safe methodology prep**
+**✅ Step 7 — Public-safe methodology prep**
 
 Parallelism rule: no parallel work. Public-facing artifacts require Track E safety review before any release or mirror action.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 7.1 | Meta Coordinator session | ⬜ READY W7.5-G public-safe methodology candidate scope | W7.5-F evidence ✅ | Prepare private sanitized methodology candidates only; no raw selected outputs, private paths, prompt/gate moat, RingFall strategy, `docs/public/**`, mirror, or release. Must carry P5 `narrow` recommendation and require Track E public-safety review before any public material. |
-| 7.2 | Track E session | ⏸ W7.5-G public-safety review | W7.5-G candidate scope ✅ | Review candidate public material before any `docs/public/**`, example, or mirror action is accepted. |
+| 7.1 | Meta Coordinator session | ✅ W7.5-G public-safe methodology candidate scope | W7.5-F evidence ✅ | Private candidate scope captured in `docs/private/Wave7_5-W7_5_G-Public-Safe-Methodology-Candidate-Scope-v1.md`; no raw selected outputs, private paths, prompt/gate moat, RingFall strategy, `docs/public/**`, mirror, release, implementation approval, or public methodology/showcase output was created. P5 `narrow` is carried forward. |
+| 7.2 | Track E session | ✅ W7.5-G public-safety review | W7.5-G candidate scope ✅ | Review accepted GREEN in `docs/private/Wave7_5-W7_5_G-TrackE-Public-Safety-Review-v1.md`. The private candidate scope is safe as a private planning artifact, but this does not authorize `docs/public/**`, public release, mirror, Track A presentation, HUB, bridge/API/session delivery, routing, dispatch, or commit/push automation. A concrete sanitized public package still needs its own Track E review before publication. |
 
-**⏸ Step 8 — HUB compatibility revisit**
+**✅ Step 8 — HUB compatibility revisit**
 
 Parallelism rule: no parallel work. HUB remains parked unless Meta explicitly opens a docs/contract-first compatibility step.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 8.1 | Meta Coordinator session | ⏸ W7.5-H HUB compatibility revisit | W7.5 closeout ✅ | Decide whether Wave 8 starts, stays parked, or narrows to read-only compatibility only. |
+| 8.1 | Meta Coordinator session | ✅ W7.5-H HUB compatibility revisit | W7.5-G ✅ | Accepted in `docs/private/Wave7_5-W7_5_H-HUB-Compatibility-Revisit-v1.md`. Wave 8/HUB implementation remains parked; future HUB compatibility is narrowed to docs/contract backlog for HUB-0 read-only evidence consumption and HUB-1 next-action preview only. Next active frontier returns to RingFall target-side source-of-truth sync: `RF-STATUS-SYNC-01`, then `RF-GUARDRAIL-SYNC-01`. |
 
 Non-goals:
 - no OpenCode bridge/API/session delivery
