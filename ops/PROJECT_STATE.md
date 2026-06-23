@@ -1,143 +1,76 @@
 # Jelenlegi állapot
 
-Wave 6 lezárva `narrow_continue` döntéssel; Wave 6.5 RingFall readiness/adoption closeout elfogadva. Nincs public case study, public mirror artifact, sanitized report, `docs/public/` output vagy Track A presentation task. Bridge/API/session delivery implementáció továbbra is blokkolt.
+Wave 6 lezárva `narrow_continue` döntéssel; Wave 6.5 RingFall readiness/adoption closeout elfogadva. W7.5 measurement/context-continuity hardening csomag lezárt. W7.6 target-orchestrator seamless integration P0/P1/P2/P3 docs/contract closeout kész: a P2 Track A/B/C/D/E review lefutott, Track A és Track D `GREEN`, Track B/C/E `YELLOW/revise`, `RED` nem volt; P3 Meta döntés `revise` lett, majd a szűk revision bundle bekerült a P1 PRD-be és a backup-first apply scriptbe. Global OpenCode command/skill apply még nem futott. Public case study, public mirror artifact, `docs/public/**` output, HUB implementation, automatikus `/compact`, implicit compact-event detection és OpenCode bridge/API/session delivery továbbra is blokkolt.
 
 # Jelenlegi wave / sprint / step / epic
 
-- Wave: Wave 7.5 — Measurement & Context Continuity Hardening
-- Sprint: W7.5-S1 — activation and sanity/testability
-- Step: W7.5-H accepted; RF-STATUS-SYNC-01 READY
-- Epic: RingFall target-side source-of-truth sync via `track-metaops` may start
+- Wave: Wave 7.6 — Target Orchestrator Seamless Integration
+- Sprint: W7.6-S1 — checkpoint closeout command/skill readiness
+- Step: W7.6-P3 P1 implementation/apply decision docs/contract revise closeout kész; W7.6-P4 csak explicit user-approved global apply és post-apply verification után nyílhat.
+- Epic: `/fal-checkpoint-target` + `fal-target-orchestration` P1 command/skill PRD és backup-first apply script. Full `/fal-orchestrate-target`, router hardening, parallel reconcile, Wave 7.7 product/advisory UX és RingFall Wave 2 execution későbbi gate-hez kötött.
 
 # Jelenlegi workflow fázis
 
-W7-G closeout accepted: W7-G1 docs-only advisory suggestion semantics és W7-G2 Track E safety review accepted `APPROVE_WITH_GUARDRAILS`. W7.5 measurement/context-continuity aktiválva Wave 8/HUB előtt. W7.5-A Track E repo/test sanity closeout accepted. W7.5-B/C Track E accepted: `workflow_metrics.json` MVP és `review_findings_ledger.json` MVP direct-import library surface + focused tests; a korábbi unsafe `run_id` path traversal blocker fixelve és review-zva. W7.5-D Meta context hydration policy lock accepted. Step 5 accepted: Track B `context_digest.json` contract/support és Track C local/private learning candidate backlog semantics elkészült és review-zva; a Track C owner-decision invariant review-fixben javítva. W7.5-F RingFall pilot protocol and P1-P5 measured pilot accepted. P5 synthesis recommendation: `narrow`. Pilot evidence: P1-P4 required sidecars complete, clean-pass eligible count 1, true-positive findings 2 (`P2-F1`, `P3-F1`), proposed doc-cleanup candidates 2, target mutation count 0, context recovery labels `restored`. W7.5-G.1 private public-safe methodology candidate scope elkészült, W7.5-G.2 Track E public-safety review GREEN lett, és W7.5-G accepted. W7.5-H HUB compatibility revisit accepted: Wave 8/HUB implementation parked, future HUB compatibility csak docs/contract backlogként marad HUB-0 read-only evidence consumption és HUB-1 next-action preview szinten. Public output továbbra sem engedélyezett konkrét sanitized public package és új Track E review nélkül. RingFall + FAL integrationhoz private canon készült: one orchestrator session / two modes, dedicated `track-metaops` lane, checkpoint sync + batch fallback, copy/paste orchestrator és target-doc promptok. RingFall Wave 1 planning/execution és feature implementation továbbra sem engedélyezett. Nincs fake quality score, public readiness claim, raw transcript/body retention, automation, CLI/script, HUB implementation vagy bridge/API/session scope. A W7-E2 residual semantic non-leakage risk továbbvitt státusza: `in-scope now`.
+W7.6 workflow-hardening marad, nem target implementation. P3 revision bundle tartalma: target source-of-truth read order kivétel a generic Reliability Layerrel szemben; `fal.target_profile.v1` és `fal.active_context.v1` field law minimum mezőkkel, explicit-args precedence-szel, defaults-only profile viselkedéssel, enum/status értékekkel és advisory unknown-extra szabállyal; `workflow_verdict` / `domain_verdict` / `routing_verdict` output/ledger separation; finding-status minimum enum és source artifact + human/Meta decision separation; minimális `workflow_metrics.jsonl` row/status contract vagy explicit reconcile-debt fallback. Egy reviewer subagent self-review kezdetben hiányolta az enum/status értékeket az apply scriptbe ágyazott command/skill szövegből; ez javítva lett. `ops/Combined-Execution-Sequencing-Plan.md` Step 3/4 closeout frissítve, `ops/AGENTS.md` local/ignored státusz szinkronizálva. Nem történt global apply, RingFall mutation, public output, bridge/API/session delivery, automatic `/compact`, commit/push automation vagy server restart.
 
 # Utolsó aktor / szerep
 
-Meta Coordinator
+OC-Server-FAL Orchestrator + reviewer subagent
 
 # Utolsó döntés
 
-W7-D committed (`ca1167d`), W7-E1 committed (`9d1ff9f`), Combined sync committed (`bf13189`). W7-E2 committed (`227fd11`). W7-F Track E evaluator/test changes accepted GREEN; W7-F-META closeout accepted `narrow_continue`. W7-G1 accepted, W7-G2 accepted `APPROVE_WITH_GUARDRAILS`. Meta W7-G closeout accepted and W7.5 activated. W7.5-A Track E repo/test sanity closeout accepted after clean Swarm review. W7.5-B/C Track E workflow metrics + review findings ledger accepted GREEN after path-safety review-fix. W7.5-D context hydration policy accepted as policy-only local/private artifact. W7.5-D context digest support and W7.5-E learning candidate backlog semantics accepted after step-review synthesis and Track C owner-decision review-fix. W7.5-F RingFall pilot P1-P5 accepted with local/private sidecars and `narrow` recommendation. W7.5-G.1 accepted as private candidate scope only; W7.5-G.2 Track E public-safety review GREEN with no required fixes. W7.5-H accepted as docs/contract-first HUB compatibility revisit: Wave 8/HUB implementation remains parked, future HUB-0/HUB-1 compatibility remains backlog only. Public output remains blocked until a concrete sanitized public package receives its own Track E review. Next active action is RingFall `RF-STATUS-SYNC-01` through `track-metaops`. Implementation automation, routing, dispatch, commit/push automation, bridge/API/session delivery, browser-side control, HUB implementation, RingFall implementation and public export remain blocked.
+P3 döntés: `revise`, nem `hold`. A revise teljesült docs/contract scope-ban. A revised P1 PRD/apply script apply-képes jelölt, de a global command/skill létrehozása/frissítése továbbra is explicit user approval + manual apply + verification gate mögött marad.
 
 # Utolsó befejezett akció
 
-Meta owner-grill után elkészítette, Track E review után javította, majd elfogadta a W6.5 csomagot (`67f66e1`). RingFallban public-safe Wave 0 skeleton root commit készült és GitHubra felment `08732d5 init` message-dzsel. W7-A lezárult `accepted_with_contract_revisions` döntéssel. W7-B1/W7-B2 closeout accepted lett (`de0240d`), W7-B3 Track A CLI UX accepted lett (`ce40fbd`), W7-C1 Track E negatív gate feltárta a Track B privacy gapet, Track B javította, Track E rerunolta, Meta pedig W7-B/C closeoutot elfogadta. W7-D, W7-E1, W7-E2, W7-F, W7-G1 és W7-G2 accepted/committed state-ben vannak. Post-W7 stratégiai input integrálva W7.5 hardening irányként, W7-G closeout accepted. W7.5-A accepted; W7.5-B/C accepted GREEN; W7.5-D policy lock accepted. Step 5 accepted: context digest contract support és learning candidate backlog semantics elkészült direct-import módon, no export/no automation scope-ban. W7.5-F protocol és P1-P5 accepted; W7.5-G.1 private candidate scope elkészült és W7.5-G.2 Track E public-safety review GREEN lett. W7.5-H HUB compatibility revisit accepted, Wave 8/HUB implementation parked. RingFall + FAL orchestration integration canon draft és copy/paste promptkészlet elkészült. Nem történt suggestion implementation, OpenCode bridge/API/session delivery, browser control, commit/push automation vagy public evidence release.
+Frissült `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md`, `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`, `ops/Combined-Execution-Sequencing-Plan.md` és local/ignored `ops/AGENTS.md`. Mechanikus ellenőrzés: PowerShell parser OK az apply scriptre; `git diff --check` csak a korábban ismert CRLF warningokat mutatta `ops/Combined-Execution-Sequencing-Plan.md` és `ops/PROJECT_STATE.md` fájlokra. Egy reviewer subagent self-review futott; a talált apply-script enum/status blocker javítva lett.
 
 Automatizációs tudnivaló változatlan: `fractalagentlab-architecture-intelligence-refresh` 72 óránként fut ebben a workspace-ben, csak `docs/architecture/**` diagnosztikai/architektúra artefaktumokat frissíthet, implementation kódhoz nem nyúlhat, és `ops/PROJECT_STATE.md`-t csak blocking/major architektúra-probléma esetén módosíthatja.
 
 # Következő akció
 
-FAL Orchestrator / RingFall Meta indítsa a `RF-STATUS-SYNC-01` target-side docs/source-of-truth taskot a `track-metaops` lane-en. Használandó prompt input: `docs/private/Ringfall-MetaOps-Task-Prompts-v01.md`. A task célja a `P2-F1` Wave 0/status-sync gap rendezése; tilos RingFall Wave 1 planning/execution, feature implementation, public export, HUB implementation, OpenCode bridge/API/session delivery, routing/dispatch automation vagy commit/push automation.
+Elsődleges: commit után user/Meta dönthet a backup-first apply script futtatásáról: `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`. Ha a user explicit jóváhagyja és az apply lefut, utána verify: a global `fal-checkpoint-target.md` és `fal-target-orchestration/SKILL.md` létezzen, és tartalmazza az authority/schema/verdict/finding/metrics contract szöveget. Csak ezután nyílhat W7.6-P4 Track E RingFall Wave 1 read-only backfill validation. RingFall Wave 2 execution külön Meta-gated target terv nélkül továbbra sem indulhat.
 
 # Következő elvárt szerep
 
-FAL Orchestrator + RingFall `track-metaops` RF-STATUS-SYNC-01
+User / Meta apply approval decision; utána operator apply + verification, majd Track E W7.6-P4 backfill validation
 
 # Most ne gondolkodj ezen
 
-- Ne nyisd meg W6-I-et az elfogadott Candidate A docs-only scope-on túl.
-- Ne értelmezd W6-I-et broad external usefulness vagy public-safe case-study bizonyítékként.
-- Ne kezeld RingFallt implementation targetként readiness brief, Track E review és Meta acceptance nélkül.
-- Ne kezdd el a HUB-ot FAL feature-ként; HUB compatibility most Wave8/later, a Wave7 evidence-learning contract után.
-- Ne indíts OpenCode bridge/API implementációt; W6-G lezárás nem delivery engedély.
-- Ne nyúlj a WorldSim `refinery-service-java/`, live endpoint, secret-bearing vagy deploy felületeihez a first-loop kiválasztásban.
-- Ne érintsd a WorldSim `.swarm/**` vagy `ops/PROJECT_STATE.md` felületeit az első external loopban.
-- Ne értelmezd a W6-F `optional`, `confidence: low`, FAL-only eredményt bridge delivery engedélyként.
-- Ne normalizáld W6-E `pass_with_warnings`, `clean_pass=false`, `net_recommendation: insufficient_data` eredményét clean usefulness claimmé.
-- Ne hozz létre külön Track state fájlokat.
-- Ne alakítsd az `ops/PROJECT_STATE.md` fájlt hosszú naplóvá.
-- Ne commitold a raw `data/evidence/wave6/**` evidence-t.
-- Ne kezeld a RingFall `.fal/**` local/private runbookot public vagy canonical RingFall design artifactként.
-- Ne kezdd el W7-G suggestion implementationt; W7.5 elsőként mérési/context-continuity scope review, nem automation. Ne stage-eld `.gitignore`, Wave6/W6.5 docs vagy unrelated fájlokat post-W7 commit prep során.
+- Ne induljon el RingFall Wave 2 implementation/execution külön Wave 2 planning brief és Meta gate előtt.
+- Ne induljon C#/.NET core, Python brain, Unity, provider/model runtime vagy scenario/simulation implementation puszta FAL workflow-hardening ürüggyel.
+- Ne nyisd meg a HUB implementációt vagy Wave 8 executiont.
+- Ne indíts OpenCode bridge/API/session deliveryt, routing/dispatch automationt vagy commit/push automationt.
+- Ne indíts automatikus `/compact`-ot; W7.6 csak compact-readiness és hydration authority állapotot rögzíthet.
+- Ne feltételezz implicit compact-event detectiont; W7.6 csak explicit boundary artifactból vagy operator/workflow jelzésből dolgozhat.
+- Ne építs full `/fal-orchestrate-target` commandot P1-P4 bizonyíték előtt.
+- Ne nyisd meg Wave 7.7 product UX vagy external advisory intake implementációt W7.6 bizonyíték és külön Meta gate előtt.
+- Ne hozz létre public release-t, public mirror artifactot vagy `docs/public/**` outputot.
+- Ne futtasd a global apply scriptet külön explicit user approval nélkül.
 
 # Nyitott kérdések / blokkolók
 
-- W7-B1/W7-B2/W7-B3/W7-C1 aktív blocker nincs; accepted.
-- `RF-2026-06-04-01` fixed locally; Track E rerun privacy/false-green sufficiency PASS.
-- W7-D `RF-2026-06-05-01` accepted and committed in `ca1167d`.
-- W7-E1 `RF-2026-06-06-01` accepted and committed in `9d1ff9f`; `RF-2026-06-05-02` no-op-brief drift route-olva.
-- W7-E2 Track E learning/privacy validation accepted; `w7_f_unblocked: true`. W7-F és W7-F-META accepted; `narrow_continue`, residual semantic non-leakage risk `in-scope now`. W7-G1 docs-only semantics brief accepted; W7-G2 Track E safety review accepted `APPROVE_WITH_GUARDRAILS`; W7-G closeout accepted; W7.5-A accepted; W7.5-B/C accepted GREEN after review-fix; W7.5-D context hydration policy lock accepted; Step 5 Track B/C accepted after review-fix; W7.5-F pilot protocol accepted after Track E review-fix; P1-P5 accepted with `narrow` recommendation; W7.5-G.1 private candidate scope accepted; W7.5-G.2 Track E public-safety review GREEN; W7.5-H docs/contract-first HUB compatibility revisit accepted; `RF-STATUS-SYNC-01` READY.
-- W7-B partial-write risk elfogadott LOW residual marad, ha downstream consumers acceptance validationre támaszkodnak és nem artifact directory presence-re.
-- RingFall már git repo, public-safe első commit: `08732d5 init`; GitHub remote: `https://github.com/terekzoltan/RingFall.git`, `origin/main` is `08732d5`.
-- RingFall feature implementation továbbra is blokkolt későbbi readiness gate előtt; Wave 1 implementation planning/execution külön target-doc/status-sync vagy Wave 0 closeout nélkül nem indulhat.
-- Public release, public mirror, `docs/public/` output és Track A presentation továbbra is blokkolt; future public artifact csak külön export-candidate draft + új Track E review után lehetséges.
-- W6-I warning: WorldSim `ops/PROJECT_STATE.md` hiányzott, ezért W6-I csak Combined-only canonical verificationként elfogadott.
-- Wave 6 closeout `medium_low` confidence marad; W6-I adott external docs-only evidence-t, de csak warning-grade és Combined-only narrowed formában.
-- OpenCode API assumptions unverified; bridge/API/session delivery implementáció továbbra is blokkolt.
-- WorldSim W6-H alatt elfogadott target, de csak a Candidate A docs-only loopra.
+- Global OpenCode command/skill apply még nem történt; W7.6-P4 backfill addig blokkolt, amíg az apply és verification nincs kész.
+- RingFall Wave 2 implementation továbbra is blokkolt külön Wave 2 planning brief és Meta gate előtt.
+- Public-safe konkrét methodology/public package még nincs draftolva vagy külön review-zva.
+- Wave 8/HUB továbbra is parked docs/contract backlog.
+- OpenCode bridge/API assumptions továbbra is unverified; delivery implementáció továbbra is blokkolt.
+- Wave 7.7 productized target orchestration UX és external advisory intake parked; csak W7.6 P1/P2/P4 evidence után nyílhat.
 
 # Evidence pointerek
 
-- `docs/private/Project-State-Continuity-Protocol-v01.md`
 - `ops/PROJECT_STATE.md`
 - `ops/AGENTS.md`
 - `ops/Combined-Execution-Sequencing-Plan.md`
-- `ops/Meta-Coordinator-Runbook.md`
-- `ops/Track-Implementation-Runbook.md`
-- `docs/private/Coding-Vertical-Review-Gate-Policy-v01.md`
-- `docs/private/Wave6-W6-S2-Meta-W6-E-Capture-Brief.md`
-- `docs/private/Wave6-W6-S2-TrackE-W6-E-Second-Loop-Capture.md`
-- `docs/private/Wave6-W6-S2-TrackE-W6-F-Usefulness-Evaluation-v1.md`
-- `docs/private/Wave6-W6-S2-TrackD-W6-G-OpenCode-Bridge-Readiness-Brief-v1.md`
-- `docs/private/Wave6-W6-S2-Meta-W6-G-Step-Review-Closeout.md`
-- `docs/private/Wave6-W6-S3-Meta-W6-H-Target-Readiness-Brief.md`
-- `docs/private/Wave6-W6-S3-Meta-W6-H-Step-Review-Closeout.md`
-- `docs/private/Wave6-Post-Closeout-Ringfall-HUB-Strategy-v01.md`
-- `docs/private/Wave6-W6-S3-Meta-W6-I-Prompt-Package-v1.md`
-- `docs/private/Wave6-W6-S3-Meta-W6-I-WorldSim-Docs-Only-Meta-Review-v1.md`
-- `docs/private/Wave6-W6-S3-Meta-W6-I-Step-Review-Closeout.md`
-- `docs/private/Wave6-W6-S3-Meta-W6-J-Public-Safety-No-Release-Decision-v1.md`
-- `docs/private/Wave6-Post-Closeout-Usefulness-Synthesis-v01.md`
-- `docs/private/FAL-External-Project-Usage-Runbook-v01.md`
-- `docs/private/External-Project-Packet-Fields-v01.md`
-- `docs/private/Ringfall-Target-Readiness-Brief-v01.md`
-- `docs/private/Ringfall-Safe-Slice-1-Repo-Skeleton-Readiness-Review-v01.md`
-- `docs/private/Wave6_5-Ringfall-Adoption-Readiness-Closeout-v01.md`
-- `docs/private/Wave7-OpenCode-Evidence-Learning-Layer-Plan-v1.md`
-- `docs/private/Wave7-W7-A-OpenCode-Backed-Loop-Contract-v1.md`
-- `docs/private/Wave7-W7-A-META1-Contract-Adoption-Review-v1.md`
-- `docs/private/Wave7-W7-A-B-Contract-Compatibility-Review-v1.md`
-- `docs/private/Wave7-W7-A-E-Evidence-Privacy-Review-v1.md`
-- `docs/private/Wave7-W7-A-META2-Acceptance-Closeout-v1.md`
-- `docs/private/Wave7-W7-B-Router-Evidence-Ingest-CLI-v1.md`
-- `docs/private/Wave7-W7-B-META-Closeout-v1.md`
-- `docs/private/Wave7-W7-B3-TrackA-Ingest-CLI-UX-v1.md`
-- `docs/private/Wave7-W7-C-OpenCode-Backed-Workbench-Integration-v1.md`
-- `docs/private/Wave7-W7-D-OpenCode-Learning-State-And-Suggestions-v1.md`
-- `docs/private/Wave7-W7-E1-TrackC-Project-Global-Learning-Input-Semantics-v1.md`
-- `docs/private/Wave7-W7-E2-TrackE-Learning-Privacy-Validation-v1.md`
-- `docs/private/Wave7-W7-F-TrackE-Usefulness-Evaluation-v1.md`
-- `docs/private/Wave7-W7-G1-TrackC-Advisory-Suggestion-Semantics-v1.md`
-- `docs/private/Wave7-W7-G2-TrackE-Advisory-Suggestion-Safety-Review-v1.md`
-- `docs/private/FAL_Post_Wave7_Workflow_Plan.md`
-- `docs/private/Wave7_5-Measurement-Continuity-Hardening-Plan-v1.md`
-- `docs/private/Wave7-W7-G-Meta-Closeout-W7_5-Activation-v1.md`
-- `docs/private/Wave7_5-W7_5_D-Meta-Context-Hydration-Policy-Lock-v1.md`
-- `docs/private/Wave7_5-W7_5_A-TrackE-Repo-Test-Sanity-Closeout-v1.md`
-- `docs/private/Ringfall-FAL-Pilot-Protocol-v01.md`
-- `docs/private/Ringfall-FAL-Pilot-P1-Current-State-Refresh-v01.md`
-- `data/artifacts/w75f-p1-ringfall-state-refresh-20260612/`
-- `docs/private/Ringfall-FAL-Pilot-P2-Combined-vs-Wave-Plan-Consistency-Review-v01.md`
-- `data/artifacts/w75f-p2-ringfall-plan-consistency-20260612/`
-- `docs/private/Ringfall-FAL-Pilot-P3-Risk-Gate-Mapping-Review-v01.md`
-- `data/artifacts/w75f-p3-ringfall-risk-gate-mapping-20260612/`
-- `docs/private/Ringfall-FAL-Pilot-P4-Implementation-Readiness-Brief-v01.md`
-- `data/artifacts/w75f-p4-ringfall-implementation-readiness-20260612/`
-- `docs/private/Ringfall-FAL-Pilot-P5-Synthesis-and-Learning-Candidate-Review-v01.md`
-- `data/artifacts/w75f-p5-ringfall-pilot-synthesis-20260612/`
-- `docs/private/Ringfall-FAL-Orchestrator-Integration-Model-v01.md`
-- `docs/private/Ringfall-FAL-Checkpoint-Sync-Contract-v01.md`
-- `docs/private/Ringfall-Orchestrator-Session-Prompt-v01.md`
-- `docs/private/Ringfall-MetaOps-Task-Prompts-v01.md`
-- `docs/private/Wave7_5-W7_5_G-Public-Safe-Methodology-Candidate-Scope-v1.md`
-- `docs/private/Wave7_5-W7_5_G-TrackE-Public-Safety-Review-v1.md`
-- `docs/private/Wave7_5-W7_5_H-HUB-Compatibility-Revisit-v1.md`
-- `C:\EGYETEM\FUNSTUFF\RingFall\.fal\FAL-Target-Project-Local-Runbook-v01.md`
-- W6-I loop output: `data/evidence/wave6/loops/w6i-worldsim-docs-only-20260528/`
-- W6-F eval output: `data/evidence/wave6/eval/w6f-usefulness-evaluation-v1/`
-- W6-E loop output: `data/evidence/wave6/loops/w6e-fal-project-state-protocol-20260511/`
-- W6-D commit: `90014ed Complete W6-D first loop capture`
-- W6-D delivery note: `docs/private/Wave6-W6-S1-TrackE-W6-D-First-Loop-Capture.md`
-- W6-E loop id: `w6e-fal-project-state-protocol-20260511`
+- `docs/private/FAL-Target-Orchestrator-Seamless-Integration-Plan-v01.md`
+- `docs/private/Wave7_6-Session-Continuity-Compact-Authority-PRD-v1.md`
+- `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md`
+- `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`
+- `docs/private/FAL_external_advisory_handoff_2026-06-23.md`
+- `tools/oc-session-router/docs/workflow-orchestrator-runbook.md`
+- `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/11-track-a-output.md`
+- `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/12-track-b-output.md`
+- `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/13-track-c-output.md`
+- `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/14b-track-d-output.md`
+- `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/15-track-e-output.md`
+- `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/20-meta-ready-synthesis.md`

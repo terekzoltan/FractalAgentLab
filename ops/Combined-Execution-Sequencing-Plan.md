@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-06-14
+**Last updated:** 2026-06-23
 
 ---
 
@@ -123,6 +123,20 @@ Mandatory rules:
 
 Versioned protocol reference:
 - `docs/private/Project-State-Continuity-Protocol-v01.md`
+
+### OC Session Router Workflow Canon
+
+For OC Session Router workflow semantics and operator usage, the canonical runbook is:
+
+```text
+tools/oc-session-router/docs/workflow-orchestrator-runbook.md
+```
+
+Rules:
+- use that runbook as the primary shared description of the live router workflow, command order, review timing, prompt-forwarding behavior, recovery behavior, and operator stop conditions
+- keep target-specific proof points, target state, and target constraints in the target repo runtime state rather than turning the shared runbook into a target-state ledger
+- if a wave/step/sprint changes router wrapper semantics, prompt-control injection, review timing, FAL sync hook usage, recovery behavior, or stop conditions, the same closeout must update `tools/oc-session-router/docs/workflow-orchestrator-runbook.md`
+- if the change also alters the operator quick path, update `tools/oc-session-router/docs/session-router-cheatsheet.md` and `tools/oc-session-router/README.md` in the same closeout or explicitly record why not
 
 ---
 
@@ -2071,7 +2085,7 @@ Parallelism rule: no parallel work. HUB remains parked unless Meta explicitly op
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 8.1 | Meta Coordinator session | ✅ W7.5-H HUB compatibility revisit | W7.5-G ✅ | Accepted in `docs/private/Wave7_5-W7_5_H-HUB-Compatibility-Revisit-v1.md`. Wave 8/HUB implementation remains parked; future HUB compatibility is narrowed to docs/contract backlog for HUB-0 read-only evidence consumption and HUB-1 next-action preview only. Next active frontier returns to RingFall target-side source-of-truth sync: `RF-STATUS-SYNC-01`, then `RF-GUARDRAIL-SYNC-01`. |
+| 8.1 | Meta Coordinator session | ✅ W7.5-H HUB compatibility revisit | W7.5-G ✅ | Accepted in `docs/private/Wave7_5-W7_5_H-HUB-Compatibility-Revisit-v1.md`. Wave 8/HUB implementation remains parked; future HUB compatibility is narrowed to docs/contract backlog for HUB-0 read-only evidence consumption and HUB-1 next-action preview only. After RingFall Wave 1 post-analysis, the next active FAL frontier is W7.6 target-orchestrator seamless integration, not HUB or RingFall feature implementation. |
 
 Non-goals:
 - no OpenCode bridge/API/session delivery
@@ -2081,10 +2095,172 @@ Non-goals:
 - no public export without dedicated Track E/public-safety review
 - no claim that semantic non-leakage is proven
 
+#### Wave 7.6 — Target Orchestrator Seamless Integration
+
+Activation gate:
+- W7.5-H HUB compatibility revisit is accepted and HUB implementation remains parked
+- RingFall Wave 1 post-analysis showed that FAL governance discipline helped, but FAL checkpoint/context/finding capture was not seamless
+- this wave is workflow-hardening for target-project orchestration, not RingFall feature execution
+- no OpenCode bridge/API/session delivery, automatic dispatch, automatic commit/push, public export, HUB implementation, or RingFall Wave 2 execution is authorized by this wave
+
+Canonical planning input:
+- `docs/private/FAL-Target-Orchestrator-Seamless-Integration-Plan-v01.md`
+- `docs/private/Wave7_6-Session-Continuity-Compact-Authority-PRD-v1.md`
+- `docs/private/FAL_external_advisory_handoff_2026-06-23.md` as recommendation-only input; it does not change authority or open scope
+
+Planned deliverables:
+- P0 Meta design freeze and Combined sequencing integration
+- session continuity and compact authority PRD input for P1
+- P1 `/fal-checkpoint-target` command and `fal-target-orchestration` skill PRD through `oc-toolsmith`
+- target profile / active-context / checkpoint / findings / metrics row contracts sufficient for P1
+- compact-readiness, context-delta, handoff sufficiency, and advisory usage telemetry requirements for P1
+- minimal negative-control and bounded stop/escalation requirements for P1 review
+- workflow-integrated cadence rules for always, boundary, conditional, validation, and audit checks
+- explicit compact-boundary handling that does not rely on implicit compact-event detection
+- read-only RingFall Wave 1 backfill validation after P1 exists
+- cold-start recovery drill as part of backfill/usefulness validation
+- existing workflow hook policy for `seq-next -> terv-review -> implement -> step-review -> review-fix`
+- later parallel reconcile hardening before full orchestrator command
+- finding-to-regression lineage as a W7.6-P9 read-only audit dimension, not a new database
+- full `/fal-orchestrate-target` command only after P1-P3 evidence proves the smaller slices
+- productized Easy/Guided/Strict/Audit UX and external advisory intake design are parked for Wave 7.7, not implemented in W7.6
+
+Track ownership model:
+
+| Track | Wave 7.6 role | First allowed posture |
+|---|---|---|
+| Meta Coordinator | P0 design freeze, sequencing, P1 PRD, acceptance, closeout | planning/review only; may use `oc-toolsmith` workflow for global command/skill design |
+| Track B | target profile, active context, checkpoint row contract review | schema/contract review before tooling treats fields as law |
+| Track C | review-finding, routing, context-delta, and handoff semantics | semantics/review only; no automatic prompt rewrite/routing |
+| Track D | router/tooling compatibility, artifact pinning, latest-output classifier, PowerShell wrapper implications, advisory token/cost usage feasibility, bounded stop/resume feasibility | tooling plan/implementation only after P1 PRD acceptance; no OpenCode server control or automatic compaction |
+| Track E | evidence sufficiency, metrics/finding ledger validation, negative controls, cold-start recovery drill, RingFall W1 backfill audit | measurement/QA; no public output |
+| Track A | product UX implications review only | no W7.6 UI/UX implementation; later Easy/Guided/Strict/Audit mode design is parked for Wave 7.7 |
+
+Epics:
+
+| Epic | Owner | Support | Core output | Prereq |
+|---|---|---|---|---|
+| W7.6-P0 Target-orchestrator design freeze and sequencing | Meta | none | P0 closeout in plan doc plus Combined integration | W7.5-H ✅ + user approval |
+| W7.6-P1 Checkpoint closeout command/skill PRD | Meta using `oc-toolsmith` | Track A/B/C/D/E review | `/fal-checkpoint-target` + `fal-target-orchestration` PRD and reviewable global command/skill patch plan consuming the W7.6 compact/session authority PRD plus deduplicated advisory-derived checks and cadence rules | W7.6-P0 ✅; draft produced |
+| W7.6-P2 P1 contract/semantics/tooling/evidence review | Meta synthesis | Track A/B/C/D/E review lanes | completed review: Track A/D `GREEN`, Track B/C/E `YELLOW/revise`, no `RED`; required narrow revision bundle identified for authority read order, target profile/active-context field law, verdict separation, finding status, and metrics row/status | W7.6-P1 PRD draft |
+| W7.6-P3 P1 implementation/apply decision | Meta | `oc-toolsmith`, Track A/B/C/D/E as reviewers | P3 decision `revise`; revision bundle applied to the PRD and backup-first apply script; global apply still requires explicit user approval and verification | W7.6-P1 + W7.6-P2 reviews |
+| W7.6-P4 RingFall Wave 1 read-only backfill validation | Track E | Meta, Track B/C if schema/finding ambiguity appears | measured backfill report: checkpoint coverage, active-context freshness, handoff sufficiency, cold-start recovery verdict, minimal negative controls, findings draft, reconcile debt | W7.6-P3 accepted plus global P1 command/skill applied and verified |
+| W7.6-P5 Existing workflow hook integration plan | Meta | Track D, Track E | hook plan for existing command/wrapper workflow and clean-closeout gates, with required update to `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` if workflow semantics change | W7.6-P4 evidence |
+| W7.6-P6 Router/tooling artifact-pinning hardening | Track D | Track E, Meta | pinned artifact, latest-output/fix-plan classifier, bounded retry/resume, stop-condition, and recovery guardrail plan/implementation, plus required runbook update if wrapper semantics change | W7.6-P5 accepted |
+| W7.6-P7 Parallel reconcile hardening | Track D | Track E, Track B/C as needed | parallel run reconcile support and lane-level evidence rules, plus required runbook update if shared workflow semantics change | W7.6-P6 accepted |
+| W7.6-P8 Full orchestrator command readiness decision | Meta | all relevant tracks | decide whether `/fal-orchestrate-target` may be built, revised, or held | W7.6-P1-P7 evidence |
+| W7.6-P9 Wave-level usefulness audit | Track E | Meta | usefulness audit comparing future captured wave against RingFall Wave 1 baseline, including finding-to-regression lineage samples | W7.6-P4 plus at least one later target run |
+
+### Wave 7.6 — Execution Steps
+
+**✅ Step 1 — P0 Meta design freeze and sequencing integration**
+
+Parallelism rule: no parallel work. Meta closes the design baseline before any command/skill or Track implementation starts.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 1.1 | Meta Coordinator session | ✅ W7.6-P0 target-orchestrator design freeze and Combined integration | W7.5-H ✅ + user approval | `docs/private/FAL-Target-Orchestrator-Seamless-Integration-Plan-v01.md` is frozen for P1. Final P0 decisions: skill `fal-target-orchestration`, first command `/fal-checkpoint-target`, later command `/fal-orchestrate-target`, FAL aggregate evidence under `data/artifacts/target-projects/<project_id>/`, target `.fal/ACTIVE_CONTEXT.json` as FAL mirror machine state only, and P1 before full-loop automation. |
+
+**✅ Step 2 — Session continuity PRD plus P1 checkpoint command/skill PRD through `oc-toolsmith`**
+
+Parallelism rule: no parallel Track implementation until the session-continuity PRD input exists and the `oc-toolsmith` PRD/patch plan exists. Meta uses `oc-toolsmith`; no direct global command/skill edits.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 2.1 | Meta Coordinator session | ✅ W7.6 compact/session authority PRD input | W7.6-P0 ✅ | `docs/private/Wave7_6-Session-Continuity-Compact-Authority-PRD-v1.md` created as required P1 input. It defines compact as cache, not canon; pre/post compact boundaries; context delta; handoff sufficiency; cold-start recovery drill; advisory usage snapshot; minimal negative controls; bounded stop/escalation; workflow-integrated cadence; compact-detection limitation; and W7.7 product/advisory UX parking. |
+| 2.2 | Meta Coordinator session using `oc-toolsmith` | ✅ W7.6-P1 `/fal-checkpoint-target` + `fal-target-orchestration` PRD draft | Step 2.1 ✅ | Produced `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md` and reviewable script `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`. No global command/skill file was modified or applied. |
+
+**✅ Step 3 — Parallel authority/contract/tooling/evidence review of P1**
+
+Parallelism rule: Track A, Track B, Track C, Track D, and Track E may review the same P1 PRD/patch plan in parallel because their ownership is disjoint: product-UX compatibility, schema/state, semantics/memory, tooling feasibility, and evidence/metrics. This is review-only; no Track implementation opens here.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 3.1a | Track A agent session | ✅ W7.6-P2 product-UX compatibility review | W7.6-P1 draft | Track A `GREEN` in `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/11-track-a-output.md`; no UX implementation or W7.7 product mode scope opened. |
+| 3.1b | Track B agent session | ✅ W7.6-P2 schema/state contract review | W7.6-P1 draft | Track B `YELLOW/revise` in `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/12-track-b-output.md`; required fixes were authority read order and `fal.target_profile.v1` / `fal.active_context.v1` field law. |
+| 3.1c | Track C agent session | ✅ W7.6-P2 finding/routing/session semantics review | W7.6-P1 draft | Track C `YELLOW/revise` in `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/13-track-c-output.md`; required fixes were workflow/domain/routing verdict separation and finding-status semantics. |
+| 3.1d | Track D agent session | ✅ W7.6-P2 tooling/session telemetry feasibility review | W7.6-P1 draft | Track D `GREEN` in authoritative artifact `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/14b-track-d-output.md`; superseded `14-track-d-output.md` is ignored. |
+| 3.1e | Track E agent session | ✅ W7.6-P2 evidence/metrics sufficiency review | W7.6-P1 draft | Track E `YELLOW/revise` in `.opencode-router/parallel-runs/w76-p2-track-review-20260623-live/15-track-e-output.md`; required fix was minimum metrics row/status behavior or explicit reconcile-debt fallback. |
+
+**✅ Step 4 — P1 apply/hold decision**
+
+Parallelism rule: no parallel work. Meta must synthesize Track reviews before any global command/skill apply script is accepted.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 4.1 | Meta Coordinator session | ✅ W7.6-P3 P1 implementation/apply decision | W7.6-P1 draft + W7.6-P2 reviews | P3 decision was `revise`, not `hold`. The required revision bundle was applied to `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md` and `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`: target authority read order, profile/active-context field law, workflow/domain/routing verdict separation, finding-status semantics, and metrics row/status contract. No global command/skill apply was run; user approval is still required before executing the backup-first script. |
+
+**⏸ Step 5 — RingFall Wave 1 read-only backfill validation**
+
+Parallelism rule: no parallel target mutation. This validates P1 against existing RingFall Wave 1 artifacts only.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 5.1 | Track E agent session | ⏸ W7.6-P4 RingFall W1 backfill validation | W7.6-P3 accepted plus global P1 command/skill applied and verified | Produce measured backfill report from pinned RingFall W1 docs/router artifacts: checkpoint coverage, active-context freshness, handoff sufficiency, cold-start recovery verdict, minimal negative controls, draft findings, metrics, reconcile debt. No RingFall implementation, commit, push, public output, or source-of-truth rewrite. |
+| 5.2 | Meta Coordinator session | ⏸ W7.6-P4 Meta backfill closeout | W7.6-P4 Track E report | Decide whether P1 is sufficient to proceed to hook integration or needs revision. |
+
+**⏸ Step 6 — Existing workflow hook integration planning**
+
+Parallelism rule: serialize until P1 backfill proves the checkpoint closeout slice. Hook integration must not jump directly to full orchestration.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 6.1 | Meta Coordinator session | ⏸ W7.6-P5 existing workflow hook plan | W7.6-P4 Meta closeout | Define exactly where existing `seq-next -> terv-review -> implement -> step-review -> review-fix` command workflows call P1, what clean-closeout gates apply, and whether `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` must be updated for any workflow-usage or semantics change. |
+| 6.2 | Track D agent session | ⏸ W7.6-P6 router/tooling artifact-pinning hardening | W7.6-P5 accepted | Implement or plan artifact pinning, latest-output classification, fix-plan classification, bounded retry/resume, explicit stop conditions, fast-reply recovery, and no-duplicate-send guardrails if needed. If wrapper semantics change, update `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` in the same closeout. |
+
+**⏸ Step 7 — Parallel reconcile and full command readiness**
+
+Parallelism rule: no full `/fal-orchestrate-target` command until parallel reconcile and artifact pinning are accepted.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 7.1 | Track D agent session | ⏸ W7.6-P7 parallel reconcile hardening | W7.6-P6 accepted | Add or plan lane-level artifact pinning, combined final synthesis checkpoint, and parallel-run reconcile rules. If the shared parallel operator workflow changes, update `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` in the same closeout. |
+| 7.2 | Track E agent session | ⏸ W7.6-P9 wave-level usefulness audit design | W7.6-P4 evidence | Define audit metrics for future target waves, including finding-to-regression lineage samples, cold-start recovery, handoff sufficiency, and negative-control behavior; may run in parallel with Track D if file scopes are disjoint and no router contract changes are needed from Track E. |
+| 7.3 | Meta Coordinator session | ⏸ W7.6-P8 full orchestrator command readiness decision | W7.6-P1-P7 evidence | Decide whether `/fal-orchestrate-target` may be built, must be revised, or remains held. |
+
+Non-goals:
+- no RingFall Wave 2 execution from this wave
+- no OpenCode bridge/API/session delivery
+- no automatic dispatch, routing, commit, push, or server restart
+- no global command/skill edits without `oc-toolsmith` and backup-first apply script
+- no HUB/dashboard/UI implementation
+- no public output or `docs/public/**`
+- no new canonical finding-to-regression database from W7.6
+- no external advisory intake product flow in W7.6
+
+#### Wave 7.7 — Productized Target Orchestration UX (parked)
+
+Activation gate:
+- W7.6 P1/P2 must prove that compact/session authority, checkpoint evidence, context-delta status, and advisory usage telemetry are coherent enough to build on
+- W7.6 RingFall Wave 1 read-only backfill should produce enough evidence to distinguish useful ceremony from unnecessary operator burden
+- any external advisory intake design must preserve recommendation-only authority and Meta deduplication against private canon
+- this wave remains parked until Meta explicitly opens it
+
+Goal:
+- make FAL target orchestration easy by default while preserving optional strict/audit paths for high-assurance workflows
+
+Candidate deliverables:
+- Easy/Guided/Strict/Audit mode policy for target orchestration
+- command defaults and target-profile auto-detection rules
+- ambiguity question flow for operator decisions
+- strict-mode artifact requirements
+- audit/team-mode evidence and reconciliation expectations
+- external advisory intake envelope for partial-context recommendations
+- Meta disposition table: `already_exists`, `partially_exists`, `useful_candidate`, `defer`, `reject`, `unknown_private_context`
+- safe abstraction feedback loop for future external advisors without leaking raw private evidence or internal reasoning
+- future decision on whether user-approved auto-compact can run at checkpoint boundaries
+
+Non-goals while parked:
+- no product UI/dashboard implementation
+- no automatic OpenCode control
+- no weakening of W7.6 compact-is-cache / canon-first authority doctrine
+- no automatic compaction without a later explicit gate
+- no external advisory item may change current next action without owner/Meta reprioritization
+
 #### Wave 8 or later — HUB Compatibility Layer / External Control Surface Contract
 
 Activation gate:
-- Wave 7 produces stable OpenCode-backed loop artifact conventions and W7.5 either closes or Meta explicitly defers measurement/continuity work with rationale
+- Wave 7 produces stable OpenCode-backed loop artifact conventions, W7.5 closes measurement/continuity hardening, and W7.6 either closes target-orchestrator seamless integration or Meta explicitly defers it with rationale
 - future HUB remains a separate project and FAL only defines safe status/export/control boundaries
 - Wave 8 must remain docs/contract-first until Meta separately approves implementation; no HUB code, bridge delivery, or dashboard implementation is implied
 
@@ -2177,6 +2353,7 @@ Non-goals:
 | 6.5 | Ringfall adoption/readiness | external-project packet-field compatibility | target-project language and room semantics | bridge remains deferred unless Wave 6 supports it | usefulness synthesis and evidence sufficiency | no UI by default |
 | 7 | OpenCode-backed evidence learning layer | loop/run/trace/artifact contract | learning/identity semantics support | router ingest support only after contract | evidence/privacy validation | browse support after ingest shape stabilizes |
 | 7.5 | Measurement and context continuity hardening | metrics/context contract review | learning candidate semantics | evidence compatibility only if needed | metrics, review ledger, pilot measurement | public-safe/readability only if opened |
+| 7.6 | Target orchestrator seamless integration | target profile / active context / checkpoint contract review | finding/routing verdict semantics | router artifact pinning and reconcile hardening after P1 | checkpoint/evidence sufficiency and backfill audit | no default role |
 | 8 | HUB compatibility contract | status/export and approval-state contract | room taxonomy semantics | future bridge/API feasibility only if gated | privacy/export and evidence boundary | display-needs review only |
 
 ---
@@ -2239,42 +2416,48 @@ If the workflow is recurring and stable, consider **workflow graph hardening**.
 This section should always describe the **current frontier**, not the original kickoff history.
 
 ### Current frontier
-Wave 0 through Wave 5 are complete. Wave 6 is closed as `narrow_continue`, and Wave 6.5 RingFall readiness/adoption is closed with the public-safe RingFall skeleton pushed as `08732d5 init`.
+Wave 0 through Wave 5 are complete. Wave 6 is closed as `narrow_continue`, Wave 6.5 RingFall readiness/adoption is closed, Wave 7 OpenCode-backed evidence learning is closed through W7-G2, and Wave 7.5 Measurement & Context Continuity Hardening is closed through W7.5-H.
 
-The immediate mainline frontier is now Wave 7:
+The immediate mainline frontier is now Wave 7.6 target-orchestrator seamless integration:
 
-- ✅ `W7-A-META1` Meta Coordinator contract/adoption review returned `READY_WITH_GUARDRAILS`.
-- ✅ `W7-A-B` Track B contract compatibility review is accepted with one routed `output_payload.step_results` compatibility follow-up.
-- ✅ `W7-A-E` Track E evidence/privacy review is accepted with required contract changes before W7-A acceptance.
-- ✅ `W7-A-META2` Meta acceptance closeout accepted W7-A with contract revisions.
-- ✅ `W7-B1` / `W7-B2` / `W7-B3` ingest foundations and CLI are accepted and committed.
-- ✅ `W7-C1` ingest validation/privacy sufficiency is accepted and committed; `RF-2026-06-04-01` is fixed.
-- ✅ `W7-B/C` Meta closeout accepted the artifact shape for downstream consumers.
-- ✅ `W7-D` Track A workbench/index support is accepted and committed in `ca1167d`.
-- ✅ `W7-E1` Track C project/global learning input semantics is accepted and committed in `9d1ff9f`.
-- ✅ `W7-E2` Track E learning/privacy validation is accepted with residual semantic non-leakage risk documented.
-- ✅ `W7-F` Track E usefulness evaluation and `W7-F-META` closeout are accepted with recommendation `narrow_continue`; residual semantic non-leakage risk carries forward as `in-scope now`.
-- ⬜ READY `W7-G1` Track C docs-only advisory suggestion semantics may open next; `W7-G2` remains parked until W7-G1 is accepted.
-- ⏸ Wave 8 HUB compatibility remains parked until W7 evidence artifacts stabilize or Meta explicitly opens docs-first work.
+- ✅ `W7.6-P0` Meta design freeze and Combined sequencing integration is complete.
+- ✅ W7.6 compact/session authority PRD input is complete in `docs/private/Wave7_6-Session-Continuity-Compact-Authority-PRD-v1.md`, including deduplicated advisory-derived checks for cold-start recovery, handoff sufficiency, negative controls, bounded stop/escalation, and P9 lineage audit.
+- ✅ `W7.6-P1` `/fal-checkpoint-target` + `fal-target-orchestration` PRD draft through `oc-toolsmith` is produced in `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md` with reviewable script `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`.
+- ✅ `W7.6-P2` Track A/B/C/D/E parallel review completed: Track A/D `GREEN`, Track B/C/E `YELLOW/revise`, no `RED`.
+- ✅ `W7.6-P3` Meta apply decision completed as `revise`; the required narrow revision bundle was applied to the P1 PRD and backup-first apply script.
+- ⏸ `W7.6-P4` RingFall Wave 1 read-only backfill validation waits for explicit user approval, global P1 command/skill apply, and post-apply verification.
+- ⏸ Wave 7.7 Productized Target Orchestration UX remains parked until W7.6 evidence justifies it.
+- ⏸ Wave 8/HUB compatibility remains parked; this frontier does not authorize HUB work.
 
 Current blocker summary:
 
-- no blocker to start W7-G1 docs-only advisory suggestion semantics after W7-F-META closeout
-- RingFall feature implementation remains blocked before a later readiness gate
+- no blocker remains in the P2/P3 docs/contract revision bundle after the revised PRD/apply-script text is reviewed
+- global OpenCode command/skill edits remain blocked until the user explicitly approves and runs the backup-first apply script
+- W7.6-P4 remains blocked until global P1 command/skill apply is verified
+- RingFall Wave 2 implementation remains blocked before a separate target planning brief and Meta gate
 - public release, public mirror, `docs/public/` output, and Track A presentation remain blocked
 - OpenCode bridge/API/session delivery remains blocked
+- automatic `/compact` remains blocked; W7.6 may record compact-readiness only
+- external advisory intake remains parked for Wave 7.7 and cannot alter current next action by itself
 
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. Track C opens `W7-G1` docs-only advisory suggestion semantics.
-2. Track E runs `W7-G2` advisory suggestion safety review after W7-G1 is accepted.
-3. Meta closes W7-G and decides whether any later suggestion implementation, Wave 8 docs-first compatibility, or HUB-related planning may open.
-4. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.
+1. User/Meta may approve running `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1` after reviewing the revised P1 contract text.
+2. After apply, verify the two global OpenCode files exist and contain the revised authority/schema/verdict/finding/metrics contract text.
+3. Track E runs RingFall Wave 1 read-only backfill validation only after P1 is applied and verified.
+4. Hook integration, router hardening, parallel reconcile, and full `/fal-orchestrate-target` command remain later gated steps.
+5. Wave 7.7 productized target-orchestration UX remains `⏸` until W7.6 evidence justifies it.
+6. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.
 
 Reference:
 - `docs/private/Wave7-OpenCode-Evidence-Learning-Layer-Plan-v1.md`
 - `docs/private/Wave7-W7-A-OpenCode-Backed-Loop-Contract-v1.md`
+- `docs/private/FAL-Target-Orchestrator-Seamless-Integration-Plan-v01.md`
+- `docs/private/Wave7_6-Session-Continuity-Compact-Authority-PRD-v1.md`
+- `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md`
+- `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`
+- `docs/private/FAL_external_advisory_handoff_2026-06-23.md`
 - `ops/Review-Findings-Registry.md`
 
 ### Future coding vertical insertion note (not active frontier yet)
