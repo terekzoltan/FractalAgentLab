@@ -2257,6 +2257,83 @@ Non-goals while parked:
 - no automatic compaction without a later explicit gate
 - no external advisory item may change current next action without owner/Meta reprioritization
 
+#### Wave 7.8 — CI Readiness And Mechanical Gates
+
+Activation gate:
+- W7.6 target-orchestrator checkpoint proof should exist through P4, or Meta explicitly opens CI hardening earlier as the next infrastructure slice after verified P1 apply
+- Wave 7.8 does not require Wave 7.7 product UX activation; it is an infrastructure wave, not a product-mode wave
+- no CD/deploy automation, secret-dependent CI, or private artifact upload is authorized
+- green CI must remain mechanical evidence only and must not replace FAL review/evidence gates
+
+Goal:
+- integrate early, narrow CI for tracked FAL mechanical surfaces before later infrastructure and product work increase adoption cost
+
+Planned deliverables:
+- CI scope boundary for tracked vs private/local FAL surfaces
+- tracked UI CI for `ui/` typecheck, test, and build
+- generated-data boundary so CI does not depend on ignored/private evidence or `.opencode-router` state
+- reassessment of whether FAL has a stable tracked Python/core CI surface beyond the UI
+- explicit policy that CI results may feed evidence but do not replace FAL review
+- report-only/later coverage policy until a separate Track E gate accepts harder thresholds
+
+Track ownership model:
+
+| Track | Wave 7.8 role | First allowed posture |
+|---|---|---|
+| Meta Coordinator | activation, CI scope lock, CI-as-evidence policy, closeout | docs-first planning and gate ownership |
+| Track A | UI CI and generated-data boundary | tracked UI/mechanical CI only |
+| Track B | tracked Python/core CI reassessment | reassessment only unless canonical tracked commands exist |
+| Track E | CI gate review, coverage policy, hygiene expectations | QA/policy/mechanical verification |
+| Track C | consult only if CI scope touches tracked semantics surfaces | no default implementation role |
+| Track D | consult only if CI scope touches adapters/tooling surfaces | no default implementation role |
+
+Epics:
+
+| Epic | Owner | Support | Core output | Prereq |
+|---|---|---|---|---|
+| W7.8-A CI scope boundary | Meta | Track E, Track A | accepted tracked-vs-private CI scope and non-goals | W7.6 P4 evidence or explicit Meta exception |
+| W7.8-B UI CI | Track A | Track E | reviewed workflow for `ui/` `npm ci`, `typecheck`, `test`, `build` | W7.8-A accepted |
+| W7.8-C Generated-data boundary | Track A | Meta | CI-safe fixture/data policy so UI CI does not depend on private/ignored evidence | W7.8-A accepted |
+| W7.8-D Python/core CI reassessment | Track B | Track E | decision on whether additional tracked root/package CI commands exist and are stable enough to gate | W7.8-A accepted |
+| W7.8-E CI-as-evidence policy | Meta | Track E | explicit rule that green CI is mechanical evidence only | W7.8-B/C plus optional W7.8-D |
+| W7.8-F Coverage policy later | Track E | Meta | report-only/later coverage policy with no broad hard gate | W7.8-B/C plus optional W7.8-D |
+
+### Wave 7.8 — Execution Steps
+
+**⏸ Step 1 — CI scope lock**
+
+Parallelism rule: no parallel work. Meta locks CI scope before any workflow file or gate implementation opens.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 1.1 | Meta Coordinator session | ⏸ W7.8-A CI scope boundary | W7.6 P4 evidence, or explicit Meta exception | Confirm that `ops/`, `docs/private/`, `.opencode-router/`, `.swarm/`, local evidence, global OpenCode config, and target private artifacts remain outside CI scope. |
+
+**⏸ Step 2 — Mechanical CI implementation**
+
+Parallelism rule: Track A UI CI and generated-data boundary may proceed in parallel after Step 1 if they touch only `ui/` and reviewed fixture surfaces.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 2.1 | Track A agent session | ⏸ W7.8-B UI CI | W7.8-A accepted | Add reviewed CI workflow for `ui/` mechanical checks only: `npm ci`, `npm run typecheck`, `npm test`, `npm run build`. |
+| 2.2 | Track A agent session | ⏸ W7.8-C generated-data boundary | W7.8-A accepted | Ensure CI does not require private/ignored run artifacts or `.opencode-router` state; use checked-in public-safe fixtures or absence-tolerant behavior. |
+
+**⏸ Step 3 — Reassessment and policy closeout**
+
+Parallelism rule: Track B reassessment may run in parallel with Track E coverage/policy review only if it stays docs-first and does not open new CI commands silently.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 3.1 | Track B agent session | ⏸ W7.8-D Python/core CI reassessment | W7.8-A accepted | Determine whether any stable tracked Python/core CI command exists beyond the UI; do not invent root CI without a canonical manifest. |
+| 3.2 | Meta Coordinator session | ⏸ W7.8-E CI-as-evidence policy | W7.8-B/C accepted and optional W7.8-D input | Record that failed CI blocks merge/closeout, but passed CI is mechanical evidence only and does not imply semantic/domain approval. |
+| 3.3 | Track E agent session | ⏸ W7.8-F coverage policy later | W7.8-B/C accepted and optional W7.8-D input | Keep coverage report-only/later until a separate Track E review accepts module-specific hard thresholds. |
+
+Wave gate:
+- FAL has a narrow tracked CI surface
+- private/local coordination and evidence boundaries remain intact
+- no CD/deploy automation or secret-dependent CI is introduced
+- no broad coverage hard gate is introduced prematurely
+- green CI remains mechanical evidence only
+
 #### Wave 8 or later — HUB Compatibility Layer / External Control Surface Contract
 
 Activation gate:
@@ -2354,6 +2431,7 @@ Non-goals:
 | 7 | OpenCode-backed evidence learning layer | loop/run/trace/artifact contract | learning/identity semantics support | router ingest support only after contract | evidence/privacy validation | browse support after ingest shape stabilizes |
 | 7.5 | Measurement and context continuity hardening | metrics/context contract review | learning candidate semantics | evidence compatibility only if needed | metrics, review ledger, pilot measurement | public-safe/readability only if opened |
 | 7.6 | Target orchestrator seamless integration | target profile / active context / checkpoint contract review | finding/routing verdict semantics | router artifact pinning and reconcile hardening after P1 | checkpoint/evidence sufficiency and backfill audit | no default role |
+| 7.8 | CI readiness and mechanical gates | python/core CI reassessment | consult only | consult only | CI gate review and report-only coverage policy | UI CI + fixture boundary |
 | 8 | HUB compatibility contract | status/export and approval-state contract | room taxonomy semantics | future bridge/API feasibility only if gated | privacy/export and evidence boundary | display-needs review only |
 
 ---
@@ -2425,15 +2503,16 @@ The immediate mainline frontier is now Wave 7.6 target-orchestrator seamless int
 - ✅ `W7.6-P1` `/fal-checkpoint-target` + `fal-target-orchestration` PRD draft through `oc-toolsmith` is produced in `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md` with reviewable script `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`.
 - ✅ `W7.6-P2` Track A/B/C/D/E parallel review completed: Track A/D `GREEN`, Track B/C/E `YELLOW/revise`, no `RED`.
 - ✅ `W7.6-P3` Meta apply decision completed as `revise`; the required narrow revision bundle was applied to the P1 PRD and backup-first apply script.
-- ⏸ `W7.6-P4` RingFall Wave 1 read-only backfill validation waits for explicit user approval, global P1 command/skill apply, and post-apply verification.
+- 🔄 `W7.6-P4` RingFall Wave 1 read-only backfill validation is now the active next step: the global P1 command/skill files exist, and at least one user-driven DRY_RUN checkpoint trial has been started; clean full P4 evidence capture is still pending.
 - ⏸ Wave 7.7 Productized Target Orchestration UX remains parked until W7.6 evidence justifies it.
+- ⏸ Wave 7.8 CI readiness and mechanical gates is now sequenced as a later infrastructure wave; it does not replace the immediate W7.6 frontier.
 - ⏸ Wave 8/HUB compatibility remains parked; this frontier does not authorize HUB work.
 
 Current blocker summary:
 
 - no blocker remains in the P2/P3 docs/contract revision bundle after the revised PRD/apply-script text is reviewed
-- global OpenCode command/skill edits remain blocked until the user explicitly approves and runs the backup-first apply script
-- W7.6-P4 remains blocked until global P1 command/skill apply is verified
+- global P1 command/skill files now exist locally; the remaining near-term blocker is clean, complete P4 evidence capture rather than pre-apply approval
+- W7.8 CI implementation remains future work behind its own activation gate; it is planned, not active
 - RingFall Wave 2 implementation remains blocked before a separate target planning brief and Meta gate
 - public release, public mirror, `docs/public/` output, and Track A presentation remain blocked
 - OpenCode bridge/API/session delivery remains blocked
@@ -2443,12 +2522,24 @@ Current blocker summary:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. User/Meta may approve running `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1` after reviewing the revised P1 contract text.
-2. After apply, verify the two global OpenCode files exist and contain the revised authority/schema/verdict/finding/metrics contract text.
-3. Track E runs RingFall Wave 1 read-only backfill validation only after P1 is applied and verified.
-4. Hook integration, router hardening, parallel reconcile, and full `/fal-orchestrate-target` command remain later gated steps.
+1. Capture a clean full `/fal-checkpoint-target` `DRY_RUN / propose_only` report for RingFall Wave 1 from the applied global command/skill, without system-reminder contamination or truncated sections.
+2. Evaluate P4 backfill dimensions from that report: source-of-truth verdict, active-context freshness, handoff sufficiency, context-delta status, compact boundary status, finding rows, metrics row status, and reconcile debt.
+3. If P4 evidence is sufficient, Meta closes W7.6-P4 and decides whether hook integration or another P4 pass is needed.
+4. Wave 7.8 CI readiness/mechanical gates may open later under its own activation gate; it does not require Wave 7.7 product UX activation.
 5. Wave 7.7 productized target-orchestration UX remains `⏸` until W7.6 evidence justifies it.
 6. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.
+
+### CI readiness planning note
+
+CI readiness for RingFall and FAL is canonized as a private planning input in `docs/private/CI-Readiness-Plan-RingFall-FAL-v01.md`.
+
+This does not change the immediate W7.6 frontier. It records the future direction that CI should be integrated early and narrowly:
+
+- RingFall starts with contract/schema CI around `tools/schema_check.py`.
+- FAL starts with tracked UI/mechanical CI around `ui/package.json` scripts.
+- CD/deploy automation remains out of scope.
+- Coverage starts report-only unless a later Track E gate accepts module-specific hard thresholds.
+- Green CI is mechanical evidence only; it does not replace FAL review/evidence gates.
 
 Reference:
 - `docs/private/Wave7-OpenCode-Evidence-Learning-Layer-Plan-v1.md`
@@ -2458,6 +2549,7 @@ Reference:
 - `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md`
 - `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`
 - `docs/private/FAL_external_advisory_handoff_2026-06-23.md`
+- `docs/private/CI-Readiness-Plan-RingFall-FAL-v01.md`
 - `ops/Review-Findings-Registry.md`
 
 ### Future coding vertical insertion note (not active frontier yet)
