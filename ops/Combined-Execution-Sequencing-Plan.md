@@ -2144,9 +2144,9 @@ Epics:
 | W7.6-P1 Checkpoint closeout command/skill PRD | Meta using `oc-toolsmith` | Track A/B/C/D/E review | `/fal-checkpoint-target` + `fal-target-orchestration` PRD and reviewable global command/skill patch plan consuming the W7.6 compact/session authority PRD plus deduplicated advisory-derived checks and cadence rules | W7.6-P0 ✅; draft produced |
 | W7.6-P2 P1 contract/semantics/tooling/evidence review | Meta synthesis | Track A/B/C/D/E review lanes | completed review: Track A/D `GREEN`, Track B/C/E `YELLOW/revise`, no `RED`; required narrow revision bundle identified for authority read order, target profile/active-context field law, verdict separation, finding status, and metrics row/status | W7.6-P1 PRD draft |
 | W7.6-P3 P1 implementation/apply decision | Meta | `oc-toolsmith`, Track A/B/C/D/E as reviewers | P3 decision `revise`; revision bundle applied to the PRD and backup-first apply script; global apply still requires explicit user approval and verification | W7.6-P1 + W7.6-P2 reviews |
-| W7.6-P4 RingFall Wave 1 read-only backfill validation | Track E | Meta, Track B/C if schema/finding ambiguity appears | measured backfill report: checkpoint coverage, active-context freshness, handoff sufficiency, cold-start recovery verdict, minimal negative controls, findings draft, reconcile debt | W7.6-P3 accepted plus global P1 command/skill applied and verified |
-| W7.6-P5 Existing workflow hook integration plan | Meta | Track D, Track E | hook plan for existing command/wrapper workflow and clean-closeout gates, with required update to `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` if workflow semantics change | W7.6-P4 evidence |
-| W7.6-P6 Router/tooling artifact-pinning hardening | Track D | Track E, Meta | pinned artifact, latest-output/fix-plan classifier, bounded retry/resume, stop-condition, and recovery guardrail plan/implementation, plus required runbook update if wrapper semantics change | W7.6-P5 accepted |
+| W7.6-P4 RingFall Wave 1 read-only backfill validation | Track E | Meta, Track B/C if schema/finding ambiguity appears | accepted read-only backfill validation: checkpoint reconstruction proved, stale active-context / missing aggregate evidence surfaced as reconcile debt, explicit cold-start recovery drill still open | W7.6-P3 accepted plus global P1 command/skill applied and verified |
+| W7.6-P5 Existing workflow hook integration plan | Meta | Track D, Track E | accepted hook plan in `docs/private/Wave7_6-W7_6_P5-Existing-Workflow-Hook-Integration-Plan-v1.md`; defines existing workflow hook stages, clean-closeout gates, fail-closed/reconcile-debt behavior, and runbook policy update while preserving P4 recovery-drill debt | W7.6-P4 evidence |
+| W7.6-P6 Router/tooling artifact-pinning hardening | Track D | Track E, Meta | accepted after no-Swarm three-lane Meta step review and targeted review-fix; serial helper path now has pinned-source preflight, dry-run/propose default, explicit apply gate, source classifier hardening, and `review_fix_done` separation; local ignored tooling remains operational state, not normal versioned commit content | W7.6-P5 accepted |
 | W7.6-P7 Parallel reconcile hardening | Track D | Track E, Track B/C as needed | parallel run reconcile support and lane-level evidence rules, plus required runbook update if shared workflow semantics change | W7.6-P6 accepted |
 | W7.6-P8 Full orchestrator command readiness decision | Meta | all relevant tracks | decide whether `/fal-orchestrate-target` may be built, revised, or held | W7.6-P1-P7 evidence |
 | W7.6-P9 Wave-level usefulness audit | Track E | Meta | usefulness audit comparing future captured wave against RingFall Wave 1 baseline, including finding-to-regression lineage samples | W7.6-P4 plus at least one later target run |
@@ -2190,31 +2190,31 @@ Parallelism rule: no parallel work. Meta must synthesize Track reviews before an
 |---|---|---|---|---|
 | 4.1 | Meta Coordinator session | ✅ W7.6-P3 P1 implementation/apply decision | W7.6-P1 draft + W7.6-P2 reviews | P3 decision was `revise`, not `hold`. The required revision bundle was applied to `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md` and `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`: target authority read order, profile/active-context field law, workflow/domain/routing verdict separation, finding-status semantics, and metrics row/status contract. No global command/skill apply was run; user approval is still required before executing the backup-first script. |
 
-**⏸ Step 5 — RingFall Wave 1 read-only backfill validation**
+**✅ Step 5 — RingFall Wave 1 read-only backfill validation**
 
 Parallelism rule: no parallel target mutation. This validates P1 against existing RingFall Wave 1 artifacts only.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 5.1 | Track E agent session | ⏸ W7.6-P4 RingFall W1 backfill validation | W7.6-P3 accepted plus global P1 command/skill applied and verified | Produce measured backfill report from pinned RingFall W1 docs/router artifacts: checkpoint coverage, active-context freshness, handoff sufficiency, cold-start recovery verdict, minimal negative controls, draft findings, metrics, reconcile debt. No RingFall implementation, commit, push, public output, or source-of-truth rewrite. |
-| 5.2 | Meta Coordinator session | ⏸ W7.6-P4 Meta backfill closeout | W7.6-P4 Track E report | Decide whether P1 is sufficient to proceed to hook integration or needs revision. |
+| 5.1 | Track E agent session | ✅ W7.6-P4 RingFall W1 backfill validation | W7.6-P3 accepted plus global P1 command/skill applied and verified | User-driven dry-run report proved high-confidence checkpoint reconstruction for `W1-S7-C1-K`, surfaced stale `.fal/ACTIVE_CONTEXT.*` and missing aggregate evidence as reconcile debt, and proposed finding/metrics rows. One explicit validation gap remains: a separate `recovery_verdict` drill was not run. |
+| 5.2 | Meta Coordinator session | ✅ W7.6-P4 Meta backfill closeout | W7.6-P4 Track E report | Meta accepts P4 as read-only backfill validation with reconcile debt. P1 is sufficient to proceed to hook integration planning. Full recovery proof remains open until a later explicit cold-start drill records `recovery_verdict: restored | partially_restored | failed`. |
 
-**⏸ Step 6 — Existing workflow hook integration planning**
+**✅ Step 6 — Existing workflow hook integration planning and router/tooling hardening**
 
 Parallelism rule: serialize until P1 backfill proves the checkpoint closeout slice. Hook integration must not jump directly to full orchestration.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 6.1 | Meta Coordinator session | ⏸ W7.6-P5 existing workflow hook plan | W7.6-P4 Meta closeout | Define exactly where existing `seq-next -> terv-review -> implement -> step-review -> review-fix` command workflows call P1, what clean-closeout gates apply, and whether `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` must be updated for any workflow-usage or semantics change. |
-| 6.2 | Track D agent session | ⏸ W7.6-P6 router/tooling artifact-pinning hardening | W7.6-P5 accepted | Implement or plan artifact pinning, latest-output classification, fix-plan classification, bounded retry/resume, explicit stop conditions, fast-reply recovery, and no-duplicate-send guardrails if needed. If wrapper semantics change, update `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` in the same closeout. |
+| 6.1 | Meta Coordinator session | ✅ W7.6-P5 existing workflow hook plan | W7.6-P4 Meta closeout | Accepted in `docs/private/Wave7_6-W7_6_P5-Existing-Workflow-Hook-Integration-Plan-v1.md`. Defines required hook stages (`meta_plan_review_done`, `step_review_done`, `review_fix_done`, `handoff_done`), conditional hooks (`implementation_done`, `pre_compact_checkpoint`, `post_compact_hydration`), clean-closeout gates, fail-closed vs reconcile-debt behavior, and updates `tools/oc-session-router/docs/workflow-orchestrator-runbook.md`. |
+| 6.2 | Track D agent session | ✅ W7.6-P6 router/tooling artifact-pinning hardening | W7.6-P5 accepted | Accepted after no-Swarm, three-lane Meta step review and review-fix in `docs/private/Wave7_6-W7_6_P6-Meta-Step-Review-Closeout-v1.md`. Patch hardens the serial helper path with pinned source-artifact preflight, dry-run/propose default, explicit `-FalSyncApply` / `-Apply` write gate, fix-plan/final-synthesis classifier checks, marker-stage mismatch rejection, `review_fix_done` stage separation, and runbook/README/state sync. Local ignored tooling remains operational state and is not part of the normal versioned closeout commit. |
 
-**⏸ Step 7 — Parallel reconcile and full command readiness**
+**🔄 Step 7 — Parallel reconcile and full command readiness**
 
 Parallelism rule: no full `/fal-orchestrate-target` command until parallel reconcile and artifact pinning are accepted.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 7.1 | Track D agent session | ⏸ W7.6-P7 parallel reconcile hardening | W7.6-P6 accepted | Add or plan lane-level artifact pinning, combined final synthesis checkpoint, and parallel-run reconcile rules. If the shared parallel operator workflow changes, update `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` in the same closeout. |
+| 7.1 | Track D agent session | 🔄 W7.6-P7 parallel reconcile hardening | W7.6-P6 accepted | Add or plan lane-level artifact pinning, combined final synthesis checkpoint, and parallel-run reconcile rules. If the shared parallel operator workflow changes, update `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` in the same closeout. |
 | 7.2 | Track E agent session | ⏸ W7.6-P9 wave-level usefulness audit design | W7.6-P4 evidence | Define audit metrics for future target waves, including finding-to-regression lineage samples, cold-start recovery, handoff sufficiency, and negative-control behavior; may run in parallel with Track D if file scopes are disjoint and no router contract changes are needed from Track E. |
 | 7.3 | Meta Coordinator session | ⏸ W7.6-P8 full orchestrator command readiness decision | W7.6-P1-P7 evidence | Decide whether `/fal-orchestrate-target` may be built, must be revised, or remains held. |
 
@@ -2503,7 +2503,10 @@ The immediate mainline frontier is now Wave 7.6 target-orchestrator seamless int
 - ✅ `W7.6-P1` `/fal-checkpoint-target` + `fal-target-orchestration` PRD draft through `oc-toolsmith` is produced in `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md` with reviewable script `ops/temp/apply-w7-6-p1-fal-target-orchestration.ps1`.
 - ✅ `W7.6-P2` Track A/B/C/D/E parallel review completed: Track A/D `GREEN`, Track B/C/E `YELLOW/revise`, no `RED`.
 - ✅ `W7.6-P3` Meta apply decision completed as `revise`; the required narrow revision bundle was applied to the P1 PRD and backup-first apply script.
-- 🔄 `W7.6-P4` RingFall Wave 1 read-only backfill validation is now the active next step: the global P1 command/skill files exist, and at least one user-driven DRY_RUN checkpoint trial has been started; clean full P4 evidence capture is still pending.
+- ✅ `W7.6-P4` RingFall Wave 1 read-only backfill validation is accepted as read-only checkpoint proof with reconcile debt; full cold-start recovery proof remains open.
+- ✅ `W7.6-P5` existing workflow hook integration plan is complete in `docs/private/Wave7_6-W7_6_P5-Existing-Workflow-Hook-Integration-Plan-v1.md`.
+- ✅ `W7.6-P6` router/tooling artifact-pinning hardening is accepted after no-Swarm, three-lane Meta step review and review-fix.
+- 🔄 `W7.6-P7` parallel reconcile hardening is now the active next step.
 - ⏸ Wave 7.7 Productized Target Orchestration UX remains parked until W7.6 evidence justifies it.
 - ⏸ Wave 7.8 CI readiness and mechanical gates is now sequenced as a later infrastructure wave; it does not replace the immediate W7.6 frontier.
 - ⏸ Wave 8/HUB compatibility remains parked; this frontier does not authorize HUB work.
@@ -2511,7 +2514,10 @@ The immediate mainline frontier is now Wave 7.6 target-orchestrator seamless int
 Current blocker summary:
 
 - no blocker remains in the P2/P3 docs/contract revision bundle after the revised PRD/apply-script text is reviewed
-- global P1 command/skill files now exist locally; the remaining near-term blocker is clean, complete P4 evidence capture rather than pre-apply approval
+- global P1 command/skill files exist locally, and P4 proved the checkpoint slice on real RingFall Wave 1 artifacts
+- a later explicit cold-start recovery drill is still open before compact/hydration recovery may be treated as proven
+- serial wrapper FAL hook behavior is accepted for P6 scope; parallel reconcile remains unproven until P7
+- local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) remain outside the normal versioned closeout commit unless a later explicit policy exception force-adds them
 - W7.8 CI implementation remains future work behind its own activation gate; it is planned, not active
 - RingFall Wave 2 implementation remains blocked before a separate target planning brief and Meta gate
 - public release, public mirror, `docs/public/` output, and Track A presentation remain blocked
@@ -2522,12 +2528,13 @@ Current blocker summary:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. Capture a clean full `/fal-checkpoint-target` `DRY_RUN / propose_only` report for RingFall Wave 1 from the applied global command/skill, without system-reminder contamination or truncated sections.
-2. Evaluate P4 backfill dimensions from that report: source-of-truth verdict, active-context freshness, handoff sufficiency, context-delta status, compact boundary status, finding rows, metrics row status, and reconcile debt.
-3. If P4 evidence is sufficient, Meta closes W7.6-P4 and decides whether hook integration or another P4 pass is needed.
-4. Wave 7.8 CI readiness/mechanical gates may open later under its own activation gate; it does not require Wave 7.7 product UX activation.
-5. Wave 7.7 productized target-orchestration UX remains `⏸` until W7.6 evidence justifies it.
-6. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.
+1. Open `W7.6-P7 parallel reconcile hardening` from accepted P6 serial-helper evidence.
+2. Define lane-level artifact pinning, combined final synthesis checkpoint behavior, and parallel-run reconcile rules without treating serial P6 as parallel clean-closeout proof.
+3. Keep the missing explicit `recovery_verdict` drill visible as later validation debt; do not claim compact/hydration recovery is already proven.
+4. Keep `W7.6-P8` full `/fal-orchestrate-target` readiness blocked until P7 evidence exists.
+5. Wave 7.8 CI readiness/mechanical gates may open later under its own activation gate; it does not require Wave 7.7 product UX activation.
+6. Wave 7.7 productized target-orchestration UX remains `⏸` until W7.6 evidence justifies it.
+7. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.
 
 ### CI readiness planning note
 

@@ -157,6 +157,46 @@ ACCEPTED_SCOPE_SUMMARY: Docs-only sync accepted.
             self.assertEqual(1, second.skipped_count)
             self.assertEqual("already_synced", second.results[0].reason)
 
+    def test_sync_checkpoint_preserves_review_fix_done_stage(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="fal-router-sync-") as fal_tmp_dir, tempfile.TemporaryDirectory(prefix="ringfall-target-") as target_tmp_dir:
+            target_repo = Path(target_tmp_dir)
+            run_dir = target_repo / ".opencode-router" / "step-review-runs" / "fix-cycle-1"
+            run_dir.mkdir(parents=True)
+            source_path = run_dir / "05-meta-final-synthesis.md"
+            source_path.write_text(
+                """
+=== FAL CHECKPOINT START ===
+CHECKPOINT_STAGE: review_fix_done
+TARGET: RF-REVIEW-FIX-01
+ORIGIN_SESSION: meta
+DECISION: pass
+SUMMARY: Review-fix cycle accepted.
+NEXT_ACTION: Proceed to closeout.
+ACCEPTED_SCOPE_SUMMARY: Review-fix patch accepted.
+=== FAL CHECKPOINT END ===
+""".strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = sync_checkpoint(
+                target_repo_path=target_repo,
+                project_id="ringfall",
+                project_name="RingFall",
+                source_session="meta",
+                stage="review_fix_done",
+                target="RF-REVIEW-FIX-01",
+                source_path=source_path,
+                data_dir=fal_tmp_dir,
+            )
+
+            artifact_root = Path(fal_tmp_dir) / "artifacts" / result.run_id
+            checkpoint_payload = json.loads((artifact_root / "fal_checkpoint_sync.json").read_text(encoding="utf-8"))
+            synthesis_payload = json.loads((artifact_root / "review_synthesis.json").read_text(encoding="utf-8"))
+            self.assertEqual("review_fix_done", checkpoint_payload["checkpoint_stage"])
+            self.assertIn("review_fix", synthesis_payload)
+            self.assertNotIn("step_review", synthesis_payload)
+
 
 if __name__ == "__main__":
     unittest.main()

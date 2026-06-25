@@ -741,7 +741,7 @@ def _default_next_action(stage: str, decision: str | None) -> str | None:
             return "Target Track should revise the plan and re-emit plan_ready_for_meta_review."
         if decision_value == "blocked":
             return "Target loop should stop and resolve the blocker before implementation."
-    if stage_value == "step_review_done":
+    if stage_value in {"step_review_done", "review_fix_done"}:
         if decision_value == "pass":
             return "Target Track may acknowledge /step-review-utan and close the loop when appropriate."
         if decision_value == "fix_required":
@@ -758,6 +758,8 @@ def _default_scope_summary(stage: str) -> str | None:
         return "Planning checkpoint captured from target repo router flow."
     if stage == "step_review_done":
         return "Implementation review checkpoint captured from target repo router flow."
+    if stage == "review_fix_done":
+        return "Review-fix acceptance checkpoint captured from target repo router flow."
     return "Target repo checkpoint captured for FAL governance."
 
 
@@ -898,6 +900,11 @@ def _build_review_synthesis(*, run_id: str, checkpoint_stage: str, decision: str
         }
     if checkpoint_stage == "step_review_done":
         synthesis["step_review"] = {
+            "final_verdict": decision,
+            "final_summary": summary,
+        }
+    if checkpoint_stage == "review_fix_done":
+        synthesis["review_fix"] = {
             "final_verdict": decision,
             "final_summary": summary,
         }
@@ -1076,7 +1083,7 @@ def _write_active_context(
 def _packet_stage_if_relevant(packet_path: Path) -> str | None:
     payload = _load_packet_json(packet_path)
     stage = payload.get("stage")
-    if stage in {"meta_plan_review_done", "step_review_done"}:
+    if stage in {"meta_plan_review_done", "step_review_done", "review_fix_done"}:
         return str(stage)
     return None
 

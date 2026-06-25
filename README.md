@@ -1,257 +1,183 @@
 # Fractal Agent Lab
 
-Fractal Agent Lab is a multi-agent systems project focused on building **inspectable, replayable, and evolvable agent workflows**.
+Fractal Agent Lab is a local evidence, review, measurement, and context-continuity layer for OpenCode-assisted software-delivery workflows.
 
-The project combines:
+OpenCode remains the interactive coding/session motor. FAL's job is to make the surrounding workflow inspectable: what was planned, what was reviewed, what changed, what evidence exists, what is still blocked, and what the next safe action is.
 
-- multi-agent orchestration
-- structured runtime state
-- trace and replay foundations
-- evaluation-oriented design
-- a future adaptive identity layer for agents
-
-The goal is not to build a black-box "AI swarm", but a system where agent behavior can be **understood, improved, and compared over time**.
+The current goal is not to build an autonomous coding agent or a dashboard-first command center. The goal is to make human-in-the-loop AI-assisted development safer, more measurable, and easier to resume across sessions.
 
 ---
 
-## Why This Project Exists
+## Current Direction
 
-A lot of agent systems today focus on task completion, tool use, or routing, but often leave out a few things that become critical as systems grow:
+The project has moved from early agent-orchestration experiments into an OpenCode-backed workflow governance layer.
 
-- traceability
-- evaluation
-- replayability
-- explicit coordination
-- behavioral consistency over time
+Current thesis:
 
-Fractal Agent Lab is built around the idea that multi-agent systems should be treated as **engineered systems**, not just prompt chains.
+> FAL is a local control-plane evidence layer around OpenCode sessions that makes agentic software-delivery workflows inspectable, reviewable, measurable, and recoverable after context loss.
 
-That means the project is designed to make workflows:
-
-- easier to reason about
-- easier to debug
-- easier to evolve
-- and eventually more interesting to study as adaptive systems
+Older orchestration experiments remain in the repo as useful research history and test material. They are not the current north star.
 
 ---
 
-## What Makes It Different
+## What FAL Does Now
 
-### 1. Traceability-first design
+### 1. Turns workflow activity into structured evidence
 
-Runs should not disappear into a black box.
+FAL takes the messy output of a human/OpenCode workflow and records it as structured artifacts.
 
-The project is being built so that workflow execution can leave behind structured traces that later support:
+Instead of relying on chat history, the workflow can leave behind sidecars such as:
 
-- inspection
-- replay
-- evaluation
-- comparison across iterations
+- `opencode_loop_summary.json`
+- `packet_ledger.json`
+- `selected_outputs.json`
+- `review_synthesis.json`
+- `approval_log.json`
+- `workflow_metrics.json`
+- `review_findings_ledger.json`
+- `context_digest.json`
 
-### 2. Explicit role vs behavior separation
+This makes the workflow reviewable later without pretending that raw chat is the source of truth.
 
-An agent role is static.
-An agent's actual behavior over time is not.
+### 2. Measures workflows across multiple axes
 
-One of the long-term ideas in this project is to model agents not only as predefined roles, but as evolving system components with observable behavioral drift.
+FAL avoids a fake single "quality score". A loop can instead be evaluated through separate evidence dimensions:
 
-### 3. Evaluation is part of the architecture
+- reliability: clean-pass eligibility, validation state, false-green risk, blocker count
+- review quality: review findings, required fixes, true-positive / false-positive / uncertain labels
+- efficiency: packet count, approval count, fix-cycle count, operator decision count
+- evidence health: required sidecar presence, stage coverage, artifact completeness
+- context health: context digest presence, recovery label, loaded/deferred context refs
+- learning value: learning candidates created, accepted, rejected, or left pending
+- privacy/public safety: raw-output retention, public-export state, redaction boundary
+- operator burden: how much manual steering was needed
 
-Evaluation is not treated as an afterthought.
+The point is to see where a workflow is strong or weak instead of compressing everything into a misleading number.
 
-The system is being designed with room for:
+### 3. Preserves review findings as first-class state
 
-- replay-driven checks
-- baseline comparisons
-- drift monitoring
-- future workflow quality scoring
+Review output should not disappear into a conversation.
 
-### 4. Built in layers, not as a monolith
+FAL can track findings with severity, category, affected files, required fix, resolution status, and human label. This is the basis for finding precision, false-green analysis, missed-issue follow-up, and later workflow improvement.
 
-The project is structured around a clean internal separation between:
+### 4. Helps sessions recover after context loss
 
-- core contracts
-- runtime execution
-- agent definitions
-- workflow composition
-- adapters
-- tracing
-- evaluation
-- future identity logic
+Long OpenCode sessions eventually compact or lose context. FAL treats recovery as a contract, not a ritual.
 
-This makes it easier to extend without turning the codebase into a fragile one-shot prototype.
+The key pieces are:
 
----
+- `context_digest.json`: a sidecar that records what context was loaded, deferred, and how recovery went
+- target-local `.fal/ACTIVE_CONTEXT.*`: a small hot-path card for the target repo's current state
+- checkpoint summaries: bounded, machine-readable summaries of stable workflow points
 
-## Project Vision
+This lets a new session reload the current truth first, then deeper documents only when needed.
 
-Fractal Agent Lab is moving toward a system where:
+### 5. Keeps learning controlled
 
-- workflows are explicitly modeled
-- runs produce inspectable state and traces
-- agents can be coordinated across multiple roles
-- execution quality can be evaluated over time
-- identity can later emerge as a measurable adaptive layer
+FAL can turn repeated issues into learning candidates, but it does not automatically rewrite prompts, change routing, commit code, or publish anything.
 
-A simple way to describe the long-term direction is:
+The intended lifecycle is:
 
-> static roles, dynamic behavior, explicit coordination.
+```text
+proposed -> reviewed -> accepted/rejected -> implemented separately -> validated -> retired
+```
 
----
+### 6. Supports external target-project governance
 
-## Core Concepts
+FAL can sit around another project as a governance and evidence layer.
 
-### `AgentSpec`
-
-Defines what an agent is supposed to be.
-
-This includes things like:
-
-- role
-- kind
-- allowed tools
-- handoff targets
-- model policy references
-- metadata
-
-### `WorkflowSpec`
-
-Defines how a workflow is structured.
-
-This is the unit that describes which steps exist, how they are ordered, and which agents participate.
-
-### `RunState`
-
-Represents the live state of a workflow run.
-
-This is the place where execution-time data accumulates.
-
-### `TraceEvent`
-
-Captures meaningful events during execution.
-
-This is the basis for replay, observability, and evaluation.
-
-### Emergent Identity Layer
-
-A planned subsystem that will model agents as evolving identity profiles shaped by execution history, feedback, and coordination patterns.
-
-This is a future-facing direction, but it is being grounded as an engineering problem rather than treated as vague personality simulation.
+The target project still owns its own code, docs, and decisions. FAL records the loop, checks gates, preserves findings, and keeps the next safe action clear.
 
 ---
 
-## Current Focus
+## Current Boundaries
 
-The project has completed the Wave 5 local workbench slice. The current surface is a
-bounded operator workbench for browsing and acting on workflow evidence while canonical
-artifacts remain the source of truth.
+FAL does not currently authorize or provide:
 
-Current workbench posture:
+- autonomous software implementation
+- OpenCode bridge/API/session delivery
+- browser-side OpenCode control
+- automatic routing, dispatch, commit, or push
+- public release of raw evidence
+- HUB/dashboard implementation
+- target-project implementation approval by itself
 
-- run browsing is generated from local/private `data/` artifacts
-- strict-valid trace timelines render only when generated trace-detail files are valid
-- launch/packet surfaces are operator-mediated command previews, not browser-side execution
-- run comparison displays structural/evidence-readiness facts, not quality scoring or provider/model ranking
-- memory/eval inspection is read-only and source-reported
+HUB compatibility is parked as future docs/contract-first work. The only allowed future HUB posture currently under consideration is read-only evidence consumption and next-action preview, not control.
 
-The workbench does not control OpenCode sessions, perform commits, publish a public demo,
-rank providers/models, or replace canonical evidence artifacts.
+---
 
-Wave 6 is the next documented direction, but implementation should start only through an
-explicit evidence-ledger-first sequencing decision.
+## Main Artifact Surfaces
+
+Canonical runtime artifacts:
+
+- `data/runs/<run_id>.json`
+- `data/traces/<run_id>.jsonl`
+
+Additive workflow sidecars:
+
+- `data/artifacts/<run_id>/workflow_metrics.json`
+- `data/artifacts/<run_id>/review_findings_ledger.json`
+- `data/artifacts/<run_id>/context_digest.json`
+
+Coordination and policy surfaces:
+
+- `ops/PROJECT_STATE.md`
+- `ops/Combined-Execution-Sequencing-Plan.md`
+- `ops/AGENTS.md`
+- `docs/private/`
+- `docs/public/`
+
+Target-local restore surface, when FAL is used around another repo:
+
+- `.fal/ACTIVE_CONTEXT.md`
+- `.fal/ACTIVE_CONTEXT.json`
+
+`data/` and target `.fal/` surfaces are local/private by default.
+
+---
+
+## How It Helps In Practice
+
+A typical governed loop looks like this:
+
+```text
+human + OpenCode session
+  -> plan / review / implementation / review-fix loop
+  -> selected outputs and checkpoint summaries
+  -> FAL evidence sidecars
+  -> metrics + findings + context digest
+  -> next safe action recorded for the next session
+```
+
+The value is not that FAL writes the code. The value is that it reduces workflow drift:
+
+- the next session knows what is actually done
+- review findings stay visible until resolved
+- blocked work stays blocked instead of accidentally starting
+- context can be restored from a small current-state card
+- public/private boundaries stay explicit
+- later methodology claims can be checked against evidence
 
 ---
 
 ## Repository Structure
 
 ```text
-ops/        local/private coordination and project-operating documents
-docs/       architecture and subsystem design docs
-src/        main Python implementation
-tests/      replay / eval / validation
+ops/        private coordination, sequencing, and project-operating state
+docs/       architecture, public-safe docs, and private doctrine
+src/        Python implementation
+tests/      replay, eval, validation, and contract tests
 configs/    runtime and provider configuration
-examples/   small committed examples
-data/       local runtime artifacts (gitignored)
-ui/         local Wave 5 workbench UI
+examples/   small curated examples
+data/       local runtime artifacts, ignored by git
+ui/         local workbench experiments, not the current mainline
 ```
-
-Canonical runtime artifact paths:
-
-- `data/runs/<run_id>.json`
-- `data/traces/<run_id>.jsonl`
-
-Additive sidecar-ready path:
-
-- `data/artifacts/<run_id>/`
-
----
-
-## Design Documents
-
-This project treats design documents as first-class artifacts.
-
-Key docs include:
-
-- `docs/Repo-Skeleton-v01.md`
-- `docs/Emergent-Identity-Layer-v01.md`
-- `docs/Repo-Visibility-and-Release-Policy-v01.md`
-
-These reflect an important part of the project: the system is meant to show not only implementation, but also architecture and design thinking.
-
----
-
-## Planned Build Progression
-
-### Wave 0
-
-Repository spine, contracts, runtime shell, first runnable workflow path, stored artifacts, and Wave 0 smoke/acceptance groundwork.
-
-### Wave 1
-
-Basic hero-workflow execution hardening, early orchestration learning, baseline comparisons, and better visibility.
-
-### Wave 2
-
-Replay and eval hardening, stronger state/trace contracts, and the first observational version of the Emergent Identity Layer.
-
-### Later
-
-- richer workflow orchestration
-- stronger benchmark and evaluation paths
-- UI / workbench improvements
-- identity-aware routing experiments
-- possible team/system-level aggregation ideas
-
----
-
-## Long-term Research Direction
-
-One of the most interesting directions in this project is the idea that agents should not be modeled only as static role wrappers.
-
-Instead, they may gradually develop measurable identity profiles based on:
-
-- repeated execution behavior
-- success and failure patterns
-- coordination tendencies
-- reflection and correction behavior
-- later, possibly reputation and team-level interaction
-
-In practical terms, this means treating identity as a small adaptive subsystem built on top of execution and trace data.
-
-The important constraint is that this is being approached as an engineering feature:
-
-- bounded
-- inspectable
-- versionable
-- measurable
-
-not as vague "AI personality" theater.
 
 ---
 
 ## Quickstart
 
-The project is still evolving, but the current repo already has multiple runnable CLI workflow paths and stored artifact/trace support.
+The historical CLI workflow paths remain useful for smoke checks and development.
 
 ### Requirements
 
@@ -271,7 +197,7 @@ PowerShell:
 $env:PYTHONPATH='src'; python -m fractal_agent_lab.cli list-workflows
 ```
 
-### Run the current `h1.lite` workflow
+### Run a small workflow smoke path
 
 Git Bash:
 
@@ -285,97 +211,47 @@ PowerShell:
 $env:PYTHONPATH='src'; python -m fractal_agent_lab.cli run h1.lite --input-json '{"idea":"AI founder assistant"}' --format json --show-trace
 ```
 
-### Inspect a stored trace timeline
+### Inspect stored traces
 
 Git Bash:
 
 ```bash
+PYTHONPATH=src python -m fractal_agent_lab.cli trace list --format text
 PYTHONPATH=src python -m fractal_agent_lab.cli trace show --run-id <run_id>
 ```
 
 PowerShell:
 
 ```powershell
+$env:PYTHONPATH='src'; python -m fractal_agent_lab.cli trace list --format text
 $env:PYTHONPATH='src'; python -m fractal_agent_lab.cli trace show --run-id <run_id>
 ```
 
-### Browse stored traces across workflows
+### Run focused checks
 
 Git Bash:
 
 ```bash
-PYTHONPATH=src python -m fractal_agent_lab.cli trace list --format text
-```
-
-PowerShell:
-
-```powershell
-$env:PYTHONPATH='src'; python -m fractal_agent_lab.cli trace list --format text
-```
-
-Note:
-
-- exact curated run-id walkthroughs are maintained in wave delivery docs because they
-  depend on operator-local `data/` artifacts
-- `data/` is a local runtime surface (gitignored), so exact artifact availability is not
-  guaranteed across all clones
-
-### Run the current tests
-
-Git Bash:
-
-```bash
-PYTHONPATH=src python -m unittest tests.adapters.test_h1_lite_step_runner tests.evals.test_artifact_acceptance
-```
-
-### Validate a stored artifact pair
-
-```bash
-PYTHONPATH=src python scripts/validate_f0_m_artifact_pair.py <run_id>
+PYTHONPATH=src python -m unittest tests.evals.test_opencode_workflow_metrics tests.core.contracts.test_w7_5_context_digest tests.memory.test_learning_candidates
 ```
 
 ---
 
-## Project Philosophy
+## Visibility Policy
 
-Fractal Agent Lab is built around a few simple preferences:
+This repo uses a private-canonical / public-curated model.
 
-- explicitness over magic
-- inspectability over hype
-- measured complexity over premature abstraction
-- architecture before framework inflation
-- systems thinking over prompt folklore
+Private coordination, raw evidence, prompt/gate heuristics, failure corpora, and local artifacts stay private by default. Public output must be deliberately sanitized and reviewed before publication.
 
-The project is intentionally trying to stay grounded.
+See:
 
-The goal is not to make agents look impressive in isolation.
-The goal is to build a system where agent workflows become:
-
-- legible
-- testable
-- evolvable
-- and eventually worth studying
+- `docs/Repo-Visibility-and-Release-Policy-v01.md`
+- `docs/public/README.md`
 
 ---
 
-## Status Note
+## Status
 
-This is an actively evolving personal project.
+FAL is an active personal engineering project.
 
-Some design artifacts are intentionally public-facing because they contribute to the portfolio value of the project.
-Some deeper coordination, research, and evaluation material may remain private during development.
-
-That boundary is intentional.
-
-The project officially supports a dual-repo model:
-
-- a canonical private lab repo
-- and a curated public portfolio repo
-
-See `docs/Repo-Visibility-and-Release-Policy-v01.md` for the current visibility and release policy.
-
-Current runtime note:
-
-- the mainline system is still mock-backed today
-- the first real-provider MVP is planned for Wave 3
-- broader provider parity and routing hardening are planned for Wave 4
+The current mature slice is the OpenCode-backed evidence and measurement layer. Future work may include public-safe methodology writeups, target-project validation, and eventually HUB compatibility contracts, but none of those imply autonomous control or public release by default.
