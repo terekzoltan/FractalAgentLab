@@ -2228,33 +2228,99 @@ Non-goals:
 - no new canonical finding-to-regression database from W7.6
 - no external advisory intake product flow in W7.6
 
-#### Wave 7.7 — Productized Target Orchestration UX (ready for Meta activation)
+#### Wave 7.7 — Productized Target Orchestration UX (docs-first planning open)
 
 Activation gate:
-- W7.6 evidence through P9 is sufficient to open docs-first activation planning for Wave 7.7
-- W7.7 implementation remains separately gated; no full `/fal-orchestrate-target` build, target implementation, or bridge/API/session delivery opens by default
-- any external advisory intake design must preserve recommendation-only authority and Meta deduplication against private canon
+- W7.6 is closed with design debt through `docs/private/Wave7_6-W7_6-Closeout-Decision-v1.md`, and W7.6 evidence through P9 is sufficient to open W7.7 docs-first activation planning.
+- W7.7 implementation remains separately gated; no full `/fal-orchestrate-target` build, target implementation, bridge/API/session delivery, public output, automatic `/compact`, or global apply execution opens by default.
+- External advisory intake is allowed only as recommendation-only planning input with Meta deduplication against private canon and no current-next-action authority.
+- P9b actual cold-start `recovery_verdict: restored | partially_restored | failed` remains separate validation debt, not a hidden W7.7 activation prerequisite.
 
 Goal:
-- make FAL target orchestration easy by default while preserving optional strict/audit paths for high-assurance workflows
+- make FAL target orchestration easy by default for the owner and OC Server Orchestrator while preserving strict and audit/team paths for high-assurance workflows.
 
-Candidate deliverables:
-- Easy/Guided/Strict/Audit mode policy for target orchestration
-- command defaults and target-profile auto-detection rules
-- ambiguity question flow for operator decisions
-- strict-mode artifact requirements
-- audit/team-mode evidence and reconciliation expectations
-- external advisory intake envelope for partial-context recommendations
-- Meta disposition table: `already_exists`, `partially_exists`, `useful_candidate`, `defer`, `reject`, `unknown_private_context`
-- safe abstraction feedback loop for future external advisors without leaking raw private evidence or internal reasoning
-- future decision on whether user-approved auto-compact can run at checkpoint boundaries
+Planning inputs:
+- `docs/private/Wave7_7-Activation-and-Sequencing-Plan-v1.md`
+- `docs/private/Wave7_7-Mode-Policy-and-Review-Depth-Selector-v1.md`
+- `docs/private/Wave7_7-Auto-Detect-and-Question-Flow-Policy-v1.md`
+- `docs/private/Wave7_7-External-Advisory-Intake-Envelope-v1.md`
+- `docs/private/Wave7_7-Full-Orchestrator-Command-PRD-v1.md`
+- `docs/private/Wave7_7-Closeout-Readiness-Rubric-v1.md`
+
+Canonical mode and review policy:
+- canonical mode names: `easy`, `guided`, `strict`, `audit_team`, `external_advisory`
+- default mode: `guided`
+- `external_advisory` is the fifth mode and remains recommendation-only
+- review depth is an independent policy axis, not automatically determined by mode
+- review risk labels: `trivial`, `normal`, `high_risk`, `audit_or_parallel`
+- target/profile/artifact confidence labels: `high`, `medium`, `low`
+- default write posture: dry-run/propose; target `.fal/ACTIVE_CONTEXT.*` or FAL aggregate evidence writes require explicit apply authority
 
 Non-goals at activation:
 - no product UI/dashboard implementation
-- no automatic OpenCode control
+- no automatic OpenCode control or browser-side control
 - no weakening of W7.6 compact-is-cache / canon-first authority doctrine
-- no automatic compaction without a later explicit gate
+- no automatic compaction and no implicit compact-event detection
 - no external advisory item may change current next action without owner/Meta reprioritization
+- no full `/fal-orchestrate-target` build from PRD-only planning
+- no RingFall Wave 2 implementation/execution
+- no public output or `docs/public/**`
+
+**🔄 Step 1 — Meta activation and full W7.7 plan package**
+
+Parallelism rule: serial Meta planning step. This step creates the full W7.7 plan package and sequencing but does not accept or execute later W7.7 implementation/design steps.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 1.1 | Meta Coordinator session | 🔄 W7.7-A activation / sequencing / plan-doc package | W7.6 closeout accepted; owner grill decisions captured | Drafts the W7.7 plan-only package, updates Combined and `ops/PROJECT_STATE.md`, keeps runbook update as a later acceptance requirement, does not edit global OpenCode files, does not run apply scripts, and does not commit automatically. Owner chose diff-first commit policy. |
+
+**⬜ Step 2 — Mode policy and independent review-depth selector**
+
+Parallelism rule: one policy step because review-depth selection depends on the mode vocabulary, but remains an independent axis in the same acceptance surface.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 2.1 | Meta Coordinator + Track E review session | ⬜ W7.7-B mode policy and review-depth selector acceptance | W7.7-A plan package | Finalize or revise `Wave7_7-Mode-Policy-and-Review-Depth-Selector-v1.md`: `guided` default, `easy` low-friction propose, `strict` artifact-complete, `audit_team` team reconciliation, `external_advisory` recommendation-only, and risk labels `trivial` / `normal` / `high_risk` / `audit_or_parallel`. Acceptance must preserve the runbook's review controls and require a later runbook update if live semantics change. |
+
+**⬜ Step 3 — Parallel UX policy lanes for detection, questions, and advisory intake**
+
+Parallelism rule: these lanes may run in parallel after Step 2 because they consume the same mode/review-depth contract and do not depend on each other's output until Step 4 synthesis.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 3.1 | Track D + Meta Coordinator session | ⬜ W7.7-C target-profile auto-detection and confidence contract | W7.7-B accepted | Finalize or revise the `high` / `medium` / `low` detection policy for target repo, profile, router settings, sessions, pinned artifacts, FAL mirror freshness, and dirty state. No router/code implementation opens by default. |
+| 3.2 | Track A + Meta Coordinator session | ⬜ W7.7-D operator question bank and Guided-mode prompt flow | W7.7-B accepted | Finalize or revise question-tool prompts for mode, review depth, apply authority, dirty state, stale FAL mirror, compact boundary, advisory import, and full-command gate attempts. Preserve minimal-interruption runbook doctrine. |
+| 3.3 | Track C + Track E + Meta Coordinator session | ⬜ W7.7-E external advisory fifth-mode envelope and triage policy | W7.7-B accepted | Finalize or revise `Wave7_7-External-Advisory-Intake-Envelope-v1.md`: envelope fields, context-limit disclosure, privacy boundary, safe abstraction feedback, and disposition statuses `already_exists`, `partially_exists`, `useful_candidate`, `defer`, `reject`, `unknown_private_context`. |
+
+**⬜ Step 4 — Full `/fal-orchestrate-target` PRD-only synthesis**
+
+Parallelism rule: serial synthesis step. The full command PRD must consume Step 2 mode/review policy plus all Step 3 UX lanes.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 4.1 | Meta Coordinator + Track D / oc-toolsmith review session | ⬜ W7.7-F full command PRD-only readiness package | W7.7-B/C/D/E accepted | Finalize or revise `Wave7_7-Full-Orchestrator-Command-PRD-v1.md` as an implementation-ready spec and future gate document. This may define command UX, args, defaults, mode/review/confidence behavior, stop conditions, artifact outputs, checkpoint hooks, and apply-design requirements, but it must not authorize build, global apply, bridge/API/session delivery, target implementation, or automatic compact. |
+
+**⬜ Step 5 — oc-toolsmith apply-design generation, no execution**
+
+Parallelism rule: serial because apply-design targets must derive from the accepted command PRD. This step may generate a backup-first apply script artifact later, but execution remains separately gated.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 5.1 | oc-toolsmith + Meta Coordinator session | ⬜ W7.7-G global command/skill apply-design artifact generation | W7.7-F accepted | Generate or specify the future `/fal-orchestrate-target` command/skill/apply-script design under backup-first rules, with no global file mutation and no script execution unless a separate explicit user/Meta gate approves it. Acceptance must name target global file paths, backup behavior, parse checks, rollback notes, and no-secret/no-password rules. |
+
+**⬜ Step 6 — W7.7 closeout and next-gate decision**
+
+Parallelism rule: serial Meta closeout. This step decides what can open next and preserves W7.6 debts.
+
+| Order | Session | Epic(s) | Prereq | Notes |
+|---|---|---|---|---|
+| 6.1 | Meta Coordinator + Track E review session | ⬜ W7.7-H wave closeout / readiness decision | W7.7-G accepted or explicitly deferred | Use `Wave7_7-Closeout-Readiness-Rubric-v1.md` to decide whether W7.7 closes as plan-only, opens an implementation gate, routes to W7.8 CI/mechanical gates, routes to P9b recovery validation, or holds. Must keep full command build blocked unless a dedicated readiness decision addresses PRD acceptance, runbook alignment, recovery-proof status, `RF-2026-06-27-01`, dirty router/core diff triage, oc-toolsmith/apply readiness, and explicit user approval. |
+
+Deferred / adjacent gates:
+- P9b actual cold-start recovery drill remains separate validation debt.
+- W7.8 CI/mechanical gates remain independent infrastructure work and may address `RF-2026-06-27-01`.
+- Dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diff must be triaged before router/full-command/CI work.
+- Full `/fal-orchestrate-target` implementation remains blocked until a separate full-command readiness decision and explicit user/Meta approval.
 
 #### Wave 7.8 — CI Readiness And Mechanical Gates
 
