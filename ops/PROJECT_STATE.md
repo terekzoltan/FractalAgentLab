@@ -27,13 +27,13 @@ W7.7 grill-me döntések: plan-only most; full doc set; `guided` default; Englis
 
 # Utolsó befejezett akció
 
-Elkészült a W7.7 Step 1 plan-only draft csomag Combinedba és private tervfájlokba: activation/sequencing plan, mode policy + review-depth selector, auto-detect/question-flow policy, external advisory intake envelope, full-command PRD-only draft, closeout/readiness rubric. Ez még nem W7.7 implementation acceptance és nem global apply authority. A local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) továbbra is local runtime/operator state, nem része a normál versioned closeout commitnak.
+Elkészült a W7.7 Step 1 plan-only draft csomag Combinedba és private tervfájlokba: activation/sequencing plan, mode policy + review-depth selector, auto-detect/question-flow policy, external advisory intake envelope, full-command PRD-only draft, closeout/readiness rubric. Utólag javítva lett a Combined W7.7 szakasz single-owner szabálya: egy sorban pontosan egy producing owner szerepelhet, a Meta/review workflow gate nem külön Combined sor, és az egy stepben lévő több sor parallel lane-t jelent. Ez még nem W7.7 implementation acceptance és nem global apply authority. A local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) továbbra is local runtime/operator state, nem része a normál versioned closeout commitnak.
 
 Automatizációs tudnivaló változatlan: `fractalagentlab-architecture-intelligence-refresh` 72 óránként fut ebben a workspace-ben, csak `docs/architecture/**` diagnosztikai/architektúra artefaktumokat frissíthet, implementation kódhoz nem nyúlhat, és `ops/PROJECT_STATE.md`-t csak blocking/major architektúra-probléma esetén módosíthatja.
 
 # Következő akció
 
-Elsődleges: owner/Meta review a W7.7 plan-only diffre, majd döntés: revise, mini/deep review, vagy explicit closeout-commit. Commit automatikusan nincs. A dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diffet bármilyen későbbi Track D/router build, W7.8 CI gate vagy full-command work előtt triage-olni kell. P9b recovery drill csak külön explicit Meta döntéssel nyílhat.
+Elsődleges: owner/Meta review a javított W7.7 plan-only diffre, majd döntés: revise, mini/deep review, vagy explicit closeout-commit. Commit automatikusan nincs. A dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diffet bármilyen későbbi Track D/router build, W7.8 CI gate vagy full-command work előtt triage-olni kell. P9b recovery drill csak külön explicit Meta döntéssel nyílhat.
 
 # Következő elvárt szerep
 
