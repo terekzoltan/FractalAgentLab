@@ -2149,7 +2149,7 @@ Epics:
 | W7.6-P6 Router/tooling artifact-pinning hardening | Track D | Track E, Meta | accepted after no-Swarm three-lane Meta step review and targeted review-fix; serial helper path now has pinned-source preflight, dry-run/propose default, explicit apply gate, source classifier hardening, and `review_fix_done` separation; local ignored tooling remains operational state, not normal versioned commit content | W7.6-P5 accepted |
 | W7.6-P7 Parallel reconcile hardening | Track D | Track E, Track B/C as needed | parallel run reconcile support and lane-level evidence rules, plus required runbook update if shared workflow semantics change | W7.6-P6 accepted |
 | W7.6-P8 Full orchestrator command readiness decision | Meta | all relevant tracks | decision `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`: do not build full `/fal-orchestrate-target` now; proceed to P9 audit design / later W7.8 mechanical gates before revisiting | W7.6-P1-P7 evidence |
-| W7.6-P9 Wave-level usefulness audit | Track E | Meta | usefulness audit design for future captured waves, including cold-start recovery drill shape and finding-to-regression lineage samples; not a new database or target implementation gate | W7.6-P8 decision plus W7.6-P4 evidence |
+| W7.6-P9 Wave-level usefulness audit | Track E | Meta | accepted usefulness audit design in `docs/private/Wave7_6-W7_6_P9-Wave-Level-Usefulness-Audit-Design-v1.md`; defines future target-wave audit metrics, cold-start recovery drill protocol, negative controls, handoff sufficiency audit, and candidate finding-to-regression lineage sample format; design/protocol only, not recovery proof, not a new database, and not target implementation | W7.6-P8 decision plus W7.6-P4 evidence |
 
 ### Wave 7.6 — Execution Steps
 
@@ -2208,7 +2208,7 @@ Parallelism rule: serialize until P1 backfill proves the checkpoint closeout sli
 | 6.1 | Meta Coordinator session | ✅ W7.6-P5 existing workflow hook plan | W7.6-P4 Meta closeout | Accepted in `docs/private/Wave7_6-W7_6_P5-Existing-Workflow-Hook-Integration-Plan-v1.md`. Defines required hook stages (`meta_plan_review_done`, `step_review_done`, `review_fix_done`, `handoff_done`), conditional hooks (`implementation_done`, `pre_compact_checkpoint`, `post_compact_hydration`), clean-closeout gates, fail-closed vs reconcile-debt behavior, and updates `tools/oc-session-router/docs/workflow-orchestrator-runbook.md`. |
 | 6.2 | Track D agent session | ✅ W7.6-P6 router/tooling artifact-pinning hardening | W7.6-P5 accepted | Accepted after no-Swarm, three-lane Meta step review and review-fix in `docs/private/Wave7_6-W7_6_P6-Meta-Step-Review-Closeout-v1.md`. Patch hardens the serial helper path with pinned source-artifact preflight, dry-run/propose default, explicit `-FalSyncApply` / `-Apply` write gate, fix-plan/final-synthesis classifier checks, marker-stage mismatch rejection, `review_fix_done` stage separation, and runbook/README/state sync. Local ignored tooling remains operational state and is not part of the normal versioned closeout commit. |
 
-**🔄 Step 7 — Parallel reconcile and full command readiness**
+**✅ Step 7 — Parallel reconcile and full command readiness**
 
 Parallelism rule: P7 accepted the parallel reconcile/artifact-pinning prerequisite, but P8 holds full `/fal-orchestrate-target` implementation until a later dedicated PRD/review and explicit approval.
 
@@ -2216,7 +2216,7 @@ Parallelism rule: P7 accepted the parallel reconcile/artifact-pinning prerequisi
 |---|---|---|---|---|
 | 7.1 | Track D agent session | ✅ W7.6-P7 parallel reconcile hardening | W7.6-P6 accepted | Accepted after Meta+Swarm re-review. Patch replaces the `sync-fal-checkpoint.ps1` noncatchable `exit $LASTEXITCODE` branch with catchable failure behavior and proves both parallel plan/step wrappers still write `fal-parallel-reconcile-summary.json` with failed-lane evidence before failing on actual helper/Python nonzero exit. Residual checked-in wrapper regression coverage debt routed as `RF-2026-06-27-01` to W7.8 or the next router failure-path change. |
 | 7.2 | Meta Coordinator session | ✅ W7.6-P8 full orchestrator command readiness decision | W7.6-P1-P7 evidence | Decision: `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`. Do not build full `/fal-orchestrate-target` now. Accepted smaller checkpoint/hook/reconcile slices may continue, but full command implementation requires a later dedicated PRD/review and must wait on P9 audit design / regression-guard readiness. |
-| 7.3 | Track E agent session | ⬜ READY W7.6-P9 wave-level usefulness audit design | W7.6-P8 decision + W7.6-P4 evidence | Define audit metrics for future target waves, including finding-to-regression lineage samples, cold-start recovery drill shape, handoff sufficiency, and negative-control behavior. This is design/audit planning only, not target implementation or a new canonical database. |
+| 7.3 | Track E agent session | ✅ W7.6-P9 wave-level usefulness audit design | W7.6-P8 decision + W7.6-P4 evidence | Accepted private design/protocol artifact in `docs/private/Wave7_6-W7_6_P9-Wave-Level-Usefulness-Audit-Design-v1.md`. It defines future target-wave audit dimensions, cold-start recovery drill protocol, negative controls, handoff sufficiency audit, decision labels, deferred gates, and candidate finding-to-regression lineage samples. It does not execute the cold-start drill and does not prove `recovery_verdict`; actual recovery proof remains routed to P9b or later targeted validation. |
 
 Non-goals:
 - no RingFall Wave 2 execution from this wave
@@ -2228,13 +2228,12 @@ Non-goals:
 - no new canonical finding-to-regression database from W7.6
 - no external advisory intake product flow in W7.6
 
-#### Wave 7.7 — Productized Target Orchestration UX (parked)
+#### Wave 7.7 — Productized Target Orchestration UX (ready for Meta activation)
 
 Activation gate:
-- W7.6 P1/P2 must prove that compact/session authority, checkpoint evidence, context-delta status, and advisory usage telemetry are coherent enough to build on
-- W7.6 RingFall Wave 1 read-only backfill should produce enough evidence to distinguish useful ceremony from unnecessary operator burden
+- W7.6 evidence through P9 is sufficient to open docs-first activation planning for Wave 7.7
+- W7.7 implementation remains separately gated; no full `/fal-orchestrate-target` build, target implementation, or bridge/API/session delivery opens by default
 - any external advisory intake design must preserve recommendation-only authority and Meta deduplication against private canon
-- this wave remains parked until Meta explicitly opens it
 
 Goal:
 - make FAL target orchestration easy by default while preserving optional strict/audit paths for high-assurance workflows
@@ -2250,7 +2249,7 @@ Candidate deliverables:
 - safe abstraction feedback loop for future external advisors without leaking raw private evidence or internal reasoning
 - future decision on whether user-approved auto-compact can run at checkpoint boundaries
 
-Non-goals while parked:
+Non-goals at activation:
 - no product UI/dashboard implementation
 - no automatic OpenCode control
 - no weakening of W7.6 compact-is-cache / canon-first authority doctrine
@@ -2496,7 +2495,7 @@ This section should always describe the **current frontier**, not the original k
 ### Current frontier
 Wave 0 through Wave 5 are complete. Wave 6 is closed as `narrow_continue`, Wave 6.5 RingFall readiness/adoption is closed, Wave 7 OpenCode-backed evidence learning is closed through W7-G2, and Wave 7.5 Measurement & Context Continuity Hardening is closed through W7.5-H.
 
-The immediate mainline frontier is now Wave 7.6 target-orchestrator seamless integration:
+Wave 7.6 closeout summary:
 
 - ✅ `W7.6-P0` Meta design freeze and Combined sequencing integration is complete.
 - ✅ W7.6 compact/session authority PRD input is complete in `docs/private/Wave7_6-Session-Continuity-Compact-Authority-PRD-v1.md`, including deduplicated advisory-derived checks for cold-start recovery, handoff sufficiency, negative controls, bounded stop/escalation, and P9 lineage audit.
@@ -2506,8 +2505,11 @@ The immediate mainline frontier is now Wave 7.6 target-orchestrator seamless int
 - ✅ `W7.6-P4` RingFall Wave 1 read-only backfill validation is accepted as read-only checkpoint proof with reconcile debt; full cold-start recovery proof remains open.
 - ✅ `W7.6-P5` existing workflow hook integration plan is complete in `docs/private/Wave7_6-W7_6_P5-Existing-Workflow-Hook-Integration-Plan-v1.md`.
 - ✅ `W7.6-P6` router/tooling artifact-pinning hardening is accepted after no-Swarm, three-lane Meta step review and review-fix.
-- 🔄 `W7.6-P7` parallel reconcile hardening is now the active next step.
-- ⏸ Wave 7.7 Productized Target Orchestration UX remains parked until W7.6 evidence justifies it.
+- ✅ `W7.6-P7` parallel reconcile hardening is accepted, with `RF-2026-06-27-01` routed as later regression-guard debt.
+- ✅ `W7.6-P8` full `/fal-orchestrate-target` readiness decision is accepted as `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`.
+- ✅ `W7.6-P9` wave-level usefulness audit design is accepted in `docs/private/Wave7_6-W7_6_P9-Wave-Level-Usefulness-Audit-Design-v1.md`; it is design/protocol only and does not prove cold-start recovery.
+- ✅ W7.6 closes with design debt in `docs/private/Wave7_6-W7_6-Closeout-Decision-v1.md`; P9b remains deferred targeted validation, not an active W7.6 blocker.
+- 🔄 NEXT: Wave 7.7 Productized Target Orchestration UX may open as docs-first Meta activation/seq-next planning.
 - ⏸ Wave 7.8 CI readiness and mechanical gates is now sequenced as a later infrastructure wave; it does not replace the immediate W7.6 frontier.
 - ⏸ Wave 8/HUB compatibility remains parked; this frontier does not authorize HUB work.
 
@@ -2516,7 +2518,8 @@ Current blocker summary:
 - no blocker remains in the P2/P3 docs/contract revision bundle after the revised PRD/apply-script text is reviewed
 - global P1 command/skill files exist locally, and P4 proved the checkpoint slice on real RingFall Wave 1 artifacts
 - a later explicit cold-start recovery drill is still open before compact/hydration recovery may be treated as proven
-- serial wrapper FAL hook behavior is accepted for P6 scope; parallel reconcile remains unproven until P7
+- serial wrapper FAL hook behavior is accepted for P6 scope, and parallel reconcile behavior is accepted for P7 scope
+- P9 design acceptance is not recovery proof; actual `recovery_verdict: restored | partially_restored | failed` remains P9b or later targeted validation debt, but does not block W7.6 closeout in design/debt state
 - local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) remain outside the normal versioned closeout commit unless a later explicit policy exception force-adds them
 - W7.8 CI implementation remains future work behind its own activation gate; it is planned, not active
 - RingFall Wave 2 implementation remains blocked before a separate target planning brief and Meta gate
@@ -2528,12 +2531,12 @@ Current blocker summary:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. Run Track E `W7.6-P9` wave-level usefulness audit design if continuing W7.6 evidence-hardening.
-2. Treat P8 as `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`: the full `/fal-orchestrate-target` command is not implementation-ready from current evidence.
+1. Open Wave 7.7 Meta activation/seq-next planning in docs-first scope if continuing the next product-mode frontier.
+2. Treat W7.6 as closed with design debt; P9b remains available later as read-only targeted validation, not as the current active frontier.
 3. Keep the missing explicit `recovery_verdict` drill visible as later validation debt; do not claim compact/hydration recovery is already proven.
-4. Keep any full `/fal-orchestrate-target` implementation blocked until the `W7.6-P8` readiness decision explicitly authorizes it.
+4. Keep any full `/fal-orchestrate-target` implementation blocked until a dedicated full-command PRD/review and explicit Meta/user approval authorize it.
 5. Wave 7.8 CI readiness/mechanical gates may open later under its own activation gate; it does not require Wave 7.7 product UX activation.
-6. Wave 7.7 productized target-orchestration UX remains `⏸` until W7.6 evidence justifies it.
+6. Wave 7.7 docs-first activation may proceed, but any deeper implementation or external advisory intake scope still requires a later explicit Meta gate.
 7. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.
 
 ### CI readiness planning note
