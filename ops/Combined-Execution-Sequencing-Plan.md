@@ -2148,8 +2148,8 @@ Epics:
 | W7.6-P5 Existing workflow hook integration plan | Meta | Track D, Track E | accepted hook plan in `docs/private/Wave7_6-W7_6_P5-Existing-Workflow-Hook-Integration-Plan-v1.md`; defines existing workflow hook stages, clean-closeout gates, fail-closed/reconcile-debt behavior, and runbook policy update while preserving P4 recovery-drill debt | W7.6-P4 evidence |
 | W7.6-P6 Router/tooling artifact-pinning hardening | Track D | Track E, Meta | accepted after no-Swarm three-lane Meta step review and targeted review-fix; serial helper path now has pinned-source preflight, dry-run/propose default, explicit apply gate, source classifier hardening, and `review_fix_done` separation; local ignored tooling remains operational state, not normal versioned commit content | W7.6-P5 accepted |
 | W7.6-P7 Parallel reconcile hardening | Track D | Track E, Track B/C as needed | parallel run reconcile support and lane-level evidence rules, plus required runbook update if shared workflow semantics change | W7.6-P6 accepted |
-| W7.6-P8 Full orchestrator command readiness decision | Meta | all relevant tracks | decide whether `/fal-orchestrate-target` may be built, revised, or held | W7.6-P1-P7 evidence |
-| W7.6-P9 Wave-level usefulness audit | Track E | Meta | usefulness audit comparing future captured wave against RingFall Wave 1 baseline, including finding-to-regression lineage samples | W7.6-P4 plus at least one later target run |
+| W7.6-P8 Full orchestrator command readiness decision | Meta | all relevant tracks | decision `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`: do not build full `/fal-orchestrate-target` now; proceed to P9 audit design / later W7.8 mechanical gates before revisiting | W7.6-P1-P7 evidence |
+| W7.6-P9 Wave-level usefulness audit | Track E | Meta | usefulness audit design for future captured waves, including cold-start recovery drill shape and finding-to-regression lineage samples; not a new database or target implementation gate | W7.6-P8 decision plus W7.6-P4 evidence |
 
 ### Wave 7.6 — Execution Steps
 
@@ -2210,13 +2210,13 @@ Parallelism rule: serialize until P1 backfill proves the checkpoint closeout sli
 
 **🔄 Step 7 — Parallel reconcile and full command readiness**
 
-Parallelism rule: no full `/fal-orchestrate-target` command until parallel reconcile and artifact pinning are accepted.
+Parallelism rule: P7 accepted the parallel reconcile/artifact-pinning prerequisite, but P8 holds full `/fal-orchestrate-target` implementation until a later dedicated PRD/review and explicit approval.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
 | 7.1 | Track D agent session | ✅ W7.6-P7 parallel reconcile hardening | W7.6-P6 accepted | Accepted after Meta+Swarm re-review. Patch replaces the `sync-fal-checkpoint.ps1` noncatchable `exit $LASTEXITCODE` branch with catchable failure behavior and proves both parallel plan/step wrappers still write `fal-parallel-reconcile-summary.json` with failed-lane evidence before failing on actual helper/Python nonzero exit. Residual checked-in wrapper regression coverage debt routed as `RF-2026-06-27-01` to W7.8 or the next router failure-path change. |
-| 7.2 | Track E agent session | ⏸ W7.6-P9 wave-level usefulness audit design | W7.6-P4 evidence | Define audit metrics for future target waves, including finding-to-regression lineage samples, cold-start recovery, handoff sufficiency, and negative-control behavior; may run in parallel with Track D if file scopes are disjoint and no router contract changes are needed from Track E. |
-| 7.3 | Meta Coordinator session | ⬜ READY W7.6-P8 full orchestrator command readiness decision | W7.6-P1-P7 evidence | Decide whether `/fal-orchestrate-target` may be built, must be revised, or remains held. This is a readiness decision only; no bridge/API/session delivery, auto-compact, public output, or RingFall implementation opens by default. |
+| 7.2 | Meta Coordinator session | ✅ W7.6-P8 full orchestrator command readiness decision | W7.6-P1-P7 evidence | Decision: `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`. Do not build full `/fal-orchestrate-target` now. Accepted smaller checkpoint/hook/reconcile slices may continue, but full command implementation requires a later dedicated PRD/review and must wait on P9 audit design / regression-guard readiness. |
+| 7.3 | Track E agent session | ⬜ READY W7.6-P9 wave-level usefulness audit design | W7.6-P8 decision + W7.6-P4 evidence | Define audit metrics for future target waves, including finding-to-regression lineage samples, cold-start recovery drill shape, handoff sufficiency, and negative-control behavior. This is design/audit planning only, not target implementation or a new canonical database. |
 
 Non-goals:
 - no RingFall Wave 2 execution from this wave
@@ -2528,8 +2528,8 @@ Current blocker summary:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. Run `W7.6-P8` full `/fal-orchestrate-target` readiness decision from accepted P1-P7 evidence; treat it as a decision gate, not automatic implementation authorization.
-2. Treat P7 lane-level artifact pinning, combined final synthesis checkpoint behavior, and parallel-run reconcile rules as accepted evidence, while keeping `RF-2026-06-27-01` checked-in regression coverage debt visible.
+1. Run Track E `W7.6-P9` wave-level usefulness audit design if continuing W7.6 evidence-hardening.
+2. Treat P8 as `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`: the full `/fal-orchestrate-target` command is not implementation-ready from current evidence.
 3. Keep the missing explicit `recovery_verdict` drill visible as later validation debt; do not claim compact/hydration recovery is already proven.
 4. Keep any full `/fal-orchestrate-target` implementation blocked until the `W7.6-P8` readiness decision explicitly authorizes it.
 5. Wave 7.8 CI readiness/mechanical gates may open later under its own activation gate; it does not require Wave 7.7 product UX activation.
