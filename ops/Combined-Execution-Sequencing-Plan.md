@@ -2272,31 +2272,31 @@ Non-goals at activation:
 - no RingFall Wave 2 implementation/execution
 - no public output or `docs/public/**`
 
-**🔄 Step 1 — Meta activation and full W7.7 plan package**
+**✅ Step 1 — Meta activation and full W7.7 plan package**
 
 Parallelism rule: serial Meta planning step. This step creates the full W7.7 plan package and sequencing but does not accept or execute later W7.7 implementation/design steps.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 1.1 | Meta Coordinator session | 🔄 W7.7-A activation / sequencing / plan-doc package | W7.6 closeout accepted; owner grill decisions captured | Drafts the W7.7 plan-only package, updates Combined and `ops/PROJECT_STATE.md`, keeps runbook update as a later acceptance requirement, does not edit global OpenCode files, does not run apply scripts, and does not commit automatically. Owner chose diff-first commit policy. |
+| 1.1 | Meta Coordinator session | ✅ W7.7-A activation / sequencing / plan-doc package | W7.6 closeout accepted; owner grill decisions captured | Completed as plan-only package in `docs/private/Wave7_7-Activation-and-Sequencing-Plan-v1.md` and tracked sequencing/state commits through `76da6d4` plus single-owner sequencing clarification in `ce50b5e`. No global OpenCode files changed, no apply scripts ran, and no implementation scope opened. |
 
-**⬜ Step 2 — Mode policy and independent review-depth selector**
+**✅ Step 2 — Mode policy and independent review-depth selector**
 
 Parallelism rule: one policy step because review-depth selection depends on the mode vocabulary, but remains an independent axis in the same acceptance surface.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 2.1 | Meta Coordinator session | ⬜ W7.7-B mode policy and review-depth selector acceptance | W7.7-A plan package | Finalize or revise `Wave7_7-Mode-Policy-and-Review-Depth-Selector-v1.md`: `guided` default, `easy` low-friction propose, `strict` artifact-complete, `audit_team` team reconciliation, `external_advisory` recommendation-only, and risk labels `trivial` / `normal` / `high_risk` / `audit_or_parallel`. Normal review workflow may choose appropriate depth, but review is not a separate Combined row. Acceptance must preserve the runbook's review controls and require a later runbook update if live semantics change. |
+| 2.1 | Meta Coordinator session | ✅ W7.7-B mode policy and review-depth selector acceptance | W7.7-A plan package | Accepted in `docs/private/Wave7_7-W7_7_B-Mode-Policy-Acceptance-v1.md`. Canonical modes are `easy`, `guided`, `strict`, `audit_team`, `external_advisory`; default mode is `guided`; review depth remains independent with risk labels `trivial`, `normal`, `high_risk`, `audit_or_parallel`. No runbook update is required now because live wrapper semantics did not change. |
 
-**⬜ Step 3 — Parallel UX policy lanes for detection, questions, and advisory intake**
+**🔄 Step 3 — Parallel UX policy lanes for detection, questions, and advisory intake**
 
 Parallelism rule: these lanes may run in parallel after Step 2 because they consume the same mode/review-depth contract and do not depend on each other's output until Step 4 synthesis.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 3.1 | Track D session | ⬜ W7.7-C target-profile auto-detection and confidence contract | W7.7-B accepted | Finalize or revise the `high` / `medium` / `low` detection policy for target repo, profile, router settings, sessions, pinned artifacts, FAL mirror freshness, and dirty state. No router/code implementation opens by default. Meta/review gates run through the normal workflow around this Track D output. |
-| 3.2 | Track A session | ⬜ W7.7-D operator question bank and Guided-mode prompt flow | W7.7-B accepted | Finalize or revise question-tool prompts for mode, review depth, apply authority, dirty state, stale FAL mirror, compact boundary, advisory import, and full-command gate attempts. Preserve minimal-interruption runbook doctrine. Meta/review gates run through the normal workflow around this Track A output. |
-| 3.3 | Track C session | ⬜ W7.7-E external advisory fifth-mode envelope and triage policy | W7.7-B accepted | Finalize or revise `Wave7_7-External-Advisory-Intake-Envelope-v1.md`: envelope fields, context-limit disclosure, privacy boundary, safe abstraction feedback, and disposition statuses `already_exists`, `partially_exists`, `useful_candidate`, `defer`, `reject`, `unknown_private_context`. Track E concerns are review-gate expectations, not a separate producing owner in this row. |
+| 3.1 | Track D session | 🔄 W7.7-C target-profile auto-detection and confidence contract | W7.7-B accepted | Next parallel lane. Finalize or revise the `high` / `medium` / `low` detection policy for target repo, profile, router settings, sessions, pinned artifacts, FAL mirror freshness, and dirty state. No router/code implementation opens by default. Meta/review gates run through the normal workflow around this Track D output. |
+| 3.2 | Track A session | 🔄 W7.7-D operator question bank and Guided-mode prompt flow | W7.7-B accepted | Next parallel lane. Finalize or revise question-tool prompts for mode, review depth, apply authority, dirty state, stale FAL mirror, compact boundary, advisory import, and full-command gate attempts. Preserve minimal-interruption runbook doctrine. Meta/review gates run through the normal workflow around this Track A output. |
+| 3.3 | Track C session | 🔄 W7.7-E external advisory fifth-mode envelope and triage policy | W7.7-B accepted | Next parallel lane. Finalize or revise `Wave7_7-External-Advisory-Intake-Envelope-v1.md`: envelope fields, context-limit disclosure, privacy boundary, safe abstraction feedback, and disposition statuses `already_exists`, `partially_exists`, `useful_candidate`, `defer`, `reject`, `unknown_private_context`. Track E concerns are review-gate expectations, not a separate producing owner in this row. |
 
 **⬜ Step 4 — Full `/fal-orchestrate-target` PRD-only synthesis**
 

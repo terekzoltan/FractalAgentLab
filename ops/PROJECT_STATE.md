@@ -10,12 +10,12 @@ Public case study, public mirror artifact, `docs/public/**` output, HUB implemen
 
 - Wave: Wave 7.7 — Productized Target Orchestration UX
 - Sprint: W7.7 activation / sequencing
-- Step: W7.7 Step 1 — Meta activation and full W7.7 plan package draft; owner diff/commit/review döntés még hátra van.
-- Epic: Productized target-orchestration UX sequencing: `easy`, `guided`, `strict`, `audit_team`, `external_advisory` mode-policy, independent review-depth selector, auto-detect/question flow, advisory envelope, full `/fal-orchestrate-target` PRD-only gate, és későbbi oc-toolsmith apply-design step no execution.
+- Step: W7.7 Step 3 — parallel UX policy lanes are next/open after W7.7-B acceptance.
+- Epic: W7.7-C Track D target-profile auto-detection/confidence contract, W7.7-D Track A operator question bank / Guided-mode prompt flow, and W7.7-E Track C external advisory fifth-mode envelope may proceed in parallel from the accepted mode/review-depth policy.
 
 # Jelenlegi workflow fázis
 
-Wave 7.7 docs-first / planning-only frontier. A mostani W7.7 csomag terv és sequencing, nem implementation acceptance. A W7.6 no-go doctrine változatlanul öröklődik: target source-of-truth order kivétel marad, compact cache nem canon, és a P9 audit design elfogadása nem recovery proof. A külön explicit cold-start `recovery_verdict: restored | partially_restored | failed` drill még hiányzik, ezért compact/hydration recovery proofot nem szabad késznek tekinteni. Future wave-ként integrálva marad FAL oldalon `Wave 7.8 — CI Readiness And Mechanical Gates`, RingFall oldalon `Wave 1.5 — Contract CI readiness`. Nem történt RingFall mutation, public output, `docs/public/**` artifact, global OpenCode apply, runbook semantic update vagy HUB/API/bridge delivery.
+Wave 7.7 docs-first / planning-only frontier. W7.7-A plan package és W7.7-B mode policy / independent review-depth selector elfogadva. A W7.6 no-go doctrine változatlanul öröklődik: target source-of-truth order kivétel marad, compact cache nem canon, és a P9 audit design elfogadása nem recovery proof. A külön explicit cold-start `recovery_verdict: restored | partially_restored | failed` drill még hiányzik, ezért compact/hydration recovery proofot nem szabad késznek tekinteni. Future wave-ként integrálva marad FAL oldalon `Wave 7.8 — CI Readiness And Mechanical Gates`, RingFall oldalon `Wave 1.5 — Contract CI readiness`. Nem történt RingFall mutation, public output, `docs/public/**` artifact, global OpenCode apply, runbook semantic update vagy HUB/API/bridge delivery.
 
 # Utolsó aktor / szerep
 
@@ -23,21 +23,21 @@ Meta Coordinator
 
 # Utolsó döntés
 
-W7.7 grill-me döntések: plan-only most; full doc set; `guided` default; English canonical mode names; `external_advisory` fifth mode; review-depth independent policy; risk labels `trivial`, `normal`, `high_risk`, `audit_or_parallel`; confidence labels `high`, `medium`, `low`; moderate auto-detect; P9b separate debt; full `/fal-orchestrate-target` PRD-only legyen future gate spec + detailed UX + implementation-ready spec, de build/apply nincs nyitva; apply-design későbbi stepben generálható, execution nélkül; runbook update későbbi acceptance, nem most; commit előtt diff/owner döntés kell.
+W7.7-B acceptance döntés: `ACCEPTED`. Canonical modes: `easy`, `guided`, `strict`, `audit_team`, `external_advisory`; default `guided`; review-depth independent; risk labels `trivial`, `normal`, `high_risk`, `audit_or_parallel`; weaker-than-recommended review override csak recorded reason + residual risk mellett engedett. No implementation/global apply opened, runbook update most nem required mert live wrapper semantics nem változott.
 
 # Utolsó befejezett akció
 
-Elkészült a W7.7 Step 1 plan-only draft csomag Combinedba és private tervfájlokba: activation/sequencing plan, mode policy + review-depth selector, auto-detect/question-flow policy, external advisory intake envelope, full-command PRD-only draft, closeout/readiness rubric. Utólag javítva lett a Combined W7.7 szakasz single-owner szabálya: egy sorban pontosan egy producing owner szerepelhet, a Meta/review workflow gate nem külön Combined sor, és az egy stepben lévő több sor parallel lane-t jelent. Ez még nem W7.7 implementation acceptance és nem global apply authority. A local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) továbbra is local runtime/operator state, nem része a normál versioned closeout commitnak.
+Elkészült és elfogadva lett a W7.7-B mode policy / review-depth selector acceptance: `docs/private/Wave7_7-W7_7_B-Mode-Policy-Acceptance-v1.md`. Step 3 párhuzamos lane-jei megnyithatók: Track D auto-detect/confidence, Track A question-flow, Track C external advisory envelope. Ez még nem W7.7 implementation acceptance és nem global apply authority. A local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) továbbra is local runtime/operator state, nem része a normál versioned closeout commitnak.
 
 Automatizációs tudnivaló változatlan: `fractalagentlab-architecture-intelligence-refresh` 72 óránként fut ebben a workspace-ben, csak `docs/architecture/**` diagnosztikai/architektúra artefaktumokat frissíthet, implementation kódhoz nem nyúlhat, és `ops/PROJECT_STATE.md`-t csak blocking/major architektúra-probléma esetén módosíthatja.
 
 # Következő akció
 
-Elsődleges: owner/Meta review a javított W7.7 plan-only diffre, majd döntés: revise, mini/deep review, vagy explicit closeout-commit. Commit automatikusan nincs. A dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diffet bármilyen későbbi Track D/router build, W7.8 CI gate vagy full-command work előtt triage-olni kell. P9b recovery drill csak külön explicit Meta döntéssel nyílhat.
+Elsődleges: W7.7 Step 3 párhuzamos UX policy lane-ek indítása vagy explicit review/commit döntés a W7.7-B acceptance tracked diffre. A dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diffet bármilyen későbbi Track D/router build, W7.8 CI gate vagy full-command work előtt triage-olni kell. P9b recovery drill csak külön explicit Meta döntéssel nyílhat.
 
 # Következő elvárt szerep
 
-Owner / Meta Coordinator W7.7 plan-package diff review and commit/review decision
+Track D / Track A / Track C parallel W7.7 Step 3 planning lanes, or Meta closeout-commit for W7.7-B acceptance first
 
 # Most ne gondolkodj ezen
 
@@ -86,5 +86,6 @@ Owner / Meta Coordinator W7.7 plan-package diff review and commit/review decisio
 - `docs/private/Wave7_7-External-Advisory-Intake-Envelope-v1.md`
 - `docs/private/Wave7_7-Full-Orchestrator-Command-PRD-v1.md`
 - `docs/private/Wave7_7-Closeout-Readiness-Rubric-v1.md`
+- `docs/private/Wave7_7-W7_7_B-Mode-Policy-Acceptance-v1.md`
 - `tools/oc-session-router/docs/workflow-orchestrator-runbook.md`
 - `ops/Review-Findings-Registry.md`
