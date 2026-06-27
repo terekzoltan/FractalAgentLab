@@ -2214,9 +2214,9 @@ Parallelism rule: no full `/fal-orchestrate-target` command until parallel recon
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 7.1 | Track D agent session | 🔄 W7.6-P7 parallel reconcile hardening | W7.6-P6 accepted | Add or plan lane-level artifact pinning, combined final synthesis checkpoint, and parallel-run reconcile rules. If the shared parallel operator workflow changes, update `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` in the same closeout. |
+| 7.1 | Track D agent session | ✅ W7.6-P7 parallel reconcile hardening | W7.6-P6 accepted | Accepted after Meta+Swarm re-review. Patch replaces the `sync-fal-checkpoint.ps1` noncatchable `exit $LASTEXITCODE` branch with catchable failure behavior and proves both parallel plan/step wrappers still write `fal-parallel-reconcile-summary.json` with failed-lane evidence before failing on actual helper/Python nonzero exit. Residual checked-in wrapper regression coverage debt routed as `RF-2026-06-27-01` to W7.8 or the next router failure-path change. |
 | 7.2 | Track E agent session | ⏸ W7.6-P9 wave-level usefulness audit design | W7.6-P4 evidence | Define audit metrics for future target waves, including finding-to-regression lineage samples, cold-start recovery, handoff sufficiency, and negative-control behavior; may run in parallel with Track D if file scopes are disjoint and no router contract changes are needed from Track E. |
-| 7.3 | Meta Coordinator session | ⏸ W7.6-P8 full orchestrator command readiness decision | W7.6-P1-P7 evidence | Decide whether `/fal-orchestrate-target` may be built, must be revised, or remains held. |
+| 7.3 | Meta Coordinator session | ⬜ READY W7.6-P8 full orchestrator command readiness decision | W7.6-P1-P7 evidence | Decide whether `/fal-orchestrate-target` may be built, must be revised, or remains held. This is a readiness decision only; no bridge/API/session delivery, auto-compact, public output, or RingFall implementation opens by default. |
 
 Non-goals:
 - no RingFall Wave 2 execution from this wave
@@ -2528,10 +2528,10 @@ Current blocker summary:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. Open `W7.6-P7 parallel reconcile hardening` from accepted P6 serial-helper evidence.
-2. Define lane-level artifact pinning, combined final synthesis checkpoint behavior, and parallel-run reconcile rules without treating serial P6 as parallel clean-closeout proof.
+1. Run `W7.6-P8` full `/fal-orchestrate-target` readiness decision from accepted P1-P7 evidence; treat it as a decision gate, not automatic implementation authorization.
+2. Treat P7 lane-level artifact pinning, combined final synthesis checkpoint behavior, and parallel-run reconcile rules as accepted evidence, while keeping `RF-2026-06-27-01` checked-in regression coverage debt visible.
 3. Keep the missing explicit `recovery_verdict` drill visible as later validation debt; do not claim compact/hydration recovery is already proven.
-4. Keep `W7.6-P8` full `/fal-orchestrate-target` readiness blocked until P7 evidence exists.
+4. Keep any full `/fal-orchestrate-target` implementation blocked until the `W7.6-P8` readiness decision explicitly authorizes it.
 5. Wave 7.8 CI readiness/mechanical gates may open later under its own activation gate; it does not require Wave 7.7 product UX activation.
 6. Wave 7.7 productized target-orchestration UX remains `⏸` until W7.6 evidence justifies it.
 7. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.

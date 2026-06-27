@@ -1,12 +1,12 @@
 # Jelenlegi állapot
 
-Wave 6 lezárva `narrow_continue` döntéssel; Wave 6.5 RingFall readiness/adoption closeout elfogadva. W7.5 measurement/context-continuity hardening csomag lezárt. W7.6 target-orchestrator seamless integration P0/P1/P2/P3 docs/contract closeout kész, a global `fal-checkpoint-target` command és `fal-target-orchestration` skill applied, W7.6-P4 Meta closeout elfogadta a RingFall Wave 1 read-only backfill validationt reconcile debt mellett, W7.6-P5 Meta hook integration plan elkészült, és W7.6-P6 Track D router/tooling artifact-pinning hardening Meta step-review után elfogadva. A P6 patch P1-kompatibilis dry-run alapértelmezést, pinned `-SourcePath` követelményt, latest-output/fix-plan/final-synthesis classifier gate-et, marker-stage mismatch rejectiont, `review_fix_done` stage elkülönítést és explicit `-FalSyncApply` / `-Apply` write-authority kaput ad a serial helper pathhoz. A checkpoint slice bizonyított, de az explicit cold-start `recovery_verdict` drill még nyitott validation debt. Public case study, public mirror artifact, `docs/public/**` output, HUB implementation, automatikus `/compact`, implicit compact-event detection és OpenCode bridge/API/session delivery továbbra is blokkolt.
+Wave 6 lezárva `narrow_continue` döntéssel; Wave 6.5 RingFall readiness/adoption closeout elfogadva. W7.5 measurement/context-continuity hardening csomag lezárt. W7.6 target-orchestrator seamless integration P0/P1/P2/P3 docs/contract closeout kész, a global `fal-checkpoint-target` command és `fal-target-orchestration` skill applied, W7.6-P4 Meta closeout elfogadta a RingFall Wave 1 read-only backfill validationt reconcile debt mellett, W7.6-P5 Meta hook integration plan elkészült, W7.6-P6 Track D router/tooling artifact-pinning hardening Meta step-review után elfogadva, és W7.6-P7 Track D parallel reconcile hardening sync-helper nonzero-exit review-fix Meta+Swarm re-review után elfogadva. A P6 patch P1-kompatibilis dry-run alapértelmezést, pinned `-SourcePath` követelményt, latest-output/fix-plan/final-synthesis classifier gate-et, marker-stage mismatch rejectiont, `review_fix_done` stage elkülönítést és explicit `-FalSyncApply` / `-Apply` write-authority kaput ad a serial helper pathhoz. A P7 review-fix a `sync-fal-checkpoint.ps1` nonzero Python exit ágát catch-elhető hibává alakította, így a parent parallel wrapper structured failed-lane resultot tud írni és a `fal-parallel-reconcile-summary.json` summary-before-failure guarantee bizonyított plan és step wrapper smoke-kal. `RF-2026-06-26-01` javítva/elfogadva; `RF-2026-06-27-01` tartós checked-in wrapper regression coverage debtként routed W7.8 vagy következő router failure-path változás elé. A checkpoint slice bizonyított, de az explicit cold-start `recovery_verdict` drill még nyitott validation debt. Public case study, public mirror artifact, `docs/public/**` output, HUB implementation, automatikus `/compact`, implicit compact-event detection és OpenCode bridge/API/session delivery továbbra is blokkolt.
 
 # Jelenlegi wave / sprint / step / epic
 
 - Wave: Wave 7.6 — Target Orchestrator Seamless Integration
 - Sprint: W7.6-S1 — checkpoint closeout command/skill readiness
-- Step: W7.6-P7 parallel reconcile hardening a következő aktív lépés; W7.6-P6 accepted, P8 full command readiness továbbra is blokkolt P7 evidence előtt.
+- Step: W7.6-P7 parallel reconcile hardening accepted; következő döntési pont W7.6-P8 full command readiness, amely csak readiness döntés lehet, nem automatikus implementation nyitás.
 - Epic: `/fal-checkpoint-target` + `fal-target-orchestration` P1 command/skill PRD és backup-first apply script. Full `/fal-orchestrate-target`, router hardening, parallel reconcile, Wave 7.7 product/advisory UX és RingFall Wave 2 execution későbbi gate-hez kötött.
 
 # Jelenlegi workflow fázis
@@ -19,21 +19,21 @@ Meta Coordinator
 
 # Utolsó döntés
 
-P6 döntés: `GREEN_AFTER_REVIEW_FIX`. A no-Swarm, három belső Meta-lane step review először classifier blokkolókat talált, Track D/P6 scope-ban javítva lettek, és a targeted negative controlok passzoltak. `W7.6-P7` megnyitható; `W7.6-P8` továbbra is P7 evidence után dönthető el.
+P7 döntés: `GREEN_ACCEPTED_AFTER_META_SWARM_REVIEW`. A `sync-fal-checkpoint.ps1` nonzero Python failure catch-elhető `throw`, nem parent-flow `exit`; plan és step wrapper negative smoke bizonyítja, hogy actual helper nonzero failure után is elkészül a `fal-parallel-reconcile-summary.json` failed-lane evidence-szel. `RF-2026-06-26-01` fixed/accepted. `RF-2026-06-27-01` low regression-guard debt aktívan routed. `W7.6-P8` readiness decision most megnyitható, de nem jelent automatikus full command implementációt.
 
 # Utolsó befejezett akció
 
-Elkészült `docs/private/Wave7_6-W7_6_P6-Meta-Step-Review-Closeout-v1.md`. A P6 closeout elfogadta a serial router/tooling hardeninget review-fix után, rögzítette a 3-lane no-Swarm review findings/fixeket, és átvezette a frontiert P7-re. A local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) továbbra is local runtime/operator state, nem része a normál versioned closeout commitnak.
+Elkészült és elfogadást kapott a W7.6-P7 Track D sync-helper nonzero-exit review-fix patch: a helper script `exit $LASTEXITCODE` ága catch-elhető `throw` lett, és synthetic wrapper smoke bizonyítja a plan/step wrapper summary-before-failure invariantot actual Python nonzero failure mellett. A local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) továbbra is local runtime/operator state, nem része a normál versioned closeout commitnak.
 
 Automatizációs tudnivaló változatlan: `fractalagentlab-architecture-intelligence-refresh` 72 óránként fut ebben a workspace-ben, csak `docs/architecture/**` diagnosztikai/architektúra artefaktumokat frissíthet, implementation kódhoz nem nyúlhat, és `ops/PROJECT_STATE.md`-t csak blocking/major architektúra-probléma esetén módosíthatja.
 
 # Következő akció
 
-Elsődleges: nyíljon `W7.6-P7 parallel reconcile hardening`. Track D feladata lane-level artifact pinning, combined final synthesis checkpoint behavior és parallel-run reconcile rules kidolgozása/keményítése úgy, hogy a serial P6 acceptance ne legyen parallel clean-closeout proofként kezelve. Ha shared parallel operator workflow semantics változik, a `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` local canonical runbookot ugyanabban a closeoutban frissíteni kell. A hiányzó explicit cold-start `recovery_verdict` drill maradjon külön validation debt; RingFall Wave 2 execution külön Meta-gated target terv nélkül továbbra sem indulhat.
+Elsődleges: W7.6-P8 full `/fal-orchestrate-target` readiness decision előkészítése Meta döntési körben. P8 csak azt döntheti el, hogy a full command építhető-e, tovább kell-e szűkíteni, vagy parkolva marad; nem nyithat automatikus bridge/API/session deliveryt, auto-compactot, public outputot vagy RingFall target implementationt. A hiányzó explicit cold-start `recovery_verdict` drill maradjon külön validation debt; RingFall Wave 2 execution külön Meta-gated target terv nélkül továbbra sem indulhat.
 
 # Következő elvárt szerep
 
-Track D agent session W7.6-P7 parallel reconcile hardening
+Meta Coordinator W7.6-P8 full orchestrator command readiness decision
 
 # Most ne gondolkodj ezen
 
@@ -52,7 +52,8 @@ Track D agent session W7.6-P7 parallel reconcile hardening
 # Nyitott kérdések / blokkolók
 
 - Az explicit cold-start `recovery_verdict: restored | partially_restored | failed` drill még hiányzik; ez validation debt marad P4b/P9 felé.
-- P7 parallel reconcile hardening még nincs bizonyítva; lane-level reconcile nélkül full orchestrator readiness nem nyílhat.
+- P7 parallel reconcile hardening accepted; P8 readiness decision megnyitható, de full command implementation csak P8 explicit döntése után.
+- A P7 helper-nonzero path smoke-proven, de tartós checked-in PowerShell wrapper regression coverage még hiányzik; route: W7.8 CI/mechanical gates vagy a következő router failure-path módosítás előtt kötelező targeted regression.
 - RingFall Wave 2 implementation továbbra is blokkolt külön Wave 2 planning brief és Meta gate előtt.
 - Public-safe konkrét methodology/public package még nincs draftolva vagy külön review-zva.
 - Wave 8/HUB továbbra is parked docs/contract backlog.
