@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-06-23
+**Last updated:** 2026-06-28
 
 ---
 
@@ -2298,13 +2298,13 @@ Parallelism rule: these lanes may run in parallel after Step 2 because they cons
 | 3.2 | Track A session | ✅ W7.7-D operator question bank and Guided-mode prompt flow | W7.7-B accepted | Accepted/closed by parallel step-review `GREEN` in `.opencode-router/parallel-runs/parallel-step-review-20260628-131414`; Track ACK `08-track-a-track-response.md`. Evidence artifact: `docs/private/Wave7_7-W7_7_D-Operator-Question-Bank-and-Guided-Prompt-Flow-v1.md` as ignored/local private evidence, not force-added in normal closeout. No live wrapper/runbook semantic change opened. |
 | 3.3 | Track C session | ✅ W7.7-E external advisory fifth-mode envelope and triage policy | W7.7-B accepted | Accepted/closed by parallel step-review `GREEN` in `.opencode-router/parallel-runs/parallel-step-review-20260628-131414`; Track ACK `08-track-c-track-response.md`. Evidence artifact: `docs/private/Wave7_7-External-Advisory-Intake-Envelope-v1.md` as ignored/local private evidence, not force-added in normal closeout. `external_advisory` remains recommendation-only and cannot change current next action without owner/Meta reprioritization. |
 
-**⬜ Step 4 — Full `/fal-orchestrate-target` PRD-only synthesis**
+**✅ Step 4 — Full `/fal-orchestrate-target` PRD-only synthesis**
 
 Parallelism rule: serial synthesis step. The full command PRD must consume Step 2 mode/review policy plus all Step 3 UX lanes.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 4.1 | Meta Coordinator session | ⬜ W7.7-F full command PRD-only readiness package | W7.7-B/C/D/E accepted | Next allowed action after Step 3 closeout. Finalize or revise `Wave7_7-Full-Orchestrator-Command-PRD-v1.md` as a PRD-only readiness/spec and future gate document. This may define command UX, args, defaults, mode/review/confidence behavior, stop conditions, artifact outputs, checkpoint hooks, and apply-design requirements, but it must not authorize build, global apply, bridge/API/session delivery, target implementation, automatic compact, public output, commit/push automation, or RingFall Wave 2. Track D / oc-toolsmith input may be requested through normal review/consultation, not as a co-owner in this row. |
+| 4.1 | Meta Coordinator session | ✅ W7.7-F full command PRD-only readiness package | W7.7-B/C/D/E accepted | Accepted/closed as PRD-only in `docs/private/Wave7_7-Full-Orchestrator-Command-PRD-v1.md` after one reviewer subagent GREEN plus Meta self-review GREEN. It consumes W7.7-B/C/D/E, defines future command UX, args, defaults, mode/review/confidence behavior, Guided questions, external advisory no-authority/disposition law, stop conditions, artifact outputs, checkpoint hooks, runbook alignment gate, and future build gate blockers. This acceptance does not authorize build, global apply, bridge/API/session delivery, target implementation, automatic compact, public output, commit/push automation, or RingFall Wave 2. Track D / oc-toolsmith input may be requested through normal review/consultation, not as a co-owner in this row. |
 
 **⬜ Step 5 — oc-toolsmith apply-design generation, no execution**
 
