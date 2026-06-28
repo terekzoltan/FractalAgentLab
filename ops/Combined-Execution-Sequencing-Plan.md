@@ -2306,13 +2306,13 @@ Parallelism rule: serial synthesis step. The full command PRD must consume Step 
 |---|---|---|---|---|
 | 4.1 | Meta Coordinator session | ✅ W7.7-F full command PRD-only readiness package | W7.7-B/C/D/E accepted | Accepted/closed as PRD-only in `docs/private/Wave7_7-Full-Orchestrator-Command-PRD-v1.md` after one reviewer subagent GREEN plus Meta self-review GREEN. It consumes W7.7-B/C/D/E, defines future command UX, args, defaults, mode/review/confidence behavior, Guided questions, external advisory no-authority/disposition law, stop conditions, artifact outputs, checkpoint hooks, runbook alignment gate, and future build gate blockers. This acceptance does not authorize build, global apply, bridge/API/session delivery, target implementation, automatic compact, public output, commit/push automation, or RingFall Wave 2. Track D / oc-toolsmith input may be requested through normal review/consultation, not as a co-owner in this row. |
 
-**⬜ Step 5 — oc-toolsmith apply-design generation, no execution**
+**✅ Step 5 — oc-toolsmith apply-design generation, no execution**
 
 Parallelism rule: serial because apply-design targets must derive from the accepted command PRD. This step may generate a backup-first apply script artifact later, but execution remains separately gated.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 5.1 | Meta Coordinator session | ⬜ W7.7-G global command/skill apply-design artifact generation | W7.7-F accepted | Generate or specify the future `/fal-orchestrate-target` command/skill/apply-script design using `oc-toolsmith` policy under backup-first rules, with no global file mutation and no script execution unless a separate explicit user/Meta gate approves it. Acceptance must name target global file paths, backup behavior, parse checks, rollback notes, and no-secret/no-password rules. |
+| 5.1 | Meta Coordinator session | ✅ W7.7-G global command/skill apply-design artifact generation | W7.7-F accepted | Accepted/closed as apply-design-only in `docs/private/Wave7_7-W7_7_G-Global-Command-Skill-Apply-Design-v1.md` after one reviewer subagent GREEN plus Meta self-review GREEN. Local generated script: `ops/temp/apply-w7-7-g-fal-orchestrate-target-command-skill.ps1`. Target global paths are `$env:USERPROFILE\.config\opencode\commands\fal-orchestrate-target.md` and `$env:USERPROFILE\.config\opencode\skills\fal-orchestrate-target\SKILL.md`. The script defaults to dry-run and requires explicit `-Apply`; it was not executed. No global file mutation, target implementation, runbook semantics change, public output, commit/push automation, or RingFall Wave 2 opened. |
 
 **⬜ Step 6 — W7.7 closeout and next-gate decision**
 
