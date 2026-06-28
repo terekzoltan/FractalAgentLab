@@ -2288,15 +2288,15 @@ Parallelism rule: one policy step because review-depth selection depends on the 
 |---|---|---|---|---|
 | 2.1 | Meta Coordinator session | ✅ W7.7-B mode policy and review-depth selector acceptance | W7.7-A plan package | Accepted in `docs/private/Wave7_7-W7_7_B-Mode-Policy-Acceptance-v1.md`. Canonical modes are `easy`, `guided`, `strict`, `audit_team`, `external_advisory`; default mode is `guided`; review depth remains independent with risk labels `trivial`, `normal`, `high_risk`, `audit_or_parallel`. No runbook update is required now because live wrapper semantics did not change. |
 
-**🔄 Step 3 — Parallel UX policy lanes for detection, questions, and advisory intake**
+**✅ Step 3 — Parallel UX policy lanes for detection, questions, and advisory intake**
 
 Parallelism rule: these lanes may run in parallel after Step 2 because they consume the same mode/review-depth contract and do not depend on each other's output until Step 4 synthesis.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 3.1 | Track D session | 🔄 W7.7-C target-profile auto-detection and confidence contract | W7.7-B accepted | Next parallel lane. Finalize or revise the `high` / `medium` / `low` detection policy for target repo, profile, router settings, sessions, pinned artifacts, FAL mirror freshness, and dirty state. No router/code implementation opens by default. Meta/review gates run through the normal workflow around this Track D output. |
-| 3.2 | Track A session | 🔄 W7.7-D operator question bank and Guided-mode prompt flow | W7.7-B accepted | Next parallel lane. Finalize or revise question-tool prompts for mode, review depth, apply authority, dirty state, stale FAL mirror, compact boundary, advisory import, and full-command gate attempts. Preserve minimal-interruption runbook doctrine. Meta/review gates run through the normal workflow around this Track A output. |
-| 3.3 | Track C session | 🔄 W7.7-E external advisory fifth-mode envelope and triage policy | W7.7-B accepted | Next parallel lane. Finalize or revise `Wave7_7-External-Advisory-Intake-Envelope-v1.md`: envelope fields, context-limit disclosure, privacy boundary, safe abstraction feedback, and disposition statuses `already_exists`, `partially_exists`, `useful_candidate`, `defer`, `reject`, `unknown_private_context`. Track E concerns are review-gate expectations, not a separate producing owner in this row. |
+| 3.1 | Track D session | ✅ W7.7-C target-profile auto-detection and confidence contract | W7.7-B accepted | Accepted/closed by parallel step-review `GREEN` in `.opencode-router/parallel-runs/parallel-step-review-20260628-131414`; Track ACK `08-track-d-track-response.md`. Evidence artifact: `docs/private/Wave7_7-W7_7_C-Target-Profile-Detection-Contract-v1.md` as ignored/local private evidence, not force-added in normal closeout. No router/code implementation opened. |
+| 3.2 | Track A session | ✅ W7.7-D operator question bank and Guided-mode prompt flow | W7.7-B accepted | Accepted/closed by parallel step-review `GREEN` in `.opencode-router/parallel-runs/parallel-step-review-20260628-131414`; Track ACK `08-track-a-track-response.md`. Evidence artifact: `docs/private/Wave7_7-W7_7_D-Operator-Question-Bank-and-Guided-Prompt-Flow-v1.md` as ignored/local private evidence, not force-added in normal closeout. No live wrapper/runbook semantic change opened. |
+| 3.3 | Track C session | ✅ W7.7-E external advisory fifth-mode envelope and triage policy | W7.7-B accepted | Accepted/closed by parallel step-review `GREEN` in `.opencode-router/parallel-runs/parallel-step-review-20260628-131414`; Track ACK `08-track-c-track-response.md`. Evidence artifact: `docs/private/Wave7_7-External-Advisory-Intake-Envelope-v1.md` as ignored/local private evidence, not force-added in normal closeout. `external_advisory` remains recommendation-only and cannot change current next action without owner/Meta reprioritization. |
 
 **⬜ Step 4 — Full `/fal-orchestrate-target` PRD-only synthesis**
 
@@ -2304,7 +2304,7 @@ Parallelism rule: serial synthesis step. The full command PRD must consume Step 
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 4.1 | Meta Coordinator session | ⬜ W7.7-F full command PRD-only readiness package | W7.7-B/C/D/E accepted | Finalize or revise `Wave7_7-Full-Orchestrator-Command-PRD-v1.md` as an implementation-ready spec and future gate document. This may define command UX, args, defaults, mode/review/confidence behavior, stop conditions, artifact outputs, checkpoint hooks, and apply-design requirements, but it must not authorize build, global apply, bridge/API/session delivery, target implementation, or automatic compact. Track D / oc-toolsmith input may be requested through normal review/consultation, not as a co-owner in this row. |
+| 4.1 | Meta Coordinator session | ⬜ W7.7-F full command PRD-only readiness package | W7.7-B/C/D/E accepted | Next allowed action after Step 3 closeout. Finalize or revise `Wave7_7-Full-Orchestrator-Command-PRD-v1.md` as a PRD-only readiness/spec and future gate document. This may define command UX, args, defaults, mode/review/confidence behavior, stop conditions, artifact outputs, checkpoint hooks, and apply-design requirements, but it must not authorize build, global apply, bridge/API/session delivery, target implementation, automatic compact, public output, commit/push automation, or RingFall Wave 2. Track D / oc-toolsmith input may be requested through normal review/consultation, not as a co-owner in this row. |
 
 **⬜ Step 5 — oc-toolsmith apply-design generation, no execution**
 
