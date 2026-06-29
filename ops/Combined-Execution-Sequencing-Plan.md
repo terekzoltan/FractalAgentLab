@@ -2380,24 +2380,24 @@ Parallelism rule: no parallel work. Meta locks CI scope before any workflow file
 |---|---|---|---|---|
 | 1.1 | Meta Coordinator session | ✅ W7.8-A CI scope boundary | W7.6 P4 evidence, or explicit Meta exception | Accepted in `docs/private/Wave7_8-W7_8_A-CI-Scope-Boundary-v1.md` as `GREEN_WITH_CONSTRAINTS`. `ops/`, `docs/private/`, `.opencode-router/`, `.swarm/`, local evidence, global OpenCode config, `tools/oc-session-router/**`, target private artifacts, secret-dependent jobs, CD/deploy, root Python/core CI implementation, coverage hard gates, and runtime/router/full `/fal-orchestrate-target` implementation remain outside scope. W7.8-B/C may open for tracked UI mechanical CI plus generated-data boundary only. |
 
-**🔄 Step 2 — Mechanical CI implementation**
+**✅ Step 2 — Mechanical CI implementation**
 
 Parallelism rule: Track A UI CI and generated-data boundary may proceed in parallel after Step 1 if they touch only `ui/` and reviewed fixture surfaces.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
 | 2.1 | Track A agent session | ✅ W7.8-B UI CI | W7.8-A accepted | Accepted after Meta draft + Swarm review APPROVE. Added `.github/workflows/ui-ci.yml` as UI-only mechanical GitHub Actions workflow for `npm ci`, `npm run typecheck`, `npm test`, and `npm run build`; local evidence reports `npm ci`, typecheck, `CI=true npm test` (34 tests), and build PASS. No private/upload/coverage/deploy/secret/root/router scope opened. |
-| 2.2 | Track A agent session | ⬜ READY W7.8-C generated-data boundary | W7.8-A accepted | Ensure CI does not require private/ignored run artifacts, `ui/public/generated/**`, `data/**`, or `.opencode-router` state; use checked-in public-safe fixtures or absence-tolerant behavior. |
+| 2.2 | Track A agent session | ✅ W7.8-C generated-data boundary | W7.8-A accepted | Accepted after Meta draft + Swarm review APPROVE. Clean `HEAD` worktree proof at `6e4e6a5` confirmed UI `npm ci`, typecheck, `CI=true npm test` (34 tests), and build PASS without ignored/private `ui/public/generated/**`, `.opencode-router/**`, `.swarm/**`, or `data/**` runtime evidence beyond tracked `data/.gitignore`; no semantic generated-data correctness claim. |
 
-**⏸ Step 3 — Reassessment and policy closeout**
+**🔄 Step 3 — Reassessment and policy closeout**
 
 Parallelism rule: Track B reassessment may run in parallel with Track E coverage/policy review only if it stays docs-first and does not open new CI commands silently.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 3.1 | Track B agent session | ⏸ W7.8-D Python/core CI reassessment | W7.8-A accepted | Determine whether any stable tracked Python/core CI command exists beyond the UI; do not invent root CI without a canonical manifest. |
-| 3.2 | Meta Coordinator session | ⏸ W7.8-E CI-as-evidence policy | W7.8-B/C accepted and optional W7.8-D input | Record that failed CI blocks merge/closeout, but passed CI is mechanical evidence only and does not imply semantic/domain approval. |
-| 3.3 | Track E agent session | ⏸ W7.8-F coverage policy later | W7.8-B/C accepted and optional W7.8-D input | Keep coverage report-only/later until a separate Track E review accepts module-specific hard thresholds. |
+| 3.1 | Track B agent session | ⬜ READY W7.8-D Python/core CI reassessment | W7.8-A accepted | Determine whether any stable tracked Python/core CI command exists beyond the UI; do not invent root CI without a canonical manifest. |
+| 3.2 | Meta Coordinator session | ⬜ READY W7.8-E CI-as-evidence policy | W7.8-B/C accepted and optional W7.8-D input | Record that failed CI blocks merge/closeout, but passed CI is mechanical evidence only and does not imply semantic/domain approval. |
+| 3.3 | Track E agent session | ⬜ READY W7.8-F coverage policy later | W7.8-B/C accepted and optional W7.8-D input | Keep coverage report-only/later until a separate Track E review accepts module-specific hard thresholds. |
 
 Wave gate:
 - FAL has a narrow tracked CI surface
