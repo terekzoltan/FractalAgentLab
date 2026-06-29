@@ -1,21 +1,21 @@
 # Jelenlegi állapot
 
-Wave 6 lezárva `narrow_continue` döntéssel; Wave 6.5 RingFall readiness/adoption closeout elfogadva. W7.5 measurement/context-continuity hardening csomag lezárt. W7.6 target-orchestrator seamless integration lezárva `CLOSE_W7_6_WITH_DESIGN_DEBT` Meta döntéssel. A wave elfogadott kisebb slice-jai: P1 `/fal-checkpoint-target` + `fal-target-orchestration` applied, P4 read-only RingFall Wave 1 backfill accepted reconcile debt mellett, P5 hook integration plan accepted, P6 serial router/helper hardening accepted, P7 parallel reconcile hardening accepted, P8 full `/fal-orchestrate-target` readiness decision `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`, P9 wave-level usefulness audit design accepted private design/protocol artifactként. W7.7 docs-first activation / sequencing plan-only csomagként fut: Guided default, English canonical mode names, independent review-depth selector, `external_advisory` fifth mode, P9b separate debt, full `/fal-orchestrate-target` PRD-only path, apply-design later step no execution. W7.7 Step 3 parallel UX policy lanes C/D/E GREEN closeouttal elfogadva; W7.7-F Meta synthesis PRD-only readiness/spec csomag quick review + self-review után ACCEPTED, build/apply authority nélkül. W7.7-G apply-design artifact quick review + self-review után ACCEPTED, script nem futtatva, global apply nincs.
+Wave 6 lezárva `narrow_continue` döntéssel; Wave 6.5 RingFall readiness/adoption closeout elfogadva. W7.5 measurement/context-continuity hardening csomag lezárt. W7.6 target-orchestrator seamless integration lezárva `CLOSE_W7_6_WITH_DESIGN_DEBT` Meta döntéssel. A wave elfogadott kisebb slice-jai használhatók: P1 `/fal-checkpoint-target` + `fal-target-orchestration` applied, P4 read-only RingFall Wave 1 backfill accepted reconcile debt mellett, P5 hook integration plan accepted, P6/P7 router/helper hardening accepted, P8 full `/fal-orchestrate-target` readiness decision `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`, P9 audit design accepted. W7.7 Productized Target Orchestration UX docs-first wave lezárva `CLOSE_W7_7_PLAN_ONLY_WITH_APPLY_DECISION_READY` döntéssel; az owner lefuttatta a global `/fal-orchestrate-target` command/skill apply-kat, és a post-apply verification igazolta a `FAL-RELIABILITY-LAYER:v3`, `FAL hygiene rule`, `/fal-checkpoint-target` és `fal-target-orchestration` markereket.
 
-A P6/P7 kisebb slice-ok használhatók: pinned `-SourcePath`, dry-run/propose default, latest-output/fix-plan/final-synthesis classifier gate, marker-stage mismatch rejection, `review_fix_done` stage elkülönítés, explicit `-FalSyncApply` / `-Apply` write-authority kapu, és parallel `fal-parallel-reconcile-summary.json` summary-before-failure evidence. A P9 design meghatározza a future target-wave audit metrics, cold-start drill protocol, negative controls, handoff sufficiency audit és candidate finding-to-regression lineage sample formátumot. A full `/fal-orchestrate-target` command továbbra sem implementation-ready: actual `recovery_verdict` proof, `RF-2026-06-27-01` regression-guard kezelés, dirty core diff triage, és külön full-command PRD/review kell. A hiányzó recovery proof explicit debt marad, de nem blokkolja tovább W7.6 lezárását.
+A W7.8-A CI scope boundary elfogadva `GREEN_WITH_CONSTRAINTS` státusszal. W7.8 infrastruktúra/mechanikus CI readiness wave, nem product-mode wave. Első engedélyezett CI felület: tracked UI mechanikai ellenőrzés `ui/package-lock.json` alapján (`npm ci`, `npm run typecheck`, `npm test`, `npm run build`) és a generated-data boundary tisztázása. CI-be nem kerülhet `ops/**`, `docs/private/**`, `data/**` runtime evidence, `ui/public/generated/**` ignored generated data kötelező inputként, `.opencode-router/**`, `.swarm/**`, global OpenCode config, `tools/oc-session-router/**`, target private artifact, secret-dependent provider job, CD/deploy, public upload vagy coverage hard gate. Root Python/core CI implementáció nincs engedélyezve W7.8-A-ból, csak későbbi W7.8-D reassessment után.
 
-Public case study, public mirror artifact, `docs/public/**` output, HUB implementation, automatikus `/compact`, implicit compact-event detection, OpenCode bridge/API/session delivery és RingFall Wave 2 execution továbbra is blokkolt.
+Public case study, public mirror artifact, `docs/public/**` output, HUB implementation, automatikus `/compact`, implicit compact-event detection, OpenCode bridge/API/session delivery, runtime/router/full `/fal-orchestrate-target` implementation és RingFall Wave 2 execution továbbra is blokkolt.
 
 # Jelenlegi wave / sprint / step / epic
 
-- Wave: Wave 7.7 — Productized Target Orchestration UX
-- Sprint: W7.7 activation / sequencing
-- Step: W7.7 Step 6 — W7.7-H wave closeout / readiness decision következik.
-- Epic: W7.7-H Meta Coordinator wave closeout / readiness decision a W7.7-A/B/C/D/E/F/G accepted artifacts alapján; döntés arról, hogy W7.7 plan-onlyként zár, explicit apply döntésre route-ol, W7.8/P9b felé route-ol, vagy hold marad.
+- Wave: Wave 7.8 — CI Readiness And Mechanical Gates
+- Sprint: W7.8 Step 2 — Mechanical CI implementation
+- Step: W7.8 Step 2 — W7.8-B accepted, W7.8-C következik.
+- Epic: W7.8-C generated-data boundary `READY`; W7.8-B UI CI accepted.
 
 # Jelenlegi workflow fázis
 
-Wave 7.7 docs-first / planning-only frontier. W7.7-A plan package, W7.7-B mode policy / independent review-depth selector, W7.7-C/D/E parallel UX policy lanes, W7.7-F full-command PRD-only package és W7.7-G apply-design artifact elfogadva. A W7.6 no-go doctrine változatlanul öröklődik: target source-of-truth order kivétel marad, compact cache nem canon, és a P9 audit design elfogadása nem recovery proof. A külön explicit cold-start `recovery_verdict: restored | partially_restored | failed` drill még hiányzik, ezért compact/hydration recovery proofot nem szabad késznek tekinteni. Future wave-ként integrálva marad FAL oldalon `Wave 7.8 — CI Readiness And Mechanical Gates`, RingFall oldalon `Wave 1.5 — Contract CI readiness`. Nem történt RingFall mutation, public output, `docs/public/**` artifact, global OpenCode apply, runbook semantic update vagy HUB/API/bridge delivery.
+W7.8-A Meta scope-lock lezárva. W7.8-B UI CI implementáció accepted: `.github/workflows/ui-ci.yml` létrejött UI-only mechanikus GitHub Actions workflowként, local evidence szerint `npm ci`, `npm run typecheck`, `CI=true npm test` (34 tests) és `npm run build` PASS, nincs `ui/package.json` / `ui/package-lock.json` diff, és nincs forbidden private/upload/coverage/deploy/secret/root/router hivatkozás. `RF-2026-06-29-01` fixed/accepted. W7.8-C generated-data boundary továbbra is külön acceptance: tiszta checkout / ignored `ui/public/generated/**` proof még nincs lezárva. Root Python/core manifest (`pyproject.toml`, `pytest.ini`, `requirements*.txt`, `tox.ini`, `noxfile.py`, `setup.py`, `setup.cfg`, `Pipfile`, `poetry.lock`, `uv.lock`) nem található, ezért root Python/core CI csak W7.8-D reassessment után nyílhat. A dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diff továbbra is külön triage blocker router/full-command/root CI scope előtt.
 
 # Utolsó aktor / szerep
 
@@ -23,21 +23,21 @@ Meta Coordinator
 
 # Utolsó döntés
 
-W7.7-G closeout döntés: `ACCEPTED` apply-design-only artifact. Egy reviewer subagent és Meta self-review GREEN eredményt adott blocking/major finding nélkül. Ez nem script execution, nem global apply authority, nem implementation authorization és nem live runbook semantics change. Canonical W7.7-B modes/risk labels változatlanok; router/code/test/live-runbook/global apply/target/public scope nem nyílt.
+W7.8-B final step-review döntés: `GREEN/APPROVE`. Meta draft és Swarm Assistant review egyaránt elfogadta a workflow-t; nincs blocking/major finding. A W7.8-A scope lock változatlanul kizárja a private/local evidence felületeket, secret/CD/public upload scope-ot, coverage hard gate-et, root Python/core CI implementációt, router/FAL sync regression gate-et és full `/fal-orchestrate-target` runtime/router implementációt.
 
 # Utolsó befejezett akció
 
-Lezárult a W7.7-G quick review + closeout: `docs/private/Wave7_7-W7_7_G-Global-Command-Skill-Apply-Design-v1.md` státusza `apply_design_accepted`. A local script `ops/temp/apply-w7-7-g-fal-orchestrate-target-command-skill.ps1` parser checkje PASS, veszélyes/destruktív/network mintát nem tartalmaz, default dry-run, és írás csak későbbi explicit `-Apply` futtatással történhetne. A script W7.7-G-ben nem futott.
+W7.8-B UI CI final step-review synthesis accepted. `RF-2026-06-29-01` fixed/accepted lett a registryben, mert a workflow artifact és lokális UI verification evidence rendelkezésre áll. Nem módosult production code, nem történt target repo mutation vagy global OpenCode write.
 
 Automatizációs tudnivaló változatlan: `fractalagentlab-architecture-intelligence-refresh` 72 óránként fut ebben a workspace-ben, csak `docs/architecture/**` diagnosztikai/architektúra artefaktumokat frissíthet, implementation kódhoz nem nyúlhat, és `ops/PROJECT_STATE.md`-t csak blocking/major architektúra-probléma esetén módosíthatja.
 
 # Következő akció
 
-Elsődleges: W7.7-H wave closeout / readiness decision. A döntésnek explicit módon választania kell: W7.7 plan-only close, explicit user apply decision route, W7.8 CI/mechanical gates route, P9b recovery validation route, vagy hold. Full `/fal-orchestrate-target` build továbbra is blokkolt külön readiness decision és explicit Meta/user approval nélkül. A dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diffet bármilyen későbbi Track D/router build, W7.8 CI gate vagy full-command/live wrapper semantics előtt triage-olni kell, különösen a `review_fix_done` kezelés miatt. P9b recovery drill csak külön explicit Meta döntéssel nyílhat.
+Elsődleges: Track A nyissa / zárja W7.8-C generated-data boundary acceptance-t. Bizonyítani kell, hogy a UI CI / build/test tiszta checkoutban nem igényel ignored/private `ui/public/generated/**`, `data/**` vagy `.opencode-router/**` állapotot, vagy public-safe checked-in fixture/absence-tolerant megoldást kell adni. W7.8-B remote GitHub Actions run evidence később támogató evidence lehet, de W7.8-C proofot nem helyettesít.
 
 # Következő elvárt szerep
 
-Meta Coordinator W7.7-H wave closeout / readiness decision
+Track A agent session: W7.8-C generated-data boundary implementation/review; tartsd külön a W7.8-B UI CI acceptance-től.
 
 # Most ne gondolkodj ezen
 
@@ -47,49 +47,38 @@ Meta Coordinator W7.7-H wave closeout / readiness decision
 - Ne indíts OpenCode bridge/API/session deliveryt, routing/dispatch automationt vagy commit/push automationt.
 - Ne indíts automatikus `/compact`-ot; W7.6 csak compact-readiness és hydration authority állapotot rögzíthet.
 - Ne feltételezz implicit compact-event detectiont; W7.6 csak explicit boundary artifactból vagy operator/workflow jelzésből dolgozhat.
-- Ne építs full `/fal-orchestrate-target` commandot a P8 hold döntés után külön full-command PRD/review és explicit Meta/user approval nélkül.
-- Ne nyisd meg Wave 7.7 product UX, external advisory intake, global command/skill apply vagy `/fal-orchestrate-target` implementációt a mostani plan-only csomagnál mélyebb scope-ra külön Meta/user gate nélkül.
+- Ne építs mélyebb `/fal-orchestrate-target` runtime/router/full wrapper implementációt külön implementation-readiness review és explicit Meta/user approval nélkül.
 - Ne hozz létre public release-t, public mirror artifactot vagy `docs/public/**` outputot.
 - Ne tekintsd a P9 audit design elfogadását recovery proofnak; a hiányzó explicit `recovery_verdict` drill továbbra is külön validation debt.
+- Ne add hozzá root Python/core CI-t W7.8-D reassessment és külön acceptance nélkül.
+- Ne vezess be coverage hard gate-et W7.8-F vagy későbbi Track E acceptance nélkül.
 
 # Nyitott kérdések / blokkolók
 
 - P8 full command readiness döntés: hold; full `/fal-orchestrate-target` implementation csak külön PRD/review és explicit Meta/user approval után nyílhat.
 - Az explicit cold-start `recovery_verdict: restored | partially_restored | failed` drill még hiányzik; ez validation debt marad P9b vagy későbbi targeted validation felé.
-- A P7 helper-nonzero path smoke-proven, de tartós checked-in PowerShell wrapper regression coverage még hiányzik; route: W7.8 CI/mechanical gates vagy a következő router failure-path módosítás előtt kötelező targeted regression.
-- Dirty tracked core diff van `src/fractal_agent_lab/integrations/router_fal_sync.py` és `tests/integrations/test_router_fal_sync.py` alatt; W7.7-C nem módosította, de későbbi router/CI/full-command munka előtt triage kell, különösen a `review_fix_done` stage kezelés miatt.
-- W7.7-G accepted/closed apply-design-only artifact, de bármilyen későbbi W7.7 implementation/global apply/script execution scope külön Meta/user gate-et igényel.
+- A P7 helper-nonzero path smoke-proven, de tartós checked-in PowerShell wrapper regression coverage még hiányzik; route: W7.8-D vagy következő router failure-path módosítás előtt targeted regression.
+- Dirty tracked core diff van `src/fractal_agent_lab/integrations/router_fal_sync.py` és `tests/integrations/test_router_fal_sync.py` alatt; W7.8-B/C nem módosíthatja és nem építhet rá root/router CI-t.
+- W7.8-C-nek ellenőriznie kell, hogy a UI build/test tiszta checkoutban nem igényel ignored `ui/public/generated/**` adatot, vagy public-safe checked-in fixture/absence-tolerant megoldást kell adnia.
+- Root Python/core CI surface még nincs elfogadva, mert nincs canonical manifest vagy root test command.
+- `RF-2026-06-29-01` fixed/accepted; W7.8-B remote GitHub Actions first-run observation opcionális támogató evidence, nem blocking.
 - RingFall Wave 2 implementation továbbra is blokkolt külön Wave 2 planning brief és Meta gate előtt.
 - Public-safe konkrét methodology/public package még nincs draftolva vagy külön review-zva.
 - Wave 8/HUB továbbra is parked docs/contract backlog.
 - OpenCode bridge/API assumptions továbbra is unverified; delivery implementáció továbbra is blokkolt.
-- W7.7 `external_advisory` most csak fifth-mode envelope/triage terv; recommendation-only marad és nem változtathat current next actiont Meta/owner reprioritization nélkül.
-- RingFall Wave 1.5 és FAL Wave 7.8 CI readiness wave-ek Combinedba integrálva vannak, de implementációjuk külön Meta sequencing + Track review gate-et igényel; nem CD és nem coverage hard-gate engedély.
 
 # Evidence pointerek
 
 - `ops/PROJECT_STATE.md`
 - `ops/AGENTS.md`
 - `ops/Combined-Execution-Sequencing-Plan.md`
-- `docs/private/FAL-Target-Orchestrator-Seamless-Integration-Plan-v01.md`
-- `docs/private/Wave7_6-Session-Continuity-Compact-Authority-PRD-v1.md`
-- `docs/private/Wave7_6-W7_6_P1-FAL-Checkpoint-Target-Command-Skill-PRD-v1.md`
 - `docs/private/Wave7_6-W7_6_P4-Meta-Backfill-Closeout-v1.md`
 - `docs/private/Wave7_6-W7_6_P5-Existing-Workflow-Hook-Integration-Plan-v1.md`
 - `docs/private/Wave7_6-W7_6_P6-Meta-Step-Review-Closeout-v1.md`
 - `docs/private/Wave7_6-W7_6_P8-Full-Orchestrator-Readiness-Decision-v1.md`
 - `docs/private/Wave7_6-W7_6_P9-Wave-Level-Usefulness-Audit-Design-v1.md`
 - `docs/private/Wave7_6-W7_6-Closeout-Decision-v1.md`
-- `docs/private/Wave7_7-Activation-and-Sequencing-Plan-v1.md`
-- `docs/private/Wave7_7-Mode-Policy-and-Review-Depth-Selector-v1.md`
-- `docs/private/Wave7_7-Auto-Detect-and-Question-Flow-Policy-v1.md`
-- `docs/private/Wave7_7-External-Advisory-Intake-Envelope-v1.md`
-- `docs/private/Wave7_7-Full-Orchestrator-Command-PRD-v1.md`
-- `docs/private/Wave7_7-Closeout-Readiness-Rubric-v1.md`
-- `docs/private/Wave7_7-W7_7_B-Mode-Policy-Acceptance-v1.md`
-- `docs/private/Wave7_7-W7_7_C-Target-Profile-Detection-Contract-v1.md`
-- `docs/private/Wave7_7-W7_7_D-Operator-Question-Bank-and-Guided-Prompt-Flow-v1.md`
-- `docs/private/Wave7_7-W7_7_G-Global-Command-Skill-Apply-Design-v1.md`
-- `ops/temp/apply-w7-7-g-fal-orchestrate-target-command-skill.ps1`
-- `tools/oc-session-router/docs/workflow-orchestrator-runbook.md`
+- `docs/private/Wave7_7-W7_7_H-Wave-Closeout-Readiness-Decision-v1.md`
+- `docs/private/Wave7_7-Fal-Orchestrate-Target-FAL-Hygiene-Apply-Decision-v1.md`
+- `docs/private/Wave7_8-W7_8_A-CI-Scope-Boundary-v1.md`
 - `ops/Review-Findings-Registry.md`

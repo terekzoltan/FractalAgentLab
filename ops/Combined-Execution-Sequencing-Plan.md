@@ -2228,7 +2228,7 @@ Non-goals:
 - no new canonical finding-to-regression database from W7.6
 - no external advisory intake product flow in W7.6
 
-#### Wave 7.7 — Productized Target Orchestration UX (docs-first planning open)
+#### Wave 7.7 — Productized Target Orchestration UX (docs-first planning closed)
 
 Activation gate:
 - W7.6 is closed with design debt through `docs/private/Wave7_6-W7_6-Closeout-Decision-v1.md`, and W7.6 evidence through P9 is sufficient to open W7.7 docs-first activation planning.
@@ -2312,21 +2312,22 @@ Parallelism rule: serial because apply-design targets must derive from the accep
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 5.1 | Meta Coordinator session | ✅ W7.7-G global command/skill apply-design artifact generation | W7.7-F accepted | Accepted/closed as apply-design-only in `docs/private/Wave7_7-W7_7_G-Global-Command-Skill-Apply-Design-v1.md` after one reviewer subagent GREEN plus Meta self-review GREEN. Local generated script: `ops/temp/apply-w7-7-g-fal-orchestrate-target-command-skill.ps1`. Target global paths are `$env:USERPROFILE\.config\opencode\commands\fal-orchestrate-target.md` and `$env:USERPROFILE\.config\opencode\skills\fal-orchestrate-target\SKILL.md`. The script defaults to dry-run and requires explicit `-Apply`; it was not executed. No global file mutation, target implementation, runbook semantics change, public output, commit/push automation, or RingFall Wave 2 opened. |
+| 5.1 | Meta Coordinator session | ✅ W7.7-G global command/skill apply-design artifact generation | W7.7-F accepted | Accepted/closed as apply-design-only in `docs/private/Wave7_7-W7_7_G-Global-Command-Skill-Apply-Design-v1.md` after one reviewer subagent GREEN plus Meta self-review GREEN. Local generated script: `ops/temp/apply-w7-7-g-fal-orchestrate-target-command-skill.ps1`. Target global paths are `$env:USERPROFILE\.config\opencode\commands\fal-orchestrate-target.md` and `$env:USERPROFILE\.config\opencode\skills\fal-orchestrate-target\SKILL.md`. The script defaults to dry-run and requires explicit `-Apply`; after W7.7-H closeout the owner explicitly approved manual owner-run apply for these two global files in `docs/private/Wave7_7-W7_7_G-Explicit-Apply-Decision-v1.md`. The agent/session still did not execute the script. No target implementation, runbook semantics change, public output, commit/push automation, or RingFall Wave 2 opened. |
 
-**⬜ Step 6 — W7.7 closeout and next-gate decision**
+**✅ Step 6 — W7.7 closeout and next-gate decision**
 
 Parallelism rule: serial Meta closeout. This step decides what can open next and preserves W7.6 debts.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 6.1 | Meta Coordinator session | ⬜ W7.7-H wave closeout / readiness decision | W7.7-G accepted or explicitly deferred | Use `Wave7_7-Closeout-Readiness-Rubric-v1.md` to decide whether W7.7 closes as plan-only, opens an implementation gate, routes to W7.8 CI/mechanical gates, routes to P9b recovery validation, or holds. Must keep full command build blocked unless a dedicated readiness decision addresses PRD acceptance, runbook alignment, recovery-proof status, `RF-2026-06-27-01`, dirty router/core diff triage, oc-toolsmith/apply readiness, and explicit user approval. Any review is part of the selected workflow depth, not a separate Combined row. |
+| 6.1 | Meta Coordinator session | ✅ W7.7-H wave closeout / readiness decision | W7.7-G accepted | Closed in `docs/private/Wave7_7-W7_7_H-Wave-Closeout-Readiness-Decision-v1.md` as `CLOSE_W7_7_PLAN_ONLY_WITH_APPLY_DECISION_READY`. W7.7 closes as plan-only/docs-first; explicit user apply decision for W7.7-G generated global command/skill script was ready at closeout and was later approved by the owner for manual owner-run `-Apply`. W7.8 CI/mechanical gates and P9b recovery validation remain separate Meta sequencing options. Deeper runtime/router/full wrapper implementation remains gated until a dedicated readiness decision addresses runbook alignment, recovery-proof status, `RF-2026-06-27-01`, dirty router/core diff triage, and explicit user approval. |
 
 Deferred / adjacent gates:
 - P9b actual cold-start recovery drill remains separate validation debt.
 - W7.8 CI/mechanical gates remain independent infrastructure work and may address `RF-2026-06-27-01`.
 - Dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diff must be triaged before router/full-command/CI work.
-- Full `/fal-orchestrate-target` implementation remains blocked until a separate full-command readiness decision and explicit user/Meta approval.
+- Deeper `/fal-orchestrate-target` runtime/router/full wrapper implementation remains blocked until a separate full-command readiness decision and explicit user/Meta approval.
+- W7.7-G generated script `-Apply` gate was owner-approved for manual owner-run apply of exactly the two global OpenCode command/skill files; post-apply verification later confirmed the global `/fal-orchestrate-target` command/skill contain the FAL hygiene and `/fal-checkpoint-target` policy markers.
 
 #### Wave 7.8 — CI Readiness And Mechanical Gates
 
@@ -2371,22 +2372,22 @@ Epics:
 
 ### Wave 7.8 — Execution Steps
 
-**⏸ Step 1 — CI scope lock**
+**✅ Step 1 — CI scope lock**
 
 Parallelism rule: no parallel work. Meta locks CI scope before any workflow file or gate implementation opens.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 1.1 | Meta Coordinator session | ⏸ W7.8-A CI scope boundary | W7.6 P4 evidence, or explicit Meta exception | Confirm that `ops/`, `docs/private/`, `.opencode-router/`, `.swarm/`, local evidence, global OpenCode config, and target private artifacts remain outside CI scope. |
+| 1.1 | Meta Coordinator session | ✅ W7.8-A CI scope boundary | W7.6 P4 evidence, or explicit Meta exception | Accepted in `docs/private/Wave7_8-W7_8_A-CI-Scope-Boundary-v1.md` as `GREEN_WITH_CONSTRAINTS`. `ops/`, `docs/private/`, `.opencode-router/`, `.swarm/`, local evidence, global OpenCode config, `tools/oc-session-router/**`, target private artifacts, secret-dependent jobs, CD/deploy, root Python/core CI implementation, coverage hard gates, and runtime/router/full `/fal-orchestrate-target` implementation remain outside scope. W7.8-B/C may open for tracked UI mechanical CI plus generated-data boundary only. |
 
-**⏸ Step 2 — Mechanical CI implementation**
+**🔄 Step 2 — Mechanical CI implementation**
 
 Parallelism rule: Track A UI CI and generated-data boundary may proceed in parallel after Step 1 if they touch only `ui/` and reviewed fixture surfaces.
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 2.1 | Track A agent session | ⏸ W7.8-B UI CI | W7.8-A accepted | Add reviewed CI workflow for `ui/` mechanical checks only: `npm ci`, `npm run typecheck`, `npm test`, `npm run build`. |
-| 2.2 | Track A agent session | ⏸ W7.8-C generated-data boundary | W7.8-A accepted | Ensure CI does not require private/ignored run artifacts or `.opencode-router` state; use checked-in public-safe fixtures or absence-tolerant behavior. |
+| 2.1 | Track A agent session | ✅ W7.8-B UI CI | W7.8-A accepted | Accepted after Meta draft + Swarm review APPROVE. Added `.github/workflows/ui-ci.yml` as UI-only mechanical GitHub Actions workflow for `npm ci`, `npm run typecheck`, `npm test`, and `npm run build`; local evidence reports `npm ci`, typecheck, `CI=true npm test` (34 tests), and build PASS. No private/upload/coverage/deploy/secret/root/router scope opened. |
+| 2.2 | Track A agent session | ⬜ READY W7.8-C generated-data boundary | W7.8-A accepted | Ensure CI does not require private/ignored run artifacts, `ui/public/generated/**`, `data/**`, or `.opencode-router` state; use checked-in public-safe fixtures or absence-tolerant behavior. |
 
 **⏸ Step 3 — Reassessment and policy closeout**
 
@@ -2581,8 +2582,8 @@ Wave 7.6 closeout summary:
 - ✅ `W7.6-P8` full `/fal-orchestrate-target` readiness decision is accepted as `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`.
 - ✅ `W7.6-P9` wave-level usefulness audit design is accepted in `docs/private/Wave7_6-W7_6_P9-Wave-Level-Usefulness-Audit-Design-v1.md`; it is design/protocol only and does not prove cold-start recovery.
 - ✅ W7.6 closes with design debt in `docs/private/Wave7_6-W7_6-Closeout-Decision-v1.md`; P9b remains deferred targeted validation, not an active W7.6 blocker.
-- 🔄 NEXT: Wave 7.7 Productized Target Orchestration UX may open as docs-first Meta activation/seq-next planning.
-- ⏸ Wave 7.8 CI readiness and mechanical gates is now sequenced as a later infrastructure wave; it does not replace the immediate W7.6 frontier.
+- ✅ Wave 7.7 Productized Target Orchestration UX opened and closed as docs-first planning with owner-run prompt-layer command/skill apply verified after closeout.
+- 🔄 NEXT: Wave 7.8 CI readiness and mechanical gates remains open at Step 2; W7.8-B UI CI is accepted and Track A should proceed to W7.8-C generated-data boundary under the accepted UI-only/generated-data constraints.
 - ⏸ Wave 8/HUB compatibility remains parked; this frontier does not authorize HUB work.
 
 Current blocker summary:
@@ -2593,29 +2594,29 @@ Current blocker summary:
 - serial wrapper FAL hook behavior is accepted for P6 scope, and parallel reconcile behavior is accepted for P7 scope
 - P9 design acceptance is not recovery proof; actual `recovery_verdict: restored | partially_restored | failed` remains P9b or later targeted validation debt, but does not block W7.6 closeout in design/debt state
 - local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) remain outside the normal versioned closeout commit unless a later explicit policy exception force-adds them
-- W7.8 CI implementation remains future work behind its own activation gate; it is planned, not active
+- W7.8-A scope boundary and W7.8-B UI-only mechanical CI are accepted; W7.8-C generated-data boundary is the next active Track A work
 - RingFall Wave 2 implementation remains blocked before a separate target planning brief and Meta gate
 - public release, public mirror, `docs/public/` output, and Track A presentation remain blocked
 - OpenCode bridge/API/session delivery remains blocked
 - automatic `/compact` remains blocked; W7.6 may record compact-readiness only
-- external advisory intake remains parked for Wave 7.7 and cannot alter current next action by itself
+- W7.7 `external_advisory` remains recommendation-only and cannot alter the current next action by itself
 
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. Open Wave 7.7 Meta activation/seq-next planning in docs-first scope if continuing the next product-mode frontier.
-2. Treat W7.6 as closed with design debt; P9b remains available later as read-only targeted validation, not as the current active frontier.
+1. Open Track A W7.8-C generated-data boundary under `docs/private/Wave7_8-W7_8_A-CI-Scope-Boundary-v1.md`; W7.8-B UI CI is already accepted.
+2. Treat W7.6 and W7.7 as closed with design debt; P9b remains available later as read-only targeted validation, not as the current active frontier.
 3. Keep the missing explicit `recovery_verdict` drill visible as later validation debt; do not claim compact/hydration recovery is already proven.
 4. Keep any full `/fal-orchestrate-target` implementation blocked until a dedicated full-command PRD/review and explicit Meta/user approval authorize it.
-5. Wave 7.8 CI readiness/mechanical gates may open later under its own activation gate; it does not require Wave 7.7 product UX activation.
-6. Wave 7.7 docs-first activation may proceed, but any deeper implementation or external advisory intake scope still requires a later explicit Meta gate.
+5. Keep root Python/core CI blocked until W7.8-D reassessment accepts a canonical tracked command surface.
+6. Keep W7.8 CI non-secret, non-CD, non-deploy, and mechanical-evidence-only.
 7. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.
 
 ### CI readiness planning note
 
 CI readiness for RingFall and FAL is canonized as a private planning input in `docs/private/CI-Readiness-Plan-RingFall-FAL-v01.md`.
 
-This does not change the immediate W7.6 frontier. It records the future direction that CI should be integrated early and narrowly:
+This note was the private planning input for the now-open W7.8 direction and remains constrained to early, narrow CI:
 
 - RingFall starts with contract/schema CI around `tools/schema_check.py`.
 - FAL starts with tracked UI/mechanical CI around `ui/package.json` scripts.
