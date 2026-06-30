@@ -2395,7 +2395,7 @@ Parallelism rule: Track B reassessment may run in parallel with Track E coverage
 
 | Order | Session | Epic(s) | Prereq | Notes |
 |---|---|---|---|---|
-| 3.1 | Track B agent session | ⬜ READY W7.8-D Python/core CI reassessment | W7.8-A accepted | Determine whether any stable tracked Python/core CI command exists beyond the UI; do not invent root CI without a canonical manifest. |
+| 3.1 | Track B agent session | ✅ W7.8-D Python/core CI reassessment | W7.8-A accepted | Accepted after Meta draft + Swarm review APPROVE. Private docs-only artifact `docs/private/Wave7_8-W7_8_D-Python-Core-CI-Reassessment-v1.md` records `NO_ROOT_PYTHON_CI_YET_WITH_REASSESSMENT_COMPLETE`: no root Python manifest or canonical tracked command surface exists, README unittest examples remain non-canonical guidance, future candidate commands are not approved gates, and dirty `review_fix_done` router/FAL sync diff remains separate triage before router/full-command/root CI assumptions. |
 | 3.2 | Meta Coordinator session | ⬜ READY W7.8-E CI-as-evidence policy | W7.8-B/C accepted and optional W7.8-D input | Record that failed CI blocks merge/closeout, but passed CI is mechanical evidence only and does not imply semantic/domain approval. |
 | 3.3 | Track E agent session | ⬜ READY W7.8-F coverage policy later | W7.8-B/C accepted and optional W7.8-D input | Keep coverage report-only/later until a separate Track E review accepts module-specific hard thresholds. |
 
