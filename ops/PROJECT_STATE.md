@@ -10,12 +10,12 @@ Public case study, public mirror artifact, `docs/public/**` output, HUB implemen
 
 - Wave: Wave 7.8 — CI Readiness And Mechanical Gates
 - Sprint: W7.8 Step 3 — reassessment and policy closeout
-- Step: W7.8 Step 3 — W7.8-D accepted, W7.8-E/F következik.
-- Epic: W7.8-D Python/core CI reassessment accepted; W7.8-E CI-as-evidence policy és W7.8-F coverage policy következik.
+- Step: W7.8 Step 3 — W7.8-E accepted, W7.8-F következik.
+- Epic: W7.8-E CI-as-evidence policy accepted; W7.8-F coverage policy következik.
 
 # Jelenlegi workflow fázis
 
-W7.8-A Meta scope-lock lezárva. W7.8-B UI CI implementáció accepted: `.github/workflows/ui-ci.yml` létrejött UI-only mechanikus GitHub Actions workflowként, local evidence szerint `npm ci`, `npm run typecheck`, `CI=true npm test` (34 tests) és `npm run build` PASS, nincs `ui/package.json` / `ui/package-lock.json` diff, és nincs forbidden private/upload/coverage/deploy/secret/root/router hivatkozás. `RF-2026-06-29-01` fixed/accepted. W7.8-C generated-data boundary accepted: tiszta `HEAD` checkout/worktree proof szerint a UI `npm ci`, `npm run typecheck`, `CI=true npm test` (34 tests) és `npm run build` PASS ignored/private `ui/public/generated/**`, `.opencode-router/**`, `.swarm/**` vagy `data/**` runtime evidence nélkül; `data/` csak tracked `.gitignore`-t tartalmazott, és a workflow forbidden generated/private reference scan tiszta volt. W7.8-D Python/core CI reassessment accepted: `docs/private/Wave7_8-W7_8_D-Python-Core-CI-Reassessment-v1.md` privát artifact döntése `NO_ROOT_PYTHON_CI_YET_WITH_REASSESSMENT_COMPLETE`; nincs root Python/core manifest (`pyproject.toml`, `pytest.ini`, `requirements*.txt`, `tox.ini`, `noxfile.py`, `setup.py`, `setup.cfg`, `Pipfile`, `poetry.lock`, `uv.lock`) és nincs canonical tracked Python command surface, ezért root Python/core CI továbbra sem nyílhat külön command-law/manifest/dependency policy és Meta-reviewed follow-up nélkül. A dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diff továbbra is külön triage blocker router/full-command/root CI scope előtt.
+W7.8-A Meta scope-lock lezárva. W7.8-B UI CI implementáció accepted: `.github/workflows/ui-ci.yml` létrejött UI-only mechanikus GitHub Actions workflowként, local evidence szerint `npm ci`, `npm run typecheck`, `CI=true npm test` (34 tests) és `npm run build` PASS, nincs `ui/package.json` / `ui/package-lock.json` diff, és nincs forbidden private/upload/coverage/deploy/secret/root/router hivatkozás. `RF-2026-06-29-01` fixed/accepted. W7.8-C generated-data boundary accepted: tiszta `HEAD` checkout/worktree proof szerint a UI `npm ci`, `npm run typecheck`, `CI=true npm test` (34 tests) és `npm run build` PASS ignored/private `ui/public/generated/**`, `.opencode-router/**`, `.swarm/**` vagy `data/**` runtime evidence nélkül; `data/` csak tracked `.gitignore`-t tartalmazott, és a workflow forbidden generated/private reference scan tiszta volt. W7.8-D Python/core CI reassessment accepted: `docs/private/Wave7_8-W7_8_D-Python-Core-CI-Reassessment-v1.md` privát artifact döntése `NO_ROOT_PYTHON_CI_YET_WITH_REASSESSMENT_COMPLETE`; nincs root Python/core manifest (`pyproject.toml`, `pytest.ini`, `requirements*.txt`, `tox.ini`, `noxfile.py`, `setup.py`, `setup.cfg`, `Pipfile`, `poetry.lock`, `uv.lock`) és nincs canonical tracked Python command surface, ezért root Python/core CI továbbra sem nyílhat külön command-law/manifest/dependency policy és Meta-reviewed follow-up nélkül. W7.8-E CI-as-evidence policy accepted: `docs/private/Wave7_8-W7_8_E-CI-As-Evidence-Policy-v1.md` rögzíti, hogy failed CI blockolhat mechanikus merge/closeoutot a lefedett surface-en, de passed CI csak mechanikus evidence és nem semantic/domain/FAL approval. A dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diff továbbra is külön triage blocker router/full-command/root CI scope előtt.
 
 # Utolsó aktor / szerep
 
@@ -23,21 +23,21 @@ Meta Coordinator
 
 # Utolsó döntés
 
-W7.8-D final step-review döntés: `GREEN/APPROVE`. Meta draft és Swarm Assistant review egyaránt elfogadta a docs-only Python/core CI reassessment artifactot; nincs blocking/major finding. Root Python/core CI marad blocked, mert nincs canonical tracked command surface. A W7.8-A scope lock változatlanul kizárja a private/local evidence felületeket, secret/CD/public upload scope-ot, coverage hard gate-et, router/FAL sync regression gate-et és full `/fal-orchestrate-target` runtime/router implementációt.
+W7.8-E mini step-review döntés: `GREEN/APPROVE`. Egy read-only reviewer subagent és a Meta main pass egyaránt elfogadta a docs-only CI-as-evidence policy artifactot; nincs blocking/major finding. Root Python/core CI marad blocked, mert nincs canonical tracked command surface. A W7.8-A scope lock változatlanul kizárja a private/local evidence felületeket, secret/CD/public upload scope-ot, coverage hard gate-et, router/FAL sync regression gate-et és full `/fal-orchestrate-target` runtime/router implementációt.
 
 # Utolsó befejezett akció
 
-W7.8-D Python/core CI reassessment final step-review synthesis accepted. A privát docs-only artifact kimondja, hogy nincs root Python CI most; a README `PYTHONPATH=src python -m unittest ...` példák non-canonical developer guidance maradnak, a future candidate parancsok nem approved gate-ek. Nem módosult production code, workflow, Python manifest, router/FAL sync fájl vagy test.
+W7.8-E CI-as-evidence policy mini step-review accepted. A privát docs-only artifact kimondja, hogy failing CI blockolhat mechanikus closeoutot a lefedett surface-en, passing CI viszont csak supporting mechanical evidence, és nem helyettesíti a FAL review/evidence gate-eket vagy semantic/domain approvalt. Nem módosult production code, workflow, Python manifest, router/FAL sync fájl vagy test.
 
 Automatizációs tudnivaló változatlan: `fractalagentlab-architecture-intelligence-refresh` 72 óránként fut ebben a workspace-ben, csak `docs/architecture/**` diagnosztikai/architektúra artefaktumokat frissíthet, implementation kódhoz nem nyúlhat, és `ops/PROJECT_STATE.md`-t csak blocking/major architektúra-probléma esetén módosíthatja.
 
 # Következő akció
 
-Elsődleges: W7.8-E CI-as-evidence policy és W7.8-F coverage policy előkészítés indulhat W7.8-B/C/D inputból. W7.8-E rögzítse, hogy a failed CI blockolhat mechanikus closeoutot, de a passed CI csak mechanikus evidence; W7.8-F továbbra se nyisson coverage hard gate-et külön Track E acceptance nélkül.
+Elsődleges: W7.8-F coverage policy docs-first follow-up indulhat. W7.8-F célja coverage report-only / later policy rögzítése; coverage hard gate továbbra sem nyílhat külön Track E acceptance nélkül.
 
 # Következő elvárt szerep
 
-Meta Coordinator vagy Track E session: W7.8-E CI-as-evidence policy és/vagy W7.8-F coverage policy docs-first closeout.
+Track E vagy Meta Coordinator session: W7.8-F coverage policy docs-first review.
 
 # Most ne gondolkodj ezen
 
@@ -81,4 +81,5 @@ Meta Coordinator vagy Track E session: W7.8-E CI-as-evidence policy és/vagy W7.
 - `docs/private/Wave7_7-W7_7_H-Wave-Closeout-Readiness-Decision-v1.md`
 - `docs/private/Wave7_7-Fal-Orchestrate-Target-FAL-Hygiene-Apply-Decision-v1.md`
 - `docs/private/Wave7_8-W7_8_A-CI-Scope-Boundary-v1.md`
+- `docs/private/Wave7_8-W7_8_E-CI-As-Evidence-Policy-v1.md`
 - `ops/Review-Findings-Registry.md`
