@@ -5,7 +5,7 @@
 **Scope:** Track-level execution ordering for the A1 + A2 + A3 hybrid roadmap  
 **Intent:** turn `ops/AGENTS.md` from a coordination map into an actually executable wave / sprint plan  
 **Status:** active planning document  
-**Last updated:** 2026-06-28
+**Last updated:** 2026-07-23
 
 ---
 
@@ -2406,87 +2406,115 @@ Wave gate:
 - no broad coverage hard gate is introduced prematurely
 - green CI remains mechanical evidence only
 
-#### Wave 8 or later — HUB Compatibility Layer / External Control Surface Contract
+#### Historical parked HUB compatibility concept - retained as Wave 10 input
 
-Activation gate:
-- Wave 7 produces stable OpenCode-backed loop artifact conventions, W7.5 closes measurement/continuity hardening, and W7.6 either closes target-orchestrator seamless integration or Meta explicitly defers it with rationale
-- future HUB remains a separate project and FAL only defines safe status/export/control boundaries
-- Wave 8 must remain docs/contract-first until Meta separately approves implementation; no HUB code, bridge delivery, or dashboard implementation is implied
+The earlier forward concept named `Wave 8 or later - HUB Compatibility Layer / External Control Surface Contract`. It remains historical planning evidence through:
 
-Planned deliverables:
-- `docs/private/Wave8-HUB-Compatibility-Layer-Plan-v01.md`
-- `docs/private/External-Control-Surface-Contract-v01.md`
-- `docs/private/Project-Room-Taxonomy-v01.md`
-- `docs/private/Approval-Queue-State-Model-v01.md`
-- `docs/private/FAL-HUB-Privacy-Boundary-v01.md`
+- `docs/private/Wave8-HUB-Compatibility-Layer-Plan-v01.md`;
+- `docs/private/External-Control-Surface-Contract-v01.md`;
+- `docs/private/Project-Room-Taxonomy-v01.md`;
+- `docs/private/Approval-Queue-State-Model-v01.md`;
+- `docs/private/FAL-HUB-Privacy-Boundary-v01.md`.
 
-Track ownership model:
+As of the 2026-07-23 Owner decision, this concept is no longer the living Wave 8 execution slot. Its status/export, room taxonomy, privacy, display-needs, and bridge-feasibility questions are inputs to W10-A and later conditional W10 consumer-surface work. Historical artifacts and old IDs are not rewritten or treated as active rows.
 
-| Track | Wave 8 role | First allowed posture |
-|---|---|---|
-| Meta Coordinator | activation decision, scope lock, compatibility closeout | docs-first planning only |
-| Track B | external status/export contract and approval-state model | contract docs and compatibility review |
-| Track C | project room taxonomy and semantic classification | docs/semantics only |
-| Track E | privacy/export boundary and evidence-release rules | review/gate policy only |
-| Track A | display-needs review for future HUB/workbench surfaces | requirements review only; no UI implementation by default |
-| Track D | future bridge/API feasibility only if explicitly requested | no-mutation feasibility brief only |
-
-Epics:
-
-| Epic | Owner | Support | Core output | Prereq |
-|---|---|---|---|---|
-| W8-A HUB compatibility activation and scope lock | Meta | Track B/E consultation | Wave8 plan accepted as docs-first, or held | W7-F closeout or explicit Meta exception |
-| W8-B External status/export contract | Track B | Track E | status feed, export shape, approval-state compatibility contract | W8-A accepted |
-| W8-C Project room taxonomy | Track C | Meta, Track B | room/project classification semantics and naming rules | W8-A accepted |
-| W8-D Privacy/export boundary | Track E | Track B, Track C | public/private export law, redaction requirements, evidence-release gates | W8-B/W8-C draft outputs |
-| W8-E Display-needs review | Track A | Track E | future display requirements and no-implementation UX constraints | W8-B/W8-C/W8-D draft outputs |
-| W8-F Bridge/API feasibility no-mutation brief | Track D | Track B, Track E | feasibility/risk note only, if opened | W8-B + W8-D accepted and Meta requests it |
-| W8-G Meta compatibility closeout | Meta | all tracks as reviewers | accept/revise/hold compatibility layer | W8-B/W8-C/W8-D plus optional W8-E/W8-F |
-
-### Wave 8 — Execution Steps
-
-**⏸ Step 1 — Activation and docs-first scope lock**
-
-Parallelism rule: no parallel work. Wave 8 starts only with one Meta activation/scope review.
-
-| Order | Session | Epic(s) | Prereq | Notes |
-|---|---|---|---|---|
-| 1.1 | Meta Coordinator session | ⏸ W8-A activation/scope review | W7-F closeout, or explicit Meta exception after W7-A/W7-B | Confirm why HUB compatibility is needed now, what mainline opportunity cost is accepted, and that no HUB implementation is authorized |
-
-**⏸ Step 2 — Core compatibility contracts, parallel only if scope is clean**
-
-Parallelism rule: `2.1a` and `2.1b` may run in parallel only if Meta provides a shared terminology seed and confirms file scopes are disjoint.
-
-| Order | Session | Epic(s) | Prereq | Notes |
-|---|---|---|---|---|
-| 2.1a | Track B session | ⏸ W8-B external status/export and approval-state contract | W8-A accepted | Defines status/export fields, approval queue state, request vs observe vs propose-action boundaries |
-| 2.1b | Track C session | ⏸ W8-C project room taxonomy | W8-A accepted | May run parallel with W8-B if terms are coordinated; defines project/room classification and semantic labels |
-
-**⏸ Step 3 — Privacy, display, and optional bridge feasibility**
-
-Parallelism rule: Track E privacy/export review goes first. Track A display-needs review and Track D no-mutation feasibility may run in parallel only after W8-D if Meta explicitly opens both.
-
-| Order | Session | Epic(s) | Prereq | Notes |
-|---|---|---|---|---|
-| 3.1 | Track E session | ⏸ W8-D privacy/export boundary | W8-B draft ✅ + W8-C draft ✅ | Defines private/raw vs sanitized candidate vs public-approved release rules and review gates |
-| 3.2a | Track A session | ⏸ W8-E display-needs review | W8-D ✅ + explicit Meta request | Requirements-only review for what a future HUB or workbench would need to display; no UI implementation by default |
-| 3.2b | Track D session | ⏸ W8-F bridge/API feasibility brief | W8-B ✅ + W8-D ✅ + explicit Meta request | No-mutation feasibility/risk note only; no API/session delivery implementation |
-
-**⏸ Step 4 — Meta acceptance or hold**
-
-Parallelism rule: no parallel work. Meta closeout happens after all opened W8 review lanes finish.
-
-| Order | Session | Epic(s) | Prereq | Notes |
-|---|---|---|---|---|
-| 4.1 | Meta Coordinator session | ⏸ W8-G compatibility closeout | W8-B ✅ + W8-C ✅ + W8-D ✅; W8-E/W8-F if opened | Decide whether future HUB compatibility is accepted, needs revision, or remains parked |
-
-Non-goals:
-- no HUB implementation in FAL
-- no UI/dashboard implementation by default
-- no automatic dispatch, repo/session mutation, commit, or push
-- no public export of private raw evidence or private learning-loop heuristics
+The historical safety rules remain binding unless a later accepted Epic changes them: no HUB implementation by planning-document existence, no second truth source, no automatic repository mutation, and no public export of raw private evidence.
 
 ---
+
+## 9A. Living forward roadmap - Canon-aligned Waves 8-10
+
+Canonical detailed references:
+
+- `docs/private/FAL-Canon-Lifecycle-Integration-Architecture-v1.md`
+- `docs/private/FAL-Wave8-Wave10-Canon-Aligned-Roadmap-v1.md`
+
+Planning status:
+
+- no Wave is activated by these rows;
+- `FAL-MIG-P` is the next FAL governance-planning assignment after compact;
+- W8-A is the only Wave 8 activation Epic and remains closed until the migration plan and current authority are reconciled;
+- Wave 9 waits for the Wave 8 Gate and a frozen intervention;
+- Wave 10 waits for W9-L `OPEN_W10_SCALING`;
+- ongoing RingFall, WorldSim, and TriageCI work remains governed by each target's current workflow and is not a trial.
+
+### Transitional Wave FAL-CANON-MIG - Canon Adoption Planning
+
+| Position | Epic | Accountable Lane / class | Prerequisite | Deliverable and evidence gate | Readiness | Status / phase | Next unlock |
+|---|---|---|---|---|---|---|---|
+| 10 | FAL-MIG-P Canon Reference, Hydration Adoption, and Repository Simplification | Meta / `GOVERNANCE` / `plans/epics/FAL-MIG-P.md#temporary-accountable-profile` | Reviewed v2.0 plan exists; Stage A waits for the frozen review-ready CANON-HYDRATION resolver/profile/conformance/FAL-rehearsal handoff | `plans/epics/FAL-MIG-P.md` plus v1.2 supersession and v2 review lineage; later Stage A additive/shadow/no-delete FAL candidate with classification, preservation, privacy, rollback, dual-root, one-Combined and cold-restore proof | NOT_READY | PLANNED / PLAN_REVISION | CANON-HYDRATION implementation may continue; FAL Stage A `/implement` only after the exact Canon handoff; no Wave 8 activation |
+
+FAL-CANON-MIG Wave Gate law: `WAVE_CLOSED` requires `FAL-MIG-P` to complete its full Canon lifecycle with candidate-bound step review and closeout. This Gate authorizes W8-A reconciliation only; it does not apply migration, return `OPEN_W8`, or activate Wave 8.
+
+### Wave 8 - Canon-Aligned Truthful Control Plane
+
+| Position | Epic | Accountable Lane / class | Prerequisite | Deliverable and evidence gate | Readiness | Status / phase | Next unlock |
+|---|---|---|---|---|---|---|---|
+| 10 | W8-A Authority and Roadmap Reconciliation | Meta / `GOVERNANCE` | FAL-MIG-P accepted; post-W7.8 state and worktree readable | one frontier, planning-package provenance, FAL-CI/spec-drift/dirty-scope dispositions, `OPEN_W8` or `HOLD` | NOT_READY | PLANNED / NOT_STARTED | W8-B and W8-F only after `OPEN_W8` |
+| 20a | W8-B Canon Adoption and Platform Responsibility Contract | Meta / `GOVERNANCE` | W8-A closed with `OPEN_W8` | Canon version/exceptions, FAL/OpenCode/Router/Codex ownership, target FAL mode, semantic migration law | NOT_READY | PLANNED / NOT_STARTED | W8-C |
+| 20b | W8-F False-Progress and Ceremony Audit | Track E / `TRACK` | W8-A closed with `OPEN_W8` | H4/H5/W6/W7 keep/adapt/retire/derived inventory, burden baseline, false-progress controls | NOT_READY | PLANNED / NOT_STARTED | W8-G |
+| 30 | W8-C Lifecycle and Closeout Law | Track B / `TRACK` | W8-B closed | Canon state/phase/readiness, terminal outputs, Track-B transition/receipt schema, prior-state/idempotency/causation/dispatch/hash law, candidate/cycle identity, fix/re-review/closeout and compatibility law | NOT_READY | PLANNED / NOT_STARTED | W8-D and W8-E contract input |
+| 40 | W8-D Recovery Truth Contract | Track B / `TRACK` | W8-C closed | evidence-bound recovery states, sealed pack, safe defaults, qualification drill | NOT_READY | PLANNED / NOT_STARTED | W8-E and W8-I |
+| 50 | W8-E Canonical Event Adapter and Router-FAL Sync Resolution | Track D / `TRACK` | W8-C and W8-D closed | W8-C envelope consumer, selective interlocks, private pending outbox, target-neutral adapter, dirty-sync disposition, idempotency tests; sealing waits for W8-I | NOT_READY | PLANNED / NOT_STARTED | W8-G and W8-H |
+| 60 | W8-G Minimum Useful Loop and Artifact Budget | Track B / `TRACK` | W8-C, W8-E, W8-F closed | deterministic PASS/fix/recovery/blocked paths and bounded artifact classes | NOT_READY | PLANNED / NOT_STARTED | W8-H |
+| 70 | W8-H Python Reproducibility and Command Law | Track B / `TRACK` | W8-E and W8-G closed | tracked environment law, clean-checkout install/test command, narrow CI candidate | NOT_READY | PLANNED / NOT_STARTED | W8-I |
+| 80 | W8-I Evidence Integrity, Privacy and Hybrid Durability | Track B / `TRACK` | W8-B, W8-D, W8-G, W8-H closed | atomic seal, provenance, tracked/private split, retention/redaction, fresh-workspace restore | NOT_READY | PLANNED / NOT_STARTED | W8-J |
+| 90 | W8-J Golden Loop and Intervention Freeze | Meta / `GOVERNANCE` | W8-B through W8-I closed | direct-pass, fix/re-review, interrupted/reconcile and negative-control evidence; `STABLE_FOR_CROSS_PROJECT_PILOT`, `REVISE`, or `HOLD` | NOT_READY | PLANNED / NOT_STARTED | Wave 8 Gate; W9-A only after `WAVE_CLOSED` |
+
+Wave 8 Gate law: `WAVE_CLOSED` requires all mandatory Epics `CLOSED`, no competing lifecycle semantic owner, no false clean closeout or unsupported recovery success, automatic FAL event capture on the normal OpenCode path, critical fail-closed interlocks, routine outbox reconciliation, candidate-bound atomic evidence, clean-checkout Python proof, fresh-workspace hydration, and W8-J `STABLE_FOR_CROSS_PROJECT_PILOT`.
+
+### Wave 9 - Cross-Project Empirical Validation and Operational Readiness
+
+| Position | Epic | Accountable Lane / class | Prerequisite | Deliverable and evidence gate | Readiness | Status / phase | Next unlock |
+|---|---|---|---|---|---|---|---|
+| 10 | W9-A Protocol and Claim Freeze | Meta / `GOVERNANCE` | Wave 8 `WAVE_CLOSED` | B1/FAL comparator, endpoints, thresholds, stop law, allowed claims | NOT_READY | PLANNED / NOT_STARTED | W9-B and optional W9-D |
+| 20 | W9-B Trial Manifest and Instrumentation | Track E / `TRACK` | W9-A closed | complete attempted/failed/aborted registry, versions, burden, deviations, evidence lineage | NOT_READY | PLANNED / NOT_STARTED | W9-C |
+| 30 | W9-C Target Wave Bank and Blind Rubrics | Track E / `TRACK` | W9-A and W9-B closed | future bounded target Waves, profiles, gold truth, seeded controls, blind rubrics | NOT_READY | PLANNED / NOT_STARTED | W9-E |
+| 20x | W9-D Codex Shadow Conformance, optional | Track D / `TRACK` | W9-A and W9-B closed | explicit-artifact-only read-only conformance; no primary OpenCode effect contamination | NOT_READY | PLANNED / NOT_STARTED | optional portability evidence only |
+| 40 | W9-E Cold-Start Recovery Proof | Track E / `TRACK` | W9-B and W9-C closed | preregistered multi-condition P9b proof with stale/missing/corrupt controls | NOT_READY | PLANNED / NOT_STARTED | W9-F |
+| 50 | W9-F False-Green Negative-Control Harness | Track E / `TRACK` | W9-B, W9-C, W9-E closed | detection, false-alarm, refusal, and escape evidence | NOT_READY | PLANNED / NOT_STARTED | W9-G |
+| 60 | W9-G FAL Self-Hosted Feasibility Wave | Meta / `GOVERNANCE` | W9-E and W9-F closed | one complete small FAL Wave under frozen intervention | NOT_READY | PLANNED / NOT_STARTED | W9-H |
+| 70 | W9-H RingFall Evidence and Interlock Qualification | Track E / `TRACK` | W9-G closed, RingFall readiness, target-side Wave activation | separate FAL lifecycle consumes pinned target-closeout handoff; target and FAL close independently | NOT_READY | PLANNED / NOT_STARTED | W9-I after explicit disposition |
+| 80 | W9-I WorldSim Evidence and Interlock Qualification | Track E / `TRACK` | W9-H disposition, WorldSim readiness, target-side Wave activation | separate FAL lifecycle consumes pinned target-closeout handoff; target and FAL close independently | NOT_READY | PLANNED / NOT_STARTED | W9-J after explicit disposition |
+| 90 | W9-J TriageCI Evidence and Interlock Qualification | Track E / `TRACK` | W9-I disposition, TriageCI readiness, target-side Wave activation | separate FAL lifecycle consumes pinned target-closeout handoff; target and FAL close independently | NOT_READY | PLANNED / NOT_STARTED | W9-K after explicit disposition |
+| 100 | W9-K Blind Cross-Project Audit and Burden Evaluation | Track E / `TRACK` | W9-G through W9-J closed | truth, recovery, quality, burden, uncertainty, and deviations | NOT_READY | PLANNED / NOT_STARTED | W9-L |
+| 110 | W9-L W10 Promotion Decision | Meta / `GOVERNANCE` | W9-K closed | `OPEN_W10_SCALING`, `REVISE_INTERVENTION`, `HOLD_SCALING`, or `CANCEL_SCALING` | NOT_READY | PLANNED / NOT_STARTED | W10-A only on `OPEN_W10_SCALING` |
+
+Target boundary: current RingFall, WorldSim, and TriageCI development continues normally and is not retroactively trial evidence. W9 selects future bounded target Waves at activation; each target owns its own Combined/state/Epics, implementation, acceptance, and commit. FAL owns evidence/interlock/analysis only.
+
+### Wave 10 - Scaled Canon Orchestration and Operator Surface
+
+| Position | Epic | Accountable Lane / class | Prerequisite | Deliverable and evidence gate | Readiness | Status / phase | Next unlock |
+|---|---|---|---|---|---|---|---|
+| 10 | W10-A Scaling Activation and Consumer-Needs Decision | Meta / `GOVERNANCE` | W9-L `OPEN_W10_SCALING` | scaling scope and platform-native/thin/custom-HUB/cancel consumer decision | NOT_READY | PLANNED / NOT_STARTED | W10-B |
+| 20 | W10-B Wave Execution Envelope Contract | Track B / `TRACK` | W10-A closed | approval receipt, allowed Epics/positions, budgets, risk/review/commit/stop/expiry/revocation law | NOT_READY | PLANNED / NOT_STARTED | W10-C |
+| 30 | W10-C Multi-Epic Orchestrator State Machine | Track B / `TRACK` | W10-B closed | next-ready selection, durable run state, exact routing/resume, no out-of-envelope selection | NOT_READY | PLANNED / NOT_STARTED | W10-D and W10-E |
+| 40 | W10-D Selective Interlock, Outbox and Incident Recovery | Track B / `TRACK` | W10-C closed | critical gates, routine queue, target-scoped idempotency/CAS, duplicate/crash recovery | NOT_READY | PLANNED / NOT_STARTED | W10-F |
+| 40x | W10-E Review Quality and Cost Routing | Meta / `GOVERNANCE` with Track E evidence | W10-B and W10-C closed | mandatory per-Epic review, risk-selected topology, cost/model and high-cost approval policy | NOT_READY | PLANNED / NOT_STARTED | W10-F |
+| 50 | W10-F Automated Closeout and Local Commit | Track B / `TRACK` | W10-C, W10-D, W10-E closed | exact-path candidate-bound local commit, no-push and partial-failure law | NOT_READY | PLANNED / NOT_STARTED | W10-G and W10-H |
+| 60 | W10-G Operator Surface Selection and Handoff | Meta / `GOVERNANCE` | W10-A and W10-C closed | OpenCode-native/thin/adapter/custom/cancel decision and exact conditional successor ownership | NOT_READY | PLANNED / NOT_STARTED | W10-GA and/or W10-GD only when selected; otherwise W10-H |
+| 60a | W10-GA Operator Presentation Surface, conditional | Track A / `TRACK` | W10-G explicitly selects presentation scope | thin read-only/proposal-first surface without duplicate truth | NOT_READY | PLANNED / NOT_STARTED | W10-H |
+| 60b | W10-GD Operator Adapter or Tool Surface, conditional | Track D / `TRACK` | W10-G explicitly selects adapter/tool scope | bounded OpenCode/router/platform adapter without lifecycle redefinition | NOT_READY | PLANNED / NOT_STARTED | W10-H |
+| 70 | W10-H Security, Privacy and Cross-Target Isolation Gate | Track E / `TRACK` | W10-C through W10-F and every opened W10-G successor closed | isolation, approval binding, secret/redaction, revocation, audit and threat-model verdict | NOT_READY | PLANNED / NOT_STARTED | W10-I |
+| 80 | W10-I FAL Self-Hosted Full-Wave Qualification | Meta / `GOVERNANCE` | W10-H closed | one full Wave from one approval with automatic Epic routing and local commits | NOT_READY | PLANNED / NOT_STARTED | W10-J |
+| 90 | W10-J RingFall Scaled-Wave Evidence Qualification | Track E / `TRACK` | W10-I closed and target-side Wave activation | separate FAL qualification consumes one target-owned full RingFall Wave | NOT_READY | PLANNED / NOT_STARTED | W10-K after explicit disposition |
+| 100 | W10-K WorldSim Scaled-Wave Evidence Qualification | Track E / `TRACK` | W10-J disposition and target-side Wave activation | separate FAL qualification consumes one target-owned full WorldSim Wave | NOT_READY | PLANNED / NOT_STARTED | W10-L after explicit disposition |
+| 110 | W10-L TriageCI Scaled-Wave Evidence Qualification | Track E / `TRACK` | W10-K disposition and target-side Wave activation | separate FAL qualification consumes one target-owned full TriageCI Wave | NOT_READY | PLANNED / NOT_STARTED | W10-M after explicit disposition |
+| 120 | W10-M Productization and Operations Closeout | Meta / `GOVERNANCE` | W10-I through W10-L closed | operations/incident runbook, owner, capability/non-claim matrix, sunset law and Wave Gate packet | NOT_READY | PLANNED / NOT_STARTED | Wave 10 Gate |
+
+Wave 10 Gate law: `WAVE_CLOSED` requires one-approval full-Wave execution, multiple dependent Epic routes, full per-Epic Canon review, fix re-review, safe automatic local commits, no push, fail-closed material stops, routine outbox recovery, exact-stage restart, duplicate-send prevention, separate target/FAL transactions, successful FAL/RingFall/WorldSim/TriageCI qualifications, no quality regression, accepted burden, no duplicate truth in the operator surface, and an owned operations/incident/sunset model.
+
+Non-goals across Waves 8-10:
+
+- no current target-development freeze;
+- no BSc-thesis execution coupling;
+- no target feature authority in FAL;
+- no automatic push/PR/merge/deploy/publication;
+- no hidden-reasoning or undocumented-session scraping;
+- no custom HUB without measured need;
+- no arbitrary autonomous backlog selection;
+- no activation from planning-document existence;
+- no broad cleanup before `FAL-MIG-P` is planned, reviewed, and explicitly applied through later Epics.
 
 # 10. Wave and sprint matrix
 
@@ -2504,7 +2532,9 @@ Non-goals:
 | 7.5 | Measurement and context continuity hardening | metrics/context contract review | learning candidate semantics | evidence compatibility only if needed | metrics, review ledger, pilot measurement | public-safe/readability only if opened |
 | 7.6 | Target orchestrator seamless integration | target profile / active context / checkpoint contract review | finding/routing verdict semantics | router artifact pinning and reconcile hardening after P1 | checkpoint/evidence sufficiency and backfill audit | no default role |
 | 7.8 | CI readiness and mechanical gates | python/core CI reassessment | consult only | consult only | CI gate review and report-only coverage policy | UI CI + fixture boundary |
-| 8 | HUB compatibility contract | status/export and approval-state contract | room taxonomy semantics | future bridge/API feasibility only if gated | privacy/export and evidence boundary | display-needs review only |
+| 8 | Canon-aligned truthful control plane | lifecycle, recovery, minimum loop, evidence/durability core | H4/H5 semantics and role compatibility | canonical OpenCode/router event adapter | ceremony audit, integrity/recovery evidence | burden review only |
+| 9 | Cross-project empirical validation | contract compatibility and issue support | target semantics consultation | optional Codex shadow conformance | lead protocol, trials, audit and burden | operator-observation support |
+| 10 | Scaled Canon orchestration | Wave envelope and multi-Epic state machine | role/prompt compatibility | router/interlock/operator integration | quality, isolation and operational gates | selected operator surface |
 
 ---
 
@@ -2583,8 +2613,11 @@ Wave 7.6 closeout summary:
 - ✅ `W7.6-P9` wave-level usefulness audit design is accepted in `docs/private/Wave7_6-W7_6_P9-Wave-Level-Usefulness-Audit-Design-v1.md`; it is design/protocol only and does not prove cold-start recovery.
 - ✅ W7.6 closes with design debt in `docs/private/Wave7_6-W7_6-Closeout-Decision-v1.md`; P9b remains deferred targeted validation, not an active W7.6 blocker.
 - ✅ Wave 7.7 Productized Target Orchestration UX opened and closed as docs-first planning with owner-run prompt-layer command/skill apply verified after closeout.
-- 🔄 NEXT: Wave 7.8 CI readiness and mechanical gates remains open at Step 2; W7.8-B UI CI is accepted and Track A should proceed to W7.8-C generated-data boundary under the accepted UI-only/generated-data constraints.
-- ⏸ Wave 8/HUB compatibility remains parked; this frontier does not authorize HUB work.
+- ✅ Wave 7.8 CI readiness and mechanical gates is closed through W7.8-F: UI CI and generated-data isolation are accepted, root Python/core CI remains unapproved, CI green remains mechanical evidence only, and coverage remains report-only/later.
+- ✅ FAL-CI-01 prompt/tool workflow hardening is applied and restart-time live registry plus targeted smoke evidence is recorded; the broader lifecycle/router-sync debt remains a Wave 8 input rather than silently accepted behavior.
+- ✅ The Canon-aligned Wave 8-10 roadmap and lifecycle-integration architecture are documented as planning-only private inputs.
+- 🔄 NEXT: Canon Workflow Maintenance continues `CANON-HYDRATION` `/implement` at CH-3/CH-4 against `plans/epics/CANON-HYDRATION.md`; FAL-MIG-P v2.0 Stage A remains `NOT_READY` until the exact frozen review-ready Canon resolver/profile/conformance/FAL-rehearsal handoff exists.
+- ⏸ Wave 8 remains `PLANNED / NOT_STARTED / NOT_READY`; the historical HUB concept is a Wave 10 input, not the living Wave 8 slot.
 
 Current blocker summary:
 
@@ -2594,8 +2627,12 @@ Current blocker summary:
 - serial wrapper FAL hook behavior is accepted for P6 scope, and parallel reconcile behavior is accepted for P7 scope
 - P9 design acceptance is not recovery proof; actual `recovery_verdict: restored | partially_restored | failed` remains P9b or later targeted validation debt, but does not block W7.6 closeout in design/debt state
 - local/ignored operational surfaces (`tools/oc-session-router/**`, `docs/private/**`, `ops/AGENTS.md`, `ops/temp/**`) remain outside the normal versioned closeout commit unless a later explicit policy exception force-adds them
-- W7.8-A scope boundary and W7.8-B UI-only mechanical CI are accepted; W7.8-C generated-data boundary is the next active Track A work
+- W7.8-A through W7.8-F are accepted; root Python/core reproducibility and CI remain future W8-H scope, not a retroactive W7.8 implementation authorization
+- the current `.swarm` review-only plan has spec drift and is not the lifecycle authority for the FAL Wave 8-10 roadmap
+- the 2026-07-10 extracted Wave 8-10 package is planning evidence only; its unique content must be provenance-mapped during `FAL-MIG-P` before any copy, archive, or deletion
+- the existing dirty `router_fal_sync.py` and integration-test changes remain unaccepted evidence for W8-E; they must not be reverted, committed, or normalized by migration planning
 - RingFall Wave 2 implementation remains blocked before a separate target planning brief and Meta gate
+- ongoing accepted RingFall, WorldSim, and TriageCI development may continue under each target's own workflow and does not become Wave 9 trial evidence automatically
 - public release, public mirror, `docs/public/` output, and Track A presentation remain blocked
 - OpenCode bridge/API/session delivery remains blocked
 - automatic `/compact` remains blocked; W7.6 may record compact-readiness only
@@ -2604,13 +2641,14 @@ Current blocker summary:
 ### Current operational rule
 If you want to know "which session do I run next?", use this order:
 
-1. Open Track A W7.8-C generated-data boundary under `docs/private/Wave7_8-W7_8_A-CI-Scope-Boundary-v1.md`; W7.8-B UI CI is already accepted.
-2. Treat W7.6 and W7.7 as closed with design debt; P9b remains available later as read-only targeted validation, not as the current active frontier.
-3. Keep the missing explicit `recovery_verdict` drill visible as later validation debt; do not claim compact/hydration recovery is already proven.
-4. Keep any full `/fal-orchestrate-target` implementation blocked until a dedicated full-command PRD/review and explicit Meta/user approval authorize it.
-5. Keep root Python/core CI blocked until W7.8-D reassessment accepts a canonical tracked command surface.
-6. Keep W7.8 CI non-secret, non-CD, non-deploy, and mechanical-evidence-only.
-7. Wave 8 remains `⏸` unless a later explicit Meta decision opens docs-first compatibility work.
+1. Continue the accepted `CANON-HYDRATION` `/implement` lifecycle at CH-3/CH-4; consume the exact FAL-MIG-P v1.2 archive/supersession, v2 plan-review, final v2 plan, state, and this Combined row as the completed FAL-BARRIER evidence.
+2. Keep FAL-MIG-P v2.0 Stage A at `NOT_READY` until Canon Workflow Maintenance supplies the frozen review-ready resolver, reader/verifier, FAL profile, conformance, and current FAL rehearsal identities.
+3. After that handoff, run FAL Stage A through its own `/implement -> /step-review -> /step-review-utan -> /closeout-commit` lifecycle, additive/shadow/no-delete only.
+4. Keep W8-A and every later Wave row closed until FAL-MIG-P v2.0 Stage A is accepted and W8-A separately reconciles authority, baseline/dirty scope, provenance, FAL-CI debt, sequencing, and activation.
+5. Treat W7.6, W7.7, and W7.8 as closed with the recorded debt; keep the missing explicit recovery proof visible for W8-D/W9-E.
+6. Keep the dirty router/FAL sync source/test diff protected for W8-E hunk-by-hunk disposition.
+7. Allow RingFall, WorldSim, and TriageCI to continue their current accepted work independently; select only future target Waves for W9 after intervention freeze and target-side readiness.
+8. Keep full `/fal-orchestrate-target`, automatic dispatch, root Python/core CI, automatic compact, public output, HUB implementation, and remote side effects blocked until their named future gates.
 
 ### CI readiness planning note
 
@@ -2623,6 +2661,25 @@ This note was the private planning input for the now-open W7.8 direction and rem
 - CD/deploy automation remains out of scope.
 - Coverage starts report-only unless a later Track E gate accepts module-specific hard thresholds.
 - Green CI is mechanical evidence only; it does not replace FAL review/evidence gates.
+
+### CI acceptance freeze note
+
+For narrow CI, guardrail, or workflow-hardening slices such as W7.8, Meta should freeze a short acceptance contract at plan-review time instead of letting each later review silently expand the bar.
+
+- Record the exact invariants that must pass for the slice, plus explicit out-of-scope CI/policy surfaces.
+- Step review and Swarm review may block only on a direct bypass or violation of one frozen invariant unless Meta explicitly refreezes the contract.
+- Broader "what about CI surface X?" concerns should route to later hardening debt by default, not reopen the current narrow slice.
+- After two RED review-fix loops on the same narrow CI slice, Meta must explicitly refreeze the acceptance contract or stop the loop with an owner-visible decision.
+
+### FAL-CI-01 typed step-review and model-routing hardening
+
+Owner-approved workflow hardening is applied as a bounded FAL-CI-01 slice without opening broader unattended session delivery.
+
+- `/step-review` uses a v2 profile contract with 0–7 typed internal lanes; Meta keeps independent verdict and full coverage-matrix responsibility.
+- `standard` is 3 lanes, `high_risk` is 4 with a pre-resolved project/risk specialist, `deep/audit` is 5 with security and architecture, and `wide` is all 7. Every 5–7 lane review requires explicit question-tool owner approval.
+- OpenCode router message and command sends may carry an explicit `{providerID, modelID}` model object; resolved models and review controls persist across resume.
+- Global review routing currently uses Terra-primary `economy` and `reviewbalanced`, plus Terra-heavy `reviewaudit` with Sol only for high-impact critic/arbitration roles. All typed lanes are Terra-primary while Luna transport is suspended after repeated model-not-found retries bypassed the intended bounded fallback. Luna definitions remain installed only for a later explicit owner restoration after a passing probe. Meta reads `review-model-routing-briefing.md`, dispatches global tier agents through Task/subagent rather than the separate `dispatch_lanes*` registry, and owns model/effort selection and final synthesis. External Swarm must not mutate an unrelated local `.swarm` plan lifecycle. Full adaptive Swarm and experimental pro mode require explicit owner approval.
+- This slice still requires restart-time config/agent/plugin validation and a bounded step-review smoke before clean closeout.
 
 Reference:
 - `docs/private/Wave7-OpenCode-Evidence-Learning-Layer-Plan-v1.md`

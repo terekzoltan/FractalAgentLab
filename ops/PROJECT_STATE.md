@@ -1,21 +1,24 @@
 # Jelenlegi állapot
 
+State revision: fal-canon-mig-plan-revision-20260728
+Workflow phase: PLAN_REVISION
+
 Wave 6 lezárva `narrow_continue` döntéssel; Wave 6.5 RingFall readiness/adoption closeout elfogadva. W7.5 measurement/context-continuity hardening csomag lezárt. W7.6 target-orchestrator seamless integration lezárva `CLOSE_W7_6_WITH_DESIGN_DEBT` Meta döntéssel. A wave elfogadott kisebb slice-jai használhatók: P1 `/fal-checkpoint-target` + `fal-target-orchestration` applied, P4 read-only RingFall Wave 1 backfill accepted reconcile debt mellett, P5 hook integration plan accepted, P6/P7 router/helper hardening accepted, P8 full `/fal-orchestrate-target` readiness decision `HOLD_FULL_COMMAND_WITH_NARROW_NEXT`, P9 audit design accepted. W7.7 Productized Target Orchestration UX docs-first wave lezárva `CLOSE_W7_7_PLAN_ONLY_WITH_APPLY_DECISION_READY` döntéssel; az owner lefuttatta a global `/fal-orchestrate-target` command/skill apply-kat, és a post-apply verification igazolta a `FAL-RELIABILITY-LAYER:v3`, `FAL hygiene rule`, `/fal-checkpoint-target` és `fal-target-orchestration` markereket.
 
 A W7.8-A CI scope boundary elfogadva `GREEN_WITH_CONSTRAINTS` státusszal. W7.8 infrastruktúra/mechanikus CI readiness wave, nem product-mode wave. Első engedélyezett CI felület: tracked UI mechanikai ellenőrzés `ui/package-lock.json` alapján (`npm ci`, `npm run typecheck`, `npm test`, `npm run build`) és a generated-data boundary tisztázása. CI-be nem kerülhet `ops/**`, `docs/private/**`, `data/**` runtime evidence, `ui/public/generated/**` ignored generated data kötelező inputként, `.opencode-router/**`, `.swarm/**`, global OpenCode config, `tools/oc-session-router/**`, target private artifact, secret-dependent provider job, CD/deploy, public upload vagy coverage hard gate. Root Python/core CI implementáció nincs engedélyezve W7.8-A-ból, csak későbbi W7.8-D reassessment után.
 
-Public case study, public mirror artifact, `docs/public/**` output, HUB implementation, automatikus `/compact`, implicit compact-event detection, OpenCode bridge/API/session delivery, runtime/router/full `/fal-orchestrate-target` implementation és RingFall Wave 2 execution továbbra is blokkolt.
+Public case study, public mirror artifact, `docs/public/**` output, HUB implementation, automatikus `/compact`, implicit compact-event detection, OpenCode bridge/API/session delivery, runtime/router/full `/fal-orchestrate-target` implementation és FAL Wave 8 execution továbbra is blokkolt. RingFall, WorldSim és TriageCI a saját aktuális Combined/state és Meta gate-jei alatt folytathatja a meglévő workflow szerinti fejlesztést; ez nem FAL Wave 9 trial, és nem fagyasztja a target roadmapeket.
 
 # Jelenlegi wave / sprint / step / epic
 
-- Wave: Wave 7.8 — CI Readiness And Mechanical Gates
-- Sprint: W7.8 Step 3 — reassessment and policy closeout
-- Step: W7.8 Step 3 — W7.8-F accepted; W7.8 policy closeout kész.
-- Epic: W7.8-F coverage policy later accepted; következő frontier külön Meta döntés után nyílhat.
+- Wave: `FAL-CANON-MIG` — explicit átmeneti Canon-adoption governance Wave
+- Sprint: FAL-MIG-P v2.0 — Canon-hivatkozás, hydration-adoption és repository-simplification planning
+- Step: `FAL-MIG-P PLAN_REVISION_COMPLETE / IMPLEMENT_BLOCKED` — a v1.2 terv byte-pontosan archiválva és `SUPERSEDED_BEFORE_IMPLEMENTATION`; az új v2.0 terv egyszeri független Meta review-ja és `/terv-review-utan` revíziója kész, Stage A a fagyasztott CANON-HYDRATION handoffra vár
+- Epic: FAL Canon Reference, Hydration Adoption, and Repository Simplification; artifact: `plans/epics/FAL-MIG-P.md`, revision `FAL-MIG-P-plan-v2.0-final`, SHA-256 `c8d4eca307a32f951bb3804a47e1a7fce9522e361637a37930df1cf77b9201bc`; Combined referencia: `ops/Combined-Execution-Sequencing-Plan.md` `9A. Living forward roadmap` / `FAL-MIG-P`.
 
 # Jelenlegi workflow fázis
 
-W7.8-A Meta scope-lock lezárva. W7.8-B UI CI implementáció accepted: `.github/workflows/ui-ci.yml` létrejött UI-only mechanikus GitHub Actions workflowként, local evidence szerint `npm ci`, `npm run typecheck`, `CI=true npm test` (34 tests) és `npm run build` PASS, nincs `ui/package.json` / `ui/package-lock.json` diff, és nincs forbidden private/upload/coverage/deploy/secret/root/router hivatkozás. `RF-2026-06-29-01` fixed/accepted. W7.8-C generated-data boundary accepted: tiszta `HEAD` checkout/worktree proof szerint a UI `npm ci`, `npm run typecheck`, `CI=true npm test` (34 tests) és `npm run build` PASS ignored/private `ui/public/generated/**`, `.opencode-router/**`, `.swarm/**` vagy `data/**` runtime evidence nélkül; `data/` csak tracked `.gitignore`-t tartalmazott, és a workflow forbidden generated/private reference scan tiszta volt. W7.8-D Python/core CI reassessment accepted: `docs/private/Wave7_8-W7_8_D-Python-Core-CI-Reassessment-v1.md` privát artifact döntése `NO_ROOT_PYTHON_CI_YET_WITH_REASSESSMENT_COMPLETE`; nincs root Python/core manifest (`pyproject.toml`, `pytest.ini`, `requirements*.txt`, `tox.ini`, `noxfile.py`, `setup.py`, `setup.cfg`, `Pipfile`, `poetry.lock`, `uv.lock`) és nincs canonical tracked Python command surface, ezért root Python/core CI továbbra sem nyílhat külön command-law/manifest/dependency policy és Meta-reviewed follow-up nélkül. W7.8-E CI-as-evidence policy accepted: `docs/private/Wave7_8-W7_8_E-CI-As-Evidence-Policy-v1.md` rögzíti, hogy failed CI blockolhat mechanikus merge/closeoutot a lefedett surface-en, de passed CI csak mechanikus evidence és nem semantic/domain/FAL approval. W7.8-F coverage policy later accepted: `docs/private/Wave7_8-W7_8_F-Coverage-Policy-Later-v1.md` rögzíti, hogy coverage csak report-only/later policy, W7.8-F önmagában nem engedélyez coverage commandot, dependencyt, package installt, workflow jobot vagy thresholdot; minden future coverage candidate csak `future_candidate_only` vagy `blocked_until_reviewed` lehet külön review előtt. A dirty tracked `src/fractal_agent_lab/integrations/router_fal_sync.py` / `tests/integrations/test_router_fal_sync.py` diff továbbra is külön triage blocker router/full-command/root CI scope előtt.
+W7.8-A/F lezárva; a root Python/core CI és coverage hard gate továbbra sincs elfogadva. A CANON-HYDRATION `NATIVE_COMPACT_WITH_ROLE_HINT`, Canon-first restore és fail-closed `PROJECT_LOCAL_LEGACY_VALIDATED` javítása alkalmazva és isolated fresh registryvel verifikálva. A végső pins-only transaction `20260728-203315317-f29a7ea479e2` állapota `VERIFIED`; candidate/live/operational snapshot inventory `15c097b479d0d88932307bec216994a5842988ab021639036ea119b5cd91a57c`, a Canon tooling snapshot `MATCH`. A Canon source commit `4864d04` pusholva az `Agent-Workflow-Canon` `origin/main` ágára. A 2026-07-23-i living Wave 8-10 roadmap továbbra is planning-only; Wave 8, migration application, fájlmozgatás/törlés és unrelated router/product mutation nincs automatikusan engedélyezve.
 
 # Utolsó aktor / szerep
 
@@ -23,27 +26,30 @@ Meta Coordinator
 
 # Utolsó döntés
 
-W7.8-F step-review döntés: `GREEN/APPROVE`. A docs-only coverage policy artifact accepted Track E scope-ban; nincs blocking/major finding. Root Python/core CI marad blocked, mert nincs canonical tracked command surface. A W7.8-A scope lock változatlanul kizárja a private/local evidence felületeket, secret/CD/public upload scope-ot, coverage hard gate-et, router/FAL sync regression gate-et és full `/fal-orchestrate-target` runtime/router implementációt.
+Owner elfogadta a központi, külső Agent Workflow Canon + generikus CANON-HYDRATION + projekt-lokális authority modellt. A FAL nem vendorolja a teljes Canont; a repository-simplification külön v2.0 FAL governance Epic, Stage A additív/shadow/no-delete, Stage B külön destruktív lifecycle. Wave 8 nem aktiválódik ettől. A korábbi Wave 8-10 roadmap többi biztonsági és public/private korlátja változatlan.
 
 # Utolsó befejezett akció
 
-W7.8-F coverage policy later step-review accepted. A privát docs-only artifact kimondja, hogy coverage csak report-only/later policy, W7.8-F nem engedélyez coverage commandot, dependencyt, package installt, workflow jobot vagy thresholdot, és globális repo coverage százalék nem elfogadott W7.8-F kimenet. Nem módosult production code, workflow, package file, Python manifest, router/FAL sync fájl vagy test.
+A WorldSim-local `.opencode` workaround fájlok eltávolítva. A futó WorldSim server a restartig tovább használhatja a memóriában cache-elt local definíciót, de a lemezen a globális fallback maradt. Semleges rootból indított, saját PID-del kezelt isolated OpenCode server igazolta a fresh globális registryt; minden ideiglenes server leállt. A private fallback, valid-capsule precedence, exact required project authority, capability-matched single role runbook és WorldSim Meta `NOT_READY` route regressziói PASS.
 
 Automatizációs tudnivaló változatlan: `fractalagentlab-architecture-intelligence-refresh` 72 óránként fut ebben a workspace-ben, csak `docs/architecture/**` diagnosztikai/architektúra artefaktumokat frissíthet, implementation kódhoz nem nyúlhat, és `ops/PROJECT_STATE.md`-t csak blocking/major architektúra-probléma esetén módosíthatja.
 
 # Következő akció
 
-Elsődleges: W7.8 policy closeout utáni következő frontier csak külön Meta döntéssel nyílhat. Root Python/core CI, router/FAL sync triage, coverage hard gate, full `/fal-orchestrate-target` runtime/router és RingFall Wave 2 továbbra is külön blokkolt scope.
+Meta reconciles the verified CANON-HYDRATION handoff against `FAL-MIG-P-plan-v2.0-final` and decides whether Stage A may leave `NOT_READY`; this does not open Wave 8. A future WorldSim server restart is operational cleanup only, not a Canon transaction blocker.
 
 # Következő elvárt szerep
 
-Meta Coordinator: válassza ki és scope-lockolja a következő frontiert külön döntéssel; ne nyisson implicit implementationt W7.8 closeoutból.
+FAL Meta Coordinator / `GOVERNANCE` handoff reconciliation.
 
 # Most ne gondolkodj ezen
 
 - Ne induljon el RingFall Wave 2 implementation/execution külön Wave 2 planning brief és Meta gate előtt.
 - Ne induljon C#/.NET core, Python brain, Unity, provider/model runtime vagy scenario/simulation implementation puszta FAL workflow-hardening ürüggyel.
 - Ne nyisd meg a HUB implementációt vagy Wave 8 executiont.
+- Ne kezeld az új roadmap vagy architecture dokumentum létezését `OPEN_W8` döntésként.
+- Ne másold át vakon az `Agent-Workflow-Canon` vagy az `extracted/` teljes tartalmát a FAL-ba; előbb source-to-target és provenance map kell.
+- Ne mozgass, ne törölj és ne archiválj FAL fájlt a migration terv elfogadása előtt.
 - Ne indíts OpenCode bridge/API/session deliveryt, routing/dispatch automationt vagy commit/push automationt.
 - Ne indíts automatikus `/compact`-ot; W7.6 csak compact-readiness és hydration authority állapotot rögzíthet.
 - Ne feltételezz implicit compact-event detectiont; W7.6 csak explicit boundary artifactból vagy operator/workflow jelzésből dolgozhat.
@@ -64,8 +70,12 @@ Meta Coordinator: válassza ki és scope-lockolja a következő frontiert külö
 - `RF-2026-06-29-01` fixed/accepted; W7.8-B remote GitHub Actions first-run observation opcionális támogató evidence, nem blocking.
 - RingFall Wave 2 implementation továbbra is blokkolt külön Wave 2 planning brief és Meta gate előtt.
 - Public-safe konkrét methodology/public package még nincs draftolva vagy külön review-zva.
-- Wave 8/HUB továbbra is parked docs/contract backlog.
-- OpenCode bridge/API assumptions továbbra is unverified; delivery implementáció továbbra is blokkolt.
+- FAL-MIG-P v2.0 Stage A `PLANNED / PLAN_REVISION / NOT_READY`; unlock: frozen review-ready CANON-HYDRATION resolver/profile/conformance/FAL-rehearsal handoff.
+- CANON-HYDRATION global apply, fresh registry verification, operational/Canon snapshot sync, pack gates, commit és push lezárva; a WorldSim futó serverének későbbi restartja csak cache reload, nem blocker.
+- Wave 8 `PLANNED / NOT_STARTED / NOT_READY`; a FAL-MIG-P v2.0 Stage A elfogadása után is külön W8-A authority reconciliation és explicit `OPEN_W8` szükséges.
+- Wave 9 és Wave 10 csak a named prior Wave Gate-ek után nyílhat; jelenlegi target munka nem trial evidence.
+- A `.swarm` review-only plan stored/current spec hash driftje továbbra is külön lifecycle blocker minden destructive Swarm plan/status művelet előtt.
+- Az OpenCode message/command model body shape lokálisan és SDK/server docs alapján verified; a mostani explicit model-routing helper slice alkalmazva. Ettől függetlenül a szélesebb unattended bridge/session delivery és automatikus dispatch továbbra is blokkolt.
 
 # Evidence pointerek
 
@@ -83,4 +93,18 @@ Meta Coordinator: válassza ki és scope-lockolja a következő frontiert külö
 - `docs/private/Wave7_8-W7_8_A-CI-Scope-Boundary-v1.md`
 - `docs/private/Wave7_8-W7_8_E-CI-As-Evidence-Policy-v1.md`
 - `docs/private/Wave7_8-W7_8_F-Coverage-Policy-Later-v1.md`
+- `docs/private/FAL_Continuous_Improvement_Backlog-v1.md`
+- `docs/private/FAL-Wave8-Wave10-Canon-Aligned-Roadmap-v1.md`
+- `docs/private/FAL-Canon-Lifecycle-Integration-Architecture-v1.md`
+- `plans/epics/FAL-MIG-P.md`
+- `plans/epics/FAL-MIG-P-plan-review-v2.md`
+- `plans/epics/FAL-MIG-P-v1.2-SUPERSESSION.md`
+- `plans/epics/archive/FAL-MIG-P-plan-v1.2.md`
+- `plans/epics/FAL-MIG-P-BARRIER-EVIDENCE.md`
+- `plans/epics/CANON-HYDRATION-WORKFLOW-CHANGE-SPEC.md`
+- `plans/epics/CANON-HYDRATION.md`
+- `../Agent-Workflow-Canon/ADOPTION.md`
+- `../Agent-Workflow-Canon/audit/MIGRATION-BACKLOG.md`
+- `tools/oc-session-router/config/model-profiles.json`
+- `tools/oc-session-router/docs/step-review-swarm-flow.md`
 - `ops/Review-Findings-Registry.md`
