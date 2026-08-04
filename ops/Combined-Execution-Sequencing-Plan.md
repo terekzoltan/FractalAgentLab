@@ -7,6 +7,24 @@
 
 This is the sole live Combined path. Historical Wave detail remains in Git history, `ops/AGENTS.md`, accepted Epic artifacts, and named private decision records. Those sources are cold evidence and do not override this current frontier.
 
+## 0. Detailed History And Roadmap Index
+
+This compact Combined is the hot-path authority surface. It intentionally records
+the current frontier and activation gates rather than reproducing the retired
+multi-thousand-line execution chronology.
+
+| Need | Authoritative location | Load when |
+|---|---|---|
+| Detailed Wave 0 through W7.8 chronology | Git revision `f982184:ops/Combined-Execution-Sequencing-Plan.md` | A decision depends on historical sequencing, prior Wave acceptance, or an older dependency rationale |
+| Earlier or intermediate Combined states | `git log --follow -- ops/Combined-Execution-Sequencing-Plan.md` | The baseline revision does not answer the historical question |
+| FAL identity, historical operating model, and long-form Wave record | `ops/AGENTS.md` | The overlay/state/active Epic does not resolve ownership, constraints, or historical intent |
+| Wave 8–10 canonical private roadmap | `docs/private/FAL-Wave8-Wave10-Canon-Aligned-Roadmap-v1.md` | W8-A authority reconciliation or any future Wave 8–10 planning decision |
+| Wave 8–10 package navigation | `FAL_Wave8_Wave10_Planning_Package_README.md` | Locating detailed Wave 8/9/10 plans or their epic-level planning inputs |
+| Current implementation truth | this Combined, `ops/PROJECT_STATE.md`, and the pinned active Epic evidence | Every meaningful workflow action |
+
+The roadmap files are planning-only. Their existence does not activate Wave 8, 9,
+or 10; only the explicit gate in the current frontier can do that.
+
 ## 1. Authority And Execution Law
 
 1. Explicit current Owner direction.
