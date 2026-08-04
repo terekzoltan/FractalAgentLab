@@ -1,8 +1,24 @@
-# Private lab repo policy:
-# ops/ and private docs are local-only.
+# Private lab repo policy: private runtime and coordination material remains local.
 
-# Local coordination state
-/ops/
+# Local coordination state. Only the reviewed governance generation is durable.
+/ops/*
+!/ops/PROJECT_OVERLAY.md
+!/ops/PROJECT_STATE.md
+!/ops/Combined-Execution-Sequencing-Plan.md
+!/ops/roles/
+/ops/roles/*
+!/ops/roles/META.md
+!/ops/roles/DELIVERY.md
+!/ops/roles/REVIEW-GATE.md
+!/ops/roles/EVIDENCE.md
+!/ops/roles/ORCHESTRATOR.md
+!/ops/roles/CLOSEOUT.md
+!/ops/archive/
+/ops/archive/*
+!/ops/archive/INDEX.md
+!/ops/migration/
+/ops/migration/*
+!/ops/migration/FAL-MIG-P-STAGE-A.md
 
 # Private coordination docs
 /docs/private/
@@ -14,6 +30,15 @@ __pycache__/
 # Local runtime data
 /data/*
 !/data/.gitignore
+
+# Curated migration evidence only; raw evidence remains ignored.
+/evidence/*
+!/evidence/FAL-MIG-P/
+/evidence/FAL-MIG-P/*
+!/evidence/FAL-MIG-P/INDEX.md
+!/evidence/FAL-MIG-P/NO-DELETE-ATTESTATION.md
+!/evidence/COMPACT-V2/
+!/evidence/COMPACT-V2/**
 
 # UI generated outputs
 /ui/node_modules/
@@ -30,6 +55,26 @@ __pycache__/
 /.opencode-toolbox/
 /.opencode-tooling-snapshot/
 /tools/oc-session-router/
+!/tools/oc-session-router/
+/tools/oc-session-router/*
+!/tools/oc-session-router/README.md
+!/tools/oc-session-router/config/
+/tools/oc-session-router/config/*
+!/tools/oc-session-router/config/README.md
+!/tools/oc-session-router/config/compact-flow-event.schema.json
+!/tools/oc-session-router/config/compact-policy.schema.json
+!/tools/oc-session-router/docs/
+/tools/oc-session-router/docs/*
+!/tools/oc-session-router/docs/session-router-cheatsheet.md
+!/tools/oc-session-router/docs/workflow-orchestrator-reference.md
+!/tools/oc-session-router/docs/workflow-orchestrator-runbook.md
+!/tools/oc-session-router/scripts/
+/tools/oc-session-router/scripts/*
+!/tools/oc-session-router/scripts/invoke-session-compact-flow.ps1
+!/tools/oc-session-router/scripts/resolve-compact-policy.ps1
+!/tools/oc-session-router/scripts/session-compact-flow-core.ps1
+!/tools/oc-session-router/scripts/test-global-compact-candidate.ps1
+!/tools/oc-session-router/scripts/test-session-compact-flow.ps1
 
 # Local generated architecture intelligence outputs
 /docs/architecture/

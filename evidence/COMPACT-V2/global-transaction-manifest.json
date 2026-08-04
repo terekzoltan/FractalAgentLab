@@ -1,0 +1,69 @@
+{
+  "schema_version": "compact-v2-global-transaction/v1",
+  "candidate_id": "compact-v2-global-16c13cc15ea12137",
+  "candidate_manifest_sha256": "16c13cc15ea121376f466c7538b75656224002c0a23407c63567ae3395485118",
+  "baseline_manifest_sha256": "d7de219af33a8b93c18072e8d6ca9f5848065a4a756cb7c121d367d9efc909e7",
+  "canon_interface_manifest_sha256": "ce399cc626d7833e7f2a3de3447975ab0d027bdd6dd94139a557dbf51f9db2ec",
+  "canon_pack_digest": "69080ed3e17343637254de77cd6662c25ce6c7db95896904fd2355967f2f720b",
+  "adapter_manifest_sha256": "54c3b3773ed2043dbc6c2932188f6d80c3b6807b171c41b28046d32251fae912",
+  "live_root_class": "CURRENT_USER_OPENCODE_CONFIG",
+  "candidate_root": "data/migration-candidates/compact-v2-global-v1",
+  "baseline_root": "data/migration-baselines/compact-v2-global-v1",
+  "restart_required": true,
+  "snapshot_sync_required": true,
+  "operations": [
+    {
+      "operation": "REPLACE",
+      "path": "commands/after-compact.md",
+      "before_sha256": "84d6d1159d941c6db3dd9310c0cc8a14b40dfa5b66adbce9ebe266b4072aca61",
+      "after_sha256": "e143fae7a5e34dde77933cb9662c3ed81771bb8917ccaad3e4c2c923bda5b82d"
+    },
+    {
+      "operation": "REPLACE",
+      "path": "commands/fal-orchestrate-target.md",
+      "before_sha256": "d8c7b74c80c3bc5384ccb9bf4e1d2ed71850278e94cc24e87688c628af9dda69",
+      "after_sha256": "f6c057bd989420f6d752d303b4caf77c76e389f5f6ccb1af313cf87fa50cd3a5"
+    },
+    {
+      "operation": "REPLACE",
+      "path": "commands/wave-start.md",
+      "before_sha256": "e438be9175fe37fbc8592e41c1c94d06aec7ccf1d8905c0ef20ed04684ac82b8",
+      "after_sha256": "4c1cab4c2a20daaa7ea92f27712e6663da9c060407cdc54f06949d750a26e881"
+    },
+    {
+      "operation": "REPLACE",
+      "path": "skills/closeout-commit/SKILL.md",
+      "before_sha256": "13f7f615c7674dbb05b6a230093cb9c6bddbff66d6b12deffb6433391efbb23e",
+      "after_sha256": "982c537fef4529b36fcb77120346ad5fd3b4592eb7fecc7e7593370b0985e08f"
+    },
+    {
+      "operation": "REPLACE",
+      "path": "skills/context-onboarding/SKILL.md",
+      "before_sha256": "698c31dc6c1ca15ba5daeb729f97b19c5318e77d44c055bb977a4009ab2e1131",
+      "after_sha256": "d9f36a4bce93eeab208a2848a4639197852b7330fb2b7a6d23d752057f3e2b40"
+    },
+    {
+      "operation": "REPLACE",
+      "path": "skills/context-restore/SKILL.md",
+      "before_sha256": "30d2bf80665c644a6dd15fee106375c59f419c255337174b18077f51143cfa69",
+      "after_sha256": "9d7d6788d671bc5e86b868e68447e3f0a91f83e7a01fae8228adc171feb60adc"
+    },
+    {
+      "operation": "REPLACE",
+      "path": "skills/fal-orchestrate-target/SKILL.md",
+      "before_sha256": "c814c3951bb014dcf16bbc62a11cf9d694693fa134b1bc13e190ff3608334ade",
+      "after_sha256": "4fdececad4a10624ec4f13245a21fc13f3fc3725795700b01e9982dc558772a3"
+    },
+    {
+      "operation": "CREATE",
+      "path": "workflow-compact-policy.json",
+      "before_sha256": "ABSENT",
+      "after_sha256": "d7689a48632ec29eee563b29b50bb381fc2cb182744b1eeba5bb6b905fec290c"
+    }
+  ],
+  "rollback": {
+    "replace_rule": "Restore archived before bytes only when current live hash equals the operation after_sha256.",
+    "create_rule": "Remove the created policy only when the journal proves this transaction created it and current live hash equals after_sha256.",
+    "drift_rule": "Any other current hash blocks rollback and preserves all files for diagnosis."
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fractal-agent-lab.local/compact-policy.schema.json",
+  "title": "FAL Compact V2 policy",
+  "type": "object",
+  "properties": {
+    "schema_version": { "const": "1" },
+    "contract": { "const": "opencode-compact-policy/v1" },
+    "scope": { "enum": ["global", "project_override"] },
+    "mode": { "enum": ["auto_safe", "recommend", "ask", "disabled"] },
+    "checks": {
+      "type": "array",
+      "items": { "enum": ["before_dispatch", "after_stage_output", "epic_closeout"] },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "warn_ratio": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+    "critical_ratio": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+    "compact_warn_at_first_safe_boundary": { "type": "boolean" },
+    "block_long_stage_at_critical": { "type": "boolean" },
+    "compact_epic_participants_after_closeout": { "type": "boolean" },
+    "safe_boundary_required": { "type": "boolean" },
+    "maximum_retry_count": { "type": "integer", "minimum": 0, "maximum": 1 },
+    "project_override": { "const": "tighten_only" },
+    "excluded_role_profiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stableId" },
+      "uniqueItems": true
+    },
+    "required_gates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stableId" },
+      "uniqueItems": true
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "schema_version",
+        "contract",
+        "scope",
+        "mode",
+        "checks",
+        "warn_ratio",
+        "critical_ratio",
+        "compact_warn_at_first_safe_boundary",
+        "block_long_stage_at_critical",
+        "compact_epic_participants_after_closeout",
+        "safe_boundary_required",
+        "maximum_retry_count",
+        "project_override"
+      ],
+      "properties": { "scope": { "const": "global" } }
+    },
+    {
+      "required": ["schema_version", "contract", "scope"],
+      "properties": { "scope": { "const": "project_override" } },
+      "anyOf": [
+        { "required": ["mode"] },
+        { "required": ["checks"] },
+        { "required": ["warn_ratio"] },
+        { "required": ["critical_ratio"] },
+        { "required": ["compact_warn_at_first_safe_boundary"] },
+        { "required": ["block_long_stage_at_critical"] },
+        { "required": ["compact_epic_participants_after_closeout"] },
+        { "required": ["safe_boundary_required"] },
+        { "required": ["maximum_retry_count"] },
+        { "required": ["excluded_role_profiles"] },
+        { "required": ["required_gates"] }
+      ]
+    }
+  ],
+  "$defs": {
+    "stableId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" }
+  },
+  "additionalProperties": false
+}

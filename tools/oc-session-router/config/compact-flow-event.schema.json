@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fractal-agent-lab.local/compact-flow-event.schema.json",
+  "title": "FAL Compact V2 flow event",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "contract",
+    "event_id",
+    "event_type",
+    "boundary_id",
+    "project_id",
+    "wave_id",
+    "epic_id",
+    "workflow_phase",
+    "state_revision",
+    "candidate_identity",
+    "configuration_identity",
+    "combined_row_identity",
+    "safe_boundary",
+    "duplicate_send_disposition",
+    "satisfied_gates",
+    "participants",
+    "created_utc"
+  ],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "contract": { "const": "compact-flow-event/v1" },
+    "event_id": { "$ref": "#/$defs/stableId" },
+    "event_type": { "enum": ["before_dispatch", "after_stage_output", "epic_closeout"] },
+    "boundary_id": { "$ref": "#/$defs/stableId" },
+    "project_id": { "$ref": "#/$defs/stableId" },
+    "wave_id": { "$ref": "#/$defs/identity" },
+    "epic_id": { "$ref": "#/$defs/identity" },
+    "workflow_phase": { "$ref": "#/$defs/workflowPhase" },
+    "state_revision": { "$ref": "#/$defs/identity" },
+    "candidate_identity": { "$ref": "#/$defs/identity" },
+    "worktree_identity": { "$ref": "#/$defs/identity" },
+    "configuration_identity": { "$ref": "#/$defs/identity" },
+    "combined_row_identity": { "$ref": "#/$defs/identity" },
+    "sender_logical_ref": { "$ref": "#/$defs/logicalSessionRef" },
+    "recipient_logical_ref": { "$ref": "#/$defs/logicalSessionRef" },
+    "safe_boundary": { "$ref": "#/$defs/safeBoundary" },
+    "duplicate_send_disposition": { "enum": ["SETTLED", "NO_SEND", "MANUAL_COMPACT_RECORDED", "UNRESOLVED"] },
+    "satisfied_gates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/stableId" }
+    },
+    "stage_artifact": { "$ref": "#/$defs/stageArtifact" },
+    "closeout": { "$ref": "#/$defs/closeout" },
+    "host_attestation": { "$ref": "#/$defs/hostAttestation" },
+    "participants": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/participant" }
+    },
+    "manual_compact_participants": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/logicalSessionRef" }
+    },
+    "unresolved_blocker_codes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/stableId" }
+    },
+    "triggered_reference_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/stableId" }
+    },
+    "created_utc": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event_type": { "const": "before_dispatch" } } },
+      "then": { "required": ["sender_logical_ref", "recipient_logical_ref"] }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "after_stage_output" } } },
+      "then": { "required": ["stage_artifact"] }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "epic_closeout" } } },
+      "then": { "required": ["closeout"] }
+    }
+  ],
+  "$defs": {
+    "stableId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+    "logicalSessionRef": {
+      "allOf": [
+        { "$ref": "#/$defs/stableId" },
+        { "not": { "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" } }
+      ]
+    },
+    "identity": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@+~-]*$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "relativePath": { "type": "string", "minLength": 1, "pattern": "^(?!.*:)(?![A-Za-z]:[\\/])(?![\\/])(?!.*(?:^|[\\/])\\.\\.(?:[\\/]|$)).+$" },
+    "command": { "type": "string", "pattern": "^/[a-z0-9][a-z0-9-]*$", "maxLength": 128 },
+    "workflowPhase": {
+      "enum": ["NOT_STARTED", "SEQ_NEXT", "PLAN_REVIEW", "PLAN_REVISION", "IMPLEMENT", "STEP_REVIEW", "REVIEW_RESPONSE", "FIX_PLAN_REVIEW", "FIX_PLAN_REVISION", "FIX_IMPLEMENT", "CLOSEOUT", "COMPLETE"]
+    },
+    "safeBoundary": {
+      "type": "object",
+      "required": ["stage_output_complete", "stage_output_classified", "stage_artifact_pinned", "stage_artifact_hash_verified", "state_combined_agree", "participant_idle", "no_unresolved_question", "route_exact", "transport_settled", "prior_compact_certain"],
+      "properties": {
+        "stage_output_complete": { "type": "boolean" },
+        "stage_output_classified": { "type": "boolean" },
+        "stage_artifact_pinned": { "type": "boolean" },
+        "stage_artifact_hash_verified": { "type": "boolean" },
+        "state_combined_agree": { "type": "boolean" },
+        "participant_idle": { "type": "boolean" },
+        "no_unresolved_question": { "type": "boolean" },
+        "route_exact": { "type": "boolean" },
+        "transport_settled": { "type": "boolean" },
+        "prior_compact_certain": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "routeInput": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "enum": ["PINNED_ARTIFACT", "EXACT_EMPTY", "NOT_APPLICABLE"] },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "logical_identity": { "$ref": "#/$defs/identity" }
+      },
+      "oneOf": [
+        {
+          "properties": { "mode": { "const": "PINNED_ARTIFACT" } },
+          "required": ["path", "sha256", "logical_identity"]
+        },
+        {
+          "properties": { "mode": { "enum": ["EXACT_EMPTY", "NOT_APPLICABLE"] } },
+          "not": {
+            "anyOf": [
+              { "required": ["path"] },
+              { "required": ["sha256"] },
+              { "required": ["logical_identity"] }
+            ]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "participant": {
+      "type": "object",
+      "required": ["logical_session_ref", "profile_id", "role_hint", "participation_class", "compact_order", "resume_mode", "expected_next_actor", "expected_next_command", "route_input"],
+      "properties": {
+        "logical_session_ref": { "$ref": "#/$defs/logicalSessionRef" },
+        "profile_id": { "$ref": "#/$defs/stableId" },
+        "role_hint": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[A-Za-z0-9][A-Za-z0-9 .-]*$" },
+        "participation_class": { "enum": ["DELIVERY", "REVIEW_SUPPORT", "META_ORCHESTRATOR"] },
+        "compact_order": { "type": "integer", "minimum": 1 },
+        "resume_mode": { "enum": ["AUTO_RESUME", "HYDRATE_ONLY"] },
+        "expected_next_actor": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[A-Za-z0-9][A-Za-z0-9 .-]*$" },
+        "expected_next_command": { "oneOf": [{ "$ref": "#/$defs/command" }, { "const": "NONE" }] },
+        "selected_command_identity": { "$ref": "#/$defs/sha256" },
+        "route_input": { "$ref": "#/$defs/routeInput" }
+      },
+      "additionalProperties": false
+    },
+    "stageArtifact": {
+      "type": "object",
+      "required": ["path", "sha256", "logical_identity"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "logical_identity": { "$ref": "#/$defs/identity" }
+      },
+      "additionalProperties": false
+    },
+    "closeout": {
+      "type": "object",
+      "required": ["receipt_path", "receipt_identity", "routing_verdict"],
+      "properties": {
+        "receipt_path": { "$ref": "#/$defs/relativePath" },
+        "receipt_identity": { "$ref": "#/$defs/sha256" },
+        "routing_verdict": { "const": "CLOSED" }
+      },
+      "additionalProperties": false
+    },
+    "hostAttestation": {
+      "type": "object",
+      "required": ["opencode_version", "opencode_launcher_identity", "command_registry_identity"],
+      "properties": {
+        "opencode_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "opencode_launcher_identity": { "$ref": "#/$defs/sha256" },
+        "command_registry_identity": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
