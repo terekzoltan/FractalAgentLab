@@ -1,6 +1,6 @@
 # FractalAgentLab Combined Execution Sequencing Plan
 
-**Status:** active compact sequencing authority
+**Status:** active cross-project recovery maintenance authority
 **Project:** FractalAgentLab private control/evidence plane
 **Owner:** Project Owner + FAL Meta Coordinator
 **Canon:** external `../Agent-Workflow-Canon`
@@ -53,9 +53,18 @@ Closing these assignments does not activate Wave 8, authorize target work, or er
 |---|---|---|---|---|---|---|---|
 | 10 | `FAL-MIG-P` Canon Reference, Hydration Adoption, and Repository Simplification Stage A | Meta / `GOVERNANCE` | verified CANON-HYDRATION handoff | accepted additive/no-delete generation, privacy and rollback proof, independent review, exact apply | READY | CLOSED / COMPLETE | Compact V2 may open separately; no Wave 8 activation |
 | 20 | `COMPACT-V2` Seamless Context Compact V2 | Compact V2 Workflow Maintainer / `SPECIALIST_DELIVERY` / `COMPACT-V2-MAINTAINER`; FAL Track D was a bounded post-Canon adapter contributor | FAL-MIG-P Stage A closed; Canon, adapter, global candidate, review, apply/restart, live/snapshot, rollback, privacy, protected-scope, and no-side-effect gates agree | T23 release index `PASS`; T24 closeout `compact-v2-closeout-16c13cc15ea1-dc1ecffd215b`; Canon `2.1.0` release readiness `READY`; current docs/test adapter `compact-v2-adapter-40a911d0abebdfb8`; applied global `compact-v2-global-16c13cc15ea12137`; snapshot `opencode-tooling-compact-v2-20260803T213256Z-16c13cc15ea1` | READY | CLOSED / COMPLETE | Target projects may resume under their own authority after fresh registry proof for any pre-apply server; FAL routes separately to W8-A; live pilot remains separately Owner-gated |
+| 25 | `ACTIVE-ROUTE-COMPACT` | Compact V2 Workflow Maintainer / `SPECIALIST_DELIVERY` / `COMPACT-V2-MAINTAINER`; Meta owns governance reconciliation only | Owner-accepted plan `awc-active-route-compact-v1-owner-20260805`; all affected workflow and compact operations frozen | Cross-Project Active Route And Non-Dispatch Compact Recovery: static Canon enrollment, target-local generated `ACTIVE_ROUTE`, canonical writer/verifier, fail-closed telemetry, policy parity, non-dispatch `ROUTE_READY`, offline target migration evidence | READY | COMPLETE / OFFLINE_RELEASE_READY | global restart and generated snapshot closure complete; full offline tests pass; sole final review P2 evidence gap reconciled without code changes; enrollment stays `LEGACY_VALIDATED`, and no compact, lifecycle command, live pilot, commit, push, or remote side effect is opened |
+| 27 | `FAL-NATIVE-REVIEW-ADAPTER` | Track D / `TRACK`; Meta owns review semantics and final synthesis | AWC `3.1.0` native-review contract and explicit Owner migration instruction | FAL serial/parallel/fix-cycle router consumes one native Meta review envelope; strict AWC 3.1 final-synthesis classifier; no plugin-role/Swarm-session dependency; hot/cold docs and offline regression evidence | READY | COMPLETE / OFFLINE_VERIFIED | FAL adapter is migrated; stale global `/fal-orchestrate-target` wording remains a separate backup-first tooling follow-up; no live pilot or global apply authorized here |
+| 28 | `FAL-EXPLICIT-STAGE-ROUTER` | Track D / `TRACK`; current session had exact Owner-approved Track D-equivalent accountability; Meta owned final acceptance | final synthesis v10 GREEN/ALLOWED; exact Delivery ACK_ONLY; packaging amendment independently accepted | commit `781fc0d`; candidate `fal-explicit-stage-router-fix-b374ca4bc9b2f390`; runtime 89/89 plus all offline gates PASS; attestation tracked; credential-shaped cheatsheet assignment removed | READY | CLOSED / COMPLETE_OFFLINE / COMMITTED | W8-A may consume this exact accepted baseline; retained FSR-009/P0B/release gates remain closed |
 | 30 | `W8-A` Authority and Roadmap Reconciliation | Meta / `GOVERNANCE` | Compact V2 disposition recorded; post-migration state and worktree readable | one frontier, provenance and dirty-scope dispositions, `OPEN_W8` or `HOLD` | READY | PLANNED / READY_FOR_DECISION | W8-B/W8-F only after explicit `OPEN_W8`; target projects do not wait on this FAL-only decision |
 
-The `COMPACT-V2` side lifecycle does not pre-approve W8-A. W8-A remains the only Wave 8 activation gate.
+`ACTIVE-ROUTE-COMPACT` is corrective maintenance and does not pre-approve W8-A.
+`FAL-EXPLICIT-STAGE-ROUTER` is separately Owner-opened pre-Wave maintenance. It
+owns command runtime, operation/authority state, response correlation, and legacy
+sender cutover. W8-A must pin its accepted closeout identity; W8-E may consume it
+for event-adapter and protected-sync integration but must not create a competing
+lifecycle command runtime.
+W8-A remains the only Wave 8 activation gate.
 
 ## 4. Compact V2 Frozen Direction
 
@@ -67,7 +76,9 @@ The Owner-approved design input requires:
 - a target-local ignored V2 boundary manifest without raw session, endpoint, transcript, or machine-root data;
 - one private idempotency ledger and canonical server summarize transport;
 - automatic `/after-compact <role>` and confidence/action classification;
-- `VERIFIED` or `SUFFICIENT` auto-resume only when the exact route input exists;
+- `VERIFIED` or `SUFFICIENT` route readiness only when the exact route input exists;
+- terminal `ROUTE_READY` with `command_sent: false`; compact never dispatches a
+  project workflow command;
 - route-scoped `PROOF_REQUIRED` for missing input;
 - hard blocking only for safety, identity, authority, privacy, duplicate-send, or uncertain compact-result conflicts;
 - one exact global approval, backup-first apply, Owner restart, fresh registry verification, and Canon snapshot synchronization.
@@ -96,17 +107,19 @@ No planning-document existence, Compact V2 completion, or current target develop
 - Keep Stage B file moves, archive retirement, and deletions unopened.
 - Keep root Python/core CI and coverage hard gates closed until their named reviewed command/dependency policy exists.
 - Keep full generic `/fal-orchestrate-target`, unrelated automatic dispatch, target implementation, public output, HUB implementation, commit/push automation, PR/merge/deploy, and publication closed until named future gates.
-- RingFall, WorldSim, and TriageCI continue only under their own current state/Combined authority; current work is not automatic FAL trial evidence.
+- FAL, WorldSim, RingFall, and TriageCI workflow progression and every compact
+  operation remain frozen until `ACTIVE-ROUTE-COMPACT` implementation and offline
+  verification close. Any later live pilot requires a separate Owner gate.
 
 ## 7. Current Operational Order
 
-1. Freeze and review the separate `COMPACT-V2` implementation Epic and dependency-closure matrix.
-2. Implement and independently review the Canon contract before the router adapter consumes it.
-3. Implement the narrow tracked FAL adapter without touching protected router/FAL-sync hunks.
-4. Build the exact global tooling candidate without live mutation.
-5. Obtain one candidate-bound Owner approval, apply backup-first, stop for Owner restart, and verify fresh discovery plus snapshot identity.
-6. Close Compact V2 only after candidate/live/snapshot identity, deterministic flow tests, privacy, idempotency, rollback, and state reconciliation pass.
-7. Return to W8-A only through a separate Meta reconciliation; otherwise remain `HOLD`.
+1. Preserve every historical RED candidate and synthesis as immutable evidence.
+2. Preserve commit candidate `fal-explicit-stage-router-fix-b374ca4bc9b2f390`, its reviewed packaging amendment, final synthesis v10, and exact Delivery `ACK_ONLY` as the position-28 closeout baseline.
+3. No further lifecycle action belongs to this closed Epic.
+4. Any later release or integration work must open under its own authority.
+5. Never touch the seven Owner-canonical Compact Lite paths or attribute them to Track D.
+6. Keep P0B, live dispatch, target work, protected mutations, restart, global apply, staging, commit, push, and remote effects closed until separately authorized.
+7. Return to W8-A only after this maintenance disposition is recorded; otherwise remain `HOLD`.
 
 ## 8. Wave Gate Law
 
