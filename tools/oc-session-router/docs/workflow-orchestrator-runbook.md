@@ -40,17 +40,37 @@ Delivery /seq-next
 
 ## Transport law
 
+- Use `scripts/Invoke-OCRouter.ps1` as the sole lifecycle command entrypoint.
+  Create one immutable run, then invoke exactly one explicit stage. The router
+  returns allowed-next metadata and stops; the Orchestrator chooses any later
+  stage in a separate transaction.
+- The launcher accepts only request/run/operation identities. Protected process
+  configuration supplies the runtime root and control registry; the engine, not
+  the request, resolves target authority, origin, recipient, sources, command, and
+  deterministic argument bytes.
+- The synchronous `/command` assistant response is the primary candidate. A
+  timeout or 5xx leaves the operation `UNCERTAIN`; `resolve-stage` is read-only and
+  cannot resend. Snapshot success remains disabled until installed-server
+  one-to-one correlation is proven by the separately Owner-gated P0B.
 - Invoke every known slash command through the command endpoint, excluding the leading slash.
-- Use ordinary messages only for the single literal `GO` control token and for returning the exact external `SWARM REVIEW RESULT` evidence block to Meta.
+- Native `/step-review` has no plain-message control token or external review-session handoff. Meta dispatches configured read-only reviewers through native Task calls inside the command stage.
 - Forward the exact pinned artifact body or an immutable resolvable pointer with identity and integrity proof; never replace it with a summary.
 - Hold one exclusive run lock. Persist an atomic, hash-bound pre-send intent before every dispatch and the returned receipt/message identity afterward. On resume, verify artifact hashes and strict output class; an unresolved pending intent stops for read-only reconciliation and is never auto-resent. Progress chatter is not a terminal artifact.
 - Never resend when delivery is ambiguous. Inspect run state/transcript read-only; if proof remains unavailable, stop.
 - Strict stage classification and diagnostic discovery are separate. A newer unclassified or progress-like assistant message may produce a diagnostic-only reconciliation record, but it is never selected, saved as stage authority, or routed. In the shared and standalone typed waits, a strict stage contract, not `MinOutputChars`, proves a terminal artifact.
-- A packet or wrapper command POST uses a bounded client wait and a durable pre-send intent. Timeout, client interruption, or another POST exception leaves the intent pending/delivery-uncertain and the packet in place. Reconcile from the recorded raw baseline; never treat the exception as proof of non-delivery or permission to resend.
+- Legacy packet, serial, parallel, review-fix, latest-output routing, message,
+  question, polling, and resume scripts are historical fail-closed surfaces. They
+  cannot be used as an alternate sender or recovery path.
 
-## Risk-selected review
+## Native risk-selected review
 
-Use the smallest evidence topology covering actual risk: `quick` is direct Meta; `focused` uses one typed lane; `standard` uses up to three; `high_risk` uses up to four and may use bounded Swarm; `deep`/`audit` use five; `wide` uses seven; `custom` names its lanes. Five-to-seven lanes or full/adaptive Swarm require a resolvable Owner-approval receipt bound to target/Epic, candidate, profile, depth, and lanes; pin its path/identity and hash in run state and revalidate it on resume. Project identity and fix-cycle number are signals, never topology authority. Recompute risk from the frozen candidate and unresolved findings on every cycle. Swarm is advisory and emits exactly one lane verdict: `APPROVE`, `APPROVE WITH FIXES`, or `BLOCK`; Meta alone emits `FINAL STEP REVIEW SYNTHESIS`.
+The Orchestrator freezes the candidate and supplies only the review envelope: target/Epic/lane identity, acceptance and evidence pointers, actual risk, budget policy, assignment cap, requested domains if any, and an exact Owner override when present. Meta owns routing and chairing: it selects domain-plus-generic-profile assignments, launches native read-only Task reviewers, inspects their receipts, and emits the sole `FINAL STEP REVIEW SYNTHESIS`.
+
+Use the smallest sufficient current Canon shape: `META_ONLY` 0, `FOCUSED` 1-2, `STANDARD` 2-3, `DEEP` 4-5, or `WIDE` 6-7. `EXPANDED_AUDIT` 8-10 requires an exact candidate-bound Owner envelope; more than ten is invalid. `conserve`, `balanced`, `quality_first`, and `exact` constrain optional coverage but never lower a mandatory safety floor. Legacy `quick|focused|standard|high_risk|deep|audit|wide|custom` values are shape aliases only; they do not name reviewers or authorize a topology.
+
+New assignments use one primary and at most two compatible secondary review domains plus one verified generic profile from the live 11-profile roster. Do not pre-register reviewer names through a plugin, call a lane launcher, use `review-sol-pro`, silently substitute a model, or uniformly weaken reviewers merely because fan-out grew. A missing required profile gets one declared compatible fallback with a recorded deviation or the stage returns `BLOCKED`.
+
+Each assignment receipt binds assignment ID, domains, question, candidate, agent/model/effort, effective status, evidence, findings, limitations, and fallback/deviation. Final synthesis must use the current Canon `Review routing:` field and account for every surfaced finding. Historical `.swarm` artifacts are cold provenance only; never replay their prompt, `GO`, result, or session frontier.
 
 ## FAL checkpoint separation
 
@@ -64,25 +84,64 @@ On abnormal identity, transport, auth, duplicate-send, or output-class state: fr
 
 When a strict classifier rejects a newer assistant output, inspect its diagnostic record and exact transcript message. If the producer violated the canonical schema, repair that envelope through the saved wrapper state only. If the output is canonical but the classifier disagrees, freeze routing and use `/workflow-fix`; do not insert an extra lifecycle stage or bypass the wrapper's pending intent with generic packet routing.
 
-Compact V2 is fluidity-first and event-driven, not a watchdog. The read-only
-`session-context-status.ps1` report never authorizes mutation; the separately
-reviewed policy adapter may act only at `before_dispatch`, `after_stage_output`,
-or `epic_closeout` with a complete target-owned event and safe-boundary proof.
-`normal` and ordinary `unknown` continue. `warn` waits for the first safe boundary;
-`critical` prevents a new long stage until compact or a human route; `over_limit`
-permits bounded recovery only. Accepted closeout processes actual participants in
-Delivery, review/support, then Meta/Orchestrator order.
+For the explicit-stage runtime, repair means a new target-authoritative artifact
+and a later explicit operation after state revalidation. Never edit operation
+state, replay a legacy wrapper, or substitute compact/latest-output text.
 
-The adapter persists one intent before canonical server summarize, accepts only
-one attributable new compaction marker, and treats timeout, competing marker or
-intent, and ambiguous resume delivery as `UNCERTAIN` without blind retry. Manual
-compact is recorded and never repeated for the same participant/boundary. After a
-verified marker it runs target-first Canon hydration; only verifier `PASS`, exact
-route input, current command identity, parent-session safety, and settled
-duplicate-send state permit automatic resume. Summaries remain orientation only.
+Compact Lite is the sole active automatic compact path. Invoke
+`invoke-session-compact-lite.ps1` only at `before_dispatch`, `after_stage_output`,
+or `epic_closeout`. It requires policy-selected pressure, participant `idle`,
+summarize availability, and no participant-scoped pending or uncertain lifecycle
+or compact intent. It persists one minimal intent, requires one attributable
+marker, invokes `/after-compact <project-id> <role>` once, accepts `RESTORED` or `DEGRADED`, and
+stops with `workflow_command_sent: false`. Timeout or ambiguous marker state is
+`COMPACT_UNCERTAIN` without blind retry. State/Combined/stage identities, route
+input, Active Route, capsules, command identity, and hydration budget are not gates.
+
+Retained Compact V2 reference: the active-route writer/verifier consumes only the static Canon profile locators
+plus current target state, the state-selected Combined span, and the state-pinned
+artifact. `VERIFY` is read-only; `WRITE` uses a flushed same-directory temporary
+file and publishes `ACTIVE_ROUTE.json` last. Caller/event fields are expectations,
+not alternate truth. A source, generation, path, worktree, privacy, schema, or
+optimistic-concurrency mismatch blocks and preserves the prior valid manifest.
+Receipts contain only target-relative paths and sanitized source identities.
+Enrollment must first add the exact target-state labels `Combined selector`,
+`Pinned artifact`, `Pinned artifact SHA-256`, `Pinned artifact logical identity`,
+`Next actor`, and `Next command`, plus the existing state revision, Wave, Epic,
+phase, candidate, and configuration labels. The static Canon profile must expose
+`authority_locators` and `active_route_locator`. Missing migration labels or
+locators block; the writer never infers them from the event, old manifest,
+capsule, summary, router state, or FAL mirror.
+
+The retained V2 compact adapter resolves one effective policy identity and warning/critical
+ratio pair, passes all three into telemetry, and blocks if the telemetry report
+does not repeat them exactly. A valid status-map omission proves `idle` only when
+the target has one valid router mapping and direct target-session lookup succeeds;
+mapping, status-map, 404, and required-telemetry failures remain distinct,
+redacted fail-closed results.
+
+Before a retained V2 non-dry compact capsule is persisted, the adapter verifies the event's
+active-route generation and state/Combined/stage source hashes. The event must
+also bind the fresh command-registry identity and exact `/after-compact` command
+identity; both are reverified before preflight and immediately before the sole
+command POST. Missing or changed identity blocks without sending. It then persists
+one summarize intent, accepts only one attributable new compaction marker, and
+treats timeout, competing marker or intent, and ambiguous hydration delivery as
+`UNCERTAIN` without blind retry. Manual compact is recorded and never repeated for
+the same participant/boundary. After one verified marker it runs target-first
+Canon hydration, sends only `/after-compact <project-id> <role>`, verifies that report against
+the direct Canon result, persists `ROUTE_READY` with `command_sent: false`, and
+stops. Compatibility parsing may accept Canon `AUTO_RESUME`, but compact never
+sends `/seq-next`, `/implement`, `/terv-review`, `/step-review`, or another
+workflow-stage command. A later explicit continue is a separate transaction that
+must re-read all authority and duplicate-send state. Summaries remain orientation
+only.
+
+`invoke-session-compact-flow.ps1`, its event schema, capsules, Active Route, and
+route-ready output are reference-only. No active Orchestrator route invokes them.
 
 ## Closeout and cold references
 
 After exact `ACK_ONLY`, `/closeout-commit` may apply only synthesis-enumerated governance/closeout deltas, verify and stage explicit target paths, and commit without push. Behavior-changing source, tests, config, runbooks, commands, skills, and policy must already be in the frozen reviewed candidate. Target and FAL transactions remain separate.
 
-Open `workflow-orchestrator-reference.md` selectively for: command/control-token mechanics; stage-aware output selection; ACK and compact guards; wrapper/runtime artifacts; parallel lanes; legacy compatibility; incident workarounds; or worked examples. See `../config/README.md` only when adding target review profiles or approval receipts. Canon role, output, hydration, recovery, closeout, and FAL-adapter runbooks override contradictory cold legacy text.
+Open `workflow-orchestrator-reference.md` selectively for: stage-aware output selection; native review envelopes and receipts; wrapper/runtime artifacts; parallel lanes; legacy-frontier blocking; ACK and compact guards; or incident recovery. See `../config/README.md` only when adding target review-domain mappings or exact Owner budget envelopes. Canon role, output, hydration, recovery, closeout, and FAL-adapter runbooks override contradictory cold legacy text.

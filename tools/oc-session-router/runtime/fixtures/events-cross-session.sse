@@ -1,0 +1,5 @@
+event: message.updated
+data: {"sessionID":"foreign-session","type":"tool","payload":"must-not-persist"}
+
+event: session.idle
+data: {"sessionID":"session-fixture"}

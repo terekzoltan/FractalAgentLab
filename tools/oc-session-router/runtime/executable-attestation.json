@@ -1,0 +1,12 @@
+{
+  "schema_version": "router-executable-attestation.v2",
+  "node_executable_path": "C:\\Program Files\\nodejs\\node.exe",
+  "node_executable_sha256": "7447c4ece014aa41fb2ff866c993c708e5a8213a00913cc2ac5049ea3ffc230d",
+  "git_executable_path": "C:\\Program Files\\Git\\cmd\\git.exe",
+  "git_executable_sha256": "054dfe58df35f7fcfbae184ff9d6a7c0da1e3743bf0401d951e012e290217c73",
+  "compiled_entry_path": "dist/src/cli.js",
+  "compiled_entry_sha256": "c5298bc9bcab660e9cecc69c7d91142396207ff1e0c407fbed0a6c9af7cc2ef4",
+  "compiled_manifest_sha256": "305a7586904eda54fe9d41b9ca14f469dbceb6fcfdee38f4be9348751d9b8273",
+  "source_manifest_identity": "fal-explicit-stage-router-source-v6",
+  "source_manifest_sha256": "11d2d90f0e9e81ca55f1ae3b5721e62ede770c53cee0d603207d74fd93de87c4"
+}

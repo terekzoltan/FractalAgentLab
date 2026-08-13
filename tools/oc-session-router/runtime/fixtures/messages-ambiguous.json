@@ -1,0 +1,1 @@
+[{"id":"assistant-1","parent_id":"user-send-1","session_id":"session-fixture","text":"META PLAN REVIEW\nOverall verdict: GREEN","after_baseline":true},{"id":"assistant-2","parent_id":"user-send-1","session_id":"session-fixture","text":"META PLAN REVIEW\nOverall verdict: RED","after_baseline":true}]
