@@ -27,17 +27,18 @@ namespace CompactFlow
 
             internal void ParseDocument()
             {
-                SkipWhitespace(); ParseValue(); SkipWhitespace();
+                SkipWhitespace(); ParseValue(0); SkipWhitespace();
                 if (index != text.Length) Fail("Unexpected trailing JSON content");
             }
 
-            private void ParseValue()
+            private void ParseValue(int depth)
             {
+                if (depth > 64) Fail("JSON nesting exceeds 64 levels");
                 SkipWhitespace();
                 if (index >= text.Length) Fail("Unexpected end of JSON");
                 char current = text[index];
-                if (current == '{') { ParseObject(); return; }
-                if (current == '[') { ParseArray(); return; }
+                if (current == '{') { ParseObject(depth); return; }
+                if (current == '[') { ParseArray(depth); return; }
                 if (current == '"') { ParseString(); return; }
                 if (current == 't') { ParseLiteral("true"); return; }
                 if (current == 'f') { ParseLiteral("false"); return; }
@@ -46,7 +47,7 @@ namespace CompactFlow
                 Fail("Invalid JSON value");
             }
 
-            private void ParseObject()
+            private void ParseObject(int depth)
             {
                 Expect('{'); SkipWhitespace();
                 HashSet<string> keys = new HashSet<string>(StringComparer.Ordinal);
@@ -55,19 +56,19 @@ namespace CompactFlow
                 {
                     SkipWhitespace(); string key = ParseString();
                     if (!keys.Add(key)) Fail("Duplicate JSON object member '" + key + "'");
-                    SkipWhitespace(); Expect(':'); ParseValue(); SkipWhitespace();
+                    SkipWhitespace(); Expect(':'); ParseValue(depth + 1); SkipWhitespace();
                     if (Consume('}')) return;
                     Expect(',');
                 }
             }
 
-            private void ParseArray()
+            private void ParseArray(int depth)
             {
                 Expect('['); SkipWhitespace();
                 if (Consume(']')) return;
                 while (true)
                 {
-                    ParseValue(); SkipWhitespace();
+                    ParseValue(depth + 1); SkipWhitespace();
                     if (Consume(']')) return;
                     Expect(',');
                 }
@@ -220,6 +221,14 @@ namespace CompactFlow
 
     public static class FileHandleGuard
     {
+        private const uint FileListDirectory = 0x0001;
+        private const uint FileShareReadWrite = 0x00000003;
+        private const uint OpenExisting = 3;
+        private const uint FileFlagBackupSemantics = 0x02000000;
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFile(string fileName, uint desiredAccess, uint shareMode, IntPtr securityAttributes, uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
+
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern uint GetFinalPathNameByHandle(SafeFileHandle handle, StringBuilder path, uint pathLength, uint flags);
 
@@ -241,9 +250,34 @@ namespace CompactFlow
             if (!GetFileInformationByHandle(handle, out information)) throw new Win32Exception(Marshal.GetLastWin32Error());
             return information.NumberOfLinks;
         }
+
+        public static SafeFileHandle OpenDirectoryReadLocked(string path)
+        {
+            SafeFileHandle handle = CreateFile(path, FileListDirectory, FileShareReadWrite, IntPtr.Zero, OpenExisting, FileFlagBackupSemantics, IntPtr.Zero);
+            if (handle == null || handle.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
+            return handle;
+        }
     }
 }
 '@
+}
+
+function Open-CompactFlowDirectoryGuard {
+  param([string]$Path)
+  Initialize-CompactFlowFileHandleGuard
+  $ExpectedPath = [IO.Path]::GetFullPath($Path).TrimEnd([char[]]@('\','/'))
+  $Item = Get-Item -LiteralPath $ExpectedPath -Force
+  if ($Item -isnot [IO.DirectoryInfo] -or ($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Output parent must be an ordinary directory.' }
+  $Handle = [CompactFlow.FileHandleGuard]::OpenDirectoryReadLocked($ExpectedPath)
+  try {
+    $FinalPath = [CompactFlow.FileHandleGuard]::GetFinalPath($Handle)
+    if ($FinalPath.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) { $FinalPath = '\\' + $FinalPath.Substring(8) }
+    elseif ($FinalPath.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) { $FinalPath = $FinalPath.Substring(4) }
+    $FinalPath = [IO.Path]::GetFullPath($FinalPath).TrimEnd([char[]]@('\','/'))
+    if (-not $FinalPath.Equals($ExpectedPath, [StringComparison]::OrdinalIgnoreCase)) { throw 'Output parent handle resolves to a different directory.' }
+    return $Handle
+  }
+  catch { $Handle.Dispose(); throw }
 }
 
 function Assert-CompactFlowStrictJson {
@@ -346,13 +380,32 @@ function Get-CompactFlowCommandEntryIdentity {
 }
 
 function Read-CompactFlowStrictJsonFile {
-  param([string]$Path, [string]$Label)
+  param([string]$Path, [string]$Label, [ValidateRange(1, 1048576)][int]$MaximumBytes = 1048576)
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "$Label is missing." }
   $Item = Get-Item -LiteralPath $Path -Force
   if (($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "$Label cannot be a reparse point." }
-  $Text = [IO.File]::ReadAllText($Item.FullName, [Text.Encoding]::UTF8)
+  if ($Item.Length -gt $MaximumBytes) { throw "$Label exceeds the maximum byte size." }
+  $Stream = $null
+  try {
+    $Stream = [IO.File]::Open($Item.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    if ($Stream.Length -gt $MaximumBytes -or $Stream.Length -gt [int]::MaxValue) { throw "$Label exceeds the maximum byte size." }
+    $Bytes = New-Object byte[] ([int]$Stream.Length)
+    $Offset = 0
+    while ($Offset -lt $Bytes.Length) {
+      $Read = $Stream.Read($Bytes, $Offset, $Bytes.Length - $Offset)
+      if ($Read -le 0) { throw "$Label changed or ended during the bounded read." }
+      $Offset += $Read
+    }
+    if ($Stream.ReadByte() -ne -1) { throw "$Label changed during the bounded read." }
+  }
+  finally { if ($null -ne $Stream) { $Stream.Dispose() } }
+  $TextOffset = if ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF) { 3 } else { 0 }
+  $Text = (New-Object Text.UTF8Encoding($false, $true)).GetString($Bytes, $TextOffset, $Bytes.Length - $TextOffset)
   Assert-CompactFlowStrictJson -Text $Text -Label $Label
-  return [pscustomobject]@{ Value = ($Text | ConvertFrom-Json); Text = $Text; Path = $Item.FullName; Sha256 = (Get-CompactFlowFileSha256 -Path $Item.FullName) }
+  $Hasher = [Security.Cryptography.SHA256]::Create()
+  try { $Sha256 = ([BitConverter]::ToString($Hasher.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant() }
+  finally { $Hasher.Dispose() }
+  return [pscustomobject]@{ Value = ($Text | ConvertFrom-Json); Text = $Text; Path = $Item.FullName; Sha256 = $Sha256; Length = $Bytes.Length }
 }
 
 function Test-CompactFlowStableId {
@@ -482,8 +535,8 @@ function Resolve-CompactFlowPolicyObjects {
 
 function Assert-CompactFlowEvent {
   param($Event)
-  $Allowed = @('schema_version','contract','event_id','event_type','boundary_id','project_id','wave_id','epic_id','workflow_phase','state_revision','candidate_identity','worktree_identity','configuration_identity','combined_row_identity','sender_logical_ref','recipient_logical_ref','safe_boundary','duplicate_send_disposition','satisfied_gates','stage_artifact','closeout','host_attestation','participants','manual_compact_participants','unresolved_blocker_codes','triggered_reference_ids','created_utc')
-  $Required = @('schema_version','contract','event_id','event_type','boundary_id','project_id','wave_id','epic_id','workflow_phase','state_revision','candidate_identity','configuration_identity','combined_row_identity','safe_boundary','duplicate_send_disposition','satisfied_gates','participants','created_utc')
+  $Allowed = @('schema_version','contract','event_id','event_type','boundary_id','project_id','wave_id','epic_id','workflow_phase','state_revision','candidate_identity','worktree_identity','configuration_identity','combined_row_identity','sender_logical_ref','recipient_logical_ref','safe_boundary','duplicate_send_disposition','satisfied_gates','stage_artifact','closeout','host_attestation','active_route','participants','manual_compact_participants','unresolved_blocker_codes','triggered_reference_ids','created_utc')
+  $Required = @('schema_version','contract','event_id','event_type','boundary_id','project_id','wave_id','epic_id','workflow_phase','state_revision','candidate_identity','configuration_identity','combined_row_identity','safe_boundary','duplicate_send_disposition','satisfied_gates','host_attestation','participants','created_utc')
   Assert-CompactFlowExactProperties -Value $Event -Allowed $Allowed -Required $Required -Label 'compact event'
   if ([string]$Event.schema_version -cne '1' -or [string]$Event.contract -cne 'compact-flow-event/v1') { throw 'Compact event identity is invalid.' }
   if (-not (Test-CompactFlowStableId -Value $Event.event_id) -or -not (Test-CompactFlowStableId -Value $Event.boundary_id) -or -not (Test-CompactFlowStableId -Value $Event.project_id)) { throw 'Compact event stable identity is invalid.' }
@@ -503,9 +556,14 @@ function Assert-CompactFlowEvent {
     if ([string]$Event.stage_artifact.sha256 -cnotmatch '^[a-f0-9]{64}$') { throw 'stage_artifact sha256 is invalid.' }
   }
   if ($null -ne $Event.PSObject.Properties['closeout']) { Assert-CompactFlowExactProperties -Value $Event.closeout -Allowed @('receipt_path','receipt_identity','routing_verdict') -Required @('receipt_path','receipt_identity','routing_verdict') -Label 'compact event closeout' }
-  if ($null -ne $Event.PSObject.Properties['host_attestation']) {
-    Assert-CompactFlowExactProperties -Value $Event.host_attestation -Allowed @('opencode_version','opencode_launcher_identity','command_registry_identity') -Required @('opencode_version','opencode_launcher_identity','command_registry_identity') -Label 'compact event host_attestation'
-    if ([string]$Event.host_attestation.opencode_version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+$' -or [string]$Event.host_attestation.opencode_launcher_identity -cnotmatch '^[a-f0-9]{64}$' -or [string]$Event.host_attestation.command_registry_identity -cnotmatch '^[a-f0-9]{64}$') { throw 'host_attestation is invalid.' }
+  Assert-CompactFlowExactProperties -Value $Event.host_attestation -Allowed @('opencode_version','opencode_launcher_identity','command_registry_identity','after_compact_command_identity') -Required @('opencode_version','opencode_launcher_identity','command_registry_identity','after_compact_command_identity') -Label 'compact event host_attestation'
+  if ([string]$Event.host_attestation.opencode_version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+$' -or [string]$Event.host_attestation.opencode_launcher_identity -cnotmatch '^[a-f0-9]{64}$' -or [string]$Event.host_attestation.command_registry_identity -cnotmatch '^[a-f0-9]{64}$' -or [string]$Event.host_attestation.after_compact_command_identity -cnotmatch '^[a-f0-9]{64}$') { throw 'host_attestation is invalid.' }
+  if ($null -ne $Event.PSObject.Properties['active_route']) {
+    Assert-CompactFlowExactProperties -Value $Event.active_route -Allowed @('profile_id','generation_id','state_sha256','combined_sha256','stage_sha256') -Required @('profile_id','generation_id','state_sha256','combined_sha256','stage_sha256') -Label 'compact event active_route'
+    if (-not (Test-CompactFlowStableId -Value $Event.active_route.profile_id)) { throw 'active_route.profile_id is invalid.' }
+    foreach ($HashName in @('generation_id','state_sha256','combined_sha256','stage_sha256')) {
+      if ([string]$Event.active_route.$HashName -cnotmatch '^[a-f0-9]{64}$') { throw "active_route.$HashName is invalid." }
+    }
   }
   $Participants = @($Event.participants)
   if ($Participants.Count -eq 0) { throw 'Compact event requires at least one participant.' }
@@ -521,10 +579,10 @@ function Assert-CompactFlowEvent {
     if ([int]$Participant.compact_order -lt 1 -or $SeenOrders.ContainsKey([string]$Participant.compact_order)) { throw 'Participant compact_order is invalid or duplicated.' }
     $SeenOrders[[string]$Participant.compact_order] = $true
     if ([string]$Participant.participation_class -cnotin @('DELIVERY','REVIEW_SUPPORT','META_ORCHESTRATOR')) { throw 'Participant class is invalid.' }
-    if ([string]$Participant.resume_mode -cnotin @('AUTO_RESUME','HYDRATE_ONLY')) { throw 'Participant resume mode is invalid.' }
+    if ([string]$Participant.resume_mode -cnotin @('ROUTE_READY','AUTO_RESUME','HYDRATE_ONLY')) { throw 'Participant resume mode is invalid.' }
     if ([string]$Participant.role_hint -cnotmatch '^[A-Za-z0-9][A-Za-z0-9 .-]{0,79}$' -or [string]$Participant.expected_next_actor -cnotmatch '^[A-Za-z0-9][A-Za-z0-9 .-]{0,79}$') { throw 'Participant role or next-actor label is invalid.' }
     if ($null -ne $Participant.PSObject.Properties['selected_command_identity'] -and [string]$Participant.selected_command_identity -cnotmatch '^[a-f0-9]{64}$') { throw 'Participant selected_command_identity is invalid.' }
-    if ([string]$Participant.resume_mode -ceq 'AUTO_RESUME' -and ([string]$Participant.expected_next_command -cnotmatch '^/[a-z0-9][a-z0-9-]{0,126}$' -or [string]$Participant.selected_command_identity -cnotmatch '^[a-f0-9]{64}$' -or [string]$Participant.route_input.mode -cnotin @('PINNED_ARTIFACT','EXACT_EMPTY'))) { throw 'AUTO_RESUME participant lacks exact command or route evidence.' }
+    if ([string]$Participant.resume_mode -in @('ROUTE_READY','AUTO_RESUME') -and ([string]$Participant.expected_next_command -cnotmatch '^/[a-z0-9][a-z0-9-]{0,126}$' -or [string]$Participant.selected_command_identity -cnotmatch '^[a-f0-9]{64}$' -or [string]$Participant.route_input.mode -cnotin @('PINNED_ARTIFACT','EXACT_EMPTY'))) { throw 'Route-ready participant lacks exact command or route evidence.' }
     if ([string]$Participant.resume_mode -ceq 'HYDRATE_ONLY' -and ([string]$Participant.expected_next_command -cne 'NONE' -or [string]$Participant.route_input.mode -cne 'NOT_APPLICABLE')) { throw 'HYDRATE_ONLY participant must use NONE and NOT_APPLICABLE.' }
     $RouteRequired = if ([string]$Participant.route_input.mode -ceq 'PINNED_ARTIFACT') { @('mode','path','sha256','logical_identity') } else { @('mode') }
     Assert-CompactFlowExactProperties -Value $Participant.route_input -Allowed $RouteRequired -Required $RouteRequired -Label 'compact event participant route_input'
@@ -555,6 +613,16 @@ function Get-CompactFlowPressureDecision {
   if (-not [bool]$PolicyResolution.automatic_action_allowed) { return [pscustomobject]@{ disposition='BLOCKED'; reason='PROJECT_POLICY_REJECTED' } }
   if (@($Policy.checks) -cnotcontains [string]$Event.event_type) { return [pscustomobject]@{ disposition='CONTINUE'; reason='EVENT_NOT_SELECTED' } }
   if (@($Policy.excluded_role_profiles) -ccontains $ProfileId) { return [pscustomobject]@{ disposition='CONTINUE'; reason='PROFILE_EXCLUDED' } }
+  $TelemetryPolicy = Get-CompactFlowProperty -Value $Telemetry -Name 'policy'
+  $TelemetryPolicyIdentity = [string](Get-CompactFlowProperty -Value $TelemetryPolicy -Name 'identity' -DefaultValue '')
+  $TelemetryWarnRatio = Get-CompactFlowProperty -Value $TelemetryPolicy -Name 'warn_ratio'
+  $TelemetryCriticalRatio = Get-CompactFlowProperty -Value $TelemetryPolicy -Name 'critical_ratio'
+  if ($TelemetryPolicyIdentity -cne [string]$PolicyResolution.effective_policy_sha256 -or
+      $null -eq $TelemetryWarnRatio -or $null -eq $TelemetryCriticalRatio -or
+      [double]$TelemetryWarnRatio -ne [double]$Policy.warn_ratio -or
+      [double]$TelemetryCriticalRatio -ne [double]$Policy.critical_ratio) {
+    return [pscustomobject]@{ disposition='BLOCKED'; reason='POLICY_TELEMETRY_MISMATCH' }
+  }
   $MissingGates=@($Policy.required_gates | Where-Object { @($Event.satisfied_gates) -cnotcontains [string]$_ })
   if ($MissingGates.Count -gt 0) { return [pscustomobject]@{ disposition='PROOF_REQUIRED'; reason=('REQUIRED_GATES_MISSING:' + ($MissingGates -join ',')) } }
   if ([string]$Policy.mode -ceq 'disabled') { return [pscustomobject]@{ disposition='CONTINUE'; reason='POLICY_DISABLED' } }
@@ -596,16 +664,34 @@ function Merge-CompactFlowParticipants {
 
 function New-CompactFlowBoundary {
   param($Event, [object[]]$Participants, [datetime]$NowUtc = [datetime]::UtcNow)
+  $BoundaryParticipants = @($Participants | ForEach-Object {
+    $Participant = $_
+    $BoundaryParticipant = [ordered]@{
+      logical_session_ref=[string]$Participant.logical_session_ref; profile_id=[string]$Participant.profile_id; role_hint=[string]$Participant.role_hint
+      participation_class=[string]$Participant.participation_class; compact_order=[int]$Participant.compact_order
+      resume_mode=$(if ([string]$Participant.resume_mode -ceq 'ROUTE_READY') { 'AUTO_RESUME' } else { [string]$Participant.resume_mode })
+      expected_next_actor=[string]$Participant.expected_next_actor; expected_next_command=[string]$Participant.expected_next_command; route_input=$Participant.route_input
+    }
+    if ($null -ne $Participant.PSObject.Properties['selected_command_identity']) { $BoundaryParticipant.selected_command_identity = [string]$Participant.selected_command_identity }
+    [pscustomobject]$BoundaryParticipant
+  })
   $Boundary = [ordered]@{
     schema_version = '2'; contract = 'opencode-seamless-compact-boundary/v2'; boundary_id = [string]$Event.boundary_id
     project_id = [string]$Event.project_id; workflow_phase = [string]$Event.workflow_phase
     expected_state_revision = [string]$Event.state_revision; expected_wave_id = [string]$Event.wave_id; expected_epic_id = [string]$Event.epic_id
     expected_candidate_identity = [string]$Event.candidate_identity; expected_compact_boundary = [string]$Event.boundary_id
     expected_configuration_identity = [string]$Event.configuration_identity; expected_combined_row_identity = [string]$Event.combined_row_identity
-    participants = @($Participants); created_utc = $NowUtc.ToString('yyyy-MM-ddTHH:mm:ssZ'); expires_utc = $NowUtc.AddHours(1).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    participants = $BoundaryParticipants; created_utc = $NowUtc.ToString('yyyy-MM-ddTHH:mm:ssZ'); expires_utc = $NowUtc.AddHours(1).ToString('yyyy-MM-ddTHH:mm:ssZ')
   }
-  foreach ($Pair in @(@('worktree_identity','expected_worktree_identity'), @('host_attestation','host_attestation'), @('triggered_reference_ids','triggered_reference_ids'))) {
+  foreach ($Pair in @(@('worktree_identity','expected_worktree_identity'), @('triggered_reference_ids','triggered_reference_ids'))) {
     if ($null -ne $Event.PSObject.Properties[$Pair[0]]) { $Boundary[$Pair[1]] = $Event.($Pair[0]) }
+  }
+  if ($null -ne $Event.PSObject.Properties['host_attestation']) {
+    $Boundary.host_attestation = [pscustomobject][ordered]@{
+      opencode_version=[string]$Event.host_attestation.opencode_version
+      opencode_launcher_identity=[string]$Event.host_attestation.opencode_launcher_identity
+      command_registry_identity=[string]$Event.host_attestation.command_registry_identity
+    }
   }
   if (@($Event.unresolved_blocker_codes).Count -gt 0) { $Boundary.blocker_codes = @($Event.unresolved_blocker_codes) }
   return [pscustomobject]$Boundary
@@ -668,7 +754,7 @@ function Get-CompactFlowPriorRunDisposition {
 }
 
 function New-CompactFlowRunState {
-  param($Event, $PolicyResolution, $Participant, $MarkerBaseline)
+  param($Event, $PolicyResolution, $Participant, $MarkerBaseline, $ActiveRouteReceipt = $null)
   $State = [ordered]@{
     schema_version='compact-run/v1'; boundary_id=[string]$Event.boundary_id; event_id=[string]$Event.event_id
     event_sha256=(Get-CompactFlowObjectIdentity -Value $Event); policy_sha256=[string]$PolicyResolution.effective_policy_sha256
@@ -676,6 +762,14 @@ function New-CompactFlowRunState {
     participant_sha256=(Get-CompactFlowObjectIdentity -Value $Participant)
     compact_performed=$false
     marker_baseline=$MarkerBaseline; previous_generation_sha256='GENESIS'; updated_utc=[datetime]::UtcNow.ToString('o')
+  }
+  if ($null -ne $ActiveRouteReceipt) {
+    $State.active_route_receipt = [pscustomobject][ordered]@{
+      generation_id = [string]$ActiveRouteReceipt.generation_id
+      state_sha256 = [string]$ActiveRouteReceipt.source_identities.state_sha256
+      combined_sha256 = [string]$ActiveRouteReceipt.source_identities.combined_sha256
+      stage_sha256 = [string]$ActiveRouteReceipt.source_identities.stage_sha256
+    }
   }
   $State.generation_sha256 = Get-CompactFlowObjectIdentity -Value ([pscustomobject]$State)
   return [pscustomobject]$State
@@ -689,15 +783,14 @@ function Move-CompactFlowRunState {
     SUMMARIZE_SENT=@('MARKER_VERIFIED','UNCERTAIN','BLOCKED')
     MARKER_VERIFIED=@('HYDRATE_SENT','BLOCKED')
     HYDRATE_SENT=@('HYDRATION_VERIFIED','PROOF_REQUIRED','CONFIRM','UNCERTAIN','BLOCKED')
-    HYDRATION_VERIFIED=@('RESUME_SENT','COMPLETE','PROOF_REQUIRED','CONFIRM','UNCERTAIN','BLOCKED')
-    RESUME_SENT=@('COMPLETE','UNCERTAIN','BLOCKED')
+    HYDRATION_VERIFIED=@('ROUTE_READY','PROOF_REQUIRED','CONFIRM','UNCERTAIN','BLOCKED')
   }
   $Current = [string]$RunState.state
   if (-not $Transitions.ContainsKey($Current) -or @($Transitions[$Current]) -cnotcontains $NextState) { throw "Illegal compact run transition $Current -> $NextState." }
   $RunState.previous_generation_sha256 = [string]$RunState.generation_sha256
   $RunState.state = $NextState; $RunState.generation = [int]$RunState.generation + 1; $RunState.updated_utc = [datetime]::UtcNow.ToString('o')
   if ($NextState -in @('MARKER_VERIFIED','MANUAL_COMPACT')) { $RunState.compact_performed = $true }
-  $RunState.terminal = $NextState -in @('COMPLETE','MANUAL_COMPACT','PROOF_REQUIRED','CONFIRM','UNCERTAIN','BLOCKED')
+  $RunState.terminal = $NextState -in @('COMPLETE','ROUTE_READY','MANUAL_COMPACT','PROOF_REQUIRED','CONFIRM','UNCERTAIN','BLOCKED')
   $Projection = [ordered]@{}
   foreach ($Name in @(Get-CompactFlowPropertyNames -Value $RunState | Where-Object { $_ -cne 'generation_sha256' })) { $Projection[$Name] = $RunState.$Name }
   $RunState.generation_sha256 = Get-CompactFlowObjectIdentity -Value ([pscustomobject]$Projection)
@@ -708,13 +801,14 @@ function Move-CompactFlowRunState {
 function Invoke-CompactFlowParticipantMachine {
   param(
     $Event, $PolicyResolution, $Participant, $Telemetry,
-    [scriptblock]$GetMarkers, [scriptblock]$SendSummarize, [scriptblock]$Hydrate, [scriptblock]$Resume,
+    [scriptblock]$GetMarkers, [scriptblock]$SendSummarize, [scriptblock]$Hydrate,
     [scriptblock]$Persist = $null, [bool]$ManualCompact = $false,
-    [ValidateSet('PASS','PROOF_REQUIRED','BLOCKED')][string]$PreflightDisposition = 'PASS'
+    [ValidateSet('PASS','PROOF_REQUIRED','BLOCKED')][string]$PreflightDisposition = 'PASS',
+    $ActiveRouteReceipt = $null
   )
   $Decision = Get-CompactFlowPressureDecision -Event $Event -PolicyResolution $PolicyResolution -Telemetry $Telemetry -ProfileId ([string]$Participant.profile_id)
   $EmptyMarkers = [pscustomobject]@{ count=0; digest=(Get-CompactFlowSha256Text -Text ''); markers=@() }
-  $RunState = New-CompactFlowRunState -Event $Event -PolicyResolution $PolicyResolution -Participant $Participant -MarkerBaseline $EmptyMarkers
+  $RunState = New-CompactFlowRunState -Event $Event -PolicyResolution $PolicyResolution -Participant $Participant -MarkerBaseline $EmptyMarkers -ActiveRouteReceipt $ActiveRouteReceipt
   if ($ManualCompact) {
     $RunState = Move-CompactFlowRunState -RunState $RunState -NextState MANUAL_COMPACT -Persist $Persist
     return [pscustomobject]@{ logical_session_ref=[string]$Participant.logical_session_ref; disposition='MANUAL_COMPACT'; reason='EXPLICIT_MANUAL_BOUNDARY'; run_state=$RunState }
@@ -775,34 +869,28 @@ function Invoke-CompactFlowParticipantMachine {
     $RunState = Move-CompactFlowRunState -RunState $RunState -NextState $Terminal -Persist $Persist
     return [pscustomobject]@{ logical_session_ref=[string]$Participant.logical_session_ref; disposition=$Terminal; reason='HYDRATION_NOT_RESUMABLE'; run_state=$RunState }
   }
-  if ([string]$Participant.resume_mode -ceq 'HYDRATE_ONLY' -or $HydrationAction -cne 'AUTO_RESUME') {
-    $RunState = Move-CompactFlowRunState -RunState $RunState -NextState HYDRATION_VERIFIED -Persist $Persist
-    $RunState = Move-CompactFlowRunState -RunState $RunState -NextState COMPLETE -Persist $Persist
-    return [pscustomobject]@{ logical_session_ref=[string]$Participant.logical_session_ref; disposition='COMPLETE'; reason='HYDRATION_COMPLETE_NO_RESUME'; run_state=$RunState }
-  }
-  $ResumeContext = [pscustomobject]@{ intent_persisted=$false; run_state=$RunState }
-  $PersistResumeIntent = {
-    param($HeldRouteProof)
-    if ([bool]$ResumeContext.intent_persisted) { throw 'Resume intent was already persisted.' }
-    $ResumeContext.run_state | Add-Member -NotePropertyName resume_intent_sha256 -NotePropertyValue (Get-CompactFlowObjectIdentity -Value ([pscustomobject][ordered]@{logical_session_ref=[string]$Participant.logical_session_ref;command=[string]$Participant.expected_next_command;route_input=$Hydration.route_input;held_route_proof=$HeldRouteProof})) -Force
-    $ResumeContext.run_state = Move-CompactFlowRunState -RunState $ResumeContext.run_state -NextState HYDRATION_VERIFIED -Persist $Persist
-    $ResumeContext.intent_persisted = $true
-  }.GetNewClosure()
-  try { $ResumeResult = & $Resume $Hydration $PersistResumeIntent }
-  catch { $ResumeResult = [pscustomobject]@{ sent=$false; disposition='UNCERTAIN' } }
-  $RunState = $ResumeContext.run_state
-  if (-not [bool]$ResumeContext.intent_persisted) {
+  if ($HydrationAction -cnotin @('AUTO_RESUME','ROUTE_READY')) {
     $RunState = Move-CompactFlowRunState -RunState $RunState -NextState BLOCKED -Persist $Persist
-    return [pscustomobject]@{ logical_session_ref=[string]$Participant.logical_session_ref; disposition='BLOCKED'; reason='RESUME_INTENT_NOT_PERSISTED_UNDER_HELD_ROUTE'; run_state=$RunState }
+    return [pscustomobject]@{ logical_session_ref=[string]$Participant.logical_session_ref; disposition='BLOCKED'; reason='HYDRATION_ROUTE_NOT_READY'; run_state=$RunState }
   }
-  if (-not [bool]$ResumeResult.sent) {
-    $ResumeDisposition = if ([string]$ResumeResult.disposition -ceq 'UNCERTAIN') { 'UNCERTAIN' } else { 'BLOCKED' }
-    $RunState = Move-CompactFlowRunState -RunState $RunState -NextState $ResumeDisposition -Persist $Persist
-    return [pscustomobject]@{ logical_session_ref=[string]$Participant.logical_session_ref; disposition=$ResumeDisposition; reason='RESUME_NOT_PROVEN'; run_state=$RunState }
+  $RouteStatus = [string](Get-CompactFlowProperty -Value $Hydration.route_input -Name 'status' -DefaultValue '')
+  if ($RouteStatus -cnotin @('EXACT','NOT_REQUIRED')) {
+    $RunState = Move-CompactFlowRunState -RunState $RunState -NextState PROOF_REQUIRED -Persist $Persist
+    return [pscustomobject]@{ logical_session_ref=[string]$Participant.logical_session_ref; disposition='PROOF_REQUIRED'; reason='ROUTE_INPUT_NOT_VERIFIED'; run_state=$RunState }
   }
-  $RunState = Move-CompactFlowRunState -RunState $RunState -NextState RESUME_SENT -Persist $Persist
-  $RunState = Move-CompactFlowRunState -RunState $RunState -NextState COMPLETE -Persist $Persist
-  return [pscustomobject]@{ logical_session_ref=[string]$Participant.logical_session_ref; disposition='COMPLETE'; reason='COMPACT_HYDRATE_RESUME_COMPLETE'; run_state=$RunState }
+  $RunState = Move-CompactFlowRunState -RunState $RunState -NextState HYDRATION_VERIFIED -Persist $Persist
+  $RunState | Add-Member -NotePropertyName route_ready_receipt -NotePropertyValue ([pscustomobject][ordered]@{
+    outcome='ROUTE_READY'
+    command_sent=$false
+    hydration_confidence=[string]$Hydration.confidence
+    hydration_action=$HydrationAction
+    route_input_status=$RouteStatus
+    route_input_mode=[string](Get-CompactFlowProperty -Value $Hydration.route_input -Name 'mode' -DefaultValue 'NOT_APPLICABLE')
+    route_input_sha256=[string](Get-CompactFlowProperty -Value $Hydration.route_input -Name 'sha256' -DefaultValue 'ABSENT')
+    route_input_logical_identity=[string](Get-CompactFlowProperty -Value $Hydration.route_input -Name 'logical_identity' -DefaultValue 'ABSENT')
+  }) -Force
+  $RunState = Move-CompactFlowRunState -RunState $RunState -NextState ROUTE_READY -Persist $Persist
+  return [pscustomobject]@{ logical_session_ref=[string]$Participant.logical_session_ref; disposition='ROUTE_READY'; reason='COMPACT_HYDRATE_ROUTE_READY_STOP'; run_state=$RunState }
 }
 
 function Resolve-CompactFlowContainedFile {
@@ -826,7 +914,7 @@ function Resolve-CompactFlowContainedFile {
 }
 
 function Open-CompactFlowRouteSnapshot {
-  param([string]$Root, [string]$RelativePath, [string]$ExpectedSha256)
+  param([string]$Root, [string]$RelativePath, [string]$ExpectedSha256, [ValidateRange(1, 2147483647)][int]$MaximumBytes = 2147483647)
   $Path = Resolve-CompactFlowContainedFile -Root $Root -RelativePath $RelativePath
   $Stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
   try {
@@ -837,7 +925,8 @@ function Open-CompactFlowRouteSnapshot {
     $FinalPath = [IO.Path]::GetFullPath($FinalPath)
     if (-not $FinalPath.Equals([IO.Path]::GetFullPath($Path), [StringComparison]::OrdinalIgnoreCase)) { throw 'Opened route handle resolves to a different final path.' }
     if ([CompactFlow.FileHandleGuard]::GetLinkCount($Stream.SafeFileHandle) -ne 1) { throw 'Opened route handle must have exactly one hard link.' }
-    $Bytes = New-Object byte[] $Stream.Length
+    if ($Stream.Length -gt $MaximumBytes -or $Stream.Length -gt [int]::MaxValue) { throw 'Route input exceeds the maximum byte size.' }
+    $Bytes = New-Object byte[] ([int]$Stream.Length)
     $Offset = 0
     while ($Offset -lt $Bytes.Length) {
       $Read = $Stream.Read($Bytes, $Offset, $Bytes.Length - $Offset)
@@ -855,6 +944,7 @@ function Write-CompactFlowAtomicJson {
   param([string]$Path, $Value)
   $Parent = Split-Path -Parent $Path
   if (-not (Test-Path -LiteralPath $Parent -PathType Container)) { [void](New-Item -ItemType Directory -Path $Parent -Force) }
+  $ParentGuard = Open-CompactFlowDirectoryGuard -Path $Parent
   $Temp = Join-Path $Parent ('.' + [IO.Path]::GetFileName($Path) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
   $Backup = Join-Path $Parent ('.' + [IO.Path]::GetFileName($Path) + '.' + [guid]::NewGuid().ToString('N') + '.bak')
   try {
@@ -863,5 +953,6 @@ function Write-CompactFlowAtomicJson {
   } finally {
     if (Test-Path -LiteralPath $Temp) { Remove-Item -LiteralPath $Temp -Force }
     if (Test-Path -LiteralPath $Backup) { Remove-Item -LiteralPath $Backup -Force }
+    $ParentGuard.Dispose()
   }
 }

@@ -14,7 +14,7 @@ function Assert-Throws { param([scriptblock]$Action,[string]$Message) $Threw=$fa
 function New-TestPolicy {
   return [pscustomobject][ordered]@{
     schema_version='1'; contract='opencode-compact-policy/v1'; scope='global'; mode='auto_safe'
-    checks=@('before_dispatch','after_stage_output','epic_closeout'); warn_ratio=0.75; critical_ratio=0.875
+    checks=@('before_dispatch','after_stage_output','epic_closeout'); warn_ratio=0.5; critical_ratio=0.62
     compact_warn_at_first_safe_boundary=$true; block_long_stage_at_critical=$true
     compact_epic_participants_after_closeout=$true; safe_boundary_required=$true
     maximum_retry_count=1; project_override='tighten_only'; excluded_role_profiles=@(); required_gates=@()
@@ -22,14 +22,14 @@ function New-TestPolicy {
 }
 
 function New-TestParticipant {
-  param([string]$Ref='delivery-main',[string]$Class='DELIVERY',[string]$Profile='fal.compact-v2-maintainer',[string]$Resume='AUTO_RESUME')
+  param([string]$Ref='delivery-main',[string]$Class='DELIVERY',[string]$Profile='fal.compact-v2-maintainer',[string]$Resume='ROUTE_READY')
   $Participant=[ordered]@{
     logical_session_ref=$Ref; profile_id=$Profile; role_hint=$(if($Class -ceq 'DELIVERY'){'Compact V2 Workflow Maintainer'}elseif($Class -ceq 'REVIEW_SUPPORT'){'SMR Analyst'}else{'Meta Coordinator'})
     participation_class=$Class; compact_order=1; resume_mode=$Resume; expected_next_actor='Meta'
-    expected_next_command=$(if($Resume -ceq 'AUTO_RESUME'){'/step-review'}else{'NONE'})
-    route_input=$(if($Resume -ceq 'AUTO_RESUME'){[pscustomobject]@{mode='PINNED_ARTIFACT';path='plans/epics/COMPACT-V2.md';sha256='1111111111111111111111111111111111111111111111111111111111111111';logical_identity='compact-v2-candidate'}}else{[pscustomobject]@{mode='NOT_APPLICABLE'}})
+    expected_next_command=$(if($Resume -in @('ROUTE_READY','AUTO_RESUME')){'/step-review'}else{'NONE'})
+    route_input=$(if($Resume -in @('ROUTE_READY','AUTO_RESUME')){[pscustomobject]@{mode='PINNED_ARTIFACT';path='plans/epics/COMPACT-V2.md';sha256='1111111111111111111111111111111111111111111111111111111111111111';logical_identity='compact-v2-candidate'}}else{[pscustomobject]@{mode='NOT_APPLICABLE'}})
   }
-  if($Resume -ceq 'AUTO_RESUME'){$Participant.selected_command_identity='2222222222222222222222222222222222222222222222222222222222222222'}
+  if($Resume -in @('ROUTE_READY','AUTO_RESUME')){$Participant.selected_command_identity='2222222222222222222222222222222222222222222222222222222222222222'}
   return [pscustomobject]$Participant
 }
 
@@ -40,6 +40,8 @@ function New-TestEvent {
     schema_version='1';contract='compact-flow-event/v1';event_id='event-1';event_type=$Type;boundary_id='boundary-1';project_id='fixture'
     wave_id='W1';epic_id='COMPACT-V2';workflow_phase='STEP_REVIEW';state_revision='state-v1';candidate_identity='compact-v2-candidate'
     configuration_identity='config-v1';combined_row_identity='combined-v1';safe_boundary=$Proof;duplicate_send_disposition='SETTLED';satisfied_gates=@()
+    host_attestation=[pscustomobject]@{opencode_version='1.18.7';opencode_launcher_identity=('e'*64);command_registry_identity=('f'*64);after_compact_command_identity=('9'*64)}
+    active_route=[pscustomobject]@{profile_id='fal.compact-v2-maintainer';generation_id=('a'*64);state_sha256=('b'*64);combined_sha256=('c'*64);stage_sha256=('d'*64)}
     participants=$Participants;unresolved_blocker_codes=@();created_utc=[datetime]::UtcNow.ToString('o')
   }
   if($Type -ceq 'before_dispatch'){$Event.sender_logical_ref='delivery-main';$Event.recipient_logical_ref='meta-main'}
@@ -49,30 +51,34 @@ function New-TestEvent {
 }
 
 function New-TestTelemetry {
-  param([string]$Pressure='warn',[string]$State='idle',[bool]$HasModel=$true)
-  return [pscustomobject]@{schema_version='session-context-status/v1';session=[pscustomobject]@{state=$State};model=[pscustomobject]@{provider_id=$(if($HasModel){'provider'}else{$null});model_id=$(if($HasModel){'model'}else{$null})};pressure=[pscustomobject]@{state=$Pressure}}
+  param([string]$Pressure='warn',[string]$State='idle',[bool]$HasModel=$true,$PolicyResolution=$null)
+  $TelemetryPolicy = if ($null -eq $PolicyResolution) { $script:TestPolicyResolution } else { $PolicyResolution }
+  return [pscustomobject]@{schema_version='session-context-status/v1';session=[pscustomobject]@{state=$State};policy=[pscustomobject]@{identity=[string]$TelemetryPolicy.effective_policy_sha256;warn_ratio=[double]$TelemetryPolicy.effective_policy.warn_ratio;critical_ratio=[double]$TelemetryPolicy.effective_policy.critical_ratio};model=[pscustomobject]@{provider_id=$(if($HasModel){'provider'}else{$null});model_id=$(if($HasModel){'model'}else{$null})};pressure=[pscustomobject]@{state=$Pressure}}
 }
 
 $Global=New-TestPolicy
 $Policy=Resolve-CompactFlowPolicyObjects -GlobalPolicy $Global
+$script:TestPolicyResolution=$Policy
 Assert-True $Policy.valid 'Global policy must resolve.'
 Assert-True $Policy.automatic_action_allowed 'Global policy must permit automatic action.'
 
-$Tight=[pscustomobject]@{schema_version='1';contract='opencode-compact-policy/v1';scope='project_override';mode='ask';checks=@('before_dispatch','after_stage_output','epic_closeout');warn_ratio=0.70;critical_ratio=0.80;maximum_retry_count=0;excluded_role_profiles=@('fixture.skip');required_gates=@('owner-ready')}
+$Tight=[pscustomobject]@{schema_version='1';contract='opencode-compact-policy/v1';scope='project_override';mode='ask';checks=@('before_dispatch','after_stage_output','epic_closeout');warn_ratio=0.40;critical_ratio=0.55;maximum_retry_count=0;excluded_role_profiles=@('fixture.skip');required_gates=@('owner-ready')}
 $TightResult=Resolve-CompactFlowPolicyObjects -GlobalPolicy $Global -ProjectOverride $Tight
 Assert-Equal $TightResult.effective_policy.mode 'ask' 'Project override may tighten mode.'
-Assert-Near $TightResult.effective_policy.warn_ratio 0.70 'Project override may lower warning threshold.'
+Assert-Near $TightResult.effective_policy.warn_ratio 0.40 'Project override may lower warning threshold.'
 Assert-Equal $TightResult.effective_policy.maximum_retry_count 0 'Project override may lower retry count.'
 Assert-True $TightResult.automatic_action_allowed 'Valid tightening override must remain automatic-policy valid.'
 $RemovedCheck=[pscustomobject]@{schema_version='1';contract='opencode-compact-policy/v1';scope='project_override';checks=@('after_stage_output','epic_closeout')}
 $RemovedCheckResult=Resolve-CompactFlowPolicyObjects -GlobalPolicy $Global -ProjectOverride $RemovedCheck
 Assert-True (-not $RemovedCheckResult.automatic_action_allowed) 'Project override must not remove a mandatory global event check.'
 
-$Loose=[pscustomobject]@{schema_version='1';contract='opencode-compact-policy/v1';scope='project_override';warn_ratio=0.80}
+$Loose=[pscustomobject]@{schema_version='1';contract='opencode-compact-policy/v1';scope='project_override';warn_ratio=0.60}
 $LooseResult=Resolve-CompactFlowPolicyObjects -GlobalPolicy $Global -ProjectOverride $Loose
 Assert-True (-not $LooseResult.automatic_action_allowed) 'Loosening override must disable automatic action.'
 Assert-True (@($LooseResult.diagnostics).Count -eq 1) 'Loosening override must emit one diagnostic.'
 Assert-Throws { Assert-CompactFlowStrictJson -Text '{"a":1,"nested":{"x":1,"x":2}}' -Label 'duplicate fixture' } 'Recursive duplicate JSON members must fail.'
+$DeepJson='0';for($Depth=0;$Depth-lt65;$Depth++){$DeepJson='{"x":'+$DeepJson+'}'}
+Assert-Throws { Assert-CompactFlowStrictJson -Text $DeepJson -Label 'deep fixture' } 'JSON nesting over the fixed maximum must fail.'
 
 $Event=New-TestEvent
 Assert-True (Assert-CompactFlowEvent -Event $Event) 'Valid event must pass.'
@@ -89,8 +95,11 @@ $EmptyRouteExtra=New-TestEvent
 $EmptyRouteExtra.participants[0].route_input=[pscustomobject]@{mode='EXACT_EMPTY';path='unexpected.md'}
 Assert-Throws { Assert-CompactFlowEvent -Event $EmptyRouteExtra } 'EXACT_EMPTY route input must reject artifact fields.'
 $NestedHostEvent=New-TestEvent
-$NestedHostEvent | Add-Member -NotePropertyName host_attestation -NotePropertyValue ([pscustomobject]@{opencode_version='1.2.3';opencode_launcher_identity=('a'*64);command_registry_identity=('b'*64);endpoint='http://127.0.0.1'})
+$NestedHostEvent.host_attestation | Add-Member -NotePropertyName endpoint -NotePropertyValue 'http://127.0.0.1'
 Assert-Throws { Assert-CompactFlowEvent -Event $NestedHostEvent } 'Nested host-attestation endpoint fields must fail event validation.'
+$MissingAfterCompactIdentityEvent=New-TestEvent
+$MissingAfterCompactIdentityEvent.host_attestation.PSObject.Properties.Remove('after_compact_command_identity')
+Assert-Throws { Assert-CompactFlowEvent -Event $MissingAfterCompactIdentityEvent } 'Missing pinned after-compact command identity must block before transport.'
 $BadCloseout=New-TestEvent -Type epic_closeout
 $BadCloseout.closeout.routing_verdict='CONTINUE'
 Assert-Throws { Assert-CompactFlowEvent -Event $BadCloseout } 'Closeout event without CLOSED receipt must fail.'
@@ -105,6 +114,14 @@ Assert-Equal $Warn.disposition AUTO_COMPACT 'Warn at safe boundary must auto com
 Assert-Equal $Critical.disposition AUTO_COMPACT 'Critical at safe boundary must auto compact.'
 Assert-Equal $Unknown.disposition CONTINUE 'Unknown pressure must not block ordinary work.'
 Assert-Equal $Over.disposition PROOF_REQUIRED 'Over-limit must allow bounded recovery only.'
+$MismatchedTelemetry=New-TestTelemetry -Pressure critical
+$MismatchedTelemetry.policy.identity='different-policy'
+$PolicyMismatch=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution $Policy -Telemetry $MismatchedTelemetry -ProfileId 'fal.compact-v2-maintainer'
+Assert-Equal $PolicyMismatch.disposition BLOCKED 'Telemetry policy identity mismatch must block automatic action.'
+$MismatchedRatios=New-TestTelemetry -Pressure critical
+$MismatchedRatios.policy.warn_ratio=0.49
+$RatioMismatch=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution $Policy -Telemetry $MismatchedRatios -ProfileId 'fal.compact-v2-maintainer'
+Assert-Equal $RatioMismatch.reason POLICY_TELEMETRY_MISMATCH 'Telemetry threshold mismatch must use the exact parity failure.'
 $Unsafe=Get-CompactFlowPressureDecision -Event (New-TestEvent -Safe $false) -PolicyResolution $Policy -Telemetry (New-TestTelemetry -Pressure critical) -ProfileId 'fal.compact-v2-maintainer'
 Assert-Equal $Unsafe.disposition PROOF_REQUIRED 'Unsafe critical boundary must stop before compact.'
 $Busy=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution $Policy -Telemetry (New-TestTelemetry -Pressure warn -State busy) -ProfileId 'fal.compact-v2-maintainer'
@@ -112,16 +129,16 @@ Assert-Equal $Busy.disposition PROOF_REQUIRED 'Busy participant must not compact
 $NoModel=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution $Policy -Telemetry (New-TestTelemetry -Pressure warn -HasModel $false) -ProfileId 'fal.compact-v2-maintainer'
 Assert-Equal $NoModel.disposition PROOF_REQUIRED 'Missing provider/model must require proof.'
 $GateEvent=New-TestEvent
-$GateDecision=Get-CompactFlowPressureDecision -Event $GateEvent -PolicyResolution $TightResult -Telemetry (New-TestTelemetry) -ProfileId 'fal.compact-v2-maintainer'
+$GateDecision=Get-CompactFlowPressureDecision -Event $GateEvent -PolicyResolution $TightResult -Telemetry (New-TestTelemetry -PolicyResolution $TightResult) -ProfileId 'fal.compact-v2-maintainer'
 Assert-Equal $GateDecision.disposition PROOF_REQUIRED 'Missing required policy gate must prevent action.'
 $GateEvent.satisfied_gates=@('owner-ready')
-$SatisfiedGateDecision=Get-CompactFlowPressureDecision -Event $GateEvent -PolicyResolution $TightResult -Telemetry (New-TestTelemetry) -ProfileId 'fal.compact-v2-maintainer'
+$SatisfiedGateDecision=Get-CompactFlowPressureDecision -Event $GateEvent -PolicyResolution $TightResult -Telemetry (New-TestTelemetry -PolicyResolution $TightResult) -ProfileId 'fal.compact-v2-maintainer'
 Assert-Equal $SatisfiedGateDecision.disposition CONFIRM 'Satisfied required policy gate must allow the tightened ask decision.'
 $Closeout=Get-CompactFlowPressureDecision -Event (New-TestEvent -Type epic_closeout) -PolicyResolution $Policy -Telemetry (New-TestTelemetry -Pressure unknown) -ProfileId 'fal.compact-v2-maintainer'
 Assert-Equal $Closeout.disposition AUTO_COMPACT 'Accepted closeout must compact actual participants regardless of pressure.'
-$RecommendPolicy=New-TestPolicy;$RecommendPolicy.mode='recommend';$Recommend=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution (Resolve-CompactFlowPolicyObjects -GlobalPolicy $RecommendPolicy) -Telemetry (New-TestTelemetry) -ProfileId 'fal.compact-v2-maintainer'
-$AskPolicy=New-TestPolicy;$AskPolicy.mode='ask';$Ask=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution (Resolve-CompactFlowPolicyObjects -GlobalPolicy $AskPolicy) -Telemetry (New-TestTelemetry) -ProfileId 'fal.compact-v2-maintainer'
-$DisabledPolicy=New-TestPolicy;$DisabledPolicy.mode='disabled';$Disabled=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution (Resolve-CompactFlowPolicyObjects -GlobalPolicy $DisabledPolicy) -Telemetry (New-TestTelemetry) -ProfileId 'fal.compact-v2-maintainer'
+$RecommendPolicy=New-TestPolicy;$RecommendPolicy.mode='recommend';$RecommendResolution=Resolve-CompactFlowPolicyObjects -GlobalPolicy $RecommendPolicy;$Recommend=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution $RecommendResolution -Telemetry (New-TestTelemetry -PolicyResolution $RecommendResolution) -ProfileId 'fal.compact-v2-maintainer'
+$AskPolicy=New-TestPolicy;$AskPolicy.mode='ask';$AskResolution=Resolve-CompactFlowPolicyObjects -GlobalPolicy $AskPolicy;$Ask=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution $AskResolution -Telemetry (New-TestTelemetry -PolicyResolution $AskResolution) -ProfileId 'fal.compact-v2-maintainer'
+$DisabledPolicy=New-TestPolicy;$DisabledPolicy.mode='disabled';$DisabledResolution=Resolve-CompactFlowPolicyObjects -GlobalPolicy $DisabledPolicy;$Disabled=Get-CompactFlowPressureDecision -Event $Event -PolicyResolution $DisabledResolution -Telemetry (New-TestTelemetry -PolicyResolution $DisabledResolution) -ProfileId 'fal.compact-v2-maintainer'
 Assert-Equal $Recommend.disposition RECOMMEND 'Recommend mode must not compact automatically.'
 Assert-Equal $Ask.disposition CONFIRM 'Ask mode must require confirmation.'
 Assert-Equal $Disabled.disposition CONTINUE 'Disabled mode must remain fluid without compact.'
@@ -137,6 +154,10 @@ Assert-Equal $Ordered[2].logical_session_ref 'a-meta' 'Meta must compact last.'
 $Conflict=New-TestParticipant -Ref 'z-delivery' -Class DELIVERY
 $Conflict.role_hint='Different Role'
 Assert-Throws { Merge-CompactFlowParticipants -Incoming @($Delivery,$Conflict) } 'Conflicting participant duplicates must fail.'
+$WireBoundary=New-CompactFlowBoundary -Event $Event -Participants @($Event.participants)
+Assert-Equal $WireBoundary.participants[0].resume_mode AUTO_RESUME 'ROUTE_READY event must map to the backward-readable Canon capsule input.'
+Assert-True ($null -eq $WireBoundary.host_attestation.PSObject.Properties['after_compact_command_identity']) 'Canon capsule must not copy the FAL-only after-compact identity field.'
+Assert-Equal $WireBoundary.host_attestation.command_registry_identity $Event.host_attestation.command_registry_identity 'Canon capsule must preserve command-registry identity.'
 
 $Before=Get-CompactFlowMarkerSet -ActiveContext @([pscustomobject]@{type='compaction';id='old';time=[pscustomobject]@{created=1000}})
 $After=Get-CompactFlowMarkerSet -ActiveContext @([pscustomobject]@{type='compaction';id='old';time=[pscustomobject]@{created=1000}},[pscustomobject]@{type='compaction';id='new';time=[pscustomobject]@{created=3000}})
@@ -167,7 +188,7 @@ $CompactedPrior=Get-CompactFlowPriorRunDisposition -RunDocument $CompactedLedger
 Assert-Equal $CompactedPrior.disposition ALREADY_COMPACTED 'A participant must compact at most once across event IDs in one boundary.'
 
 function Invoke-TestMachine {
-  param([string]$Transport='success',[string]$HydrationAction='AUTO_RESUME',[bool]$Manual=$false,[bool]$CompetingMarkers=$false,[int]$Outstanding=1,[bool]$ResumeSent=$true,$ResumeOrder=$null)
+  param([string]$Transport='success',[string]$HydrationAction='AUTO_RESUME',[bool]$Manual=$false,[bool]$CompetingMarkers=$false,[int]$Outstanding=1,$StateOrder=$null)
   $Now=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()+10000
   $Empty=Get-CompactFlowMarkerSet -ActiveContext @()
   $PostItems=@([pscustomobject]@{type='compaction';id='marker-1';time=[pscustomobject]@{created=$Now}})
@@ -176,22 +197,35 @@ function Invoke-TestMachine {
   $MarkerState=[pscustomobject]@{calls=0}
   $GetMarkers={ $MarkerState.calls=[int]$MarkerState.calls+1; if($MarkerState.calls -eq 1){$Empty}else{$Post} }.GetNewClosure()
   $Send={ [pscustomobject]@{status=$Transport;marker_identity=$(if($Transport -ceq 'success' -and -not $CompetingMarkers){'marker-1'}else{''});outstanding_intent_count=$Outstanding;competing_manual_signal=$false} }.GetNewClosure()
-  $Hydrate={ [pscustomobject]@{verification='PASS';confidence=$(if($HydrationAction -ceq 'BLOCKED'){'FAILED'}else{'VERIFIED'});action=$HydrationAction;route_input=[pscustomobject]@{mode='PINNED_ARTIFACT';status='EXACT'}} }.GetNewClosure()
-  $Persist={param($State)if($null -ne $ResumeOrder){$ResumeOrder.Add([string]$State.state)}}.GetNewClosure()
-  $Resume={ param($Hydration,$PersistResumeIntent) & $PersistResumeIntent ([pscustomobject]@{mode='PINNED_ARTIFACT';sha256=('1'*64);final_path_verified=$true;link_count=1});if($null -ne $ResumeOrder){if([string]$ResumeOrder[$ResumeOrder.Count-1] -cne 'HYDRATION_VERIFIED'){throw 'resume intent was not persisted before send'};$ResumeOrder.Add('POST')};[pscustomobject]@{sent=$ResumeSent;disposition=$(if($ResumeSent){'SENT'}else{'UNCERTAIN'})} }.GetNewClosure()
-  return Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $GetMarkers -SendSummarize $Send -Hydrate $Hydrate -Resume $Resume -Persist $Persist -ManualCompact $Manual
+  $Hydrate={ [pscustomobject]@{verification='PASS';confidence=$(if($HydrationAction -ceq 'BLOCKED'){'FAILED'}else{'VERIFIED'});action=$HydrationAction;route_input=[pscustomobject]@{mode='PINNED_ARTIFACT';status='EXACT';sha256=('1'*64);logical_identity='compact-v2-candidate'}} }.GetNewClosure()
+  $Persist={param($State)if($null -ne $StateOrder){$StateOrder.Add([string]$State.state)}}.GetNewClosure()
+  $ActiveRouteReceipt=[pscustomobject]@{generation_id=('a'*64);source_identities=[pscustomobject]@{state_sha256=('b'*64);combined_sha256=('c'*64);stage_sha256=('d'*64)}}
+  return Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $GetMarkers -SendSummarize $Send -Hydrate $Hydrate -Persist $Persist -ManualCompact $Manual -ActiveRouteReceipt $ActiveRouteReceipt
 }
 
 $Success=Invoke-TestMachine
-Assert-Equal $Success.disposition COMPLETE "Successful compact/hydrate/resume must complete ($($Success.reason))."
-Assert-Equal $Success.run_state.state COMPLETE "Successful state machine must end COMPLETE ($($Success.reason))."
+Assert-Equal $Success.disposition ROUTE_READY "Successful compact/hydrate must stop route-ready ($($Success.reason))."
+Assert-Equal $Success.run_state.state ROUTE_READY "Successful state machine must end ROUTE_READY ($($Success.reason))."
 Assert-True $Success.run_state.compact_performed 'Successful marker verification must record compact_performed.'
 Assert-True ([string]$Success.run_state.summarize_intent_sha256 -match '^[a-f0-9]{64}$') 'Summarize intent must be hash-bound.'
-Assert-True ([string]$Success.run_state.resume_intent_sha256 -match '^[a-f0-9]{64}$') 'Resume intent must be hash-bound.'
-$ResumeOrder=New-Object System.Collections.Generic.List[string]
-$OrderedResume=Invoke-TestMachine -ResumeOrder $ResumeOrder
-Assert-Equal $OrderedResume.disposition COMPLETE 'Resume-order fixture must complete.'
-Assert-True ($ResumeOrder.IndexOf('HYDRATION_VERIFIED') -ge 0 -and $ResumeOrder.IndexOf('HYDRATION_VERIFIED') -lt $ResumeOrder.IndexOf('POST')) 'Resume intent must persist while the route is held and before POST.'
+Assert-Equal $Success.run_state.route_ready_receipt.command_sent $false 'Route-ready receipt must prove no workflow command was sent.'
+Assert-Equal $Success.run_state.active_route_receipt.generation_id ('a'*64) 'Route-ready run state must bind the verified manifest generation.'
+$StateOrder=New-Object System.Collections.Generic.List[string]
+$OrderedRouteReady=Invoke-TestMachine -StateOrder $StateOrder
+Assert-Equal $OrderedRouteReady.disposition ROUTE_READY 'Ordered route-ready fixture must stop without dispatch.'
+Assert-True ($StateOrder.IndexOf('HYDRATION_VERIFIED') -ge 0 -and $StateOrder.IndexOf('HYDRATION_VERIFIED') -lt $StateOrder.IndexOf('ROUTE_READY')) 'Hydration verification must persist before ROUTE_READY.'
+Assert-True ($StateOrder.IndexOf('RESUME_SENT') -lt 0 -and $StateOrder.IndexOf('POST') -lt 0) 'Compact terminal must never persist or invoke workflow-stage dispatch.'
+Assert-True (-not (Get-Command Invoke-CompactFlowParticipantMachine).Parameters.ContainsKey('Resume')) 'Compact state machine must expose no workflow-stage Resume callback.'
+$CompactInvokerSource=Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'invoke-session-compact-flow.ps1')
+Assert-True ($CompactInvokerSource -match 'if \(-not \$DryRun\)[\s\S]{0,160}reference-only') 'Retained V2 must fail before any non-dry summarize path.'
+Assert-True ($CompactInvokerSource.IndexOf("if (-not `$DryRun)",[StringComparison]::Ordinal) -ge 0 -and $CompactInvokerSource.IndexOf("if (-not `$DryRun)",[StringComparison]::Ordinal) -lt $CompactInvokerSource.IndexOf('Resolve-CompactFlowLocalRoot -Path $TargetRoot',[StringComparison]::Ordinal)) 'Retained V2 non-dry refusal must precede target reads and summarize.'
+$CommandBodySites=[regex]::Matches($CompactInvokerSource,"New-OCRouterCommandRequestBodyObject\s+-Command\s+([^\r\n]+)")
+Assert-Equal $CommandBodySites.Count 1 'Compact invoker must construct exactly one command POST body.'
+Assert-True ($CommandBodySites[0].Groups[1].Value -match "^'after-compact'") 'The only compact command POST body must be /after-compact.'
+Assert-True ($CompactInvokerSource -notmatch 'New-OCRouterCommandRequestBodyObject\s+-Command\s+\$Command') 'Compact invoker must not construct a workflow-stage command body.'
+Assert-True ($CompactInvokerSource -match 'Get-CompactFlowLiveCommandIdentity\s+-Entries\s+\$CommandEntries\s+-CommandName\s+''after-compact''') 'Compact invoker must reverify the pinned after-compact command identity immediately before hydration transport.'
+$oldErrorActionPreference=$ErrorActionPreference;try{$ErrorActionPreference='Continue';$retainedOutput=@(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'invoke-session-compact-flow.ps1') -EventPath 'missing-event' -TargetRoot 'missing-target' -CanonRoot 'missing-canon' -GlobalPolicyPath 'missing-policy' 2>&1);$retainedExit=$LASTEXITCODE}finally{$ErrorActionPreference=$oldErrorActionPreference}
+Assert-True ($retainedExit -ne 0 -and ($retainedOutput -join "`n") -match 'reference-only; non-dry execution is retired') 'Retained V2 non-dry process invocation must refuse before reading missing targets or policy.'
 $TimedOut=Invoke-TestMachine -Transport timeout
 Assert-Equal $TimedOut.disposition UNCERTAIN 'Summarize timeout must terminate UNCERTAIN.'
 $MarkerConflict=Invoke-TestMachine -CompetingMarkers $true
@@ -200,11 +234,9 @@ $IntentConflict=Invoke-TestMachine -Outstanding 2
 Assert-Equal $IntentConflict.disposition UNCERTAIN 'Competing intent machine must terminate UNCERTAIN.'
 $HydrationBlocked=Invoke-TestMachine -HydrationAction BLOCKED
 Assert-Equal $HydrationBlocked.disposition BLOCKED "Blocked hydration must prevent resume ($($HydrationBlocked.reason))."
-$ResumeUnknown=Invoke-TestMachine -ResumeSent $false
-Assert-Equal $ResumeUnknown.disposition UNCERTAIN 'Ambiguous resume send must terminate UNCERTAIN.'
 $Manual=Invoke-TestMachine -Manual $true
 Assert-Equal $Manual.disposition MANUAL_COMPACT 'Manual compact must skip router summarize.'
-Assert-Throws { Move-CompactFlowRunState -RunState $Success.run_state -NextState RESUME_SENT } 'Terminal state must not transition or duplicate send.'
+Assert-Throws { Move-CompactFlowRunState -RunState $Success.run_state -NextState RESUME_SENT } 'Terminal state must not transition or dispatch.'
 Assert-True (($Success | ConvertTo-Json -Depth 20) -notmatch 'ses_private') 'Machine output must not disclose raw session IDs.'
 
 Assert-Throws { Assert-OCRouterParentSessionCommandSafe -Server 'http://unused' -Headers @{} -CommandName 'step-review-utan' -CommandEntries @([pscustomobject]@{name='step-review-utan';subtask=$true}) } 'Stale subtask=true command must block parent-session resume.'
@@ -216,23 +248,22 @@ $RetryPost=Get-CompactFlowMarkerSet -ActiveContext @([pscustomobject]@{type='com
 $RetryMarkerState=[pscustomobject]@{calls=0};$RetrySendState=[pscustomobject]@{calls=0}
 $RetryMarkers={ $RetryMarkerState.calls=[int]$RetryMarkerState.calls+1;if($RetryMarkerState.calls -lt 3){$RetryEmpty}else{$RetryPost} }.GetNewClosure()
 $RetrySend={ $RetrySendState.calls=[int]$RetrySendState.calls+1;if($RetrySendState.calls -eq 1){[pscustomobject]@{status='rejected_before_acceptance';marker_identity='';outstanding_intent_count=1;competing_manual_signal=$false}}else{[pscustomobject]@{status='success';marker_identity='retry-marker';outstanding_intent_count=1;competing_manual_signal=$false}} }.GetNewClosure()
-$RetryHydrate={ [pscustomobject]@{verification='PASS';confidence='VERIFIED';action='AUTO_RESUME';route_input=[pscustomobject]@{mode='PINNED_ARTIFACT';status='EXACT'}} }
-$RetryResume={ param($Hydration,$PersistResumeIntent) & $PersistResumeIntent ([pscustomobject]@{mode='PINNED_ARTIFACT';sha256=('1'*64);final_path_verified=$true;link_count=1});[pscustomobject]@{sent=$true;disposition='SENT'} }
-$RetryMachine=Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $RetryMarkers -SendSummarize $RetrySend -Hydrate $RetryHydrate -Resume $RetryResume
-Assert-Equal $RetryMachine.disposition COMPLETE 'One proven retry may complete.'
+$RetryHydrate={ [pscustomobject]@{verification='PASS';confidence='VERIFIED';action='AUTO_RESUME';route_input=[pscustomobject]@{mode='PINNED_ARTIFACT';status='EXACT';sha256=('1'*64);logical_identity='compact-v2-candidate'}} }
+$RetryMachine=Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $RetryMarkers -SendSummarize $RetrySend -Hydrate $RetryHydrate
+Assert-Equal $RetryMachine.disposition ROUTE_READY 'One proven retry may finish route-ready without dispatch.'
 Assert-Equal $RetrySendState.calls 2 'One proven retry must send exactly twice.'
 
 $BaselineFailure={ throw 'marker read failed' }
 $Unused={ throw 'must not run' }
-$BaselineMachine=Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $BaselineFailure -SendSummarize $Unused -Hydrate $Unused -Resume $Unused
+$BaselineMachine=Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $BaselineFailure -SendSummarize $Unused -Hydrate $Unused
 Assert-Equal $BaselineMachine.disposition PROOF_REQUIRED 'Missing marker baseline must stop before summarize.'
-$PreflightMachine=Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $Unused -SendSummarize $Unused -Hydrate $Unused -Resume $Unused -PreflightDisposition BLOCKED
+$PreflightMachine=Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $Unused -SendSummarize $Unused -Hydrate $Unused -PreflightDisposition BLOCKED
 Assert-Equal $PreflightMachine.disposition BLOCKED 'Failed Canon preflight must block before marker or summarize access.'
 
 $HydrationThrow={ throw 'hydration transport ambiguous' }
 $MarkerStateForHydration=[pscustomobject]@{calls=0};$HydrationMarkers={ $MarkerStateForHydration.calls=[int]$MarkerStateForHydration.calls+1;if($MarkerStateForHydration.calls -eq 1){$RetryEmpty}else{$RetryPost} }.GetNewClosure()
 $SuccessSend={ [pscustomobject]@{status='success';marker_identity='retry-marker';outstanding_intent_count=1;competing_manual_signal=$false} }
-$HydrationUnknown=Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $HydrationMarkers -SendSummarize $SuccessSend -Hydrate $HydrationThrow -Resume $Unused
+$HydrationUnknown=Invoke-CompactFlowParticipantMachine -Event (New-TestEvent) -PolicyResolution $Policy -Participant (New-TestParticipant) -Telemetry (New-TestTelemetry) -GetMarkers $HydrationMarkers -SendSummarize $SuccessSend -Hydrate $HydrationThrow
 Assert-Equal $HydrationUnknown.disposition UNCERTAIN 'Ambiguous hydration completion must stop without resume.'
 
 $Temp=Join-Path ([IO.Path]::GetTempPath()) ('compact-flow-test-'+[guid]::NewGuid().ToString('N'))
@@ -294,7 +325,7 @@ try {
   $InvalidPolicy=$InvalidPolicyJson|ConvertFrom-Json
   Assert-True (-not [bool]$InvalidPolicy.valid) 'Malformed global policy must return a structured invalid resolution.'
   Assert-True (-not [bool]$InvalidPolicy.automatic_action_allowed) 'Malformed global policy must never permit compact action.'
-  $InvalidFlowJson=& (Join-Path $PSScriptRoot 'invoke-session-compact-flow.ps1') -EventPath $DryEventPath -TargetRoot $Target -CanonRoot (Join-Path $Temp 'missing-canon') -RouterDir 'invalid-router' -Server 'not-a-server' -GlobalPolicyPath $MalformedGlobalPath
+  $InvalidFlowJson=& (Join-Path $PSScriptRoot 'invoke-session-compact-flow.ps1') -EventPath $DryEventPath -TargetRoot $Target -CanonRoot (Join-Path $Temp 'missing-canon') -RouterDir 'invalid-router' -Server 'not-a-server' -GlobalPolicyPath $MalformedGlobalPath -DryRun
   $InvalidFlow=$InvalidFlowJson|ConvertFrom-Json
   Assert-Equal $InvalidFlow.results[0].disposition CONTINUE 'Malformed global policy must not block unrelated workflow routing.'
   Assert-Equal $InvalidFlow.results[0].reason GLOBAL_POLICY_INVALID_NO_COMPACT 'Malformed global policy must return the exact no-compact reason.'

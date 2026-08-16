@@ -20,6 +20,7 @@
     "safe_boundary",
     "duplicate_send_disposition",
     "satisfied_gates",
+    "host_attestation",
     "participants",
     "created_utc"
   ],
@@ -50,6 +51,7 @@
     "stage_artifact": { "$ref": "#/$defs/stageArtifact" },
     "closeout": { "$ref": "#/$defs/closeout" },
     "host_attestation": { "$ref": "#/$defs/hostAttestation" },
+    "active_route": { "$ref": "#/$defs/activeRouteReceipt" },
     "participants": {
       "type": "array",
       "minItems": 1,
@@ -154,7 +156,7 @@
         "role_hint": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[A-Za-z0-9][A-Za-z0-9 .-]*$" },
         "participation_class": { "enum": ["DELIVERY", "REVIEW_SUPPORT", "META_ORCHESTRATOR"] },
         "compact_order": { "type": "integer", "minimum": 1 },
-        "resume_mode": { "enum": ["AUTO_RESUME", "HYDRATE_ONLY"] },
+        "resume_mode": { "enum": ["ROUTE_READY", "AUTO_RESUME", "HYDRATE_ONLY"] },
         "expected_next_actor": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "^[A-Za-z0-9][A-Za-z0-9 .-]*$" },
         "expected_next_command": { "oneOf": [{ "$ref": "#/$defs/command" }, { "const": "NONE" }] },
         "selected_command_identity": { "$ref": "#/$defs/sha256" },
@@ -184,11 +186,24 @@
     },
     "hostAttestation": {
       "type": "object",
-      "required": ["opencode_version", "opencode_launcher_identity", "command_registry_identity"],
+      "required": ["opencode_version", "opencode_launcher_identity", "command_registry_identity", "after_compact_command_identity"],
       "properties": {
         "opencode_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
         "opencode_launcher_identity": { "$ref": "#/$defs/sha256" },
-        "command_registry_identity": { "$ref": "#/$defs/sha256" }
+        "command_registry_identity": { "$ref": "#/$defs/sha256" },
+        "after_compact_command_identity": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "activeRouteReceipt": {
+      "type": "object",
+      "required": ["profile_id", "generation_id", "state_sha256", "combined_sha256", "stage_sha256"],
+      "properties": {
+        "profile_id": { "$ref": "#/$defs/stableId" },
+        "generation_id": { "$ref": "#/$defs/sha256" },
+        "state_sha256": { "$ref": "#/$defs/sha256" },
+        "combined_sha256": { "$ref": "#/$defs/sha256" },
+        "stage_sha256": { "$ref": "#/$defs/sha256" }
       },
       "additionalProperties": false
     }

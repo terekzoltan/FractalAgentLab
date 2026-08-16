@@ -8,28 +8,33 @@ last-completion usage and derived active-context estimates remain separate; the
 schema grants no compact, send, or mutation authority.
 
 `compact-policy.schema.json` mirrors the Canon `opencode-compact-policy/v1`
-global and tighten-only project branches. `compact-flow-event.schema.json`
+global and tighten-only project branches. `compact-flow-event.schema.json` is a
+retained Compact V2 reference; active Compact Lite uses typed invocation and no
+event JSON. The retained schema
 defines the private target-local event consumed by the separate adapter. Event
 input contains logical participant labels and hashes, never raw session IDs,
 credentials, endpoints, transcripts, or workstation roots.
 
-Project `checks` cannot remove a global evaluation point. Project
-`required_gates` are unioned with global gates, and every event must declare its
-currently satisfied stable gate IDs in `satisfied_gates`; a missing required gate
-returns `PROOF_REQUIRED` before compact action. Nested event objects are closed
-schemas and receive the same recursive privacy validation as top-level fields.
+Project `checks` cannot remove a global evaluation point. `required_gates` and
+`satisfied_gates` remain Compact V2 reference fields only. Active Compact Lite
+rejects a policy with nonempty `required_gates`; its hard gates are the closed,
+adapter-computed transport set in the Canon contract. Nested retained event objects
+remain closed schemas and receive the same recursive privacy validation as
+top-level fields.
 
 The portable global default is `auto_safe` with checks at `before_dispatch`,
-`after_stage_output`, and `epic_closeout`, warning ratio `0.75`, critical ratio
-`0.875`, safe-boundary enforcement, closeout participant compaction, and at most
+`after_stage_output`, and `epic_closeout`, warning ratio `0.5`, critical ratio
+`0.62`, safe-boundary enforcement, closeout participant compaction, and at most
 one explicitly proven pre-acceptance retry. A target `.fal/compact-policy.json`
 may only tighten these values or select `recommend`, `ask`, or `disabled`.
 
-The router has portable built-in profiles: `quick`, `focused`, `standard`,
-`high_risk`, `deep`, `audit`, `wide`, and `custom`. A target registry is optional
-and may add project-declared lane IDs or named custom profiles. It must not change
-Canon authority, silently widen mutation/review scope, or make a project name
-select a lane by itself.
+The router accepts the portable legacy shape aliases `quick`, `focused`,
+`standard`, `high_risk`, `deep`, `audit`, `wide`, and `custom`. They normalize to
+the current Canon native-review budget policy, assignment cap, and optional requested-domain set; they
+do not name native agents or select an external transport. A target registry is
+optional and may add project-declared review domains or named envelope mappings.
+It must not change Canon authority, silently widen scope, pin unavailable models,
+or make a project name select a domain by itself.
 
 Store a live registry in the target's private router configuration and reference
 it from target-local router settings or an explicit wrapper argument. When used,
@@ -41,17 +46,19 @@ data, or workstation-specific roots in a shared registry.
 profile only. It is not required for built-in profiles and is not a runtime
 default.
 
-Five-to-seven internal lanes and full/adaptive Swarm require an Owner-approval
-receipt. The two approval files are format examples, never approvals. A valid
-receipt must be a resolvable pinned artifact with the exact ordered fields shown
-in the examples. `Target`, `Epic`, and `Candidate` are separate mandatory
-bindings. `Review profile`, `Swarm depth`, `Lanes`, and the non-empty
-Owner-declared `Cost envelope` must exactly match the dispatch, followed by
-`Owner approval: APPROVED`. The cost envelope is an opaque, immutable budget
-description; the wrapper compares it exactly and does not infer extra authority
-from it. The wrapper pins and revalidates receipt path, SHA-256 hash, schema
-version, and every binding on resume. A boolean flag or free-text claim grants no
-authority.
+Normal native review is capped at seven total assignments. `EXPANDED_AUDIT`
+(eight to ten including retries and replacements), or a target registry profile
+that explicitly requires Owner authority, needs a resolvable candidate-bound
+approval receipt. Approval examples are formats only. Until the receipt schema is
+revised, its historical `Swarm depth` field must be exactly `none`; it is a
+compatibility slot, not transport authority. `Target`, `Epic`, `Candidate`, shape
+alias, assignment count, cost envelope, and `Owner approval: APPROVED` must match
+exactly. The wrapper pins and revalidates path, hash, version, and bindings on
+resume. A boolean or free-text claim grants no authority.
+
+Active review transport is always `native`. `UseSwarmReview`, `ForceFullReview`,
+and non-`none` Swarm depth fail closed. The old plugin-role registry and
+`swarm-assistant` session are not dependencies of the canonical review path.
 
 Modify schemas through the reviewed workflow/tooling migration. Keep target
 instances project-local so project-specific review capabilities can evolve

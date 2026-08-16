@@ -68,11 +68,22 @@ if([string]::IsNullOrWhiteSpace($LiveRoot)){$LiveRoot=Join-Path ([Environment]::
 if([string]::IsNullOrWhiteSpace($CanonRoot)){$CanonRoot=Join-Path (Split-Path -Parent $FalRoot) 'Agent-Workflow-Canon'}
 if([string]::IsNullOrWhiteSpace($SnapshotRoot)){$SnapshotRoot=Join-Path $CanonRoot 'reference\tooling-snapshot'}
 
+$CanonRoot=Resolve-TestRoot $CanonRoot 'Canon root'
+if($Mode -ceq 'Snapshot'){
+  $SnapshotRoot=Resolve-TestRoot $SnapshotRoot 'Snapshot root'
+  $CanonCommands=@('after-compact','closeout-commit','connectMany','connectPair','deep-research','fal-checkpoint-target','fal-orchestrate-target','implement','oc-toolsmith','seq-next','step-review','step-review-utan','terv-review','terv-review-utan','wave-start','workflow-fix')|Sort-Object -CaseSensitive
+  $CanonSkills=@('closeout-commit','context-onboarding','context-restore','deep-research','fal-orchestrate-target','fal-target-orchestration','fix-planning','grill-me','implementation-execution','improve-codebase-architecture','interface-first-delegation','module-prd','multi-sync','oc-toolsmith','pair-sync','plan-review','sequence-planning','step-review','tdd','ubiquitous-language','workflow-fix')|Sort-Object -CaseSensitive
+  Assert-True ((Compare-Object $CanonCommands (Get-InventoryNames $SnapshotRoot command)).Count -eq 0) 'AWC 4.x snapshot command inventory must contain exactly 16 active commands.'
+  Assert-True ((Compare-Object $CanonSkills (Get-InventoryNames $SnapshotRoot skill)).Count -eq 0) 'AWC 4.x snapshot skill inventory must contain exactly 21 active skills.'
+  $StepReview=Join-Path $SnapshotRoot 'commands\step-review.md'
+  Assert-True ((Test-Path -LiteralPath $StepReview -PathType Leaf) -and ([IO.File]::ReadAllText($StepReview) -match 'Native review selection') -and ([IO.File]::ReadAllText($StepReview) -notmatch '(?m)^/swarm-review$|WAITING FOR GO')) 'AWC 4.x snapshot step-review command is not the native contract.'
+  if($Failures.Count -gt 0){Write-Error("GLOBAL SNAPSHOT INVENTORY TEST FAILED`n- "+($Failures -join "`n- "));exit 1}
+  Write-Host 'PASS: AWC 4.x snapshot contains the exact 16-command/21-skill native-review inventory.' -ForegroundColor Green
+  exit 0
+}
 $CandidateRoot=Resolve-TestRoot $CandidateRoot 'Candidate root'
 $BaselineRoot=Resolve-TestRoot $BaselineRoot 'Baseline root'
 $LiveRoot=Resolve-TestRoot $LiveRoot 'Live root'
-$CanonRoot=Resolve-TestRoot $CanonRoot 'Canon root'
-if($Mode -ceq 'Snapshot'){$SnapshotRoot=Resolve-TestRoot $SnapshotRoot 'Snapshot root'}
 
 $Payloads=@(
   'commands\after-compact.md','commands\wave-start.md','commands\fal-orchestrate-target.md',
@@ -141,6 +152,8 @@ $GenerationRoot=if($Mode -ceq 'Candidate'){$CandidateRoot}elseif($Mode -ceq 'Liv
 Assert-GenerationSemantics -Root $GenerationRoot -Label $Mode -RequireGlobalPolicy ($Mode -cne 'Snapshot')
 
 if($Mode -ceq 'Candidate'){
+  # Historical Compact V2 transaction evidence intentionally binds the pre-AWC-3
+  # 17-command/21-skill inventory. It is not the current live/snapshot contract.
   foreach($Relative in $Payloads){Assert-True ((Get-RelativeHash $BaselineRoot $Relative)-ceq (Get-RelativeHash $LiveRoot $Relative)) "Live baseline drift: $Relative"}
   $ConfigCommands=@('after-compact','closeout-commit','connectMany','connectPair','fal-checkpoint-target','fal-orchestrate-target','implement','oc-toolsmith','seq-next','step-review','step-review-utan','swarm-review','swarm-review-setup','terv-review','terv-review-utan','wave-start','workflow-fix')|Sort-Object -CaseSensitive
   $ConfigSkills=@('closeout-commit','context-onboarding','context-restore','fal-orchestrate-target','fal-target-orchestration','fix-planning','grill-me','implementation-execution','improve-codebase-architecture','interface-first-delegation','module-prd','multi-sync','oc-toolsmith','pair-sync','plan-review','sequence-planning','step-review','swarm-review','tdd','ubiquitous-language','workflow-fix')|Sort-Object -CaseSensitive

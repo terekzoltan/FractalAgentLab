@@ -14,6 +14,10 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "oc-router-common.ps1")
 . (Join-Path $PSScriptRoot "session-compact-flow-core.ps1")
 
+if (-not $DryRun) {
+  throw 'Retained Compact V2 is reference-only; non-dry execution is retired. Use Compact Lite.'
+}
+
 function Resolve-CompactFlowLocalRoot {
   param([string]$Path, [string]$Label)
   if ([string]::IsNullOrWhiteSpace($Path) -or -not [IO.Path]::IsPathRooted($Path)) { throw "$Label must be an absolute local path." }
@@ -104,7 +108,7 @@ function Get-CompactFlowLiveCommandRegistryIdentity {
 function Get-CompactFlowHydrationReport {
   param([string]$Text)
   $Confidence = [regex]::Matches($Text, '(?m)^Hydration confidence:\s*(VERIFIED|SUFFICIENT|PARTIAL|FAILED)\s*$')
-  $Action = [regex]::Matches($Text, '(?m)^Hydration action:\s*(AUTO_RESUME|PROOF_REQUIRED|CONFIRM|BLOCKED)\s*$')
+  $Action = [regex]::Matches($Text, '(?m)^Hydration action:\s*(ROUTE_READY|AUTO_RESUME|PROOF_REQUIRED|CONFIRM|BLOCKED)\s*$')
   $Route = [regex]::Matches($Text, '(?m)^Route input:\s*(EXACT|MISSING|MISMATCH|NOT_REQUIRED)\s*$')
   if ($Confidence.Count -ne 1 -or $Action.Count -ne 1 -or $Route.Count -ne 1) { throw 'After-compact output lacks one strict V2 hydration classification.' }
   return [pscustomobject]@{ confidence=$Confidence[0].Groups[1].Value; action=$Action[0].Groups[1].Value; route_input=$Route[0].Groups[1].Value }
@@ -139,6 +143,65 @@ if (-not [bool]$PolicyResolution.valid) {
 }
 
 $CanonRootFull = Resolve-CompactFlowLocalRoot -Path $CanonRoot -Label 'Canon root'
+$ActiveRouteReceipt = $null
+if (-not $DryRun) {
+  if ($null -eq $Event.PSObject.Properties['active_route']) {
+    [pscustomobject][ordered]@{
+      schema_version='compact-flow-result/v1'; event_id=[string]$Event.event_id; boundary_id=[string]$Event.boundary_id
+      policy_identity=[string]$PolicyResolution.effective_policy_sha256; boundary_path='UNDECLARED'; boundary_sha256='UNDECLARED'; dry_run=$false
+      results=@($Event.participants | ForEach-Object { [pscustomobject][ordered]@{ logical_session_ref=[string]$_.logical_session_ref; disposition='BLOCKED'; reason='ACTIVE_ROUTE_VERIFICATION_REQUIRED' } })
+      privacy=[pscustomobject]@{ raw_session_ids_emitted=$false; endpoints_emitted=$false; transcripts_emitted=$false }
+    } | ConvertTo-Json -Depth 20 -Compress
+    return
+  }
+  $ActiveRouteParticipants = @($Event.participants | Where-Object { [string]$_.profile_id -ceq [string]$Event.active_route.profile_id })
+  if ($ActiveRouteParticipants.Count -ne 1) {
+    [pscustomobject][ordered]@{
+      schema_version='compact-flow-result/v1'; event_id=[string]$Event.event_id; boundary_id=[string]$Event.boundary_id
+      policy_identity=[string]$PolicyResolution.effective_policy_sha256; boundary_path='UNDECLARED'; boundary_sha256='UNDECLARED'; dry_run=$false
+      results=@($Event.participants | ForEach-Object { [pscustomobject][ordered]@{ logical_session_ref=[string]$_.logical_session_ref; disposition='BLOCKED'; reason='ACTIVE_ROUTE_PROFILE_AMBIGUOUS' } })
+      privacy=[pscustomobject]@{ raw_session_ids_emitted=$false; endpoints_emitted=$false; transcripts_emitted=$false }
+    } | ConvertTo-Json -Depth 20 -Compress
+    return
+  }
+  $ActiveRouteParticipant = $ActiveRouteParticipants[0]
+  $ActiveRouteWriterArguments = @{
+    Operation='VERIFY'; TargetRoot=$TargetRootFull; RegistryRoot=(Join-Path $CanonRootFull 'registry')
+    ProjectId=[string]$Event.project_id; ProfileId=[string]$Event.active_route.profile_id; ExpectedPriorGenerationId=[string]$Event.active_route.generation_id
+    ExpectedStateRevision=[string]$Event.state_revision; ExpectedWaveId=[string]$Event.wave_id; ExpectedEpicId=[string]$Event.epic_id
+    ExpectedWorkflowPhase=[string]$Event.workflow_phase; ExpectedCandidateIdentity=[string]$Event.candidate_identity; ExpectedConfigurationIdentity=[string]$Event.configuration_identity
+    ExpectedNextActor=[string]$ActiveRouteParticipant.expected_next_actor; ExpectedNextCommand=[string]$ActiveRouteParticipant.expected_next_command
+    ExpectedRouteInputMode=[string]$ActiveRouteParticipant.route_input.mode
+  }
+  foreach ($RouteExpectationName in @('path','sha256','logical_identity')) {
+    if ($null -ne $ActiveRouteParticipant.route_input.PSObject.Properties[$RouteExpectationName]) {
+      $WriterParameterName = switch ($RouteExpectationName) { 'path' {'ExpectedRouteInputPath'} 'sha256' {'ExpectedRouteInputSha256'} default {'ExpectedRouteInputLogicalIdentity'} }
+      $ActiveRouteWriterArguments[$WriterParameterName] = [string]$ActiveRouteParticipant.route_input.$RouteExpectationName
+    }
+  }
+  $ActiveRouteJson = [string](& (Join-Path $PSScriptRoot 'write-active-route-manifest.ps1') @ActiveRouteWriterArguments)
+  $ActiveRouteExitCode = $LASTEXITCODE
+  try {
+    Assert-CompactFlowStrictJson -Text $ActiveRouteJson -Label 'Active-route verification receipt'
+    $ActiveRouteReceipt = $ActiveRouteJson | ConvertFrom-Json
+  }
+  catch { $ActiveRouteExitCode = 17 }
+  $ActiveRouteMatches = $ActiveRouteExitCode -eq 0 -and
+    [string]$ActiveRouteReceipt.outcome -ceq 'VERIFIED' -and
+    [string]$ActiveRouteReceipt.generation_id -ceq [string]$Event.active_route.generation_id -and
+    [string]$ActiveRouteReceipt.source_identities.state_sha256 -ceq [string]$Event.active_route.state_sha256 -and
+    [string]$ActiveRouteReceipt.source_identities.combined_sha256 -ceq [string]$Event.active_route.combined_sha256 -and
+    [string]$ActiveRouteReceipt.source_identities.stage_sha256 -ceq [string]$Event.active_route.stage_sha256
+  if (-not $ActiveRouteMatches) {
+    [pscustomobject][ordered]@{
+      schema_version='compact-flow-result/v1'; event_id=[string]$Event.event_id; boundary_id=[string]$Event.boundary_id
+      policy_identity=[string]$PolicyResolution.effective_policy_sha256; boundary_path='UNDECLARED'; boundary_sha256='UNDECLARED'; dry_run=$false
+      results=@($Event.participants | ForEach-Object { [pscustomobject][ordered]@{ logical_session_ref=[string]$_.logical_session_ref; disposition='BLOCKED'; reason='ACTIVE_ROUTE_VERIFICATION_FAILED' } })
+      privacy=[pscustomobject]@{ raw_session_ids_emitted=$false; endpoints_emitted=$false; transcripts_emitted=$false }
+    } | ConvertTo-Json -Depth 20 -Compress
+    return
+  }
+}
 $RouterDirFull = if ([IO.Path]::IsPathRooted($RouterDir)) { [IO.Path]::GetFullPath($RouterDir) } else { [IO.Path]::GetFullPath((Join-Path $TargetRootFull $RouterDir)) }
 $ExpectedRouter = [IO.Path]::GetFullPath((Join-Path $TargetRootFull '.opencode-router'))
 if (-not $RouterDirFull.Equals($ExpectedRouter, [StringComparison]::OrdinalIgnoreCase)) { throw 'RouterDir must be the target-local .opencode-router directory.' }
@@ -213,7 +276,14 @@ foreach ($Participant in $SelectedParticipants) {
   $LogicalRef = [string]$Participant.logical_session_ref
   $Entry = Get-OCRouterSessionEntry -Config $RouterConfig -Name $LogicalRef
   $SessionId = Get-CompactFlowSessionId -Entry $Entry
-  $TelemetryArgs = @{ Target=$LogicalRef; Server=$Server; RouterDir=$RouterDirFull }
+  $TelemetryArgs = @{
+    Target=$LogicalRef
+    Server=$Server
+    RouterDir=$RouterDirFull
+    WarnRatio=[double]$PolicyResolution.effective_policy.warn_ratio
+    CriticalRatio=[double]$PolicyResolution.effective_policy.critical_ratio
+    PolicyIdentity=[string]$PolicyResolution.effective_policy_sha256
+  }
   $TelemetryJson = [string](& (Join-Path $PSScriptRoot 'session-context-status.ps1') @TelemetryArgs)
   Assert-CompactFlowStrictJson -Text $TelemetryJson -Label 'Session context telemetry'
   $Telemetry = $TelemetryJson | ConvertFrom-Json
@@ -229,7 +299,8 @@ foreach ($Participant in $SelectedParticipants) {
   if ([string]$Decision.disposition -ceq 'AUTO_COMPACT' -and -not $Manual) {
     try {
       $PreflightCommandIdentity = ''
-      if ([string]$Participant.resume_mode -ceq 'AUTO_RESUME') {
+      $PreflightEntries = $null
+      if ([string]$Participant.resume_mode -in @('ROUTE_READY','AUTO_RESUME')) {
         $PreflightEntries = Get-CompactFlowCommandEntries -BaseServer $Server -Headers $Headers
         if ($null -ne $Event.PSObject.Properties['host_attestation']) {
           $LiveRegistryIdentity = Get-CompactFlowLiveCommandRegistryIdentity -Entries $PreflightEntries
@@ -238,13 +309,18 @@ foreach ($Participant in $SelectedParticipants) {
         $PreflightCommandIdentity = Get-CompactFlowLiveCommandIdentity -Entries $PreflightEntries -CommandName ([string]$Participant.expected_next_command)
         if ($PreflightCommandIdentity -cne [string]$Participant.selected_command_identity) { throw 'Live selected-command identity differs from the boundary expectation.' }
       }
+      if ($null -eq $PreflightEntries) { $PreflightEntries = Get-CompactFlowCommandEntries -BaseServer $Server -Headers $Headers }
+      $LiveRegistryIdentity = Get-CompactFlowLiveCommandRegistryIdentity -Entries $PreflightEntries
+      if ($LiveRegistryIdentity -cne [string]$Event.host_attestation.command_registry_identity) { throw 'Live command registry identity differs from the boundary host attestation.' }
+      $AfterCompactIdentity = Get-CompactFlowLiveCommandIdentity -Entries $PreflightEntries -CommandName 'after-compact'
+      if ($AfterCompactIdentity -cne [string]$Event.host_attestation.after_compact_command_identity) { throw 'Live after-compact command identity differs from the boundary expectation.' }
       $PreflightArgs = @{ CompactBoundaryPath=$BoundaryPath; TargetRoot=$TargetRootFull; RoleHint=[string]$Participant.role_hint; RegistryRoot=(Join-Path $CanonRootFull 'registry'); PrivateRuntimeMappingPresent=$true; AsJson=$true }
       if (-not [string]::IsNullOrWhiteSpace($PreflightCommandIdentity)) { $PreflightArgs.VerifiedSelectedCommandIdentity = $PreflightCommandIdentity }
       $PreflightJson = [string](& (Join-Path $CanonRootFull 'scripts\resolve-hydration.ps1') @PreflightArgs)
       Assert-CompactFlowStrictJson -Text $PreflightJson -Label 'Canon compact preflight'
       $Preflight = $PreflightJson | ConvertFrom-Json
       if ([string]$Preflight.confidence -ceq 'FAILED' -or [string]$Preflight.action -ceq 'BLOCKED') { $PreflightDisposition = 'BLOCKED' }
-      elseif ([string]$Participant.resume_mode -ceq 'AUTO_RESUME' -and ([string]$Preflight.action -cne 'AUTO_RESUME' -or [string]$Preflight.route_input.status -cne 'EXACT')) { $PreflightDisposition = 'PROOF_REQUIRED' }
+      elseif ([string]$Participant.resume_mode -in @('ROUTE_READY','AUTO_RESUME') -and ([string]$Preflight.action -cnotin @('ROUTE_READY','AUTO_RESUME') -or [string]$Preflight.route_input.status -cne 'EXACT')) { $PreflightDisposition = 'PROOF_REQUIRED' }
     } catch { $PreflightDisposition = 'BLOCKED' }
   }
 
@@ -287,8 +363,11 @@ foreach ($Participant in $SelectedParticipants) {
     }.GetNewClosure()
     $Hydrate = {
       $CommandEntries = Get-CompactFlowCommandEntries -BaseServer $Server -Headers $Headers
+      $CurrentRegistryIdentity = Get-CompactFlowLiveCommandRegistryIdentity -Entries $CommandEntries
+      $CurrentAfterCompactIdentity = Get-CompactFlowLiveCommandIdentity -Entries $CommandEntries -CommandName 'after-compact'
+      if ($CurrentRegistryIdentity -cne [string]$Event.host_attestation.command_registry_identity -or $CurrentAfterCompactIdentity -cne [string]$Event.host_attestation.after_compact_command_identity) { return [pscustomobject]@{ verification='BLOCKED'; confidence='FAILED'; action='BLOCKED'; route_input=[pscustomobject]@{ status='MISMATCH' } } }
       $VerifiedIdentity = ''
-      if ([string]$Participant.resume_mode -ceq 'AUTO_RESUME') {
+      if ([string]$Participant.resume_mode -in @('ROUTE_READY','AUTO_RESUME')) {
         $VerifiedIdentity = Get-CompactFlowLiveCommandIdentity -Entries $CommandEntries -CommandName ([string]$Participant.expected_next_command)
         if ($VerifiedIdentity -cne [string]$Participant.selected_command_identity) { return [pscustomobject]@{ verification='BLOCKED'; confidence='FAILED'; action='BLOCKED'; route_input=[pscustomobject]@{ status='MISMATCH' } } }
       }
@@ -303,7 +382,7 @@ foreach ($Participant in $SelectedParticipants) {
       $MessageResponse = Invoke-RestMethod -Method Get -Uri $ReadUri -Headers $Headers -TimeoutSec 30
       $Baseline = Get-OCRouterLatestRawAssistantMessage -Messages @(Get-OCRouterMessageCollection -Response $MessageResponse) -AssumeNewestFirst $true
       if ($null -eq $Baseline) { throw 'Cannot establish after-compact assistant baseline.' }
-      $AfterBody = New-OCRouterCommandRequestBodyObject -Command 'after-compact' -Arguments ([string]$Participant.role_hint)
+      $AfterBody = New-OCRouterCommandRequestBodyObject -Command 'after-compact' -Arguments (([string]$Event.project_id) + ' ' + ([string]$Participant.role_hint))
       $null = Invoke-RestMethod -Method Post -Uri "$($Server.TrimEnd('/'))/session/$([Uri]::EscapeDataString($SessionId))/command" -Headers $Headers -ContentType 'application/json' -Body ($AfterBody | ConvertTo-Json -Depth 10) -TimeoutSec 60
       $Deadline = [datetime]::UtcNow.AddMinutes(5); $Candidate = $null
       while ([datetime]::UtcNow -lt $Deadline -and $null -eq $Candidate) {
@@ -315,33 +394,10 @@ foreach ($Participant in $SelectedParticipants) {
       if ($null -eq $Candidate) { throw 'After-compact hydration output timed out.' }
       $Report = Get-CompactFlowHydrationReport -Text ([string]$Candidate.Text)
       if ([string]$Report.confidence -cne [string]$HydrationResult.confidence -or [string]$Report.action -cne [string]$HydrationResult.action -or [string]$Report.route_input -cne [string]$HydrationResult.route_input.status) { throw 'After-compact report disagrees with direct Canon verification.' }
-      $script:ResumeCommandEntries = $CommandEntries
-      return $HydrationResult
-    }.GetNewClosure()
-    $Resume = {
-      param($HydrationResult, $PersistResumeIntent)
-      $Command = [string]$Participant.expected_next_command
-      Assert-OCRouterParentSessionCommandSafe -Server $Server -Headers $Headers -CommandName $Command -CommandEntries @($script:ResumeCommandEntries)
-      $Arguments = ''
-      $Snapshot = $null
-      try {
-        if ([string]$HydrationResult.route_input.mode -ceq 'PINNED_ARTIFACT') {
-          $Snapshot = Open-CompactFlowRouteSnapshot -Root $TargetRootFull -RelativePath ([string]$HydrationResult.route_input.path) -ExpectedSha256 ([string]$HydrationResult.route_input.sha256)
-          $Arguments = (New-Object Text.UTF8Encoding($false, $true)).GetString([byte[]]$Snapshot.bytes)
-        } elseif ([string]$HydrationResult.route_input.mode -cne 'EXACT_EMPTY') { return [pscustomobject]@{ sent=$false; disposition='BLOCKED' } }
-        $Body = New-OCRouterCommandRequestBodyObject -Command $Command -Arguments $Arguments
-        $HeldRouteProof = if ($null -ne $Snapshot) {
-          [pscustomobject][ordered]@{ mode='PINNED_ARTIFACT'; sha256=[string]$Snapshot.sha256; logical_identity=[string]$HydrationResult.route_input.logical_identity; final_path_verified=$true; link_count=[int]$Snapshot.link_count }
-        } else { [pscustomobject][ordered]@{ mode='EXACT_EMPTY'; canon_attested=$true } }
-        & $PersistResumeIntent $HeldRouteProof
-        try {
-          $null = Invoke-RestMethod -Method Post -Uri "$($Server.TrimEnd('/'))/session/$([Uri]::EscapeDataString($SessionId))/command" -Headers $Headers -ContentType 'application/json' -Body ($Body | ConvertTo-Json -Depth 12) -TimeoutSec 60
-          return [pscustomobject]@{ sent=$true; disposition='SENT' }
-        } catch { return [pscustomobject]@{ sent=$false; disposition='UNCERTAIN' } }
-      } finally { if ($null -ne $Snapshot -and $null -ne $Snapshot.stream) { $Snapshot.stream.Dispose() } }
-    }.GetNewClosure()
+       return $HydrationResult
+     }.GetNewClosure()
 
-    $Result = Invoke-CompactFlowParticipantMachine -Event $Event -PolicyResolution $PolicyResolution -Participant $Participant -Telemetry $Telemetry -GetMarkers $GetMarkers -SendSummarize $SendSummarize -Hydrate $Hydrate -Resume $Resume -Persist $Persist -ManualCompact $Manual -PreflightDisposition $PreflightDisposition
+    $Result = Invoke-CompactFlowParticipantMachine -Event $Event -PolicyResolution $PolicyResolution -Participant $Participant -Telemetry $Telemetry -GetMarkers $GetMarkers -SendSummarize $SendSummarize -Hydrate $Hydrate -Persist $Persist -ManualCompact $Manual -PreflightDisposition $PreflightDisposition -ActiveRouteReceipt $ActiveRouteReceipt
     $Results.Add([pscustomobject][ordered]@{ logical_session_ref=$LogicalRef; disposition=[string]$Result.disposition; reason=[string]$Result.reason; final_state=[string]$Result.run_state.state; generation_sha256=[string]$Result.run_state.generation_sha256 })
 }
 
