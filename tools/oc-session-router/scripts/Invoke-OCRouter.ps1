@@ -31,7 +31,7 @@ function Invoke-WithRouterEnvironment {
 $ErrorActionPreference = 'Stop'
 $RuntimeRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'runtime'
 $AttestationPath = Join-Path $RuntimeRoot 'executable-attestation.json'
-$ExpectedAttestationSha256 = 'a17163ee06820342590c6400824e489b6ceef161b81d16961292d262bebd1bff'
+$ExpectedAttestationSha256 = '49483a801177cd2b645aa070e32093cb234d3743aa23ad8469cab64f2460325e'
 
 function Assert-OrdinaryContainedFile {
   param([string]$Path, [string]$ContainmentRoot, [string]$Label)

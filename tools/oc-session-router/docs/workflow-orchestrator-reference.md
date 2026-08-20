@@ -9,7 +9,7 @@ readable and non-resumable.
 
 ## Status and purpose
 
-This is the selective cold reference for FAL's AWC 3.1 router adapter. The hot
+This is the selective cold reference for FAL's current AWC router adapter. The hot
 entry point is `workflow-orchestrator-runbook.md`. Open only the section needed
 for the current transport, resume, classifier, review-envelope, or recovery
 decision.
@@ -76,11 +76,20 @@ agents. The envelope binds:
 
 - Target, Epic, Accountable Lane/class/profile, and frozen candidate;
 - immutable implementation and acceptance/evidence pointers;
+- `INITIAL` for the unchanged ordinary candidate review, with no repaired
+  finding IDs; or `FIX_RECHECK` for a later reviewed repair-plan cycle;
+- for `FIX_RECHECK`, the exact repaired finding IDs, immutable repair delta, and
+  minimal regression boundary in both protected evidence and the verified
+  command envelope;
 - actual risk and optional review focus;
 - budget policy and total assignment cap;
 - requested domains when the Owner or project contract constrains them;
 - exact Owner expansion/budget receipt when required;
 - no-mutation and no-commit policy.
+
+For `FIX_RECHECK`, recompute risk and use the smallest sufficient remaining
+coverage. A prior wide review does not force the same width after a narrow fix,
+and adjacent discoveries do not expand the current candidate authority.
 
 Meta then performs both router and chair functions:
 
@@ -193,9 +202,6 @@ Review routing: budget_policy=<policy>; shape=<shape>; assignments=<ids/profiles
 `SkipSwarmReview` is accepted only as a harmless historical compatibility input;
 the active transport is native regardless.
 
-For a repeat fix cycle, recompute risk and use the smallest sufficient remaining
-coverage. A prior wide review does not force the same width after a narrow fix.
-
 ## Parallel step-review wrapper
 
 `run-parallel-step-review-flow.ps1` aggregates exact per-lane implementation pins
@@ -227,7 +233,7 @@ Current strict step-review terminal expectations:
 - Delivery response: exact `ACK_ONLY`, `FIX_PLAN_REQUIRED`, or `UNCLEAR` contract.
 
 If a fresh AWC output is rejected, compare the exact live command contract and the
-classifier. In particular, AWC 3.1 uses `Review routing:`, not the retired
+classifier. In particular, the current AWC uses `Review routing:`, not the retired
 `Review profile/topology:` line. A canonical output/classifier mismatch freezes
 routing and opens `/workflow-fix`; never hand-edit the output to bypass the gate.
 

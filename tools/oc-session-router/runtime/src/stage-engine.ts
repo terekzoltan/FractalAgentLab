@@ -108,13 +108,13 @@ export class StageEngine {
     for (const source of resolved.sources) if (sha256(Buffer.from(source.content, "utf8")) !== source.binding.sha256) throw new Error("Source content hash mismatch");
     assertSourceLineage(request, resolved.sources, loaded.authority, resolved.worktree);
     this.assertTransition(request);
-    const argument = renderSources(resolved.sources);
+    const argument = renderCommandArgument(request, resolved.sources);
     for (const source of resolved.sources) assertArtifactSafe(source.content, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
     assertArtifactSafe(argument, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
     const command = commandForStage(request.requested_stage);
     const operationId = `op-${randomUUID()}`;
     const recipientSessionSha256 = sha256(resolved.transport.session_id);
-    const semanticKey = sha256(canonicalize({ target_id: request.target_id, worktree_identity: request.worktree_identity, stage: request.requested_stage, canon_phase: resolveCanonPhase(request.requested_stage, request.plan_class), sources: resolvedBindings, plan: request.plan_identity, candidate: request.candidate_identity, cycle: request.review_cycle, findings: request.finding_ids, recipient_session_sha256: recipientSessionSha256, active_route_generation: resolved.run_authority.active_route_generation }));
+    const semanticKey = sha256(canonicalize({ target_id: request.target_id, worktree_identity: request.worktree_identity, stage: request.requested_stage, canon_phase: resolveCanonPhase(request.requested_stage, request.plan_class), sources: resolvedBindings, plan: request.plan_identity, candidate: request.candidate_identity, cycle: request.review_cycle, findings: request.finding_ids, review_risk: request.review_risk, project_review_context: request.project_review_context, recipient_session_sha256: recipientSessionSha256, active_route_generation: resolved.run_authority.active_route_generation }));
     const invocation: StageInvocation = {
       ...request,
       schema_version: "stage-invocation.v1",
@@ -329,10 +329,25 @@ function synthesisReceipt(synthesis: string, request: StageRequest, authority: R
   };
 }
 
-function acceptanceEvidenceCandidate(content: string): string {
+function acceptanceEvidenceReceipt(content: string): { candidate: string; reviewMode?: "INITIAL" | "FIX_RECHECK"; repairedFindingIds: string[] } {
   const text = content.replace(/\r\n/g, "\n").trim();
   if (!/^# FAL Explicit-Stage Router AC01-AC87 Reconciliation\n/.test(text) && !/^ACCEPTANCE EVIDENCE\n/.test(text)) throw new Error("Acceptance evidence source shape mismatch");
-  return sourceField(text, "Candidate");
+  const reviewMode = /^Review mode:/m.test(text) ? sourceField(text, "Review mode") : undefined;
+  if (reviewMode !== undefined && reviewMode !== "INITIAL" && reviewMode !== "FIX_RECHECK") throw new Error("Acceptance evidence review mode is invalid");
+  const repairedFindingIds = /^Repaired finding IDs:/m.test(text)
+    ? parseFindingIdArray(sourceField(text, "Repaired finding IDs"), "Acceptance evidence")
+    : [];
+  return { candidate: sourceField(text, "Candidate"), ...(reviewMode ? { reviewMode } : {}), repairedFindingIds };
+}
+
+function reviewModeForRequest(request: StageRequest): "INITIAL" | "FIX_RECHECK" {
+  if (!/^(0|[1-9][0-9]*)$/.test(request.review_cycle)) throw new Error("STEP_REVIEW review cycle is invalid");
+  if (request.review_cycle === "0") {
+    if (request.plan_class !== "EPIC_PLAN" || request.finding_ids.length !== 0) throw new Error("INITIAL STEP_REVIEW requires EPIC_PLAN and no repaired finding IDs");
+    return "INITIAL";
+  }
+  if (request.plan_class !== "REVIEW_FIX_PLAN" || request.finding_ids.length === 0) throw new Error("FIX_RECHECK STEP_REVIEW requires REVIEW_FIX_PLAN and repaired finding IDs");
+  return "FIX_RECHECK";
 }
 
 interface CloseoutAuthorityReceipt {
@@ -393,12 +408,18 @@ function assertSourceLineage(request: StageRequest, sources: readonly ResolvedSo
     assertFindingLineage(request, sourceFindingIds);
   }
   if (request.requested_stage === "STEP_REVIEW") {
-    assertFindingLineage(request, []);
+    const reviewMode = reviewModeForRequest(request);
     const implementation = byClass.get("IMPLEMENTATION_RESULT")!;
     const parsedImplementation = parseOutputShape("IMPLEMENT", implementation);
     if (request.candidate_identity === "UNDECLARED") throw new Error("Implementation candidate or plan lineage mismatch");
     validateOutputBinding(parsedImplementation, { ...authorityBinding(authority), candidate: request.candidate_identity, plan: request.plan_identity });
-    if (acceptanceEvidenceCandidate(byClass.get("ACCEPTANCE_EVIDENCE")!) !== request.candidate_identity) throw new Error("Acceptance evidence candidate lineage mismatch");
+    const acceptance = acceptanceEvidenceReceipt(byClass.get("ACCEPTANCE_EVIDENCE")!);
+    if (acceptance.candidate !== request.candidate_identity) throw new Error("Acceptance evidence candidate lineage mismatch");
+    if (reviewMode === "INITIAL") {
+      if (acceptance.reviewMode === "FIX_RECHECK" || acceptance.repairedFindingIds.length !== 0) throw new Error("INITIAL acceptance evidence contains repair lineage");
+    } else if (acceptance.reviewMode !== "FIX_RECHECK" || canonicalize(acceptance.repairedFindingIds) !== canonicalize(request.finding_ids)) {
+      throw new Error("FIX_RECHECK acceptance evidence finding lineage mismatch");
+    }
   }
   if (request.requested_stage === "DELIVERY_RESPONSE" || request.requested_stage === "CLOSEOUT") {
     const receipt = synthesisReceipt(byClass.get("FINAL_SYNTHESIS")!, request, authority);
@@ -522,6 +543,22 @@ function safeFailureReason(error: unknown, transport: TransportBinding): string 
 
 function renderSources(sources: readonly ResolvedSource[]): string {
   return sources.map((source, index) => `--- FAL SOURCE ${index} ${source.binding.logical_identity} ${source.binding.sha256} ---\n${source.content.replace(/\r\n/g, "\n").trimEnd()}\n--- END FAL SOURCE ${index} ---`).join("\n");
+}
+
+function renderCommandArgument(request: StageRequest, sources: readonly ResolvedSource[]): string {
+  if (request.requested_stage !== "STEP_REVIEW") return renderSources(sources);
+  const reviewMode = reviewModeForRequest(request);
+  const envelope = canonicalize({
+    schema_version: "fal-review-envelope.v1",
+    review_mode: reviewMode,
+    review_cycle: request.review_cycle,
+    candidate_identity: request.candidate_identity,
+    repaired_finding_ids: request.finding_ids,
+    review_boundary: reviewMode === "FIX_RECHECK" ? "REPAIRED_FINDINGS_AND_MINIMAL_REGRESSION" : "FROZEN_CANDIDATE",
+    scope_promotion_policy: "NEXUS_ONLY",
+    scope_expansion_authority: "NONE",
+  });
+  return `--- FAL VERIFIED REVIEW ENVELOPE ---\n${envelope}\n--- END FAL VERIFIED REVIEW ENVELOPE ---\n${renderSources(sources)}`;
 }
 
 function allowedNext(stage: StageRequest["requested_stage"], terminal: string): string[] {

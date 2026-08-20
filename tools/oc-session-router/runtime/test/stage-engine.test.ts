@@ -772,6 +772,113 @@ test("FSR-014: review cycle is protected state authority across one-stage runs",
   }
 });
 
+test("STEP_REVIEW sends a verified INITIAL or FIX_RECHECK envelope", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-review-envelope-"));
+  try {
+    const argumentsSent: string[] = [];
+    const resolver = new FakeResolver();
+    resolver.nextCommand = "/step-review";
+    const engine = new StageEngine(new StateStore(root), resolver, new CommandClient(async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { arguments: string };
+      argumentsSent.push(body.arguments);
+      return new Response(JSON.stringify({
+        info: { id: `assistant-review-${argumentsSent.length}`, role: "assistant", sessionID: "session-meta", parentID: `user-review-${argumentsSent.length}` },
+        parts: [{ id: `part-review-${argumentsSent.length}`, type: "text", text: synthesisSource("ALLOWED", "NONE"), messageID: `assistant-review-${argumentsSent.length}`, sessionID: "session-meta" }],
+      }));
+    }));
+
+    resolver.resolvedSources = [
+      resolvedSource("IMPLEMENTATION_RESULT", implementationSource("candidate-1"), 0),
+      resolvedSource("ACCEPTANCE_EVIDENCE", "ACCEPTANCE EVIDENCE\nCandidate: candidate-1\n", 1),
+    ];
+    const initialRun = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const initial: StageRequest = {
+      ...request(initialRun.run_id, initialRun.run_authority_sha256, sha256(resolver.sourceContent)),
+      request_id: "request-initial-review-envelope",
+      requested_stage: "STEP_REVIEW",
+      candidate_identity: "candidate-1",
+      expected_sources: resolver.resolvedSources.map((source) => source.binding),
+    };
+    assert.equal((await engine.invokeStage(initial)).operation_status, "SUCCEEDED");
+
+    resolver.reviewCycle = "1";
+    resolver.resolvedSources = [
+      resolvedSource("IMPLEMENTATION_RESULT", implementationSource("candidate-1", "fix-plan-1"), 0),
+      resolvedSource("ACCEPTANCE_EVIDENCE", 'ACCEPTANCE EVIDENCE\nCandidate: candidate-1\nReview mode: FIX_RECHECK\nRepaired finding IDs: ["FSR-010"]\n', 1),
+    ];
+    const fixRun = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const fixRecheck: StageRequest = {
+      ...request(fixRun.run_id, fixRun.run_authority_sha256, sha256(resolver.sourceContent)),
+      request_id: "request-fix-recheck-envelope",
+      requested_stage: "STEP_REVIEW",
+      plan_class: "REVIEW_FIX_PLAN",
+      plan_identity: "fix-plan-1",
+      candidate_identity: "candidate-1",
+      review_cycle: "1",
+      finding_ids: ["FSR-010"],
+      review_risk: "focused",
+      project_review_context: "repair-only",
+      expected_sources: resolver.resolvedSources.map((source) => source.binding),
+    };
+    assert.equal((await engine.invokeStage(fixRecheck)).operation_status, "SUCCEEDED");
+
+    assert.equal(argumentsSent.length, 2);
+    assert.match(argumentsSent[0]!, /"review_mode":"INITIAL"/);
+    assert.match(argumentsSent[0]!, /"scope_promotion_policy":"NEXUS_ONLY"/);
+    assert.match(argumentsSent[1]!, /"review_mode":"FIX_RECHECK"/);
+    assert.match(argumentsSent[1]!, /"repaired_finding_ids":\["FSR-010"\]/);
+    assert.match(argumentsSent[1]!, /"review_boundary":"REPAIRED_FINDINGS_AND_MINIMAL_REGRESSION"/);
+    assert.doesNotMatch(argumentsSent[1]!, /repair-only/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("STEP_REVIEW rejects unbound repair scope before POST", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-review-envelope-negative-"));
+  try {
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.nextCommand = "/step-review";
+    const engine = new StageEngine(new StateStore(root), resolver, new CommandClient(async () => { calls += 1; return new Response(); }));
+
+    resolver.resolvedSources = [
+      resolvedSource("IMPLEMENTATION_RESULT", implementationSource("candidate-1"), 0),
+      resolvedSource("ACCEPTANCE_EVIDENCE", "ACCEPTANCE EVIDENCE\nCandidate: candidate-1\n", 1),
+    ];
+    const initialRun = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const initialBase: StageRequest = {
+      ...request(initialRun.run_id, initialRun.run_authority_sha256, sha256(resolver.sourceContent)),
+      requested_stage: "STEP_REVIEW",
+      candidate_identity: "candidate-1",
+      expected_sources: resolver.resolvedSources.map((source) => source.binding),
+    };
+    await assert.rejects(() => engine.invokeStage({ ...initialBase, request_id: "request-initial-with-finding", plan_class: "REVIEW_FIX_PLAN", finding_ids: ["FSR-010"] }), /INITIAL STEP_REVIEW/);
+
+    resolver.reviewCycle = "1";
+    resolver.resolvedSources = [
+      resolvedSource("IMPLEMENTATION_RESULT", implementationSource("candidate-1", "fix-plan-1"), 0),
+      resolvedSource("ACCEPTANCE_EVIDENCE", 'ACCEPTANCE EVIDENCE\nCandidate: candidate-1\nReview mode: FIX_RECHECK\nRepaired finding IDs: ["FSR-999"]\n', 1),
+    ];
+    const fixRun = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const fixBase: StageRequest = {
+      ...request(fixRun.run_id, fixRun.run_authority_sha256, sha256(resolver.sourceContent)),
+      requested_stage: "STEP_REVIEW",
+      plan_class: "REVIEW_FIX_PLAN",
+      plan_identity: "fix-plan-1",
+      candidate_identity: "candidate-1",
+      review_cycle: "1",
+      finding_ids: ["FSR-010"],
+      expected_sources: resolver.resolvedSources.map((source) => source.binding),
+    };
+    await assert.rejects(() => engine.invokeStage({ ...fixBase, request_id: "request-fix-empty", finding_ids: [] }), /FIX_RECHECK STEP_REVIEW/);
+    await assert.rejects(() => engine.invokeStage({ ...fixBase, request_id: "request-fix-mismatch" }), /acceptance evidence finding lineage/i);
+    assert.equal(calls, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("FSR-002 source lineage rejects forged lifecycle receipts before POST", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-lineage-zero-post-"));
   try {
