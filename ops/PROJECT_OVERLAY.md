@@ -20,6 +20,7 @@ The target project's own authority always owns target feature truth. FAL state, 
 
 - Owner: product/domain decisions, strategic scope, exceptions, publication, and high-impact side effects.
 - Meta: sequencing, readiness, review synthesis, state/Combined maintenance, and closeout coordination; no production code.
+- W8 Governance Delivery: temporary Owner-authorized `GOVERNANCE` Delivery profile at `ops/roles/W8-GOVERNANCE-DELIVERY.md`; only W8-A review-response and governance repair, expiring at W8-A closeout or Owner revocation.
 - Track A: CLI, presentation, and operator UX.
 - Track B: runtime, state, lifecycle, contracts, and enforcement truth.
 - Track C: roles, prompts, memory, identity, and planning semantics.
@@ -47,6 +48,8 @@ The private FAL repository is canonical. Public mirrors and public-safe artifact
 Root locator: `Agent Workflow Canon root: ../Agent-Workflow-Canon`.
 
 Hydration is read-only evidence. It must preserve distinct target and control roots, exact current state/Combined identities, the pinned stage input, privacy limits, and one route. Read only the compact hot packet; trigger cold references when they enable a named decision. `READY` or later confidence labels never authorize mutation, acceptance, dispatch, or remote side effects by themselves.
+
+Explicit-stage enrollment is target-local and offline until a separately installed production capability admits the exact target. The state points to a hash-bound `stage-source-manifest.v1`; enrollment, rehearsal, or a valid manifest never authorizes an OpenCode POST. Live FAL dispatch remains closed until its own reviewed capability and Owner gate are both present.
 
 ## Canon Exceptions
 

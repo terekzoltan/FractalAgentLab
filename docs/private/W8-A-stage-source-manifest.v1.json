@@ -1,0 +1,22 @@
+{
+  "schema_version": "stage-source-manifest.v1",
+  "target_id": "FractalAgentLab",
+  "epic": "W8-A",
+  "candidate_identity": "UNDECLARED",
+  "entries": [
+    {
+      "stage": "PLAN_REVIEW",
+      "plan_class": "EPIC_PLAN",
+      "sources": [
+        {
+          "path": "docs/private/W8-A-AWC-4_1_1-Epic-Plan-v1.md",
+          "source_class": "PLAN",
+          "logical_identity": "w8-a-awc411-governance-plan-v1",
+          "producer": "fal.w8-governance-delivery",
+          "sha256": "ea7968fe091f336a45f35ee108386cb7dfc540682a3f427b8288a765c3a76faa",
+          "order": 0
+        }
+      ]
+    }
+  ]
+}
