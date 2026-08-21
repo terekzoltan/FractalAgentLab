@@ -496,6 +496,8 @@ test("bootstrap creates and verifies the fixed owner-only tree without touching 
     const launcher = path.join(routerRoot, "scripts", "Invoke-OCRouter.ps1");
     const launchedWithoutRouterEnvironment = spawnSync(powerShell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", launcher, "-Operation", "get-run", "-RunId", authority.run_id, "-TestOnlyKnownFolderRoot", localAppData], { encoding: "utf8", env });
     assert.equal(launchedWithoutRouterEnvironment.status, 0, launchedWithoutRouterEnvironment.stderr);
+    assert.equal(launchedWithoutRouterEnvironment.stderr, "");
+    assert.equal(launchedWithoutRouterEnvironment.stdout.split(/\r?\n/).filter(Boolean).length, 1, "redirected launcher success emits exactly one stdout row");
     assert.equal((JSON.parse(launchedWithoutRouterEnvironment.stdout) as { run_id: string }).run_id, authority.run_id, "launcher derives fixed registry/runtime paths without caller OC_ROUTER variables");
 
     const aclItem = path.join(runtimeRoot, "capability-uses", `${authorizationUse}.json`);

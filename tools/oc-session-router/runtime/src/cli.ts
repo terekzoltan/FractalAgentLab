@@ -1,4 +1,4 @@
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,6 +54,7 @@ const CLI_ERROR_CODES = [
   "UNSAFE_PATH",
   "P0B_REQUIRED",
   "SOURCE_IDENTITY_CHANGED",
+  "OUTPUT_CHANNEL_BLOCKED",
   "BLOCKED",
 ] as const;
 
@@ -652,7 +653,29 @@ function cliErrorReceipt(error: unknown, fallback: CliErrorCode = "BLOCKED"): { 
 }
 
 function cliErrorJson(error: unknown, fallback: CliErrorCode = "BLOCKED"): string {
-  return `${JSON.stringify(cliErrorReceipt(error, fallback))}\n`;
+  return serializeCliJsonRow(cliErrorReceipt(error, fallback));
+}
+
+type CliRowWriter = (fd: 1 | 2, row: string) => void;
+
+function serializeCliJsonRow(value: unknown): string {
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) throw new Error("CLI result is not JSON-serializable");
+    return `${serialized}\n`;
+  } catch {
+    throw new ClassifiedCliError("OUTPUT_CHANNEL_BLOCKED");
+  }
+}
+
+function writeCliJsonRow(fd: 1 | 2, value: unknown, writer: CliRowWriter = writeCliRowToFd): void {
+  const row = serializeCliJsonRow(value);
+  try { writer(fd, row); }
+  catch { throw new ClassifiedCliError("OUTPUT_CHANNEL_BLOCKED"); }
+}
+
+function writeCliRowToFd(fd: 1 | 2, row: string): void {
+  writeFileSync(fd, row, { encoding: "utf8" });
 }
 
 async function main(): Promise<void> {
@@ -716,7 +739,7 @@ async function main(): Promise<void> {
     if (!process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256 || proof.executable_attestation_sha256 !== process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256) throw new Error("P0B proof executable attestation binding mismatch");
     result = classified("STATE_STORE_BLOCKED", () => writeP0bProofReceipt(runtimeRoot, proof));
   }
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  writeCliJsonRow(1, result);
 }
 
 function validateOperationArguments(operation: string, args: Map<string, string>): void {
@@ -765,9 +788,10 @@ function required(args: Map<string, string>, key: string): string {
 const isEntry = process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
 if (isEntry) {
   main().catch((error: unknown) => {
-    process.stderr.write(cliErrorJson(error));
     process.exitCode = 3;
+    try { writeCliJsonRow(2, cliErrorReceipt(error)); }
+    catch { /* No retry, alternate channel, or raw native error is safe here. */ }
   });
 }
 
-export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson };
+export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };

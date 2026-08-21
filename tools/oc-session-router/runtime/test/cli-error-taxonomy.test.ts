@@ -16,6 +16,7 @@ const EXPECTED_CODES = [
   "UNSAFE_PATH",
   "P0B_REQUIRED",
   "SOURCE_IDENTITY_CHANGED",
+  "OUTPUT_CHANNEL_BLOCKED",
   "BLOCKED",
 ] as const;
 
@@ -74,6 +75,46 @@ test("CLI failure receipt never emits raw messages, paths, native codes, or inje
   assert.deepEqual(JSON.parse(json), { error_code: "BLOCKED" });
   assert.equal(json.split("\n").filter(Boolean).length, 1);
   for (const forbidden of [secret, "failure at", "leaked", "TOP_SECRET_NATIVE_CODE"]) assert.equal(json.includes(forbidden), false);
+});
+
+test("output channel failures are finite and never leak private native details", () => {
+  const privatePath = "C:\\private\\P0B\\KnownFolder\\link\\result.json";
+  for (const code of ["EPIPE", "ERR_STREAM_DESTROYED"]) {
+    let caught: unknown;
+    let writes = 0;
+    try {
+      _test.writeCliJsonRow(1, { ok: true }, () => {
+        writes += 1;
+        throw Object.assign(new Error(`${code}: output failed at ${privatePath}`), { code });
+      });
+    } catch (error) { caught = error; }
+    assert.equal(writes, 1);
+    assert.deepEqual(_test.cliErrorReceipt(caught), { error_code: "OUTPUT_CHANNEL_BLOCKED" });
+    const json = _test.cliErrorJson(caught);
+    assert.equal(json, '{"error_code":"OUTPUT_CHANNEL_BLOCKED"}\n');
+    for (const forbidden of [code, privatePath, "P0B", "KnownFolder", "link"]) assert.equal(json.includes(forbidden), false);
+  }
+});
+
+test("serialization completes before the single output write and cannot emit a partial row", () => {
+  const circular: { self?: unknown } = {};
+  circular.self = circular;
+  let writes = 0;
+  let caught: unknown;
+  try { _test.writeCliJsonRow(1, circular, () => { writes += 1; }); }
+  catch (error) { caught = error; }
+  assert.equal(writes, 0);
+  assert.deepEqual(_test.cliErrorReceipt(caught), { error_code: "OUTPUT_CHANNEL_BLOCKED" });
+});
+
+test("successful output emission writes exactly one UTF-8 JSON row to the selected channel", () => {
+  const calls: Array<{ fd: number; row: string }> = [];
+  _test.writeCliJsonRow(1, { ok: true, auto_advance: false }, (fd, row) => calls.push({ fd, row }));
+  assert.deepEqual(calls, [{ fd: 1, row: '{"ok":true,"auto_advance":false}\n' }]);
+
+  const failures: Array<{ fd: number; row: string }> = [];
+  _test.writeCliJsonRow(2, _test.cliErrorReceipt(new Error("private failure")), (fd, row) => failures.push({ fd, row }));
+  assert.deepEqual(failures, [{ fd: 2, row: '{"error_code":"BLOCKED"}\n' }]);
 });
 
 test("CLI process preserves exit 3 and JSON-only stderr for invalid requests", () => {
