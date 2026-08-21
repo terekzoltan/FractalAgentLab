@@ -40,6 +40,15 @@ interface SemanticActionDocument {
   updated_at: string;
 }
 
+interface CapabilityUseDocument {
+  schema_version: "capability-use.v2";
+  authorization_use_sha256: string;
+  run_id: string;
+  operation_id: string;
+  status: "CLAIMED" | "CONSUMED" | "RELEASED";
+  updated_at: string;
+}
+
 export interface DispatchLeaseDocument {
   schema_version: "dispatch-lease.v1";
   server_fingerprint_sha256: string;
@@ -145,6 +154,12 @@ export class StateStore {
     return JSON.parse(readFileSync(this.resolve("runs", runId, "operations", operationId, "operation.json"), "utf8")) as OperationDocument;
   }
 
+  loadIntent<T = unknown>(runId: string, operationId: string): T {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    return JSON.parse(readFileSync(this.resolve("runs", runId, "operations", operationId, "intent.json"), "utf8")) as T;
+  }
+
   listOperations(runId: string): OperationDocument[] {
     assertFilesystemId(runId, "run_id");
     return this.listOperationIds(runId).map((operationId) => this.loadOperation(runId, operationId)).sort((left, right) => left.sequence - right.sequence);
@@ -179,6 +194,27 @@ export class StateStore {
     assertFilesystemId(runId, "run_id");
     assertFilesystemId(operationId, "operation_id");
     this.writeJsonAtomic(this.resolve("runs", runId, "operations", operationId, "result.json"), result);
+  }
+
+  writeTransportReceipt(runId: string, operationId: string, receipt: unknown): void {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    this.writeJsonExclusive(this.resolve("runs", runId, "operations", operationId, "transport-receipt.json"), receipt);
+  }
+
+  loadTransportReceipt<T = unknown>(runId: string, operationId: string): T | undefined {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    const receiptPath = this.resolve("runs", runId, "operations", operationId, "transport-receipt.json");
+    return existsSync(receiptPath) ? JSON.parse(readFileSync(receiptPath, "utf8")) as T : undefined;
+  }
+
+  writeSnapshotDiagnostic(runId: string, operationId: string, diagnostic: unknown): void {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    const diagnosticPath = this.resolve("runs", runId, "operations", operationId, "snapshot-diagnostic.json");
+    if (existsSync(diagnosticPath)) this.writeJsonAtomic(diagnosticPath, diagnostic);
+    else this.writeJsonExclusive(diagnosticPath, diagnostic);
   }
 
   writeArtifact(runId: string, operationId: string, name: string, content: string): void {
@@ -233,6 +269,34 @@ export class StateStore {
     });
   }
 
+  claimOneUseCapability(authorizationUseSha256: string, runId: string, operationId: string): void {
+    assertSha256(authorizationUseSha256, "authorization use sha256");
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    const directory = this.resolve("capability-uses");
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    this.withExclusiveLock(this.resolve("capability-uses", `${authorizationUseSha256}.lock`), () => {
+      const documentPath = this.resolve("capability-uses", `${authorizationUseSha256}.json`);
+      if (existsSync(documentPath)) {
+        const existing = JSON.parse(readFileSync(documentPath, "utf8")) as CapabilityUseDocument;
+        if (existing.status !== "RELEASED") throw new Error("P0B one-use capability is already claimed or consumed");
+      }
+      const document: CapabilityUseDocument = { schema_version: "capability-use.v2", authorization_use_sha256: authorizationUseSha256, run_id: runId, operation_id: operationId, status: "CLAIMED", updated_at: new Date().toISOString() };
+      if (existsSync(documentPath)) this.writeJsonAtomic(documentPath, document);
+      else this.writeJsonExclusive(documentPath, document);
+    });
+  }
+
+  settleOneUseCapability(authorizationUseSha256: string, runId: string, operationId: string, status: "CONSUMED" | "RELEASED"): void {
+    assertSha256(authorizationUseSha256, "authorization use sha256");
+    this.withExclusiveLock(this.resolve("capability-uses", `${authorizationUseSha256}.lock`), () => {
+      const documentPath = this.resolve("capability-uses", `${authorizationUseSha256}.json`);
+      const current = JSON.parse(readFileSync(documentPath, "utf8")) as CapabilityUseDocument;
+      if (current.run_id !== runId || current.operation_id !== operationId || current.status !== "CLAIMED") throw new Error("P0B capability claim identity mismatch");
+      this.writeJsonAtomic(documentPath, { ...current, status, updated_at: new Date().toISOString() });
+    });
+  }
+
   private listOperationIds(runId: string): string[] {
     const dir = this.resolve("runs", runId, "operations");
     if (!existsSync(dir)) return [];
@@ -257,7 +321,18 @@ export class StateStore {
   private writeJsonAtomic(filePath: string, value: unknown): void {
     const temp = `${filePath}.tmp.${randomUUID()}`;
     this.writeJsonExclusive(temp, value);
-    renameSync(temp, filePath);
+    try {
+      for (let attempt = 0; ; attempt += 1) {
+        try { renameSync(temp, filePath); break; }
+        catch (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+          if (process.platform !== "win32" || (code !== "EPERM" && code !== "EACCES") || attempt >= 5) throw error;
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10 * (2 ** attempt));
+        }
+      }
+    } finally {
+      if (existsSync(temp)) unlinkSync(temp);
+    }
   }
 
   private withExclusiveLock<T>(lockPath: string, action: () => T): T {

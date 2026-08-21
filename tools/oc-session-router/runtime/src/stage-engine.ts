@@ -10,6 +10,7 @@ import {
   resolveCanonPhase,
   sameSources,
   sha256,
+  stageRequestFromInvocation,
   validateOutputBinding,
   type RunAuthority,
   type RunRequest,
@@ -18,8 +19,9 @@ import {
   type StageInvocation,
   type StageRequest,
 } from "./contracts.js";
+import { ROUTER_PROTOCOL_IDENTITY, SharedSessionFence, type ResolvedCapability, type SharedFenceBinding, type SharedFenceLease } from "./control-plane.js";
 import { StateStore } from "./state-store.js";
-import { CommandClient, assertPrivateTransportBinding, reconcileSnapshot, type SnapshotCandidate, type TransportBinding } from "./transport.js";
+import { CommandClient, assertPrivateTransportBinding, reconcileSnapshot, type SnapshotBaseline, type SnapshotCandidate, type TransportBinding } from "./transport.js";
 import { worktreeProofSha256, type WorktreeProof } from "./worktree-reader.js";
 
 export interface ResolvedSource {
@@ -31,8 +33,9 @@ export interface ResolvedStageAuthority {
   run_authority: RunAuthority;
   sources: ResolvedSource[];
   transport: TransportBinding;
-  capability: { mode: "DISABLED" | "FIXTURE_ONLY"; identity_sha256: string };
+  capability: ResolvedCapability;
   privacy: { absolute_paths: string[]; private_values?: string[] };
+  shared_fence?: SharedFenceBinding;
   worktree?: WorktreeProof;
 }
 
@@ -43,6 +46,7 @@ export interface AuthorityResolver {
 }
 
 export interface SnapshotReader {
+  captureBaseline?(resolved: ResolvedStageAuthority): Promise<SnapshotBaseline>;
   collect(runId: string, operationId: string): Promise<SnapshotCandidate[]>;
 }
 
@@ -69,6 +73,7 @@ export class StageEngine {
     private readonly resolver?: AuthorityResolver,
     private readonly client?: CommandClient,
     private readonly snapshots?: SnapshotReader,
+    private readonly sharedFence: SharedSessionFence = new SharedSessionFence(),
   ) {}
 
   async newRun(request: RunRequest): Promise<{ run_id: string; run_authority_sha256: string; auto_advance: false }> {
@@ -97,7 +102,9 @@ export class StageEngine {
     if (request.target_id !== loaded.authority.target_id || request.worktree_identity !== loaded.authority.worktree_identity) throw new Error("Stage request run binding mismatch");
     this.assertRequestAuthority(request, loaded.authority);
     const capability = await this.resolver.resolveStageCapability(loaded.authority, request);
-    if (capability.mode !== "FIXTURE_ONLY") throw new Error("Production command dispatch is disabled until a reviewed P0B capability transaction");
+    if (!["FIXTURE_ONLY", "P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(capability.mode)) throw new Error("Production command dispatch is disabled until a reviewed P0B capability transaction");
+    if (capability.mode !== "FIXTURE_ONLY" && (capability.router_protocol_identity !== ROUTER_PROTOCOL_IDENTITY || capability.sse_enabled !== false || !capability.snapshot_correlation || !capability.server_instance_identity_sha256 || !capability.target_directory_sha256 || capability.command_timeout_ms === undefined)) throw new Error("Production capability contract is incomplete");
+    if (capability.mode === "P0B_ISOLATED" && !capability.authorization_use_sha256) throw new Error("P0B capability lacks a stable authorization-use identity");
     const resolved = await this.resolver.resolveStageAuthority(loaded.authority, request);
     if (authoritySha256(resolved.run_authority) !== request.run_authority_sha256) throw new Error("Current target authority drifted");
     if (canonicalize(resolved.capability) !== canonicalize(capability)) throw new Error("Dispatch capability drifted before authority resolution");
@@ -125,33 +132,71 @@ export class StageEngine {
       command_body_sha256: sha256(canonicalize({ command, arguments: argument })),
       semantic_key: semanticKey,
       recipient_session_sha256: recipientSessionSha256,
+      ...(capability.mode === "FIXTURE_ONLY" ? {} : {
+        router_protocol_identity: ROUTER_PROTOCOL_IDENTITY,
+        capability_receipt_sha256: capability.identity_sha256,
+        snapshot_correlation: capability.snapshot_correlation!,
+      }),
     };
-    const intent = {
-      schema_version: "dispatch-intent.v1",
-      operation_id: operationId,
-      command_name: command,
-      command_body_sha256: invocation.command_body_sha256,
-      recipient_session_sha256: invocation.recipient_session_sha256,
-      authority_sha256: request.run_authority_sha256,
-      created_at: new Date().toISOString(),
-    };
-    const intentHash = sha256(canonicalize(intent));
-    const leaseKey = sha256(`${resolved.transport.server_fingerprint}\n${resolved.transport.session_id}`);
+    const leaseKey = sha256(canonicalize({ domain: "fal-router-global-session-lease/v1", server_instance_identity_sha256: resolved.capability.server_instance_identity_sha256 ?? sha256(resolved.transport.server_fingerprint), session_sha256: recipientSessionSha256 }));
+    const authorizationUseSha256 = capability.authorization_use_sha256;
     this.store.claimSemanticAction(semanticKey, request.run_id, operationId);
     let release: (() => void) | undefined;
+    let sharedLease: SharedFenceLease | undefined;
+    let oneUseClaimed = false;
+    let oneUseConsumed = false;
     try {
+      if (resolved.shared_fence) sharedLease = await this.sharedFence.acquire(resolved.shared_fence);
+      else if (capability.mode !== "FIXTURE_ONLY") throw new Error("Production dispatch requires the shared Compact/lifecycle session fence");
       release = this.store.acquireLease(leaseKey, { schema_version: "dispatch-lease.v1", server_fingerprint_sha256: sha256(resolved.transport.server_fingerprint), session_sha256: recipientSessionSha256, operation_class: request.requested_stage, holder: operationId, acquired_at: new Date().toISOString(), fencing_generation: randomUUID() });
       let operation;
       let responseReceived = false;
       let sendAttempted = false;
       try {
+        const baseline = capability.mode === "FIXTURE_ONLY"
+          ? undefined
+          : this.snapshots?.captureBaseline
+            ? await this.snapshots.captureBaseline(resolved)
+            : (() => { throw new Error("Production snapshot baseline reader is unavailable"); })();
+        const intent = {
+          schema_version: "dispatch-intent.v1",
+          operation_id: operationId,
+          command_name: command,
+          command_body_sha256: invocation.command_body_sha256,
+          recipient_session_sha256: invocation.recipient_session_sha256,
+          authority_sha256: request.run_authority_sha256,
+          capability_receipt_sha256: capability.identity_sha256,
+          ...(baseline ? { baseline } : {}),
+          created_at: new Date().toISOString(),
+        };
+        const intentHash = sha256(canonicalize(intent));
+        if (capability.mode === "P0B_ISOLATED") {
+          this.store.claimOneUseCapability(authorizationUseSha256!, request.run_id, operationId);
+          oneUseClaimed = true;
+        }
         operation = this.store.createOperation(request.run_id, invocation, intent, intentHash);
         operation = this.store.updateOperation(request.run_id, operationId, operation.revision, { status: "DISPATCHING" });
         const preSend = await this.resolver.resolveStageAuthority(loaded.authority, request);
         assertResolvedStageStable(preSend, resolved, request.run_authority_sha256);
+        sharedLease?.assertHeld();
+        if (capability.mode === "P0B_ISOLATED") {
+          this.store.settleOneUseCapability(authorizationUseSha256!, request.run_id, operationId, "CONSUMED");
+          oneUseConsumed = true;
+        }
         sendAttempted = true;
-        const receipt = await this.client.send(preSend.transport, command, argument, 120_000);
+        const receipt = await this.client.send(preSend.transport, command, argument, preSend.capability.command_timeout_ms ?? 120_000);
         responseReceived = true;
+        this.store.writeTransportReceipt(request.run_id, operationId, {
+          schema_version: "minimized-transport-receipt.v1",
+          status: receipt.status,
+          message_id: receipt.message_id,
+          parent_id: receipt.parent_id,
+          session_sha256: receipt.session_sha256,
+          response_sha256: receipt.response_sha256,
+          terminal_sha256: receipt.terminal_sha256,
+          ignored_part_set_sha256: receipt.ignored_part_set_sha256,
+          raw_response_persisted: false,
+        });
         assertArtifactSafe(receipt.terminal_markdown, preSend.transport, preSend.privacy.absolute_paths, preSend.privacy.private_values);
         const parsed = parseOutputShape(request.requested_stage, receipt.terminal_markdown);
         const postResponse = await this.resolver.resolveStageAuthority(loaded.authority, request);
@@ -175,6 +220,10 @@ export class StageEngine {
         this.store.settleSemanticAction(semanticKey, request.run_id, operationId, "CONSUMED");
         return result;
       } catch (error) {
+        if (oneUseClaimed && !oneUseConsumed) {
+          this.store.settleOneUseCapability(authorizationUseSha256!, request.run_id, operationId, "RELEASED");
+          oneUseClaimed = false;
+        }
         if (!operation) {
           this.store.settleSemanticAction(semanticKey, request.run_id, operationId, "RELEASED");
           throw error;
@@ -203,6 +252,7 @@ export class StageEngine {
       throw error;
     } finally {
       release?.();
+      await sharedLease?.release();
     }
   }
 
@@ -240,7 +290,7 @@ export class StageEngine {
     ];
     for (const [field, expected] of bindings) if (request[field] !== expected) throw new Error(`${field} binding mismatch`);
     if (request.issued_by !== "orchestrator") throw new Error("Stage request issued_by is not orchestrator authority");
-    if (request.expected_contract_version !== "awc-3.1") throw new Error("Stage request contract version mismatch");
+    if (request.expected_contract_version !== "awc-3.1" && request.expected_contract_version !== "awc-4.1.1") throw new Error("Stage request contract version mismatch");
     if (request.allowed_side_effect_class !== "ADDRESSED_SESSION_COMMAND") throw new Error("Stage request side-effect class does not authorize addressed command transport");
     const metaStages = new Set(["PLAN_REVIEW", "STEP_REVIEW", "CLOSEOUT"]);
     const expectedRecipient = metaStages.has(request.requested_stage) ? "Meta" : authority.accountable_lane;
@@ -254,17 +304,62 @@ export class StageEngine {
     if (!["DISPATCHING", "ACTIVE", "UNCERTAIN", "RECONCILING"].includes(operation.status)) throw new Error("Operation is not reconcilable");
     if (!this.snapshots) throw new Error("Snapshot reconciliation capability is unavailable");
     if (operation.status !== "RECONCILING") operation = this.store.updateOperation(runId, operationId, operation.revision, { status: "RECONCILING" });
-    const candidates = await this.snapshots.collect(runId, operationId);
+    let candidates: SnapshotCandidate[] = [];
+    try {
+      candidates = await this.snapshots.collect(runId, operationId);
+    } catch {
+      // Snapshot access is diagnostic. A missing, malformed, or drifted read
+      // can never turn a crash-left dispatch into either a resend or success.
+      candidates = [];
+    }
+    const transportReceipt = this.store.loadTransportReceipt<{
+      schema_version: "minimized-transport-receipt.v1";
+      message_id: string;
+      parent_id: string;
+      session_sha256: string;
+      response_sha256: string;
+      terminal_sha256: string;
+    }>(runId, operationId);
+    const exactCorrelation = operation.invocation.snapshot_correlation === "EXACT_PARENT_LINK" && transportReceipt !== undefined;
+    const stageRequest = stageRequestFromInvocation(operation.invocation);
     const resolution = reconcileSnapshot(candidates, {
       sessionSha256: operation.invocation.recipient_session_sha256,
-      parentId: `user-${operation.send_attempt_id}`,
+      parentId: transportReceipt?.parent_id ?? "NO_RESPONSE_PARENT_AVAILABLE",
+      ...(transportReceipt ? { messageId: transportReceipt.message_id, terminalSha256: transportReceipt.terminal_sha256 } : {}),
       terminal: (text) => {
         try { parseOutputShape(operation.invocation.requested_stage, text); return true; } catch { return false; }
       },
     });
-    const result = resolution.status !== "TRANSCRIPT_RECONCILED" || !resolution.candidate
-      ? makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "AMBIGUOUS", "UNVALIDATED", "UNVALIDATED", [], "", resolution.reason)
-      : makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "CORRELATION_NOT_PROVEN_ON_INSTALLED_SERVER", "UNVALIDATED", "UNVALIDATED", [], "", "fixture correlation cannot promote installed-server success before P0B");
+    if (exactCorrelation && resolution.status === "TRANSCRIPT_RECONCILED" && resolution.candidate && this.resolver && transportReceipt) {
+      try {
+        const loaded = this.store.loadRun(runId);
+        const resolved = await this.resolver.resolveStageAuthority(loaded.authority, stageRequest);
+        if (authoritySha256(resolved.run_authority) !== operation.invocation.run_authority_sha256 || resolved.capability.identity_sha256 !== operation.invocation.capability_receipt_sha256 || resolved.capability.snapshot_correlation !== "EXACT_PARENT_LINK") throw new Error("Snapshot production authority drifted");
+        assertPrivateTransportBinding(resolved.transport);
+        assertArtifactSafe(resolution.candidate.text, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
+        const parsed = parseOutputShape(operation.invocation.requested_stage, resolution.candidate.text);
+        assertSourceLineage(stageRequest, resolved.sources, loaded.authority, resolved.worktree);
+        assertOutputSourceLineage(stageRequest, resolved.sources, parsed.terminal, parsed.fields, resolved.worktree);
+        validateOutputBinding(parsed, {
+          target: loaded.authority.target_identity,
+          epic: loaded.authority.epic,
+          lane: `${loaded.authority.accountable_lane} / ${loaded.authority.accountable_class} / ${loaded.authority.accountable_profile}`,
+          ...(operation.invocation.candidate_identity === "UNDECLARED" || !["STEP_REVIEW", "CLOSEOUT"].includes(operation.invocation.requested_stage) ? {} : { candidate: operation.invocation.candidate_identity }),
+          plan: operation.invocation.plan_identity,
+          plan_class: operation.invocation.plan_class,
+        });
+        const artifact = `${resolution.candidate.text.replace(/\r\n/g, "\n").trim()}\n`;
+        this.store.writeArtifact(runId, operationId, "terminal", artifact);
+        const succeeded = makeResult(operation.invocation, operationId, "SUCCEEDED", "TRANSCRIPT_RECONCILED", "VALID", "BOUND", "VALID", allowedNext(operation.invocation.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), "exact installed snapshot correlation validated", sha256(transportReceipt.message_id), transportReceipt.response_sha256);
+        this.store.updateResult(runId, operationId, succeeded);
+        this.store.updateOperation(runId, operationId, operation.revision, { status: "SUCCEEDED" });
+        return succeeded;
+      } catch {
+        // Exact correlation is necessary but not sufficient; any authority,
+        // privacy, shape, binding, or finalization failure remains non-success.
+      }
+    }
+    const result = makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "AMBIGUOUS", "UNVALIDATED", "UNVALIDATED", [], "", exactCorrelation ? "correlated snapshot failed authoritative validation" : "snapshot evidence is diagnostic without an exact installed response correlation");
     this.store.updateResult(runId, operationId, result);
     this.store.updateOperation(runId, operationId, operation.revision, { status: "UNCERTAIN" });
     return result;
@@ -480,6 +575,7 @@ function assertResolvedStageStable(current: ResolvedStageAuthority, baseline: Re
   for (const source of current.sources) if (sha256(Buffer.from(source.content, "utf8")) !== source.binding.sha256) throw new Error("Current stage source content drifted during immediate transport revalidation");
   if (canonicalize(current.transport) !== canonicalize(baseline.transport)) throw new Error("Protected transport binding drifted during immediate transport revalidation");
   if (canonicalize(current.capability) !== canonicalize(baseline.capability)) throw new Error("Dispatch capability drifted during immediate transport revalidation");
+  if (canonicalize(current.shared_fence ?? null) !== canonicalize(baseline.shared_fence ?? null)) throw new Error("Shared Compact/lifecycle fence drifted during immediate transport revalidation");
   if (canonicalize(current.privacy) !== canonicalize(baseline.privacy)) throw new Error("Privacy authority drifted during immediate transport revalidation");
   if (canonicalize(current.worktree ?? null) !== canonicalize(baseline.worktree ?? null)) throw new Error("Worktree authority drifted during immediate transport revalidation");
 }
@@ -495,7 +591,7 @@ function assertResolvedStagePostResponse(current: ResolvedStageAuthority, baseli
     if (!mutableAuthority.has(key) && canonicalize(current.run_authority[key]) !== canonicalize(baseline.run_authority[key])) throw new Error(`Closeout immutable authority drifted: ${key}`);
   }
   if (!sameSources(current.sources.map((source) => source.binding), baseline.sources.map((source) => source.binding))) throw new Error("Closeout source authority drifted");
-  if (canonicalize(current.transport) !== canonicalize(baseline.transport) || canonicalize(current.capability) !== canonicalize(baseline.capability) || canonicalize(current.privacy) !== canonicalize(baseline.privacy)) throw new Error("Closeout protected binding drifted");
+  if (canonicalize(current.transport) !== canonicalize(baseline.transport) || canonicalize(current.capability) !== canonicalize(baseline.capability) || canonicalize(current.shared_fence ?? null) !== canonicalize(baseline.shared_fence ?? null) || canonicalize(current.privacy) !== canonicalize(baseline.privacy)) throw new Error("Closeout protected binding drifted");
   const reportedPaths = parseStrictJson(fields["Staged explicit paths"] ?? "");
   if (!Array.isArray(reportedPaths) || reportedPaths.some((entry) => typeof entry !== "string")) throw new Error("Closeout committed path postcondition failed");
   if (!current.worktree || !baseline.worktree || current.worktree.head_sha256 !== sha256(commit[1]!) || current.worktree.head_tree_sha256 !== sha256(commit[2]!) || current.worktree.head_parent_count !== 1 || current.worktree.sole_parent_sha256 !== baseline.worktree.head_sha256 || canonicalize(current.worktree.committed_paths) !== canonicalize([...reportedPaths].sort()) || !current.worktree.status_clean || current.worktree.staged_paths.length !== 0 || current.worktree.has_unstaged_or_untracked) throw new Error("Closeout committed worktree postcondition failed");

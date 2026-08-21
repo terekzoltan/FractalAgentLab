@@ -24,6 +24,53 @@ Derive router scripts from the installed/control repository script root and targ
 
 Before every dispatch prove: target root/worktree, Epic, candidate, lifecycle stage, sender/recipient role, exact input artifact and hash, command name, duplicate-send state, and allowed side effects. A familiar session label alone is insufficient. Accountable lanes and reviewer capabilities come from target overlays/runtime profiles; never infer authority from arbitrary session keys or project names.
 
+The production-router operator contract is runtime `0.2.0`, protocol
+`fal-explicit-stage-router/v1`, and this fixed Windows layout:
+
+```text
+%LOCALAPPDATA%\FractalAgentLab\oc-router\
+  control\control-registry.json
+  control\retention-policy.json
+  control\capability-receipts\
+  runtime\p0b-isolation\
+  runtime\compact-authority-handoffs\
+  runtime\quarantine\
+  runtime\diagnostics\
+  runtime\validated-evidence\
+  runtime\runs\<run>\operations\<operation>\
+  runtime\{dispatch-leases,semantic-actions,capability-uses}\
+  receipts\
+```
+
+The three authority-ledger directories are non-expiring duplicate-send state;
+terminal run/operation evidence expires at 180 days, while active, nonterminal,
+or uncertain evidence is preserved. Purge is allowed only under `DISABLED` and
+emits a count/hash-only receipt under `receipts`.
+
+The default test seam fixes `p0b_isolation_root` at `runtime\p0b-isolation`. A
+real Owner-gated pilot may instead bind an explicitly protected workspace-local
+synthetic root and its domain hash in the registry and capability receipt. Every
+P0B target/server directory must be a reparse-free descendant of that exact root.
+Node independently queries the OS KnownFolder; `LOCALAPPDATA` and router-root
+environment values cannot relocate production authority.
+
+Run `Initialize-OCRouterControlPlane.ps1 -Action Bootstrap` once and then
+`-Action Verify`; bootstrap never accepts a different root and starts in
+`DISABLED`. Every fixed path has effective access only for the current owner and
+Local System; inherited rules are accepted only from that verified owner-only
+parent. Set OpenCode Basic credentials in the current process only. Do not set
+router-root or registry variables: the launcher derives the OS KnownFolder paths,
+verifies them, and sets those values only in its scrubbed child environment. It
+also forces `OPENCODE_AUTO_SHARE=false`; the isolated OpenCode configuration must
+declare `share: "disabled"`. `init-router-runtime.ps1` is retired.
+
+Before editing target state, run `Prepare-OCRouterStage.ps1` with an explicitly
+named target root, closed preparation spec, and pre-created output directory. It
+does no network I/O and never chooses authority sources; it produces a candidate
+stage-source manifest, its exact hash, and a candidate state packet. Owner review
+and target-state adoption are separate from the later explicit
+`Invoke-OCRouter.ps1` transaction.
+
 ## Canonical lifecycle
 
 ```text
@@ -50,8 +97,21 @@ Delivery /seq-next
   deterministic argument bytes.
 - The synchronous `/command` assistant response is the primary candidate. A
   timeout or 5xx leaves the operation `UNCERTAIN`; `resolve-stage` is read-only and
-  cannot resend. Snapshot success remains disabled until installed-server
-  one-to-one correlation is proven by the separately Owner-gated P0B.
+  cannot resend. Installed `step-start`/`step-finish` and explicitly audited
+  reasoning parts are hashed and ignored; tool, subtask, file, patch, and unknown
+  parts are rejected. Snapshot GET is diagnostic unless the synchronous assistant
+  ID, parent ID, session hash, and normalized terminal hash all match exactly.
+- `DISABLED` is the default kill switch. `P0B_ISOLATED` admits only a short-lived,
+  one-use synthetic grant; it is consumed immediately before the sole POST and
+  stays consumed after timeout, 4xx/5xx, malformed response, or crash. A later
+  attempt needs a new Owner-reviewed grant and isolated session.
+- `PRODUCTION_RESPONSE_FIRST` requires a separate production-install receipt
+  bound to a nonzero accepted P0B proof. Active modes require AWC `4.1.1`; legacy
+  AWC `3.1` inputs never authorize production. SSE may be probed for evidence but
+  `enabled` remains false.
+- Lifecycle dispatch and Compact share the same persistent participant fence.
+  The runtime holds an OS-level `FileShare.None` lease through response handling
+  and rechecks it with protected authority immediately before POST.
 - Invoke every known slash command through the command endpoint, excluding the leading slash.
 - Native `/step-review` has no plain-message control token or external review-session handoff. Meta dispatches configured read-only reviewers through native Task calls inside the command stage.
 - Forward the exact pinned artifact body or an immutable resolvable pointer with identity and integrity proof; never replace it with a summary.
@@ -61,6 +121,10 @@ Delivery /seq-next
 - Legacy packet, serial, parallel, review-fix, latest-output routing, message,
   question, polling, and resume scripts are historical fail-closed surfaces. They
   cannot be used as an alternate sender or recovery path.
+- AC87 retention is fixed: ephemeral Compact handoffs 15 minutes, quarantine 7
+  days, diagnostics 30 days, validated
+  evidence 180 days, no raw reasoning/event retention, no public export, and
+  sanitized count/hash-only purge receipts.
 
 ## Native risk-selected review
 
@@ -90,13 +154,22 @@ state, replay a legacy wrapper, or substitute compact/latest-output text.
 
 Compact Lite is the sole active automatic compact path. Invoke
 `invoke-session-compact-lite.ps1` only at `before_dispatch`, `after_stage_output`,
-or `epic_closeout`. It requires policy-selected pressure, participant `idle`,
+or `epic_closeout`. Non-dry operation resolves the target root, server instance,
+private session, timeout, and capability grant only through the attested fixed
+KnownFolder control plane. Target-local `sessions.json` and caller `-Server` are
+dry-run/test expectations and cannot authorize a production POST. It requires
+policy-selected pressure, participant `idle`,
 summarize availability, and no participant-scoped pending or uncertain lifecycle
 or compact intent. It persists one minimal intent, requires one attributable
-marker, invokes `/after-compact <project-id> <role>` once, accepts `RESTORED` or `DEGRADED`, and
+marker, consumes any P0B grant after intent while the private-session fence is
+held, revalidates the measured authority immediately before both POSTs, invokes
+`/after-compact <project-id> <role>` once, accepts `RESTORED` or `DEGRADED`, and
 stops with `workflow_command_sent: false`. Timeout or ambiguous marker state is
 `COMPACT_UNCERTAIN` without blind retry. State/Combined/stage identities, route
 input, Active Route, capsules, command identity, and hydration budget are not gates.
+Normal Compact launcher output is a closed status/digest projection. Raw target,
+origin, and private-session authority crosses only an owner-only ephemeral runtime
+handoff that Lite deletes after reading; crash remnants are purged after 15 minutes.
 
 Retained Compact V2 reference: the active-route writer/verifier consumes only the static Canon profile locators
 plus current target state, the state-selected Combined span, and the state-pinned

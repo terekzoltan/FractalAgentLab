@@ -1,10 +1,12 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertSafeRelativePath,
   assertOpaqueId,
   assertSha256,
+  canonicalize,
   parseRunRequest,
   parseStageSourceManifest,
   parseStrictJson,
@@ -15,50 +17,41 @@ import {
   type StageRequest,
   type SourceClass,
 } from "./contracts.js";
+import {
+  buildSharedFenceBinding,
+  FENCE_BROKER_EXECUTABLE,
+  FENCE_BROKER_EXECUTABLE_SHA256,
+  parseControlRegistry,
+  parseRetentionPolicy,
+  p0bIsolationRootSha256,
+  purgeExpiredPrivateEvidence,
+  resolveCompactProtectedAuthority,
+  resolveProtectedCapability,
+  resolveProtectedTargetDirectory,
+  writeAtomicPrivateJson,
+  type CapabilityProbe,
+  type CompactProtectedAuthorityPacket,
+  type ControlRegistry,
+  type RegistryTarget,
+} from "./control-plane.js";
 import { StageEngine, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "./stage-engine.js";
 import { StateStore } from "./state-store.js";
-import { CommandClient } from "./transport.js";
+import { InstalledSnapshotReader } from "./snapshot-reader.js";
+import { CommandClient, InstalledCapabilityProbe, InstalledSnapshotClient } from "./transport.js";
 import { GitWorktreeReader, type WorktreeReader } from "./worktree-reader.js";
-
-interface RegistryTarget {
-  profile_identity: string;
-  target_identity: string;
-  worktree_identity: string;
-  accountable: { lane: string; class: string; profile: string };
-  root: string;
-  state_path: string;
-  combined_path: string;
-  overlay_path: string;
-  accountable_role_path: string;
-  active_route_path?: string;
-  require_active_route?: boolean;
-  server: { origin: string; fingerprint: string };
-  sessions: Record<string, { id: string }>;
-}
-
-interface ControlRegistry {
-  schema_version: "router-control-registry.v1";
-  targets: Record<string, RegistryTarget>;
-}
-
-interface ExecutableAttestation {
-  schema_version: "router-executable-attestation.v2";
-  node_executable_path: string;
-  node_executable_sha256: string;
-  git_executable_path: string;
-  git_executable_sha256: string;
-  compiled_entry_path: string;
-  compiled_entry_sha256: string;
-  compiled_manifest_sha256: string;
-  source_manifest_identity: string;
-  source_manifest_sha256: string;
-}
+import { parseP0bProofReceipt, writeP0bProofReceipt } from "./p0b-proof.js";
 
 const PRODUCTION_GIT_EXECUTABLE = "C:\\Program Files\\Git\\cmd\\git.exe";
 const PRODUCTION_GIT_SHA256 = "054dfe58df35f7fcfbae184ff9d6a7c0da1e3743bf0401d951e012e290217c73";
 
 class FileAuthorityResolver implements AuthorityResolver {
-  constructor(private readonly registryPath: string, private readonly worktreeReader?: WorktreeReader) {
+  constructor(
+    private readonly registryPath: string,
+    private readonly worktreeReader?: WorktreeReader,
+    private readonly protectedControlRoot?: string,
+    private readonly capabilityProbe: CapabilityProbe = new InstalledCapabilityProbe(),
+    private readonly rootAuthorityClass: "FIXTURE_ONLY" | "OS_KNOWN_FOLDER" | "P0B_TEST_ONLY" = "FIXTURE_ONLY",
+  ) {
     if (!path.isAbsolute(registryPath) || lstatSync(registryPath).isSymbolicLink()) throw new Error("Control registry must be an ordinary absolute file");
     this.loadRegistry();
   }
@@ -73,7 +66,7 @@ class FileAuthorityResolver implements AuthorityResolver {
   private deriveRunAuthorityFromRegistry(request: RunRequest, identity: { runId: string; createdAt: string }, loaded: { registry: ControlRegistry; sha256: string }): RunAuthority {
     const target = this.target(request.target_id, loaded.registry);
     if (target.worktree_identity !== request.expected_worktree_identity) throw new Error("Expected worktree identity mismatch");
-    const root = this.targetRoot(target);
+    const root = this.targetRoot(loaded.registry, target);
     const state = this.readTargetFile(root, target.state_path);
     const stateText = state.text;
     const stateRevision = label(stateText, "State revision");
@@ -148,8 +141,10 @@ class FileAuthorityResolver implements AuthorityResolver {
     };
   }
 
-  async resolveStageCapability(_runAuthority: RunAuthority, _request: StageRequest): Promise<ResolvedStageAuthority["capability"]> {
-    return { mode: "DISABLED", identity_sha256: sha256("P0B_REQUIRED") };
+  async resolveStageCapability(runAuthority: RunAuthority, request: StageRequest): Promise<ResolvedStageAuthority["capability"]> {
+    const loaded = this.loadRegistry();
+    const target = this.target(runAuthority.target_id, loaded.registry);
+    return this.resolveCapability(loaded.registry, runAuthority.target_id, target, request);
   }
 
   async resolveStageAuthority(runAuthority: RunAuthority, request: StageRequest): Promise<ResolvedStageAuthority> {
@@ -160,21 +155,38 @@ class FileAuthorityResolver implements AuthorityResolver {
       loaded,
     );
     const target = this.target(runAuthority.target_id, loaded.registry);
-    const root = this.targetRoot(target);
+    const root = this.targetRoot(loaded.registry, target);
     const sources = this.resolveSources(root, current, request);
     const recipient = target.sessions[request.recipient_role];
     if (!recipient?.id) throw new Error("Protected registry has no exact recipient role mapping");
+    const capability = await this.resolveCapability(loaded.registry, runAuthority.target_id, target, request);
     const username = process.env.OPENCODE_SERVER_USERNAME;
     const password = process.env.OPENCODE_SERVER_PASSWORD;
     if (!username || !password) throw new Error("Process-scoped OpenCode authentication is unavailable");
     return {
       run_authority: current,
       sources,
-      transport: { origin: target.server.origin, server_fingerprint: target.server.fingerprint, session_id: recipient.id, username, password },
-      capability: { mode: "DISABLED", identity_sha256: sha256("P0B_REQUIRED") },
+      transport: { origin: target.server.origin, server_fingerprint: capability.server_instance_identity_sha256 ?? target.server.fingerprint ?? "FIXTURE_ONLY", session_id: recipient.id, username, password, directory: root },
+      capability,
       privacy: { absolute_paths: [root, path.dirname(this.registryPath), this.registryPath], private_values: this.privateValues(loaded.registry) },
+      ...(["P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(capability.mode) ? { shared_fence: buildSharedFenceBinding(root, recipient.id) } : {}),
       ...(request.requested_stage === "CLOSEOUT" && this.worktreeReader ? { worktree: this.worktreeReader.inspect(root) } : {}),
     };
+  }
+
+  private async resolveCapability(registry: ControlRegistry, targetId: string, target: RegistryTarget, request: StageRequest): Promise<ResolvedStageAuthority["capability"]> {
+    if (registry.schema_version === "router-control-registry.v1") return { mode: "FIXTURE_ONLY", identity_sha256: sha256("FIXTURE_ONLY") };
+    return resolveProtectedCapability({
+      registry,
+      registry_path: this.registryPath,
+      ...(this.protectedControlRoot === undefined ? {} : { protected_control_root: this.protectedControlRoot }),
+      target_id: targetId,
+      target,
+      request,
+      probe: this.capabilityProbe,
+      credentials: () => ({ username: process.env.OPENCODE_SERVER_USERNAME ?? "", password: process.env.OPENCODE_SERVER_PASSWORD ?? "" }),
+      ...(process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256 === undefined ? {} : { executable_attestation_sha256: process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256 }),
+    });
   }
 
   private resolveSources(root: string, authority: RunAuthority, request: StageRequest): ResolvedSource[] {
@@ -196,15 +208,22 @@ class FileAuthorityResolver implements AuthorityResolver {
   private loadRegistry(): { registry: ControlRegistry; sha256: string } {
     if (lstatSync(this.registryPath).isSymbolicLink()) throw new Error("Control registry must remain an ordinary file");
     const bytes = readFileSync(this.registryPath);
-    const registry = parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as ControlRegistry;
-    if (registry.schema_version !== "router-control-registry.v1" || !registry.targets || typeof registry.targets !== "object" || Array.isArray(registry.targets)) throw new Error("Control registry schema mismatch");
+    const registry = parseControlRegistry(parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
+    if (this.rootAuthorityClass === "P0B_TEST_ONLY" && registry.schema_version === "router-control-registry.v2" && registry.mode === "PRODUCTION_RESPONSE_FIRST") throw new Error("Test-only KnownFolder authority cannot authorize production");
+    if (this.rootAuthorityClass === "P0B_TEST_ONLY" && registry.schema_version === "router-control-registry.v2") {
+      if (!this.protectedControlRoot) throw new Error("Test-only authority requires the fixed protected control root");
+      const expectedIsolationRoot = path.join(path.dirname(this.protectedControlRoot), "runtime", "p0b-isolation");
+      if (!sameFilesystemPath(registry.p0b_isolation_root, expectedIsolationRoot) || registry.p0b_isolation_root_sha256 !== p0bIsolationRootSha256(expectedIsolationRoot)) throw new Error("Test-only authority requires the dedicated fixed P0B fixture root");
+    }
     return { registry, sha256: sha256(bytes) };
   }
 
   private privateValues(registry: ControlRegistry): string[] {
     const values = [this.registryPath, path.dirname(this.registryPath)];
+    if (registry.schema_version === "router-control-registry.v2") values.push(registry.p0b_isolation_root);
     for (const target of Object.values(registry.targets)) {
-      values.push(target.root, target.server.origin, target.server.fingerprint);
+      values.push(target.root, target.server.origin);
+      if (target.server.fingerprint) values.push(target.server.fingerprint);
       for (const session of Object.values(target.sessions)) values.push(session.id);
     }
     return values;
@@ -216,9 +235,8 @@ class FileAuthorityResolver implements AuthorityResolver {
     return target;
   }
 
-  private targetRoot(target: RegistryTarget): string {
-    if (!path.isAbsolute(target.root) || lstatSync(target.root).isSymbolicLink()) throw new Error("Target root is unsafe");
-    return realpathSync(target.root);
+  private targetRoot(registry: ControlRegistry, target: RegistryTarget): string {
+    return resolveProtectedTargetDirectory(registry, target.root, "target root");
   }
 
   private readTargetFile(root: string, relative: string): { text: string; sha256: string } {
@@ -341,8 +359,170 @@ function assertArtifactPrivate(value: string, privateValues: readonly string[]):
   if (/(?:https?:\/\/|(?:[A-Za-z]:[\\/]|\/(?:home|Users|var|tmp)\/)[^\s`"']+|(?:^|[^A-Za-z0-9])ses_[A-Za-z0-9_-]*|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{16,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})/i.test(value)) throw new Error("Run authority contains a private registry sentinel");
 }
 
-function productionAuthorityResolver(registryPath: string): FileAuthorityResolver {
-  return new FileAuthorityResolver(registryPath, new GitWorktreeReader(PRODUCTION_GIT_EXECUTABLE, PRODUCTION_GIT_SHA256));
+interface RootAuthorityProof {
+  known_folder_root: string;
+  authority_class: "OS_KNOWN_FOLDER" | "P0B_TEST_ONLY";
+  proof_sha256: string;
+}
+
+function productionAuthorityResolver(registryPath: string, explicitTestProof?: RootAuthorityProof): FileAuthorityResolver {
+  const authority = productionAuthorityContext(registryPath, explicitTestProof);
+  return new FileAuthorityResolver(registryPath, new GitWorktreeReader(PRODUCTION_GIT_EXECUTABLE, PRODUCTION_GIT_SHA256), authority.controlRoot, new InstalledCapabilityProbe(), authority.authorityClass);
+}
+
+function dispatchAuthorityResolver(registryPath: string): FileAuthorityResolver {
+  const registry = parseControlRegistry(parseStrictJson(readFileSync(registryPath, "utf8")));
+  return registry.schema_version === "router-control-registry.v1"
+    ? new FileAuthorityResolver(registryPath, new GitWorktreeReader(PRODUCTION_GIT_EXECUTABLE, PRODUCTION_GIT_SHA256))
+    : productionAuthorityResolver(registryPath);
+}
+
+function productionAuthorityContext(registryPath: string, explicitTestProof?: RootAuthorityProof): { controlRoot: string; runtimeRoot: string; authorityClass: RootAuthorityProof["authority_class"] } {
+  let authorityClass: RootAuthorityProof["authority_class"];
+  let knownFolderRoot: string;
+  if (explicitTestProof) {
+    if (explicitTestProof.authority_class !== "P0B_TEST_ONLY") throw new Error("Only the bounded P0B test authority may be injected");
+    if (!path.isAbsolute(explicitTestProof.known_folder_root)) throw new Error("KnownFolder test authority proof is unavailable");
+    knownFolderRoot = assertOrdinaryPathSegments(explicitTestProof.known_folder_root, explicitTestProof.known_folder_root, "KnownFolder test root");
+    const expectedProof = sha256(`fal-router-known-folder-authority/v1\nP0B_TEST_ONLY\n${knownFolderRoot}`);
+    if (explicitTestProof.proof_sha256 !== expectedProof) throw new Error("KnownFolder test authority proof mismatch");
+    authorityClass = "P0B_TEST_ONLY";
+  } else if (process.env.OC_ROUTER_ROOT_AUTHORITY_CLASS === "P0B_TEST_ONLY") {
+    const candidate = process.env.OC_ROUTER_KNOWN_FOLDER_ROOT ?? "";
+    if (!path.isAbsolute(candidate)) throw new Error("KnownFolder test authority proof is unavailable");
+    knownFolderRoot = assertOrdinaryPathSegments(candidate, candidate, "KnownFolder test root");
+    const expectedProof = sha256(`fal-router-known-folder-authority/v1\nP0B_TEST_ONLY\n${knownFolderRoot}`);
+    if (process.env.OC_ROUTER_ROOT_AUTHORITY_SHA256 !== expectedProof) throw new Error("KnownFolder test authority proof mismatch");
+    authorityClass = "P0B_TEST_ONLY";
+  } else {
+    if (process.env.OC_ROUTER_ROOT_AUTHORITY_CLASS && process.env.OC_ROUTER_ROOT_AUTHORITY_CLASS !== "OS_KNOWN_FOLDER") throw new Error("KnownFolder authority class is invalid");
+    knownFolderRoot = resolveOsKnownFolderRoot();
+    authorityClass = "OS_KNOWN_FOLDER";
+    const declaredRoot = process.env.OC_ROUTER_KNOWN_FOLDER_ROOT;
+    if (declaredRoot && (!path.isAbsolute(declaredRoot) || !sameFilesystemPath(realpathSync(declaredRoot), knownFolderRoot))) throw new Error("Declared LocalAppData differs from the OS KnownFolder authority");
+    const expectedProof = sha256(`fal-router-known-folder-authority/v1\nOS_KNOWN_FOLDER\n${knownFolderRoot}`);
+    if (process.env.OC_ROUTER_ROOT_AUTHORITY_SHA256 && process.env.OC_ROUTER_ROOT_AUTHORITY_SHA256 !== expectedProof) throw new Error("Declared KnownFolder authority proof mismatch");
+    const ambient = process.env.LOCALAPPDATA;
+    if (ambient && (!path.isAbsolute(ambient) || !sameFilesystemPath(realpathSync(ambient), knownFolderRoot))) throw new Error("Ambient LocalAppData differs from the OS KnownFolder authority");
+  }
+  const fixedRoot = assertOrdinaryPathSegments(knownFolderRoot, path.join(knownFolderRoot, "FractalAgentLab", "oc-router"), "fixed router root");
+  const controlRoot = assertOrdinaryPathSegments(knownFolderRoot, path.join(fixedRoot, "control"), "fixed control root");
+  const runtimeRoot = assertOrdinaryPathSegments(knownFolderRoot, path.join(fixedRoot, "runtime"), "fixed runtime root");
+  const expectedRegistry = path.join(controlRoot, "control-registry.json");
+  if (!sameFilesystemPath(realpathSync(registryPath), realpathSync(expectedRegistry))) throw new Error("Control registry differs from the KnownFolder authority");
+  if (authorityClass === "P0B_TEST_ONLY") {
+    const registry = parseControlRegistry(parseStrictJson(readFileSync(expectedRegistry, "utf8")));
+    if (registry.schema_version !== "router-control-registry.v2" || registry.mode === "PRODUCTION_RESPONSE_FIRST") throw new Error("Test-only KnownFolder authority cannot authorize production");
+    const expectedIsolationRoot = assertOrdinaryPathSegments(runtimeRoot, path.join(runtimeRoot, "p0b-isolation"), "dedicated P0B fixture root");
+    if (!sameFilesystemPath(registry.p0b_isolation_root, expectedIsolationRoot) || registry.p0b_isolation_root_sha256 !== p0bIsolationRootSha256(expectedIsolationRoot)) throw new Error("Test-only authority requires the dedicated fixed P0B fixture root");
+  }
+  return { controlRoot, runtimeRoot, authorityClass };
+}
+
+function resolveOsKnownFolderRoot(): string {
+  if (process.platform !== "win32") throw new Error("OS KnownFolder authority is Windows-only");
+  const executable = FENCE_BROKER_EXECUTABLE;
+  const item = lstatSync(executable);
+  if (!item.isFile() || item.isSymbolicLink() || sha256(readFileSync(executable)) !== FENCE_BROKER_EXECUTABLE_SHA256) throw new Error("KnownFolder authority broker is unavailable");
+  const systemRoot = path.resolve(path.dirname(executable), "..", "..", "..");
+  const query = "[Console]::Out.Write([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData))";
+  const child = spawnSync(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", query], {
+    encoding: "utf8",
+    env: { SystemRoot: systemRoot, WINDIR: systemRoot },
+    timeout: 10_000,
+    windowsHide: true,
+  });
+  if (child.status !== 0 || child.error || child.stderr || !child.stdout || /[\r\n\0]/.test(child.stdout)) throw new Error("OS KnownFolder authority query failed");
+  const root = child.stdout;
+  if (!path.isAbsolute(root)) throw new Error("OS KnownFolder authority query returned an invalid path");
+  return assertOrdinaryPathSegments(root, root, "OS LocalApplicationData KnownFolder");
+}
+
+async function resolveCompactAuthorityOperation(options: {
+  registryPath: string;
+  controlRoot: string;
+  targetId: string;
+  recipientRole: string;
+  store: StateStore;
+  probe: CapabilityProbe;
+  credentials: () => { username: string; password: string };
+  executableAttestationSha256?: string;
+  rootAuthorityClass?: RootAuthorityProof["authority_class"];
+  consume: boolean;
+  attemptId?: string;
+  now?: Date;
+}): Promise<CompactProtectedAuthorityPacket> {
+  const registry = parseControlRegistry(parseStrictJson(readFileSync(options.registryPath, "utf8")));
+  if (options.rootAuthorityClass === "P0B_TEST_ONLY" && registry.schema_version === "router-control-registry.v2" && registry.mode === "PRODUCTION_RESPONSE_FIRST") throw new Error("Test-only KnownFolder authority cannot authorize production Compact dispatch");
+  const packet = await resolveCompactProtectedAuthority({
+    registry,
+    registry_path: options.registryPath,
+    protected_control_root: options.controlRoot,
+    target_id: options.targetId,
+    recipient_role: options.recipientRole,
+    probe: options.probe,
+    credentials: options.credentials,
+    ...(options.executableAttestationSha256 === undefined ? {} : { executable_attestation_sha256: options.executableAttestationSha256 }),
+    ...(options.now === undefined ? {} : { now: options.now }),
+  });
+  if (!options.consume) return packet;
+  const attemptId = options.attemptId;
+  if (!attemptId) throw new Error("Compact authority consumption requires an attempt ID");
+  assertOpaqueId(attemptId, "Compact attempt ID");
+  if (packet.mode === "P0B_ISOLATED") {
+    const operationId = `compact-${sha256(attemptId).slice(0, 40)}`;
+    options.store.claimOneUseCapability(packet.authorization_use_sha256, "compact-lite", operationId);
+    options.store.settleOneUseCapability(packet.authorization_use_sha256, "compact-lite", operationId, "CONSUMED");
+    return { ...packet, authorization_state: "CONSUMED" };
+  }
+  return { ...packet, authorization_state: "NOT_APPLICABLE" };
+}
+
+function compactAuthorityStatus(packet: CompactProtectedAuthorityPacket, handoffToken: string): unknown {
+  if (!/^[a-f0-9]{32}$/.test(handoffToken)) throw new Error("Compact authority handoff token is invalid");
+  return {
+    schema_version: "compact-protected-authority-status.v1",
+    authorization_state: packet.authorization_state,
+    mode: packet.mode,
+    target_id: packet.target_id,
+    logical_session_ref: packet.logical_session_ref,
+    target_directory_sha256: packet.target_directory_sha256,
+    session_sha256: packet.session_sha256,
+    server_binary_sha256: packet.server_binary_sha256,
+    server_instance_identity_sha256: packet.server_instance_identity_sha256,
+    capability_receipt_sha256: packet.capability_receipt_sha256,
+    authorization_use_sha256: packet.authorization_use_sha256,
+    command_timeout_ms: packet.command_timeout_ms,
+    handoff_token: handoffToken,
+  };
+}
+
+function writeCompactAuthorityHandoff(runtimeRoot: string, packet: CompactProtectedAuthorityPacket, handoffToken: string): unknown {
+  const status = compactAuthorityStatus(packet, handoffToken);
+  const handoffRoot = assertOrdinaryPathSegments(runtimeRoot, path.join(runtimeRoot, "compact-authority-handoffs"), "Compact authority handoff root");
+  const handoffPath = path.join(handoffRoot, `${handoffToken}.json`);
+  try { lstatSync(handoffPath); throw new Error("Compact authority handoff already exists"); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  writeAtomicPrivateJson(handoffPath, packet);
+  return status;
+}
+
+function assertOrdinaryPathSegments(containmentRoot: string, candidate: string, labelName: string): string {
+  const root = path.resolve(containmentRoot);
+  const full = path.resolve(candidate);
+  const relative = path.relative(root, full);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error(`${labelName} escapes KnownFolder authority`);
+  let current = root;
+  for (const segment of ["", ...relative.split(path.sep).filter(Boolean)]) {
+    if (segment) current = path.join(current, segment);
+    const item = lstatSync(current);
+    if (!item.isDirectory() || item.isSymbolicLink()) throw new Error(`${labelName} traverses a reparse point or non-directory`);
+  }
+  return realpathSync(full);
+}
+
+function sameFilesystemPath(left: string, right: string): boolean {
+  return process.platform === "win32" ? path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase() : path.resolve(left) === path.resolve(right);
 }
 
 function requiredSourceClasses(stage: StageRequest["requested_stage"]): readonly SourceClass[] {
@@ -403,18 +583,26 @@ function argumentsMap(values: string[]): Map<string, string> {
 
 async function main(): Promise<void> {
   const operation = process.argv[2];
-  if (!operation || !["new-run", "invoke-stage", "resolve-stage", "get-run"].includes(operation)) throw new Error("Unknown router operation");
+  if (!operation || !["new-run", "invoke-stage", "resolve-stage", "get-run", "purge-retention", "write-p0b-proof", "resolve-compact-authority", "consume-compact-authority"].includes(operation)) throw new Error("Unknown router operation");
   const args = argumentsMap(process.argv.slice(3));
   validateOperationArguments(operation, args);
   const runtimeRoot = process.env.OC_ROUTER_RUNTIME_ROOT;
   if (!runtimeRoot) throw new Error("Router runtime root must be process-scoped");
   const store = new StateStore(runtimeRoot);
   const dispatchOperation = operation === "new-run" || operation === "invoke-stage";
+  const compactOperation = operation === "resolve-compact-authority" || operation === "consume-compact-authority";
   const registryPath = process.env.OC_ROUTER_CONTROL_REGISTRY;
-  if (dispatchOperation && !registryPath) throw new Error("Protected control registry must be process-scoped for dispatch operations");
+  if ((dispatchOperation || compactOperation) && !registryPath) throw new Error("Protected control registry must be process-scoped for dispatch operations");
+  let resolver: FileAuthorityResolver | undefined;
+  if (dispatchOperation) resolver = dispatchAuthorityResolver(registryPath!);
+  else if (operation === "resolve-stage" && registryPath) {
+    try { resolver = productionAuthorityResolver(registryPath); }
+    catch { resolver = undefined; }
+  }
+  const snapshots = resolver ? new InstalledSnapshotReader(store, resolver, new InstalledSnapshotClient()) : { collect: async () => [] };
   const engine = dispatchOperation
-    ? new StageEngine(store, productionAuthorityResolver(registryPath!), new CommandClient(), { collect: async () => [] })
-    : new StageEngine(store, undefined, undefined, { collect: async () => [] });
+    ? new StageEngine(store, resolver, new CommandClient(), snapshots)
+    : new StageEngine(store, resolver, undefined, snapshots);
   let result: unknown;
   if (operation === "new-run") {
     result = await engine.newRun(parseRunRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
@@ -422,8 +610,35 @@ async function main(): Promise<void> {
     result = await engine.invokeStage(parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
   } else if (operation === "resolve-stage") {
     result = await engine.resolveStage(required(args, "--run-id"), required(args, "--operation-id"));
-  } else {
+  } else if (operation === "get-run") {
     result = engine.getRun(required(args, "--run-id"));
+  } else if (compactOperation) {
+    const authority = productionAuthorityContext(registryPath!);
+    if (!sameFilesystemPath(store.root, authority.runtimeRoot)) throw new Error("Compact runtime root differs from KnownFolder authority");
+    const packet = await resolveCompactAuthorityOperation({
+      registryPath: registryPath!,
+      controlRoot: authority.controlRoot,
+      targetId: required(args, "--target-id"),
+      recipientRole: required(args, "--recipient-role"),
+      store,
+      probe: new InstalledCapabilityProbe(),
+      credentials: () => ({ username: process.env.OPENCODE_SERVER_USERNAME ?? "", password: process.env.OPENCODE_SERVER_PASSWORD ?? "" }),
+      ...(process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256 === undefined ? {} : { executableAttestationSha256: process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256 }),
+      rootAuthorityClass: authority.authorityClass,
+      consume: operation === "consume-compact-authority",
+      ...(operation === "consume-compact-authority" ? { attemptId: required(args, "--attempt-id") } : {}),
+    });
+    result = writeCompactAuthorityHandoff(authority.runtimeRoot, packet, process.env.OC_ROUTER_COMPACT_HANDOFF_TOKEN ?? "");
+  } else if (operation === "purge-retention") {
+    if (!registryPath) throw new Error("Protected control registry is required for retention purge");
+    productionAuthorityResolver(registryPath);
+    result = purgeProtectedRuntimeEvidence(registryPath, runtimeRoot);
+  } else {
+    if (!registryPath) throw new Error("Protected control registry is required for P0B proof persistence");
+    productionAuthorityResolver(registryPath);
+    const proof = parseP0bProofReceipt(parseStrictJson(readFileSync(required(args, "--request"), "utf8")));
+    if (!process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256 || proof.executable_attestation_sha256 !== process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256) throw new Error("P0B proof executable attestation binding mismatch");
+    result = writeP0bProofReceipt(runtimeRoot, proof);
   }
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
@@ -433,8 +648,34 @@ function validateOperationArguments(operation: string, args: Map<string, string>
     ? new Set(["--request"])
     : operation === "resolve-stage"
       ? new Set(["--run-id", "--operation-id"])
-      : new Set(["--run-id"]);
+      : operation === "get-run"
+        ? new Set(["--run-id"])
+        : operation === "write-p0b-proof"
+          ? new Set(["--request"])
+          : operation === "resolve-compact-authority"
+            ? new Set(["--target-id", "--recipient-role"])
+            : operation === "consume-compact-authority"
+              ? new Set(["--target-id", "--recipient-role", "--attempt-id"])
+          : new Set<string>();
   for (const key of args.keys()) if (!allowed.has(key)) throw new Error(`Argument ${key} is not allowed for ${operation}`);
+}
+
+function purgeProtectedRuntimeEvidence(registryPath: string, runtimeRoot: string): unknown {
+  const registry = parseControlRegistry(parseStrictJson(readFileSync(registryPath, "utf8")));
+  if (registry.schema_version !== "router-control-registry.v2" || registry.mode !== "DISABLED") throw new Error("Retention purge requires the protected DISABLED kill switch");
+  const controlRoot = realpathSync(path.dirname(registryPath));
+  const fixedRoot = realpathSync(path.dirname(controlRoot));
+  const expectedRuntime = realpathSync(path.join(fixedRoot, "runtime"));
+  if (!sameFilesystemPath(realpathSync(runtimeRoot), expectedRuntime)) throw new Error("Retention runtime root differs from protected authority");
+  assertSafeRelativePath(registry.retention_policy_path, "retention policy path");
+  const policyPath = path.resolve(controlRoot, registry.retention_policy_path);
+  if (!sameFilesystemPath(path.dirname(policyPath), controlRoot) || lstatSync(policyPath).isSymbolicLink()) throw new Error("Retention policy path is unsafe");
+  const policy = parseRetentionPolicy(parseStrictJson(readFileSync(policyPath, "utf8")));
+  const receipt = purgeExpiredPrivateEvidence(expectedRuntime, policy);
+  const receiptIdentity = sha256(canonicalize(receipt));
+  const receiptsRoot = assertOrdinaryPathSegments(path.dirname(fixedRoot), path.join(fixedRoot, "receipts"), "retention receipts root");
+  writeAtomicPrivateJson(path.join(receiptsRoot, `retention-purge.${receiptIdentity}.json`), receipt);
+  return receipt;
 }
 
 function required(args: Map<string, string>, key: string): string {
@@ -456,4 +697,4 @@ if (isEntry) {
   });
 }
 
-export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, productionAuthorityResolver, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate };
+export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate };

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { sha256 } from "../src/contracts.js";
-import { CommandClient, reconcileSnapshot, type FetchLike } from "../src/transport.js";
+import { CommandClient, InstalledCapabilityProbe, InstalledSnapshotClient, reconcileSnapshot, type FetchLike } from "../src/transport.js";
 
 const session = "session-fixture";
 const responseBody = {
@@ -51,6 +54,7 @@ test("redirect and cross-origin HTTP are rejected", async () => {
   const client = new CommandClient(redirect);
   await assert.rejects(() => client.send({ origin: "http://127.0.0.1:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password" }, "implement", "", 1000), /Redirect/);
   await assert.rejects(() => client.send({ origin: "http://example.test:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password" }, "implement", "", 1000), /loopback/);
+  await assert.rejects(() => client.send({ origin: "http://localhost:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password" }, "implement", "", 1000), /literal loopback/);
 });
 
 test("HTTP 5xx is delivery-uncertain and never retried by the command client", async () => {
@@ -72,6 +76,100 @@ test("command response rejects duplicate members and non-text payload values", a
   await assert.rejects(() => new CommandClient(nonText).send(binding, "implement", "", 1000), /text payload/);
 });
 
+test("installed capability probe binds target directory and records SSE without enabling it", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "fal-router-probe-"));
+  const seen: string[] = [];
+  let eventOrdinal = 0;
+  const fake: FetchLike = async (input, init) => {
+    const endpoint = new URL(String(input));
+    seen.push(`${endpoint.pathname}${endpoint.search}`);
+    assert.match(String((init?.headers as Record<string, string>).authorization), /^Basic /);
+    if (endpoint.pathname === "/global/health") return new Response('{"healthy":true,"version":"1.18.19"}');
+    if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
+    if (endpoint.pathname === "/command") {
+      assert.equal(endpoint.searchParams.get("directory"), directory);
+      return new Response('[{"name":"implement"},{"name":"terv-review"}]');
+    }
+    if (endpoint.pathname === "/event") {
+      assert.equal(endpoint.searchParams.get("directory"), directory);
+      assert.equal((init?.headers as Record<string, string>).accept, "text/event-stream");
+      eventOrdinal += 1;
+      return new Response(`event: message\ndata: {"id":"random-${eventOrdinal}","type":"server.connected","properties":{}}\n\n`, { headers: { "content-type": "text/event-stream" } });
+    }
+    throw new Error("unexpected probe endpoint");
+  };
+  const expectedBinary = "9".repeat(64);
+  const measure = (_origin: URL, binary: string) => {
+    assert.equal(binary, expectedBinary);
+    return { server_binary_sha256: expectedBinary, server_instance_identity_sha256: "8".repeat(64) };
+  };
+  try {
+    const probe = new InstalledCapabilityProbe(fake, 4 * 1024 * 1024, measure);
+    const input = { origin: "http://127.0.0.1:4096", username: "owner", password: "process-only", directory, expected_binary_sha256: expectedBinary, required_commands: ["terv-review"] as const, timeout_ms: 1000 };
+    const result = await probe.probe(input);
+    const revalidated = await probe.probe(input);
+    assert.equal(result.server_version, "1.18.19");
+    assert.deepEqual(result.supported_commands, ["implement", "terv-review"]);
+    assert.equal(result.sse.probe_status, "VERIFIED");
+    assert.equal(result.sse.enabled, false);
+    assert.equal(result.sse.proof_sha256, revalidated.sse.proof_sha256);
+    assert.equal(eventOrdinal, 2);
+    assert.equal(seen.some((entry) => entry.startsWith("/event?directory=")), true);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("installed response lifecycle parts are audited while only authoritative text is extracted", async () => {
+  const installed = {
+    info: { id: "assistant-installed", role: "assistant", sessionID: session, parentID: "user-installed" },
+    parts: [
+      { id: "step-a", type: "step-start", messageID: "assistant-installed", sessionID: session, snapshot: "tree-a" },
+      { id: "reason-a", type: "reasoning", messageID: "assistant-installed", sessionID: session, text: "private reasoning", time: { start: 1, end: 2 } },
+      { id: "synthetic-a", type: "text", messageID: "assistant-installed", sessionID: session, text: "synthetic", synthetic: true },
+      { id: "ignored-a", type: "text", messageID: "assistant-installed", sessionID: session, text: "ignored", ignored: true },
+      { id: "text-a", type: "text", messageID: "assistant-installed", sessionID: session, text: "META PLAN REVIEW\nOverall verdict: GREEN" },
+      { id: "step-b", type: "step-finish", messageID: "assistant-installed", sessionID: session, reason: "stop", snapshot: "tree-b", cost: 0.01, tokens: { total: 12, input: 8, output: 4, reasoning: 0, cache: { read: 0, write: 0 } } },
+    ],
+  };
+  const binding = { origin: "http://127.0.0.1:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password" };
+  const receipt = await new CommandClient(async () => new Response(JSON.stringify(installed))).send(binding, "implement", "", 1000);
+  assert.equal(receipt.terminal_markdown, "META PLAN REVIEW\nOverall verdict: GREEN");
+  assert.match(receipt.ignored_part_set_sha256, /^[a-f0-9]{64}$/);
+  for (const rejectedType of ["tool", "subtask", "file", "patch", "snapshot", "unknown"]) {
+    const invalid = { ...installed, parts: [{ id: "bad", type: rejectedType, messageID: "assistant-installed", sessionID: session }] };
+    await assert.rejects(() => new CommandClient(async () => new Response(JSON.stringify(invalid))).send(binding, "implement", "", 1000), /not an inert audited part/);
+  }
+});
+
+test("installed snapshot reader is GET-only, directory-bound, and preserves exact assistant correlation", async () => {
+  let reads = 0;
+  const baselineMessage = { info: { id: "assistant-baseline", role: "assistant", sessionID: session, parentID: "user-baseline" }, parts: [{ id: "text-baseline", type: "text", text: "BASELINE", messageID: "assistant-baseline", sessionID: session }] };
+  const currentMessage = {
+    info: { id: "assistant-current", role: "assistant", sessionID: session, parentID: "user-current" },
+    parts: [
+      { id: "step-current-a", type: "step-start", snapshot: "before", messageID: "assistant-current", sessionID: session },
+      { id: "text-current", type: "text", text: "PLAN_REVIEW_COMPLETE", messageID: "assistant-current", sessionID: session },
+      { id: "step-current-b", type: "step-finish", reason: "stop", snapshot: "after", cost: 0, tokens: { total: 1, input: 1, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, messageID: "assistant-current", sessionID: session },
+    ],
+  };
+  const fake: FetchLike = async (input, init) => {
+    reads += 1;
+    const endpoint = new URL(String(input));
+    assert.equal(init?.method, "GET");
+    assert.equal(endpoint.searchParams.get("directory"), "C:\\synthetic-target");
+    return new Response(JSON.stringify(reads === 1 ? [baselineMessage] : [currentMessage, baselineMessage]));
+  };
+  const client = new InstalledSnapshotClient(fake);
+  const binding = { origin: "http://127.0.0.1:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password", directory: "C:\\synthetic-target" };
+  const baseline = await client.captureBaseline(binding, 1000);
+  assert.equal(baseline.message_id, "assistant-baseline");
+  const snapshot = await client.collect(binding, baseline, "EXACT_PARENT_LINK", 1000);
+  assert.equal(snapshot.baseline_present, true);
+  assert.deepEqual(snapshot.candidates, [{ id: "assistant-current", parent_id: "user-current", session_id: session, text: "PLAN_REVIEW_COMPLETE", after_baseline: true }]);
+  assert.match(snapshot.message_set_sha256, /^[a-f0-9]{64}$/);
+});
+
 test("command response byte limit cancels the stream before unbounded buffering", async () => {
   let cancelled = false;
   const body = new ReadableStream<Uint8Array>({
@@ -90,8 +188,12 @@ test("command response byte limit cancels the stream before unbounded buffering"
 
 test("snapshot reconciliation requires one exact candidate", () => {
   const candidate = { id: "assistant-1", parent_id: "user-send-1", session_id: session, text: "PLAN_REVIEW_COMPLETE", after_baseline: true };
-  const expected = { sessionSha256: sha256(session), parentId: "user-send-1", terminal: (text: string) => text.endsWith("PLAN_REVIEW_COMPLETE") };
+  const expected = { sessionSha256: sha256(session), parentId: "user-send-1", messageId: "assistant-1", terminalSha256: sha256(candidate.text), terminal: (text: string) => text.endsWith("PLAN_REVIEW_COMPLETE") };
   assert.equal(reconcileSnapshot([candidate], expected).status, "TRANSCRIPT_RECONCILED");
   assert.equal(reconcileSnapshot([{ ...candidate, session_id: "other" }], expected).status, "UNCERTAIN");
-  assert.equal(reconcileSnapshot([candidate, { ...candidate, id: "assistant-2" }], expected).status, "UNCERTAIN");
+  assert.equal(reconcileSnapshot([{ ...candidate, id: "assistant-other" }], expected).status, "UNCERTAIN");
+  assert.equal(reconcileSnapshot([{ ...candidate, text: `${candidate.text}\ndrift` }], expected).status, "UNCERTAIN");
+  assert.equal(reconcileSnapshot([candidate, { ...candidate }], expected).status, "UNCERTAIN");
+  assert.equal(reconcileSnapshot([{ ...candidate, parent_id: "" }], expected).status, "UNCERTAIN");
+  assert.equal(reconcileSnapshot([{ ...candidate, parent_id: "" }], { ...expected, parentId: "" }).status, "UNCERTAIN");
 });

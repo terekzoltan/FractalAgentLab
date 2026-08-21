@@ -104,20 +104,17 @@ test("CLI and PowerShell launcher derive authority from target state and fail on
     if (process.platform === "win32") {
       const launcher = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../scripts/Invoke-OCRouter.ps1");
       const launched = spawnSync("powershell.exe", [
-        "-NoProfile", "-File", launcher, "-Operation", "new-run", "-RequestPath", requestPath,
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launcher, "-Operation", "new-run", "-RequestPath", requestPath,
       ], { encoding: "utf8", env: { ...process.env, OC_ROUTER_RUNTIME_ROOT: runtime, OC_ROUTER_CONTROL_REGISTRY: registryPath } });
-      assert.equal(launched.status, 0, launched.stderr);
-      const launcherResult = JSON.parse(launched.stdout) as { run_id: string; auto_advance: boolean };
-      assert.match(launcherResult.run_id, /^run-/);
-      assert.notEqual(launcherResult.run_id, result.run_id);
-      assert.equal(launcherResult.auto_advance, false);
+      assert.notEqual(launched.status, 0, "production launcher must reject caller-selected legacy runtime/registry paths");
+      assert.match(launched.stderr, /Fixed router root is missing|Ambient LOCALAPPDATA differs/);
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("CLI and PowerShell resolve-stage preserve UNCERTAIN with no send", () => {
+test("CLI resolve-stage preserves UNCERTAIN while production launcher rejects alternate runtime authority", () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-cli-resolve-"));
   try {
     const runtime = path.join(root, "runtime");
@@ -187,13 +184,11 @@ test("CLI and PowerShell resolve-stage preserve UNCERTAIN with no send", () => {
     if (process.platform === "win32") {
       const launcher = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../scripts/Invoke-OCRouter.ps1");
       const launched = spawnSync("powershell.exe", [
-        "-NoProfile", "-File", launcher, "-Operation", "resolve-stage", "-RunId", authority.run_id, "-OperationId", operation.operation_id,
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launcher, "-Operation", "resolve-stage", "-RunId", authority.run_id, "-OperationId", operation.operation_id,
       ], { encoding: "utf8", env: withoutRegistry });
-      assert.equal(launched.status, 0, launched.stderr);
-      const launcherResult = JSON.parse(launched.stdout) as { operation_status: string; transport_status: string; output_status: string };
-      assert.equal(launcherResult.operation_status, "UNCERTAIN");
-      assert.equal(launcherResult.transport_status, "NO_SEND");
-      assert.equal(launcherResult.output_status, "AMBIGUOUS");
+      assert.notEqual(launched.status, 0);
+      assert.match(launched.stderr, /Fixed router root is missing|Ambient LOCALAPPDATA differs/);
+      assert.equal(store.loadOperation(authority.run_id, operation.operation_id).status, "UNCERTAIN");
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -254,7 +249,7 @@ test("FSR-012/017: real resolver reloads protected manifest and stage sources", 
     };
     const resolved = await resolver.resolveStageAuthority(authority, stage);
     assert.equal(resolved.sources.length, 2);
-    assert.equal(resolved.capability.mode, "DISABLED");
+    assert.equal(resolved.capability.mode, "FIXTURE_ONLY");
 
     writeFileSync(path.join(target, implementationPath), `${implementation}drift\n`);
     await assert.rejects(() => resolver.resolveStageAuthority(authority, stage), /hash mismatch/);
@@ -354,7 +349,7 @@ test("FSR-025: production-bound CLOSEOUT resolver derives authority from a prote
     git("commit", "-m", "fixture");
     process.env.OPENCODE_SERVER_USERNAME = "fixture-user";
     process.env.OPENCODE_SERVER_PASSWORD = "fixture-password";
-    const resolver = _test.productionAuthorityResolver(registryPath);
+    const resolver = new _test.FileAuthorityResolver(registryPath, new GitWorktreeReader(gitPath, sha256(readFileSync(gitPath))));
     const authority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-closeout-real-git", createdAt: "2026-08-12T00:00:00.000Z" });
     const request: StageRequest = {
       schema_version: "stage-request.v1", request_id: "request-closeout-real-git", run_id: authority.run_id, issued_at: authority.created_at, issued_by: "orchestrator", run_authority_sha256: authoritySha256(authority),
@@ -366,7 +361,7 @@ test("FSR-025: production-bound CLOSEOUT resolver derives authority from a prote
       active_route_generation: authority.active_route_generation,
     };
     const resolved = await resolver.resolveStageAuthority(authority, request);
-    assert.equal(resolved.capability.mode, "DISABLED");
+    assert.equal(resolved.capability.mode, "FIXTURE_ONLY");
     assert.equal(resolved.worktree?.status_clean, true);
     assert.deepEqual(resolved.worktree?.staged_paths, []);
     assert.equal(resolved.sources.length, 4);

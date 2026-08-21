@@ -208,7 +208,7 @@ if (-not $RouterDirFull.Equals($ExpectedRouter, [StringComparison]::OrdinalIgnor
 $RouterConfigRecord = Read-CompactFlowStrictJsonFile -Path (Resolve-CompactFlowContainedFile -Root $TargetRootFull -RelativePath '.opencode-router/sessions.json') -Label 'Router sessions registry'
 $RouterConfig = $RouterConfigRecord.Value
 if ([string]::IsNullOrWhiteSpace($Server)) { $Server = [string](Get-CompactFlowProperty -Value $RouterConfig -Name 'server' -DefaultValue '') }
-if ($Server -cnotmatch '^https?://(?:127\.0\.0\.1|localhost)(?::[0-9]{1,5})?$') { throw 'Server must be an explicit loopback HTTP(S) endpoint.' }
+if ($Server -cnotmatch '^https?://(?:127\.0\.0\.1|\[::1\])(?::[0-9]{1,5})?$') { throw 'Server must use a literal loopback HTTP(S) endpoint.' }
 $Headers = if ([string]::IsNullOrWhiteSpace($env:OPENCODE_SERVER_PASSWORD)) { @{} } else { New-OCRouterBasicAuthHeader -Username $(if ($env:OPENCODE_SERVER_USERNAME) { $env:OPENCODE_SERVER_USERNAME } else { 'opencode' }) -Password $env:OPENCODE_SERVER_PASSWORD }
 
 $RunPath = Join-Path $RouterDirFull ("compact-runs\$($Event.boundary_id).json")
