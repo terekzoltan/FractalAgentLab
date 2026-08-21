@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fal.invalid/schemas/router-control-registry.v2.json",
+  "title": "FAL protected router control registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "router_protocol_identity", "mode", "retention_policy_path", "p0b_isolation_root", "p0b_isolation_root_sha256", "targets"],
+  "properties": {
+    "schema_version": { "const": "router-control-registry.v2" },
+    "router_protocol_identity": { "const": "fal-explicit-stage-router/v1" },
+    "mode": { "enum": ["DISABLED", "P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"] },
+    "retention_policy_path": { "$ref": "#/$defs/relativePath" },
+    "p0b_isolation_root": { "type": "string", "minLength": 3 },
+    "p0b_isolation_root_sha256": { "$ref": "#/$defs/sha256" },
+    "targets": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/opaqueId" },
+      "additionalProperties": { "$ref": "#/$defs/target" }
+    }
+  },
+  "$defs": {
+    "opaqueId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._@:+~-]{0,199}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "relativePath": { "type": "string", "minLength": 1, "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*:).+$" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_identity", "target_identity", "worktree_identity", "accountable", "root", "state_path", "combined_path", "overlay_path", "accountable_role_path", "server", "sessions", "capability_receipt_path", "isolation_class"],
+      "properties": {
+        "profile_identity": { "$ref": "#/$defs/opaqueId" },
+        "target_identity": { "$ref": "#/$defs/opaqueId" },
+        "worktree_identity": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "accountable": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lane", "class", "profile"],
+          "properties": { "lane": { "type": "string", "minLength": 1 }, "class": { "type": "string", "minLength": 1 }, "profile": { "type": "string", "minLength": 1 } }
+        },
+        "root": { "type": "string", "minLength": 1 },
+        "state_path": { "$ref": "#/$defs/relativePath" },
+        "combined_path": { "$ref": "#/$defs/relativePath" },
+        "overlay_path": { "$ref": "#/$defs/relativePath" },
+        "accountable_role_path": { "$ref": "#/$defs/relativePath" },
+        "active_route_path": { "$ref": "#/$defs/relativePath" },
+        "require_active_route": { "type": "boolean" },
+        "server": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["origin", "binary_sha256", "command_timeout_ms"],
+          "properties": {
+            "origin": { "type": "string", "pattern": "^https?://(?:127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]{1,5})?$" },
+            "binary_sha256": { "$ref": "#/$defs/sha256" },
+            "command_timeout_ms": { "type": "integer", "minimum": 120000, "maximum": 900000 }
+          }
+        },
+        "sessions": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": { "id": { "type": "string", "minLength": 4 } }
+          }
+        },
+        "capability_receipt_path": { "$ref": "#/$defs/relativePath" },
+        "isolation_class": { "enum": ["SYNTHETIC_TEST_ONLY", "PRODUCTION_TARGET"] }
+      }
+    }
+  }
+}

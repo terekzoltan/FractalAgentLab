@@ -60,7 +60,7 @@ test("FSR-019: retired wrappers exit at the retirement marker before transport",
         OC_ROUTER_CONTROL_REGISTRY: path.join(root, "unreachable-registry.json"),
         FAL_TEST_SCRIPT: script,
       };
-      const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", harness], { encoding: "utf8", timeout: 5_000, windowsHide: true, env });
+      const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", harness], { encoding: "utf8", timeout: 5_000, windowsHide: true, env });
       assert.equal(result.error, undefined, `${name} timed out or failed to launch`);
       assert.notEqual(result.status, 0, `${name} unexpectedly succeeded`);
       const output = `${result.stdout}\n${result.stderr}`;
@@ -110,7 +110,7 @@ test("FSR-021: launcher pins attestation, Node, and compiled entry before execut
     copyFileSync(path.resolve(scripts, "../runtime/executable-attestation.json"), path.join(copiedRuntime, "executable-attestation.json"));
     copyFileSync(path.resolve(scripts, "../runtime/dist/src/cli.js"), path.join(copiedRuntime, "dist", "src", "cli.js"));
     const powershell = path.join(process.env.SystemRoot!, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-    const run = () => spawnSync(powershell, ["-NoProfile", "-File", path.join(copiedScripts, "Invoke-OCRouter.ps1"), "-Operation", "get-run", "-RunId", "fixture"], { encoding: "utf8", env: { ...process.env, OC_ROUTER_RUNTIME_ROOT: root, PATH: root } });
+    const run = () => spawnSync(powershell, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(copiedScripts, "Invoke-OCRouter.ps1"), "-Operation", "get-run", "-RunId", "fixture"], { encoding: "utf8", env: { ...process.env, OC_ROUTER_RUNTIME_ROOT: root, PATH: root } });
 
     writeFileSync(path.join(copiedRuntime, "dist", "src", "cli.js"), "tampered\n");
     const distTamper = run();
@@ -136,7 +136,7 @@ test("FSR-028: launcher excludes ambient Node bootstrap code", { skip: process.p
     const preload = path.join(root, "preload.cjs");
     writeFileSync(preload, `require("node:fs").writeFileSync(${JSON.stringify(sentinel)}, process.env.OPENCODE_SERVER_PASSWORD || "missing")\n`);
     const launcher = path.join(scripts, "Invoke-OCRouter.ps1");
-    const result = spawnSync(path.join(process.env.SystemRoot!, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), ["-NoProfile", "-File", launcher, "-Operation", "get-run", "-RunId", "missing-run"], {
+    const result = spawnSync(path.join(process.env.SystemRoot!, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launcher, "-Operation", "get-run", "-RunId", "missing-run"], {
       encoding: "utf8",
       env: { ...process.env, OC_ROUTER_RUNTIME_ROOT: root, OPENCODE_SERVER_PASSWORD: "fixture-private", NODE_OPTIONS: `--require=${preload}`, NODE_PATH: root },
     });

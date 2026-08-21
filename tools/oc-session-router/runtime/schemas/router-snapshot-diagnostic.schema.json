@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fal.invalid/schemas/router-snapshot-diagnostic.v1.json",
+  "title": "FAL minimized snapshot diagnostic",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "operation_id", "mode", "baseline_identity_sha256", "message_set_sha256", "candidate_count", "correlated_candidate_count", "result", "captured_at", "raw_snapshot_persisted"],
+  "properties": {
+    "schema_version": { "const": "router-snapshot-diagnostic.v1" },
+    "run_id": { "$ref": "#/$defs/opaqueId" },
+    "operation_id": { "$ref": "#/$defs/opaqueId" },
+    "mode": { "enum": ["DIAGNOSTIC_ONLY", "EXACT_PARENT_LINK"] },
+    "baseline_identity_sha256": { "$ref": "#/$defs/sha256" },
+    "message_set_sha256": { "$ref": "#/$defs/sha256" },
+    "candidate_count": { "type": "integer", "minimum": 0 },
+    "correlated_candidate_count": { "type": "integer", "minimum": 0 },
+    "result": { "enum": ["NO_CANDIDATE", "DIAGNOSTIC_CANDIDATE", "EXACT_CANDIDATE", "AMBIGUOUS", "BASELINE_MISSING", "READ_FAILED"] },
+    "captured_at": { "type": "string", "format": "date-time" },
+    "raw_snapshot_persisted": { "const": false }
+  },
+  "$defs": {
+    "opaqueId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._@:+~-]{0,199}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

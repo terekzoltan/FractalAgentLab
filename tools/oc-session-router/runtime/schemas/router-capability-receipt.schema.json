@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fal.invalid/schemas/router-capability-receipt.v1.json",
+  "title": "FAL installed-server capability receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "router_protocol_identity", "mode", "authorization_class", "authorization_id", "target_id", "isolation_class", "p0b_isolation_root_sha256", "target_identity_sha256", "worktree_identity_sha256", "target_directory_sha256", "origin_sha256", "server_binary_sha256", "server_instance_identity_sha256", "authorized_session_set_sha256", "authorized_command_set_sha256", "command_timeout_ms", "server_version", "health_identity_sha256", "doc_sha256", "command_registry_sha256", "supported_commands", "authorized_commands", "compatible_awc_contracts", "command_response_contract", "snapshot_correlation", "sse", "p0b_proof_sha256", "issued_at", "expires_at"],
+  "properties": {
+    "schema_version": { "const": "router-capability-receipt.v1" },
+    "router_protocol_identity": { "const": "fal-explicit-stage-router/v1" },
+    "mode": { "enum": ["P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"] },
+    "authorization_class": { "enum": ["P0B_ONE_USE", "PRODUCTION_INSTALL"] },
+    "authorization_id": { "$ref": "#/$defs/opaqueId" },
+    "target_id": { "$ref": "#/$defs/opaqueId" },
+    "isolation_class": { "enum": ["SYNTHETIC_TEST_ONLY", "PRODUCTION_TARGET"] },
+    "p0b_isolation_root_sha256": { "$ref": "#/$defs/sha256" },
+    "target_identity_sha256": { "$ref": "#/$defs/sha256" },
+    "worktree_identity_sha256": { "$ref": "#/$defs/sha256" },
+    "target_directory_sha256": { "$ref": "#/$defs/sha256" },
+    "origin_sha256": { "$ref": "#/$defs/sha256" },
+    "server_binary_sha256": { "$ref": "#/$defs/sha256" },
+    "server_instance_identity_sha256": { "$ref": "#/$defs/sha256" },
+    "authorized_session_set_sha256": { "$ref": "#/$defs/sha256" },
+    "authorized_command_set_sha256": { "$ref": "#/$defs/sha256" },
+    "command_timeout_ms": { "type": "integer", "minimum": 120000, "maximum": 900000 },
+    "server_version": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "health_identity_sha256": { "$ref": "#/$defs/sha256" },
+    "doc_sha256": { "$ref": "#/$defs/sha256" },
+    "command_registry_sha256": { "$ref": "#/$defs/sha256" },
+    "supported_commands": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/opaqueId" } },
+    "authorized_commands": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/opaqueId" } },
+    "compatible_awc_contracts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["awc-3.1", "awc-4.1.1"] }, "contains": { "const": "awc-4.1.1" } },
+    "command_response_contract": { "const": "SYNC_WITH_PARTS_V1" },
+    "snapshot_correlation": { "enum": ["DIAGNOSTIC_ONLY", "EXACT_PARENT_LINK"] },
+    "sse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["probe_status", "proof_sha256", "enabled"],
+      "properties": {
+        "probe_status": { "enum": ["VERIFIED", "UNSUPPORTED", "FAILED"] },
+        "proof_sha256": { "$ref": "#/$defs/sha256" },
+        "enabled": { "const": false }
+      }
+    },
+    "p0b_proof_sha256": { "$ref": "#/$defs/sha256" },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "opaqueId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._@:+~-]{0,199}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

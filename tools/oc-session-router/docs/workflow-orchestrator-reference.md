@@ -35,6 +35,65 @@ as cold provenance and is never replayed.
 | Output rejected by classifier | Stage-aware output selection |
 | Delivery ambiguity or abnormal state | Durable transport; Questions and incidents |
 | Compact or checkpoint interaction | Separation from compact, checkpoint, and closeout |
+| Production modes, protected layout, or receipts | Production router runtime |
+
+## Production router runtime
+
+Release `0.2.0` uses the independent protocol identity
+`fal-explicit-stage-router/v1`. AWC is a compatibility contract, not the router
+protocol: active P0B and production receipts must include AWC `4.1.1`; `awc-3.1`
+is accepted only by legacy fixture/input paths.
+
+The sole v2 control registry is
+`%LOCALAPPDATA%\FractalAgentLab\oc-router\control\control-registry.json`; retention
+and capability grants live beside it under `control`, private state lives under
+`runtime`, and sanitized operator/proof receipts live under `receipts`. Bootstrap
+and verify are owner-only through `Initialize-OCRouterControlPlane.ps1`; neither
+the request nor an environment variable can choose a capability receipt. The
+launcher accepts the registry environment variable only as a process-scoped
+pointer and rejects active v2 unless it equals the fixed path and owner ACL
+verification succeeds.
+
+The runtime independently queries the Windows KnownFolder through the pinned OS
+broker; caller environment values are expectations only. The registry and grant
+bind `p0b_isolation_root_sha256`. In P0B mode the exact target and server directory
+must be a reparse-free descendant of that separately owner-protected root before
+capability probing or POST.
+
+`router-control-registry.v2` has exactly three modes. `DISABLED` is the default
+and performs no capability probe or POST. `P0B_ISOLATED` is synthetic-only and
+uses a short-lived pre-send `P0B_ONE_USE` grant with proof hash zero. Claim state
+is durable before dispatch intent; consumption occurs while the shared participant
+fence is held, after immediate drift revalidation and before POST. Any attempted
+POST outcome consumes the grant. The post-send P0B proof is a separate sanitized
+receipt, so proof is not circular authorization. `PRODUCTION_RESPONSE_FIRST`
+requires a `PRODUCTION_INSTALL` receipt bound to a nonzero accepted P0B proof.
+
+The installed capability probe binds health/version, OpenAPI, the
+directory-scoped command registry, command set, server/origin fingerprints, target
+and worktree hashes, and authorized session/command hashes. SSE support is probed
+and hashed but never enabled. `/command` response text is authoritative first;
+inert lifecycle/reasoning parts are closed-schema checked and hash-audited, while
+active tool or unknown parts fail closed. GET snapshot data is private diagnostic
+evidence unless assistant message ID, parent, session, baseline, and terminal hash
+correlate exactly. Snapshot failure never causes a resend.
+
+The shared target-local fence is
+`.opencode-router/.participant-transport.<sha256("fal-router-private-session-fence/v1\n" + exact-private-session-id)>.lock`.
+The raw session ID is never emitted in normal output. Compact and lifecycle resolve
+it from protected authority and use the same persistent file with `FileShare.None`; a
+broker handle is rechecked immediately before POST and released on completion or
+parent-process loss. Compact raw authority uses an owner-only ephemeral handoff,
+is deleted after Lite reads it, and expires after 15 minutes after a crash. AC87
+retains quarantine for 7 days, diagnostics for 30,
+validated evidence for 180, never persists raw reasoning/SSE payloads, denies
+public export, and emits purge counts and hashes only.
+
+For operator preparation, `Prepare-OCRouterStage.ps1` accepts only explicit
+target/state/source paths and a closed source list, verifies the current state
+hash, and emits candidate `stage-sources` plus state-packet files without network
+access. It does not adopt them or invoke a stage. `Invoke-OCRouter.ps1` remains the
+separate explicit sender. The old `init-router-runtime.ps1` stays retired.
 
 ## Authority and safety invariants
 
@@ -300,9 +359,14 @@ merely to avoid stopping.
 ## Separation from compact, checkpoint, and closeout
 
 Compact Lite is the sole active compact mechanism and always ends with
-`workflow_command_sent: false`. Compact V2, Active Route, and `ROUTE_READY` are
+`workflow_command_sent: false`. Its non-dry authority comes only from the fixed
+owner-protected registry/capability and measured server instance; caller server,
+environment overrides, aliases, and target-local session maps cannot select a
+production transport. Compact V2, Active Route, and `ROUTE_READY` are
 retained reference semantics only. Review dispatch is a separate explicit
 transaction that rereads target authority and duplicate state.
+The Compact authority CLI projection is status/digest-only; target root, origin,
+and private session are never written to stdout.
 
 Transport wrappers do not write FAL directly. They may create proposal/receipt
 artifacts; only a separate authorized `/fal-checkpoint-target` command may apply a

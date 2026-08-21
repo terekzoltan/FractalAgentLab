@@ -4881,10 +4881,10 @@ function Enter-OCRouterRunLock {
 }
 
 function Enter-OCRouterParticipantTransportLock {
-  param([string]$RunDir, [string]$Participant)
+  param([string]$RunDir, [Alias('Participant')][string]$PrivateSessionId)
 
-  if ([string]::IsNullOrWhiteSpace($Participant)) { throw 'Participant transport lock requires a participant identity.' }
-  $ParticipantKey = (Get-OCRouterStringSha256 -Text $Participant.Trim().ToLowerInvariant()).ToLowerInvariant()
+  if ([string]::IsNullOrWhiteSpace($PrivateSessionId) -or $PrivateSessionId -cnotmatch '^[A-Za-z0-9_-]{1,160}$') { throw 'Participant transport lock requires an exact private session identity.' }
+  $ParticipantKey = (Get-OCRouterStringSha256 -Text ("fal-router-private-session-fence/v1`n" + $PrivateSessionId)).ToLowerInvariant()
 
   $CurrentPath = [IO.Path]::GetFullPath($RunDir)
   $RootPath = [IO.Path]::GetPathRoot($CurrentPath)
@@ -4897,7 +4897,7 @@ function Enter-OCRouterParticipantTransportLock {
         }
         $LockPath = Join-Path $Current.FullName ('.participant-transport.' + $ParticipantKey + '.lock')
         try { return [IO.File]::Open($LockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }
-        catch { throw 'Participant transport is locked by Compact Lite; do not dispatch until it settles.' }
+        catch { throw 'Participant transport is locked by Compact or lifecycle dispatch; do not send until it settles.' }
       }
       if ($Current -isnot [IO.DirectoryInfo] -or ($Current.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw 'Router transport root must be an ordinary non-reparse directory.'

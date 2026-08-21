@@ -1,2 +1,21 @@
+# Raw-byte production-router authorities use one checkout-stable EOL.
+/tools/oc-session-router/runtime/src/*.ts text eol=lf
+/tools/oc-session-router/runtime/package.json text eol=lf
+/tools/oc-session-router/runtime/package-lock.json text eol=lf
+/tools/oc-session-router/runtime/tsconfig.json text eol=lf
+/tools/oc-session-router/runtime/executable-attestation.json text eol=lf
+/tools/oc-session-router/runtime/schemas/*.json text eol=lf
+/tools/oc-session-router/scripts/Invoke-OCRouter.ps1 text eol=lf
+/tools/oc-session-router/scripts/Initialize-OCRouterControlPlane.ps1 text eol=lf
+/tools/oc-session-router/scripts/Prepare-OCRouterStage.ps1 text eol=lf
+/tools/oc-session-router/scripts/invoke-session-compact-flow.ps1 text eol=lf
+/tools/oc-session-router/scripts/invoke-session-compact-lite.ps1 text eol=lf
+/tools/oc-session-router/scripts/oc-router-common.ps1 text eol=lf
+/tools/oc-session-router/scripts/session-compact-flow-core.ps1 text eol=lf
+/tools/oc-session-router/scripts/session-compact-lite-core.ps1 text eol=lf
+/tools/oc-session-router/scripts/session-context-status.ps1 text eol=lf
+/tools/oc-session-router/scripts/session-context-status-core.ps1 text eol=lf
+/tools/oc-session-router/scripts/test-session-compact-lite.ps1 text eol=lf
+/tools/oc-session-router/scripts/test-session-compact-flow.ps1 text eol=lf
 docs/private/W8-A-AWC-4_1_1-Epic-Plan-v1.md text eol=lf
 docs/private/W8-A-stage-source-manifest.v1.json text eol=lf

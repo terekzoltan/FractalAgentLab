@@ -131,6 +131,9 @@ export interface StageInvocation extends Omit<StageRequest, "schema_version"> {
   command_body_sha256: string;
   semantic_key: string;
   recipient_session_sha256: string;
+  router_protocol_identity?: "fal-explicit-stage-router/v1";
+  capability_receipt_sha256?: string;
+  snapshot_correlation?: "DIAGNOSTIC_ONLY" | "EXACT_PARENT_LINK";
 }
 
 export interface ParsedOutput {
@@ -573,4 +576,22 @@ export function parseStageRequest(value: unknown): StageRequest {
   if (!Number.isFinite(Date.parse(request.issued_at))) throw new Error("issued_at is invalid");
   if (!/^(?:0|[1-9]\d*)$/.test(request.review_cycle)) throw new Error("review_cycle must be a nonnegative decimal integer");
   return request;
+}
+
+export function stageRequestFromInvocation(invocation: StageInvocation): StageRequest {
+  const {
+    operation_id: _operationId,
+    canon_phase: _canonPhase,
+    command_name: _commandName,
+    command_argument_sha256: _commandArgumentSha256,
+    command_body_sha256: _commandBodySha256,
+    semantic_key: _semanticKey,
+    recipient_session_sha256: _recipientSessionSha256,
+    router_protocol_identity: _routerProtocolIdentity,
+    capability_receipt_sha256: _capabilityReceiptSha256,
+    snapshot_correlation: _snapshotCorrelation,
+    schema_version: _schemaVersion,
+    ...request
+  } = invocation;
+  return { ...request, schema_version: "stage-request.v1" };
 }

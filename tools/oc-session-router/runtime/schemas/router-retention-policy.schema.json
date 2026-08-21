@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fal.invalid/schemas/router-retention-policy.v2.json",
+  "title": "FAL private router retention policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "compact_handoff_minutes", "quarantine_days", "diagnostic_days", "validated_evidence_days", "terminal_run_evidence_days", "active_evidence_retention", "authority_ledger_retention", "raw_reasoning_retained", "raw_event_payloads_retained", "public_export", "purge_receipts"],
+  "properties": {
+    "schema_version": { "const": "router-retention-policy.v2" },
+    "compact_handoff_minutes": { "const": 15 },
+    "quarantine_days": { "const": 7 },
+    "diagnostic_days": { "const": 30 },
+    "validated_evidence_days": { "const": 180 },
+    "terminal_run_evidence_days": { "const": 180 },
+    "active_evidence_retention": { "const": "PRESERVE_UNTIL_TERMINAL" },
+    "authority_ledger_retention": { "const": "NON_EXPIRING_DUPLICATE_SEND_AUTHORITY" },
+    "raw_reasoning_retained": { "const": false },
+    "raw_event_payloads_retained": { "const": false },
+    "public_export": { "const": "DENY" },
+    "purge_receipts": { "const": "SANITIZED_COUNTS_AND_HASHES_ONLY" }
+  }
+}

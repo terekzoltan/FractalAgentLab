@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { authoritySha256, sha256, type RunAuthority, type RunRequest, type StageRequest } from "../src/contracts.js";
+import { authoritySha256, canonicalize, sha256, type RunAuthority, type RunRequest, type StageRequest } from "../src/contracts.js";
 import { StageEngine, _test as stageTest, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "../src/stage-engine.js";
+import { ROUTER_PROTOCOL_IDENTITY, buildSharedFenceBinding } from "../src/control-plane.js";
 import { StateStore } from "../src/state-store.js";
 import { CommandClient, type FetchLike } from "../src/transport.js";
 import { worktreeProofSha256, type WorktreeProof } from "../src/worktree-reader.js";
@@ -27,7 +28,7 @@ class FakeResolver implements AuthorityResolver {
   ].join("\n");
   resolutionCalls = 0;
   driftOnResolutionCall = 0;
-  capabilityMode: "DISABLED" | "FIXTURE_ONLY" = "FIXTURE_ONLY";
+  capabilityMode: "DISABLED" | "FIXTURE_ONLY" | "P0B_ISOLATED" | "PRODUCTION_RESPONSE_FIRST" = "FIXTURE_ONLY";
   capabilityDriftOnCall = 0;
   worktreeAfterResponse?: WorktreeProof;
   nextCommand = "/terv-review";
@@ -35,6 +36,7 @@ class FakeResolver implements AuthorityResolver {
   activeRouteGeneration = "generation-0";
   recipientSessionId = "session-meta";
   privateValues: string[] = [];
+  fenceTargetRoot?: string;
   resolvedSources?: ResolvedSource[];
   worktree: WorktreeProof = { schema_version: "worktree-proof.v1", head_sha256: "1".repeat(64), head_tree_sha256: "9".repeat(64), head_parent_count: 1, sole_parent_sha256: "0".repeat(64), committed_paths: [], index_sha256: "2".repeat(64), status_sha256: "3".repeat(64), staged_paths: [], status_clean: true, has_unstaged_or_untracked: false };
 
@@ -75,7 +77,13 @@ class FakeResolver implements AuthorityResolver {
   }
 
   async resolveStageCapability(_runAuthority: RunAuthority, _request: StageRequest): Promise<ResolvedStageAuthority["capability"]> {
-    return { mode: this.capabilityMode, identity_sha256: sha256(this.capabilityMode) };
+    return this.capability(this.capabilityMode);
+  }
+
+  private capability(mode: typeof this.capabilityMode): ResolvedStageAuthority["capability"] {
+    return mode === "P0B_ISOLATED" || mode === "PRODUCTION_RESPONSE_FIRST"
+      ? { mode, identity_sha256: sha256(mode), router_protocol_identity: ROUTER_PROTOCOL_IDENTITY, snapshot_correlation: "EXACT_PARENT_LINK", sse_enabled: false, retention_policy_sha256: "7".repeat(64), live_probe_sha256: "8".repeat(64), ...(mode === "P0B_ISOLATED" ? { authorization_use_sha256: sha256(mode) } : {}), server_instance_identity_sha256: sha256("fixture-live-instance"), server_binary_sha256: sha256("fixture-server-binary"), target_directory_sha256: sha256("fixture-target-directory"), command_timeout_ms: 300_000 }
+      : { mode, identity_sha256: sha256(mode) };
   }
 
   async resolveStageAuthority(_runAuthority: RunAuthority, request: StageRequest): Promise<ResolvedStageAuthority> {
@@ -88,9 +96,10 @@ class FakeResolver implements AuthorityResolver {
     return {
       run_authority: runAuthority,
       sources,
-      transport: { origin: "http://127.0.0.1:4321", server_fingerprint: "server-fingerprint-private", session_id: this.recipientSessionId, username: "router-user-private", password: "process-only" },
-      capability: { mode: this.resolutionCalls === this.capabilityDriftOnCall ? "DISABLED" : this.capabilityMode, identity_sha256: sha256(this.resolutionCalls === this.capabilityDriftOnCall ? "DISABLED" : this.capabilityMode) },
+      transport: { origin: "http://127.0.0.1:4321", server_fingerprint: "server-fingerprint-private", session_id: this.recipientSessionId, username: "router-user-private", password: "process-only", ...(this.fenceTargetRoot ? { directory: this.fenceTargetRoot } : {}) },
+      capability: this.capability(this.resolutionCalls === this.capabilityDriftOnCall ? "DISABLED" : this.capabilityMode),
       privacy: { absolute_paths: ["C:\\fixture-target", "C:\\fixture-control"], private_values: this.privateValues },
+      ...(this.capabilityMode === "P0B_ISOLATED" || this.capabilityMode === "PRODUCTION_RESPONSE_FIRST" ? { shared_fence: buildSharedFenceBinding(this.fenceTargetRoot ?? (() => { throw new Error("production fence root missing"); })(), this.recipientSessionId) } : {}),
       ...(request.requested_stage === "CLOSEOUT" ? { worktree: this.worktreeAfterResponse && this.resolutionCalls >= 3 ? this.worktreeAfterResponse : this.worktree } : {}),
     };
   }
@@ -683,7 +692,7 @@ test("shared lease conflict does not strand a nonterminal operation", async () =
     const resolver = new FakeResolver();
     const engine = new StageEngine(store, resolver, new CommandClient(async () => new Response()));
     const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
-    const release = store.acquireLease(sha256("server-fingerprint-private\nsession-meta"), { schema_version: "dispatch-lease.v1", server_fingerprint_sha256: sha256("server-fingerprint-private"), session_sha256: sha256("session-meta"), operation_class: "PLAN_REVIEW", holder: "other", acquired_at: new Date().toISOString(), fencing_generation: "fixture-generation" });
+    const release = store.acquireLease(sha256(canonicalize({ domain: "fal-router-global-session-lease/v1", server_instance_identity_sha256: sha256("server-fingerprint-private"), session_sha256: sha256("session-meta") })), { schema_version: "dispatch-lease.v1", server_fingerprint_sha256: sha256("server-fingerprint-private"), session_sha256: sha256("session-meta"), operation_class: "PLAN_REVIEW", holder: "other", acquired_at: new Date().toISOString(), fencing_generation: "fixture-generation" });
     try {
       await assert.rejects(() => engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent))), /exist|EEXIST/i);
       const operations = path.join(root, "runs", created.run_id, "operations");
@@ -1071,6 +1080,94 @@ test("resolve-stage reconciles a crash-left DISPATCHING operation without sendin
     assert.equal(reconciled.transport_status, "NO_SEND");
     assert.equal(calls, 1);
     assert.equal(store.loadOperation(created.run_id, operation.operation_id).status, "UNCERTAIN");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("P0B production mode reaches response-first stage engine and consumes its grant once", { skip: process.platform !== "win32" }, async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-p0b-engine-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.capabilityMode = "P0B_ISOLATED";
+    resolver.fenceTargetRoot = root;
+    const terminal = planReviewSource();
+    const client = new CommandClient(async () => {
+      calls += 1;
+      return new Response(JSON.stringify({
+        info: { id: "assistant-p0b", role: "assistant", sessionID: "session-meta", parentID: "user-p0b" },
+        parts: [
+          { id: "step-start-p0b", type: "step-start", messageID: "assistant-p0b", sessionID: "session-meta", snapshot: "before" },
+          { id: "text-p0b", type: "text", text: terminal, messageID: "assistant-p0b", sessionID: "session-meta" },
+          { id: "step-finish-p0b", type: "step-finish", messageID: "assistant-p0b", sessionID: "session-meta", reason: "stop", snapshot: "after", cost: 0, tokens: { total: 1, input: 1, output: 0, reasoning: 0, cache: { read: 0, write: 0 } } },
+        ],
+      }));
+    });
+    const store = new StateStore(root);
+    const snapshots = { captureBaseline: async () => ({ message_id: "baseline-p0b", identity_sha256: sha256("baseline-p0b"), captured_at: new Date().toISOString() }), collect: async () => [] };
+    const engine = new StageEngine(store, resolver, client, snapshots);
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const current = { ...request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)), expected_contract_version: "awc-4.1.1" as const };
+    const result = await engine.invokeStage(current);
+    assert.equal(result.operation_status, "SUCCEEDED", JSON.stringify(result));
+    assert.equal(calls, 1);
+    const capabilitySha = sha256("P0B_ISOLATED");
+    assert.match(readFileSync(path.join(root, "capability-uses", `${capabilitySha}.json`), "utf8"), /"status":"CONSUMED"/);
+
+    const next = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const replay = { ...request(next.run_id, next.run_authority_sha256, sha256(resolver.sourceContent)), request_id: "request-p0b-replay", review_risk: "high_risk" as const, expected_contract_version: "awc-4.1.1" as const };
+    await assert.rejects(() => engine.invokeStage(replay), /one-use capability is already claimed or consumed/);
+    assert.equal(calls, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("P0B grant remains consumed for HTTP, timeout, and malformed-response POST outcomes", { skip: process.platform !== "win32" }, async () => {
+  const cases: Array<[string, FetchLike]> = [
+    ["http", async () => new Response("failure", { status: 503 })],
+    ["timeout", async () => { throw new Error("timeout after POST"); }],
+    ["malformed", async () => new Response('{"info":')],
+  ];
+  for (const [name, fetch] of cases) {
+    const root = mkdtempSync(path.join(tmpdir(), `fal-router-p0b-${name}-`));
+    try {
+      mkdirSync(path.join(root, ".opencode-router"));
+      const resolver = new FakeResolver();
+      resolver.capabilityMode = "P0B_ISOLATED";
+      resolver.fenceTargetRoot = root;
+      const store = new StateStore(root);
+      const engine = new StageEngine(store, resolver, new CommandClient(fetch), { captureBaseline: async () => ({ message_id: `baseline-${name}`, identity_sha256: sha256(`baseline-${name}`), captured_at: new Date().toISOString() }), collect: async () => [] });
+      const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+      const result = await engine.invokeStage({ ...request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)), request_id: `request-${name}`, expected_contract_version: "awc-4.1.1" });
+      assert.equal(result.operation_status, "UNCERTAIN", `${name}: ${JSON.stringify(result)}`);
+      assert.equal(result.transport_status, "DELIVERY_UNCERTAIN");
+      assert.match(readFileSync(path.join(root, "capability-uses", `${sha256("P0B_ISOLATED")}.json`), "utf8"), /"status":"CONSUMED"/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("P0B pre-POST capability drift sends nothing and releases an unconsumed grant", { skip: process.platform !== "win32" }, async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-p0b-drift-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.capabilityMode = "P0B_ISOLATED";
+    resolver.capabilityDriftOnCall = 2;
+    resolver.fenceTargetRoot = root;
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => { calls += 1; return new Response(); }), { captureBaseline: async () => ({ message_id: "baseline-drift", identity_sha256: sha256("baseline-drift"), captured_at: new Date().toISOString() }), collect: async () => [] });
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const result = await engine.invokeStage({ ...request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)), expected_contract_version: "awc-4.1.1" });
+    assert.equal(result.operation_status, "FAILED_TRANSPORT");
+    assert.equal(result.transport_status, "NOT_SENT");
+    assert.equal(calls, 0);
+    assert.match(readFileSync(path.join(root, "capability-uses", `${sha256("P0B_ISOLATED")}.json`), "utf8"), /"status":"RELEASED"/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
