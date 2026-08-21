@@ -1,0 +1,106 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+import { _test } from "../src/cli.js";
+
+const CLI_ENTRY = fileURLToPath(new URL("../src/cli.js", import.meta.url));
+
+const EXPECTED_CODES = [
+  "REQUEST_INVALID",
+  "ROOT_AUTHORITY_BLOCKED",
+  "RUN_AUTHORITY_BLOCKED",
+  "STATE_STORE_ACCESS",
+  "STATE_STORE_BLOCKED",
+  "TOOL_ATTESTATION_BLOCKED",
+  "UNSAFE_PATH",
+  "P0B_REQUIRED",
+  "SOURCE_IDENTITY_CHANGED",
+  "BLOCKED",
+] as const;
+
+test("CLI exposes only the reviewed finite error-code vocabulary", () => {
+  assert.deepEqual(_test.CLI_ERROR_CODES, EXPECTED_CODES);
+});
+
+test("CLI error classifier separates bounded operational failure classes", () => {
+  const cases: ReadonlyArray<readonly [Error, Parameters<typeof _test.classifyCliError>[1], string]> = [
+    [new Error("request parser rejected private C:\\secret\\request.json"), "REQUEST_INVALID", "REQUEST_INVALID"],
+    [new Error("KnownFolder authority proof mismatch at C:\\private"), "BLOCKED", "ROOT_AUTHORITY_BLOCKED"],
+    [new Error("run derivation failed with target secret"), "RUN_AUTHORITY_BLOCKED", "RUN_AUTHORITY_BLOCKED"],
+    [new Error("Git executable hash mismatch at C:\\Program Files\\Git"), "BLOCKED", "TOOL_ATTESTATION_BLOCKED"],
+    [new Error("KnownFolder authority broker is unavailable at C:\\Windows"), "BLOCKED", "TOOL_ATTESTATION_BLOCKED"],
+    [new Error("target path traverses a link or junction at C:\\private"), "BLOCKED", "UNSAFE_PATH"],
+    [new Error("Production command dispatch is disabled until a reviewed P0B capability transaction"), "BLOCKED", "P0B_REQUIRED"],
+    [new Error("SOURCE_IDENTITY_CHANGED: stage source manifest hash differs at C:\\private"), "BLOCKED", "SOURCE_IDENTITY_CHANGED"],
+    [new Error("unclassified internal failure at C:\\private"), "BLOCKED", "BLOCKED"],
+  ];
+  for (const [error, fallback, expected] of cases) assert.equal(_test.classifyCliError(error, fallback), expected);
+});
+
+test("request boundary remains authoritative when private paths contain taxonomy keywords", () => {
+  for (const privatePath of ["C:\\private\\P0B\\request.json", "C:\\private\\KnownFolder\\request.json", "C:\\private\\link\\request.json"]) {
+    const error = Object.assign(new Error(`ENOENT: request file is unavailable, open '${privatePath}'`), { code: "ENOENT" });
+    assert.equal(_test.classifyCliError(error, "REQUEST_INVALID"), "REQUEST_INVALID");
+  }
+});
+
+test("state-store classifier distinguishes access denial from other persistence failures", () => {
+  const accessCases = [
+    ["EACCES", "C:\\private\\P0B\\state.json"],
+    ["EPERM", "C:\\private\\KnownFolder\\state.json"],
+    ["EROFS", "C:\\private\\link\\state.json"],
+  ] as const;
+  for (const [code, privatePath] of accessCases) {
+    const error = Object.assign(new Error(`${code}: private native failure at ${privatePath}`), { code });
+    assert.equal(_test.stateStoreErrorCode(error), "STATE_STORE_ACCESS");
+    assert.equal(_test.classifyCliError(error, "STATE_STORE_BLOCKED"), "STATE_STORE_ACCESS");
+  }
+  for (const code of ["EIO", "ENOSPC", "EEXIST", "PRIVATE_NATIVE_CODE"]) {
+    assert.equal(_test.stateStoreErrorCode(Object.assign(new Error("private native failure"), { code })), "STATE_STORE_BLOCKED");
+  }
+  assert.equal(_test.stateStoreErrorCode(new Error("no native code")), "STATE_STORE_BLOCKED");
+});
+
+test("CLI failure receipt never emits raw messages, paths, native codes, or injected JSON", () => {
+  const secret = "C:\\Users\\ASUS\\.config\\opencode\\secret.json";
+  const error = Object.assign(new Error(`failure at ${secret}\n{\"leaked\":true}`), { code: "TOP_SECRET_NATIVE_CODE" });
+  const receipt = _test.cliErrorReceipt(error);
+  const json = _test.cliErrorJson(error);
+
+  assert.deepEqual(Object.keys(receipt), ["error_code"]);
+  assert.deepEqual(receipt, { error_code: "BLOCKED" });
+  assert.equal(json, '{"error_code":"BLOCKED"}\n');
+  assert.deepEqual(JSON.parse(json), { error_code: "BLOCKED" });
+  assert.equal(json.split("\n").filter(Boolean).length, 1);
+  for (const forbidden of [secret, "failure at", "leaked", "TOP_SECRET_NATIVE_CODE"]) assert.equal(json.includes(forbidden), false);
+});
+
+test("CLI process preserves exit 3 and JSON-only stderr for invalid requests", () => {
+  const result = spawnSync(process.execPath, [CLI_ENTRY, "not-a-router-operation"], { encoding: "utf8", windowsHide: true });
+  assert.equal(result.status, 3);
+  assert.equal(result.stdout, "");
+  assert.equal(result.stderr, '{"error_code":"REQUEST_INVALID"}\n');
+  assert.deepEqual(JSON.parse(result.stderr), { error_code: "REQUEST_INVALID" });
+});
+
+test("every operation rejects each missing required key as REQUEST_INVALID", () => {
+  const operationKeys = [
+    ["new-run", ["--request"]],
+    ["invoke-stage", ["--request"]],
+    ["resolve-stage", ["--run-id", "--operation-id"]],
+    ["get-run", ["--run-id"]],
+    ["write-p0b-proof", ["--request"]],
+    ["resolve-compact-authority", ["--target-id", "--recipient-role"]],
+    ["consume-compact-authority", ["--target-id", "--recipient-role", "--attempt-id"]],
+  ] as const;
+  for (const [operation, keys] of operationKeys) {
+    for (const missing of keys) {
+      const args = keys.filter((key) => key !== missing).flatMap((key) => [key, "fixture"]);
+      const result = spawnSync(process.execPath, [CLI_ENTRY, operation, ...args], { encoding: "utf8", windowsHide: true });
+      assert.equal(result.status, 3, `${operation} without ${missing}`);
+      assert.equal(result.stdout, "", `${operation} without ${missing}`);
+      assert.equal(result.stderr, '{"error_code":"REQUEST_INVALID"}\n', `${operation} without ${missing}`);
+    }
+  }
+});

@@ -44,6 +44,35 @@ import { parseP0bProofReceipt, writeP0bProofReceipt } from "./p0b-proof.js";
 const PRODUCTION_GIT_EXECUTABLE = "C:\\Program Files\\Git\\cmd\\git.exe";
 const PRODUCTION_GIT_SHA256 = "054dfe58df35f7fcfbae184ff9d6a7c0da1e3743bf0401d951e012e290217c73";
 
+const CLI_ERROR_CODES = [
+  "REQUEST_INVALID",
+  "ROOT_AUTHORITY_BLOCKED",
+  "RUN_AUTHORITY_BLOCKED",
+  "STATE_STORE_ACCESS",
+  "STATE_STORE_BLOCKED",
+  "TOOL_ATTESTATION_BLOCKED",
+  "UNSAFE_PATH",
+  "P0B_REQUIRED",
+  "SOURCE_IDENTITY_CHANGED",
+  "BLOCKED",
+] as const;
+
+type CliErrorCode = (typeof CLI_ERROR_CODES)[number];
+
+class ClassifiedCliError extends Error {
+  constructor(readonly errorCode: CliErrorCode) {
+    super(errorCode);
+    this.name = "ClassifiedCliError";
+  }
+}
+
+class ClassifiedStateStore extends StateStore {
+  override createRun(...args: Parameters<StateStore["createRun"]>): ReturnType<StateStore["createRun"]> {
+    try { return super.createRun(...args); }
+    catch (error) { throw new ClassifiedCliError(stateStoreErrorCode(error)); }
+  }
+}
+
 class FileAuthorityResolver implements AuthorityResolver {
   constructor(
     private readonly registryPath: string,
@@ -581,20 +610,65 @@ function argumentsMap(values: string[]): Map<string, string> {
   return result;
 }
 
+function nativeErrorCode(error: unknown): string {
+  if (!error || typeof error !== "object" || !("code" in error) || typeof error.code !== "string") return "";
+  return /^[A-Z0-9_]{1,32}$/.test(error.code) ? error.code : "";
+}
+
+function stateStoreErrorCode(error: unknown): CliErrorCode {
+  return ["EACCES", "EPERM", "EROFS"].includes(nativeErrorCode(error)) ? "STATE_STORE_ACCESS" : "STATE_STORE_BLOCKED";
+}
+
+function classifyCliError(error: unknown, fallback: CliErrorCode = "BLOCKED"): CliErrorCode {
+  if (error instanceof ClassifiedCliError) return error.errorCode;
+  if (fallback === "REQUEST_INVALID") return "REQUEST_INVALID";
+  if (fallback === "STATE_STORE_BLOCKED" && stateStoreErrorCode(error) === "STATE_STORE_ACCESS") return "STATE_STORE_ACCESS";
+  const message = error instanceof Error ? error.message : "";
+  if (/SOURCE_IDENTITY_CHANGED|SOURCE_SUBSTITUTION|stage source manifest|source content hash mismatch|Active Route (?:is stale|binding mismatch)/i.test(message)) return "SOURCE_IDENTITY_CHANGED";
+  if (/Git executable|Node executable|executable attestation|compiled (?:router|entry|manifest)|reviewed source manifest|runtime (?:package|lock|release manifest)|control-plane verifier|fence broker executable|KnownFolder authority broker/i.test(message)) return "TOOL_ATTESTATION_BLOCKED";
+  if (/link|junction|reparse|escapes (?:root|KnownFolder authority|protected control root|router root)|unsafe path|must (?:be|remain) an ordinary (?:absolute )?file|cannot be a link/i.test(message)) return "UNSAFE_PATH";
+  if (/KnownFolder|LocalAppData|fixed (?:router|control) root|control registry differs from the KnownFolder authority/i.test(message)) return "ROOT_AUTHORITY_BLOCKED";
+  if (/P0B|dispatch is disabled/i.test(message)) return "P0B_REQUIRED";
+  if (fallback === "STATE_STORE_BLOCKED") return stateStoreErrorCode(error);
+  return fallback;
+}
+
+function rethrowClassified(error: unknown, fallback: CliErrorCode): never {
+  throw new ClassifiedCliError(classifyCliError(error, fallback));
+}
+
+function classified<T>(fallback: CliErrorCode, action: () => T): T {
+  try { return action(); }
+  catch (error) { return rethrowClassified(error, fallback); }
+}
+
+async function classifiedAsync<T>(fallback: CliErrorCode, action: () => Promise<T>): Promise<T> {
+  try { return await action(); }
+  catch (error) { return rethrowClassified(error, fallback); }
+}
+
+function cliErrorReceipt(error: unknown, fallback: CliErrorCode = "BLOCKED"): { error_code: CliErrorCode } {
+  return { error_code: classifyCliError(error, fallback) };
+}
+
+function cliErrorJson(error: unknown, fallback: CliErrorCode = "BLOCKED"): string {
+  return `${JSON.stringify(cliErrorReceipt(error, fallback))}\n`;
+}
+
 async function main(): Promise<void> {
   const operation = process.argv[2];
-  if (!operation || !["new-run", "invoke-stage", "resolve-stage", "get-run", "purge-retention", "write-p0b-proof", "resolve-compact-authority", "consume-compact-authority"].includes(operation)) throw new Error("Unknown router operation");
-  const args = argumentsMap(process.argv.slice(3));
-  validateOperationArguments(operation, args);
+  if (!operation || !["new-run", "invoke-stage", "resolve-stage", "get-run", "purge-retention", "write-p0b-proof", "resolve-compact-authority", "consume-compact-authority"].includes(operation)) throw new ClassifiedCliError("REQUEST_INVALID");
+  const args = classified("REQUEST_INVALID", () => argumentsMap(process.argv.slice(3)));
+  classified("REQUEST_INVALID", () => validateOperationArguments(operation, args));
   const runtimeRoot = process.env.OC_ROUTER_RUNTIME_ROOT;
-  if (!runtimeRoot) throw new Error("Router runtime root must be process-scoped");
-  const store = new StateStore(runtimeRoot);
+  if (!runtimeRoot) throw new ClassifiedCliError("STATE_STORE_BLOCKED");
+  const store = classified("STATE_STORE_BLOCKED", () => new ClassifiedStateStore(runtimeRoot));
   const dispatchOperation = operation === "new-run" || operation === "invoke-stage";
   const compactOperation = operation === "resolve-compact-authority" || operation === "consume-compact-authority";
   const registryPath = process.env.OC_ROUTER_CONTROL_REGISTRY;
-  if ((dispatchOperation || compactOperation) && !registryPath) throw new Error("Protected control registry must be process-scoped for dispatch operations");
+  if ((dispatchOperation || compactOperation) && !registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
   let resolver: FileAuthorityResolver | undefined;
-  if (dispatchOperation) resolver = dispatchAuthorityResolver(registryPath!);
+  if (dispatchOperation) resolver = classified("ROOT_AUTHORITY_BLOCKED", () => dispatchAuthorityResolver(registryPath!));
   else if (operation === "resolve-stage" && registryPath) {
     try { resolver = productionAuthorityResolver(registryPath); }
     catch { resolver = undefined; }
@@ -605,17 +679,19 @@ async function main(): Promise<void> {
     : new StageEngine(store, resolver, undefined, snapshots);
   let result: unknown;
   if (operation === "new-run") {
-    result = await engine.newRun(parseRunRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
+    const request = classified("REQUEST_INVALID", () => parseRunRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
+    result = await classifiedAsync("RUN_AUTHORITY_BLOCKED", () => engine.newRun(request));
   } else if (operation === "invoke-stage") {
-    result = await engine.invokeStage(parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
+    const request = classified("REQUEST_INVALID", () => parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
+    result = await classifiedAsync("BLOCKED", () => engine.invokeStage(request));
   } else if (operation === "resolve-stage") {
-    result = await engine.resolveStage(required(args, "--run-id"), required(args, "--operation-id"));
+    result = await classifiedAsync("STATE_STORE_BLOCKED", () => engine.resolveStage(required(args, "--run-id"), required(args, "--operation-id")));
   } else if (operation === "get-run") {
-    result = engine.getRun(required(args, "--run-id"));
+    result = classified("STATE_STORE_BLOCKED", () => engine.getRun(required(args, "--run-id")));
   } else if (compactOperation) {
-    const authority = productionAuthorityContext(registryPath!);
+    const authority = classified("ROOT_AUTHORITY_BLOCKED", () => productionAuthorityContext(registryPath!));
     if (!sameFilesystemPath(store.root, authority.runtimeRoot)) throw new Error("Compact runtime root differs from KnownFolder authority");
-    const packet = await resolveCompactAuthorityOperation({
+    const packet = await classifiedAsync("BLOCKED", () => resolveCompactAuthorityOperation({
       registryPath: registryPath!,
       controlRoot: authority.controlRoot,
       targetId: required(args, "--target-id"),
@@ -627,37 +703,39 @@ async function main(): Promise<void> {
       rootAuthorityClass: authority.authorityClass,
       consume: operation === "consume-compact-authority",
       ...(operation === "consume-compact-authority" ? { attemptId: required(args, "--attempt-id") } : {}),
-    });
-    result = writeCompactAuthorityHandoff(authority.runtimeRoot, packet, process.env.OC_ROUTER_COMPACT_HANDOFF_TOKEN ?? "");
+    }));
+    result = classified("STATE_STORE_BLOCKED", () => writeCompactAuthorityHandoff(authority.runtimeRoot, packet, process.env.OC_ROUTER_COMPACT_HANDOFF_TOKEN ?? ""));
   } else if (operation === "purge-retention") {
-    if (!registryPath) throw new Error("Protected control registry is required for retention purge");
-    productionAuthorityResolver(registryPath);
-    result = purgeProtectedRuntimeEvidence(registryPath, runtimeRoot);
+    if (!registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
+    classified("ROOT_AUTHORITY_BLOCKED", () => productionAuthorityResolver(registryPath));
+    result = classified("STATE_STORE_BLOCKED", () => purgeProtectedRuntimeEvidence(registryPath, runtimeRoot));
   } else {
-    if (!registryPath) throw new Error("Protected control registry is required for P0B proof persistence");
-    productionAuthorityResolver(registryPath);
-    const proof = parseP0bProofReceipt(parseStrictJson(readFileSync(required(args, "--request"), "utf8")));
+    if (!registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
+    classified("ROOT_AUTHORITY_BLOCKED", () => productionAuthorityResolver(registryPath));
+    const proof = classified("REQUEST_INVALID", () => parseP0bProofReceipt(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     if (!process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256 || proof.executable_attestation_sha256 !== process.env.OC_ROUTER_EXECUTABLE_ATTESTATION_SHA256) throw new Error("P0B proof executable attestation binding mismatch");
-    result = writeP0bProofReceipt(runtimeRoot, proof);
+    result = classified("STATE_STORE_BLOCKED", () => writeP0bProofReceipt(runtimeRoot, proof));
   }
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
 function validateOperationArguments(operation: string, args: Map<string, string>): void {
-  const allowed = operation === "new-run" || operation === "invoke-stage"
-    ? new Set(["--request"])
+  const requiredKeys = operation === "new-run" || operation === "invoke-stage"
+    ? ["--request"]
     : operation === "resolve-stage"
-      ? new Set(["--run-id", "--operation-id"])
+      ? ["--run-id", "--operation-id"]
       : operation === "get-run"
-        ? new Set(["--run-id"])
+        ? ["--run-id"]
         : operation === "write-p0b-proof"
-          ? new Set(["--request"])
+          ? ["--request"]
           : operation === "resolve-compact-authority"
-            ? new Set(["--target-id", "--recipient-role"])
+            ? ["--target-id", "--recipient-role"]
             : operation === "consume-compact-authority"
-              ? new Set(["--target-id", "--recipient-role", "--attempt-id"])
-          : new Set<string>();
+              ? ["--target-id", "--recipient-role", "--attempt-id"]
+              : [];
+  const allowed = new Set(requiredKeys);
   for (const key of args.keys()) if (!allowed.has(key)) throw new Error(`Argument ${key} is not allowed for ${operation}`);
+  for (const key of requiredKeys) if (!args.get(key)) throw new Error(`Argument ${key} is required for ${operation}`);
 }
 
 function purgeProtectedRuntimeEvidence(registryPath: string, runtimeRoot: string): unknown {
@@ -687,14 +765,9 @@ function required(args: Map<string, string>, key: string): string {
 const isEntry = process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
 if (isEntry) {
   main().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : "";
-    const errorCode = message.includes("SOURCE_IDENTITY_CHANGED") ? "SOURCE_IDENTITY_CHANGED"
-      : /link|junction|escapes root/i.test(message) ? "UNSAFE_PATH"
-        : /P0B|dispatch is disabled/i.test(message) ? "P0B_REQUIRED"
-          : "BLOCKED";
-    process.stderr.write(`${JSON.stringify({ error_code: errorCode })}\n`);
+    process.stderr.write(cliErrorJson(error));
     process.exitCode = 3;
   });
 }
 
-export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate };
+export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson };

@@ -107,7 +107,7 @@ test("CLI and PowerShell launcher derive authority from target state and fail on
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launcher, "-Operation", "new-run", "-RequestPath", requestPath,
       ], { encoding: "utf8", env: { ...process.env, OC_ROUTER_RUNTIME_ROOT: runtime, OC_ROUTER_CONTROL_REGISTRY: registryPath } });
       assert.notEqual(launched.status, 0, "production launcher must reject caller-selected legacy runtime/registry paths");
-      assert.match(launched.stderr, /Fixed router root is missing|Ambient LOCALAPPDATA differs/);
+      assert.match(launched.stderr, /Fixed router root is missing|Ambient LOCALAPPDATA differs|"error_code":"RUN_AUTHORITY_BLOCKED"/);
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -187,7 +187,7 @@ test("CLI resolve-stage preserves UNCERTAIN while production launcher rejects al
         "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", launcher, "-Operation", "resolve-stage", "-RunId", authority.run_id, "-OperationId", operation.operation_id,
       ], { encoding: "utf8", env: withoutRegistry });
       assert.notEqual(launched.status, 0);
-      assert.match(launched.stderr, /Fixed router root is missing|Ambient LOCALAPPDATA differs/);
+      assert.match(launched.stderr, /Fixed router root is missing|Ambient LOCALAPPDATA differs|"error_code":"STATE_STORE_BLOCKED"/);
       assert.equal(store.loadOperation(authority.run_id, operation.operation_id).status, "UNCERTAIN");
     }
   } finally {
