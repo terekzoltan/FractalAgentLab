@@ -340,7 +340,8 @@ export function validateOutputBinding(parsed: ParsedOutput, expected: { target: 
     if (parsed.fields[field] !== undefined && parsed.fields[field] !== value) throw new Error(`${field} binding mismatch`);
   };
   const authorityFieldsRequired = parsed.kind !== "DELIVERY_RESPONSE";
-  compare("Target", expected.target, authorityFieldsRequired);
+  if (authorityFieldsRequired && parsed.fields.Target === undefined) throw new Error("Target binding missing");
+  if (parsed.fields.Target !== undefined && canonicalTargetLabel(parsed.fields.Target) !== canonicalTargetLabel(expected.target)) throw new Error("Target binding mismatch");
   compare("Epic", expected.epic, authorityFieldsRequired);
   compare("Accountable Lane / class / profile", expected.lane);
   if (expected.candidate && parsed.kind === "STEP_REVIEW") compare("Candidate", expected.candidate, true);
@@ -350,6 +351,10 @@ export function validateOutputBinding(parsed: ParsedOutput, expected: { target: 
   if (expected.plan && parsed.kind === "PLAN_REVIEW") compare("Plan artifact", expected.plan, true);
   if (expected.plan && parsed.kind === "IMPLEMENT") compare("Plan/fix-plan identity", expected.plan, true);
   if (expected.plan_class && parsed.plan_class !== undefined && parsed.plan_class !== expected.plan_class) throw new Error("Plan class binding mismatch");
+}
+
+function canonicalTargetLabel(value: string): string {
+  return value.trim().replace(/\s+repository$/i, "").toLowerCase();
 }
 
 export function sameSources(left: readonly SourceBinding[], right: readonly SourceBinding[]): boolean {

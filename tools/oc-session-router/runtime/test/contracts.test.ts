@@ -92,6 +92,8 @@ test("binding is independent from shape", () => {
   const raw = readFileSync(path.join(fixtures, "output-plan-review.md"), "utf8").replace("Target: FractalAgentLab", "Target: Other");
   const parsed = parseOutputShape("PLAN_REVIEW", raw);
   assert.throws(() => validateOutputBinding(parsed, { target: "FractalAgentLab", epic: "FAL-EXPLICIT-STAGE-ROUTER", lane: "Track D / TRACK / track-d" }), /Target binding mismatch/);
+  const displayAlias = parseOutputShape("PLAN_REVIEW", readFileSync(path.join(fixtures, "output-plan-review.md"), "utf8").replace("Target: FractalAgentLab", "Target: FRACTALAGENTLAB repository"));
+  assert.doesNotThrow(() => validateOutputBinding(displayAlias, { target: "FractalAgentLab", epic: "FAL-EXPLICIT-STAGE-ROUTER", lane: "Track D / TRACK / track-d" }));
 });
 
 test("binding requires target and epic and uses the candidate identity field", () => {

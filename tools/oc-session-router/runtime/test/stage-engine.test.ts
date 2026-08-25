@@ -1114,6 +1114,7 @@ test("resolve-stage recovers one exact command-root terminal after an uncertain 
     const uncertain = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
     assert.equal(uncertain.operation_status, "UNCERTAIN");
     resolver.capabilityIdentityGeneration = "-rotated-after-dispatch";
+    resolver.authority = { ...resolver.authority!, target_profile_sha256: sha256("rotated-profile") };
 
     const reconciled = await engine.resolveStage(created.run_id, uncertain.operation_id);
     assert.equal(reconciled.operation_status, "SUCCEEDED", JSON.stringify(reconciled));

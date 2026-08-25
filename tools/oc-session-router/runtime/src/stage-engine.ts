@@ -341,7 +341,7 @@ export class StageEngine {
       try {
         const loaded = this.store.loadRun(runId);
         const resolved = await this.resolver.resolveStageAuthority(loaded.authority, stageRequest);
-        if (authoritySha256(resolved.run_authority) !== operation.invocation.run_authority_sha256 || !["P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(resolved.capability.mode) || resolved.capability.snapshot_correlation !== "EXACT_PARENT_LINK") throw new Error("Snapshot production authority drifted");
+        if (!recoveryRunAuthorityMatches(resolved.run_authority, loaded.authority) || !["P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(resolved.capability.mode) || resolved.capability.snapshot_correlation !== "EXACT_PARENT_LINK") throw new Error("Snapshot production authority drifted");
         assertPrivateTransportBinding(resolved.transport);
         assertArtifactSafe(recoveredCandidate.text, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
         const parsed = parseOutputShape(operation.invocation.requested_stage, recoveredCandidate.text);
@@ -378,6 +378,12 @@ export class StageEngine {
     this.store.updateOperation(runId, operationId, operation.revision, { status: "UNCERTAIN" });
     return result;
   }
+}
+
+function recoveryRunAuthorityMatches(current: RunAuthority, original: RunAuthority): boolean {
+  const { target_profile_sha256: _currentProfileSha, ...currentStable } = current;
+  const { target_profile_sha256: _originalProfileSha, ...originalStable } = original;
+  return canonicalize(currentStable) === canonicalize(originalStable);
 }
 
 const SOURCE_CLASSES: Record<StageRequest["requested_stage"], readonly SourceClass[]> = {
