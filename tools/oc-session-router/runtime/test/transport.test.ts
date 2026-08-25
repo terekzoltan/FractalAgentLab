@@ -234,6 +234,37 @@ test("installed snapshot reader fails closed when the exact command root is ambi
   assert.equal(snapshot.candidates[0]?.command_root_correlated, undefined);
 });
 
+test("installed snapshot reader pages backward to the exact baseline within bounded pages", async () => {
+  const directory = "C:\\synthetic-target";
+  const message = (id: string, created: number, role: "user" | "assistant", parentID?: string) => ({
+    info: { id, role, sessionID: session, ...(parentID ? { parentID } : {}), time: { created, ...(role === "assistant" ? { completed: created + 0.5 } : {}) } },
+    parts: [{ id: `text-${id}`, type: "text", text: id === "user-command" ? "Prompt\nSOURCE" : id.toUpperCase(), messageID: id, sessionID: session }],
+  });
+  const baselineMessage = message("assistant-baseline", 1, "assistant", "user-old");
+  const commandRoot = message("user-command", 2, "user");
+  const terminal = message("assistant-terminal", 3, "assistant", "user-command");
+  const fillers = Array.from({ length: 39 }, (_, index) => message(`assistant-fill-${index}`, 4 + index, "assistant", "user-command"));
+  let messageReads = 0;
+  const client = new InstalledSnapshotClient(async (input) => {
+    const endpoint = new URL(String(input));
+    if (endpoint.pathname === "/command") return new Response(JSON.stringify([{ name: "seq-next", template: "Prompt\n$ARGUMENTS" }]));
+    messageReads += 1;
+    assert.equal(endpoint.searchParams.get("limit"), "40");
+    if (messageReads === 1) {
+      assert.equal(endpoint.searchParams.has("before"), false);
+      return new Response(JSON.stringify([terminal, ...fillers]));
+    }
+    assert.equal(endpoint.searchParams.get("before"), "assistant-terminal");
+    return new Response(JSON.stringify([baselineMessage, commandRoot]));
+  });
+  const binding = { origin: "http://127.0.0.1:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password", directory };
+  const baseline = { message_id: "assistant-baseline", identity_sha256: sha256("baseline"), captured_at: new Date().toISOString() };
+  const snapshot = await client.collect(binding, baseline, "EXACT_PARENT_LINK", 1000, { name: "seq-next", argument: "SOURCE" });
+  assert.equal(messageReads, 2);
+  assert.equal(snapshot.baseline_present, true);
+  assert.equal(snapshot.candidates.find((candidate) => candidate.id === "assistant-terminal")?.command_root_correlated, true);
+});
+
 test("production snapshot history accepts completed tool and patch parts as hash-only inert evidence", async () => {
   const historical = {
     info: { id: "assistant-history", role: "assistant", sessionID: session, parentID: "user-history", time: { created: 1, completed: 2 } },

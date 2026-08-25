@@ -246,13 +246,13 @@ export class InstalledSnapshotClient {
   constructor(private readonly fetchImpl: FetchLike = fetch, private readonly maximumBytes = 4 * 1024 * 1024) {}
 
   async captureBaseline(binding: TransportBinding, timeoutMs: number): Promise<SnapshotBaseline> {
-    const messages = await this.readMessages(binding, timeoutMs);
+    const messages = await this.readMessagePage(binding, timeoutMs, 1);
     const latest = messages.at(-1)?.info.id ?? "EMPTY";
     return { message_id: latest, identity_sha256: snapshotSetIdentity(messages), captured_at: new Date().toISOString() };
   }
 
   async collect(binding: TransportBinding, baseline: SnapshotBaseline, _mode: SnapshotCorrelationMode, timeoutMs: number, expectedCommand?: { name: string; argument: string }): Promise<SnapshotReadResult> {
-    const messages = await this.readMessages(binding, timeoutMs);
+    const messages = await this.readMessagesThroughBaseline(binding, baseline.message_id, timeoutMs);
     const baselineIndex = baseline.message_id === "EMPTY" ? -1 : messages.findIndex((message) => message.info.id === baseline.message_id);
     const baselinePresent = baseline.message_id === "EMPTY" || baselineIndex >= 0;
     const postBaseline = baselinePresent ? messages.slice(baselineIndex + 1) : [];
@@ -279,10 +279,33 @@ export class InstalledSnapshotClient {
     return { candidates, baseline_present: baselinePresent, message_set_sha256: snapshotSetIdentity(messages), captured_at: new Date().toISOString() };
   }
 
-  private async readMessages(binding: TransportBinding, timeoutMs: number): Promise<CommandResponse[]> {
+  private async readMessagesThroughBaseline(binding: TransportBinding, baselineMessageId: string, timeoutMs: number): Promise<CommandResponse[]> {
+    const pageSize = 40;
+    const maximumPages = 6;
+    const messages: CommandResponse[] = [];
+    const seen = new Set<string>();
+    let before: string | undefined;
+    for (let page = 0; page < maximumPages; page += 1) {
+      const current = await this.readMessagePage(binding, timeoutMs, pageSize, before);
+      if (current.length === 0) break;
+      for (const message of current) {
+        if (seen.has(message.info.id)) throw new Error("Snapshot pagination contains a duplicate message");
+        seen.add(message.info.id);
+        messages.push(message);
+      }
+      if (baselineMessageId === "EMPTY" || current.some((message) => message.info.id === baselineMessageId)) break;
+      if (current.length < pageSize) break;
+      before = current[0]!.info.id;
+    }
+    return messages.sort((left, right) => (left.info.created_at ?? 0) - (right.info.created_at ?? 0));
+  }
+
+  private async readMessagePage(binding: TransportBinding, timeoutMs: number, limit: number, before?: string): Promise<CommandResponse[]> {
     assertPrivateTransportBinding(binding);
     const origin = validateOrigin(binding.origin);
-    const endpoint = new URL(`/session/${encodeURIComponent(binding.session_id)}/message?limit=200`, origin);
+    const endpoint = new URL(`/session/${encodeURIComponent(binding.session_id)}/message`, origin);
+    endpoint.searchParams.set("limit", String(limit));
+    if (before) endpoint.searchParams.set("before", before);
     if (binding.directory) endpoint.searchParams.set("directory", binding.directory);
     const response = await this.fetchImpl(endpoint, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(timeoutMs), headers: { authorization: basicAuthorization(binding.username, binding.password), accept: "application/json" } });
     if (response.status >= 300 && response.status < 400) throw new Error("Snapshot redirect is forbidden");
