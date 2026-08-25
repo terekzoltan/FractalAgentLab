@@ -144,9 +144,9 @@ test("installed response lifecycle parts are audited while only authoritative te
 
 test("installed snapshot reader is GET-only, directory-bound, and preserves exact assistant correlation", async () => {
   let reads = 0;
-  const baselineMessage = { info: { id: "assistant-baseline", role: "assistant", sessionID: session, parentID: "user-baseline" }, parts: [{ id: "text-baseline", type: "text", text: "BASELINE", messageID: "assistant-baseline", sessionID: session }] };
+  const baselineMessage = { info: { id: "assistant-baseline", role: "assistant", sessionID: session, parentID: "user-baseline", time: { created: 1, completed: 2 } }, parts: [{ id: "text-baseline", type: "text", text: "BASELINE", messageID: "assistant-baseline", sessionID: session }] };
   const currentMessage = {
-    info: { id: "assistant-current", role: "assistant", sessionID: session, parentID: "user-current" },
+    info: { id: "assistant-current", role: "assistant", sessionID: session, parentID: "user-current", time: { created: 3, completed: 4 } },
     parts: [
       { id: "step-current-a", type: "step-start", snapshot: "before", messageID: "assistant-current", sessionID: session },
       { id: "text-current", type: "text", text: "PLAN_REVIEW_COMPLETE", messageID: "assistant-current", sessionID: session },
@@ -168,6 +168,39 @@ test("installed snapshot reader is GET-only, directory-bound, and preserves exac
   assert.equal(snapshot.baseline_present, true);
   assert.deepEqual(snapshot.candidates, [{ id: "assistant-current", parent_id: "user-current", session_id: session, text: "PLAN_REVIEW_COMPLETE", after_baseline: true }]);
   assert.match(snapshot.message_set_sha256, /^[a-f0-9]{64}$/);
+});
+
+test("production snapshot history accepts completed tool and patch parts as hash-only inert evidence", async () => {
+  const historical = {
+    info: { id: "assistant-history", role: "assistant", sessionID: session, parentID: "user-history", time: { created: 1, completed: 2 } },
+    parts: [
+      { id: "tool-complete", type: "tool", callID: "call-complete", tool: "read", state: { status: "completed", input: { path: "private" }, output: "private output", title: "Read", metadata: {}, time: { start: 1, end: 2 } }, metadata: {}, messageID: "assistant-history", sessionID: session },
+      { id: "tool-error", type: "tool", callID: "call-error", tool: "bash", state: { status: "error", input: { command: "private" }, error: "private error", time: { start: 2, end: 3 } }, metadata: {}, messageID: "assistant-history", sessionID: session },
+      { id: "patch-history", type: "patch", files: ["private-file"], hash: "patch-hash", messageID: "assistant-history", sessionID: session },
+      { id: "text-history", type: "text", text: "HISTORICAL TERMINAL", messageID: "assistant-history", sessionID: session },
+    ],
+  };
+  const binding = { origin: "http://127.0.0.1:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password", directory: "C:\\synthetic-target" };
+  const baseline = await new InstalledSnapshotClient(async () => new Response(JSON.stringify([historical]))).captureBaseline(binding, 1000);
+  assert.equal(baseline.message_id, "assistant-history");
+  assert.match(baseline.identity_sha256, /^[a-f0-9]{64}$/);
+  for (const privateValue of ["private output", "private error", "private-file"]) assert.equal(JSON.stringify(baseline).includes(privateValue), false);
+});
+
+test("production snapshot history remains fail-closed for active tools, incomplete assistants, unknown parts, and identity drift", async () => {
+  const binding = { origin: "http://127.0.0.1:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password", directory: "C:\\synthetic-target" };
+  const base = { info: { id: "assistant-history", role: "assistant", sessionID: session, parentID: "user-history", time: { created: 1, completed: 2 } } };
+  const rejected = [
+    { ...base, parts: [{ id: "active", type: "tool", callID: "call-active", tool: "read", state: { status: "running", input: {}, time: { start: 1 } }, metadata: {}, messageID: "assistant-history", sessionID: session }] },
+    { info: { ...base.info, time: { created: 1 } }, parts: [{ id: "text", type: "text", text: "INCOMPLETE", messageID: "assistant-history", sessionID: session }] },
+    { ...base, parts: [{ id: "unknown", type: "subtask", messageID: "assistant-history", sessionID: session }] },
+    { ...base, parts: [{ id: "patch", type: "patch", files: [], hash: "hash", unexpected: true, messageID: "assistant-history", sessionID: session }] },
+    { ...base, parts: [{ id: "text", type: "text", text: "DRIFT", messageID: "assistant-other", sessionID: session }] },
+  ];
+  for (const history of rejected) {
+    const client = new InstalledSnapshotClient(async () => new Response(JSON.stringify([history])));
+    await assert.rejects(() => client.captureBaseline(binding, 1000), /Snapshot/);
+  }
 });
 
 test("command response byte limit cancels the stream before unbounded buffering", async () => {

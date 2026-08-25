@@ -117,6 +117,14 @@ Delivery /seq-next
   prerelease/nonstandard version, router-attestation change, or live-probe drift
   fails closed and requires a new isolated P0B proof.
 - Lifecycle dispatch and Compact share the same persistent participant fence.
+- A pre-operation failure reports a bounded privacy-safe class:
+  `PARTICIPANT_FENCE_BLOCKED`, `DISPATCH_LEASE_BLOCKED`, or
+  `SNAPSHOT_BASELINE_BLOCKED`; generic `BLOCKED` is reserved for failures that
+  cannot be classified without exposing private material.
+- Snapshot baselines may hash completed historical `tool` and `patch` parts from
+  a mature session. They never execute or persist their payloads, never treat
+  them as terminal text, and still reject active tools, identity drift, unknown
+  part types, and malformed shapes.
   The runtime holds an OS-level `FileShare.None` lease through response handling
   and rechecks it with protected authority immediately before POST.
 - Invoke every known slash command through the command endpoint, excluding the leading slash.

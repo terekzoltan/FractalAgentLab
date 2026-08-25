@@ -29,8 +29,8 @@
   "runtime_package_sha256": "bd9c51ef13b981bcbf7d45d283e8e55b49a9b24fcd0d8492c40afac4113c0b96",
   "runtime_lock_sha256": "d1d22b8157b1c370086e824eeae2e0c8e9a433f72c8566982abc007779cec3f7",
   "compiled_entry_path": "dist/src/cli.js",
-  "compiled_entry_sha256": "86d1a9a9f4732d206a48101be69dabb867bfbe5e2815fd8634b0bd5f9c828a40",
-  "compiled_manifest_sha256": "f53b7d3e944fb64e4171a2d9c88a6cb5c2e022e5018c8b3b3e3325c343ae2ee4",
-  "source_manifest_identity": "fal-explicit-stage-router-source-v14",
-  "source_manifest_sha256": "9c46810b790e64300e5066b5cb324f881f222bdbc49885517145885c73d7cdac"
+  "compiled_entry_sha256": "da5694d72bc509dfc02be9842fb4026f690ff19701b2d83611d6a86137572a3f",
+  "compiled_manifest_sha256": "9067e8277cf48e727f969ad671d41103e9d4eabb93a2eb34a7b0455b31c42ab8",
+  "source_manifest_identity": "fal-explicit-stage-router-source-v15",
+  "source_manifest_sha256": "eae9bfeeea8a34f90756015426a02338fa1e9b40641601aab18b5ffd69e40c6b"
 }

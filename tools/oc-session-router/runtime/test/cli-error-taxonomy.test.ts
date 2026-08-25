@@ -16,6 +16,9 @@ const EXPECTED_CODES = [
   "UNSAFE_PATH",
   "P0B_REQUIRED",
   "SOURCE_IDENTITY_CHANGED",
+  "PARTICIPANT_FENCE_BLOCKED",
+  "DISPATCH_LEASE_BLOCKED",
+  "SNAPSHOT_BASELINE_BLOCKED",
   "OUTPUT_CHANNEL_BLOCKED",
   "BLOCKED",
 ] as const;
@@ -34,6 +37,9 @@ test("CLI error classifier separates bounded operational failure classes", () =>
     [new Error("target path traverses a link or junction at C:\\private"), "BLOCKED", "UNSAFE_PATH"],
     [new Error("Production command dispatch is disabled until a reviewed P0B capability transaction"), "BLOCKED", "P0B_REQUIRED"],
     [new Error("SOURCE_IDENTITY_CHANGED: stage source manifest hash differs at C:\\private"), "BLOCKED", "SOURCE_IDENTITY_CHANGED"],
+    [new Error("Participant transport is locked by Compact or lifecycle dispatch"), "BLOCKED", "PARTICIPANT_FENCE_BLOCKED"],
+    [new Error("EEXIST at private dispatch-leases path"), "BLOCKED", "DISPATCH_LEASE_BLOCKED"],
+    [new Error("Snapshot assistant part type tool is unsupported"), "BLOCKED", "SNAPSHOT_BASELINE_BLOCKED"],
     [new Error("unclassified internal failure at C:\\private"), "BLOCKED", "BLOCKED"],
   ];
   for (const [error, fallback, expected] of cases) assert.equal(_test.classifyCliError(error, fallback), expected);

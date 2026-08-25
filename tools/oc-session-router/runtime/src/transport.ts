@@ -420,14 +420,58 @@ function parseSnapshotMessage(value: unknown): CommandResponse {
   const info = response.info as Record<string, unknown>;
   for (const field of ["id", "role", "sessionID"] as const) if (typeof info[field] !== "string" || !info[field]) throw new Error(`Snapshot message ${field} is invalid`);
   if (info.parentID !== undefined && typeof info.parentID !== "string") throw new Error("Snapshot message parentID is invalid");
-  if (info.role === "assistant") return parseCommandResponse(value);
+  if (info.role === "assistant") return parseSnapshotAssistantMessage(response, info);
   const parts = response.parts.map((raw, index) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`Snapshot non-assistant part ${index} is invalid`);
     const part = raw as Record<string, unknown>;
     for (const field of ["id", "type", "messageID", "sessionID"] as const) if (typeof part[field] !== "string" || !part[field]) throw new Error(`Snapshot non-assistant part ${field} is invalid`);
+    if (part.messageID !== info.id || part.sessionID !== info.sessionID) throw new Error("Snapshot non-assistant part identity mismatch");
     return { id: part.id as string, type: part.type as string, messageID: part.messageID as string, sessionID: part.sessionID as string, content_sha256: sha256(canonicalize(part)) };
   });
   return { info: { id: info.id as string, role: info.role as string, sessionID: info.sessionID as string, ...(info.parentID === undefined ? {} : { parentID: info.parentID as string }) }, parts };
+}
+
+function parseSnapshotAssistantMessage(response: Record<string, unknown>, info: Record<string, unknown>): CommandResponse {
+  const time = info.time;
+  if (!time || typeof time !== "object" || Array.isArray(time) || !finiteNumber((time as Record<string, unknown>).completed)) throw new Error("Snapshot assistant message is not completed");
+  const parts = (response.parts as unknown[]).map((raw, index) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`Snapshot assistant part ${index} is invalid`);
+    const part = raw as Record<string, unknown>;
+    for (const field of ["id", "type", "messageID", "sessionID"] as const) if (typeof part[field] !== "string" || !part[field]) throw new Error(`Snapshot assistant part ${field} is invalid`);
+    if (part.messageID !== info.id || part.sessionID !== info.sessionID) throw new Error("Snapshot assistant part identity mismatch");
+    const type = part.type as string;
+    if (["text", "reasoning", "step-start", "step-finish"].includes(type)) return parseCommandResponse({ info, parts: [part] }).parts[0]!;
+    if (type === "tool") validateCompletedSnapshotToolPart(part);
+    else if (type === "patch") validateSnapshotPatchPart(part);
+    else throw new Error(`Snapshot assistant part type ${type} is unsupported`);
+    return { id: part.id as string, type, messageID: part.messageID as string, sessionID: part.sessionID as string, content_sha256: sha256(canonicalize(part)) };
+  });
+  return { info: { id: info.id as string, role: info.role as string, sessionID: info.sessionID as string, ...(info.parentID === undefined ? {} : { parentID: info.parentID as string }) }, parts };
+}
+
+function validateCompletedSnapshotToolPart(part: Record<string, unknown>): void {
+  const allowed = ["callID", "id", "messageID", "metadata", "sessionID", "state", "tool", "type"];
+  if (Object.keys(part).sort().join("\n") !== allowed.sort().join("\n")) throw new Error("Snapshot tool part has unknown or missing fields");
+  if (typeof part.callID !== "string" || !part.callID || typeof part.tool !== "string" || !part.tool) throw new Error("Snapshot tool part identity is invalid");
+  if (!part.metadata || typeof part.metadata !== "object" || Array.isArray(part.metadata)) throw new Error("Snapshot tool part metadata is invalid");
+  if (!part.state || typeof part.state !== "object" || Array.isArray(part.state)) throw new Error("Snapshot tool part state is invalid");
+  const state = part.state as Record<string, unknown>;
+  if (state.status === "completed") {
+    const completed = ["input", "metadata", "output", "status", "time", "title"];
+    if (Object.keys(state).sort().join("\n") !== completed.sort().join("\n") || typeof state.output !== "string" || typeof state.title !== "string" || !state.metadata || typeof state.metadata !== "object" || Array.isArray(state.metadata)) throw new Error("Snapshot completed tool part is invalid");
+  } else if (state.status === "error") {
+    const failed = ["error", "input", "status", "time"];
+    if (Object.keys(state).sort().join("\n") !== failed.sort().join("\n") || typeof state.error !== "string") throw new Error("Snapshot failed tool part is invalid");
+  } else {
+    throw new Error("Snapshot tool part is still active");
+  }
+  if (!state.input || typeof state.input !== "object" || Array.isArray(state.input)) throw new Error("Snapshot tool part input is invalid");
+  assertTimeShape(state.time, true);
+}
+
+function validateSnapshotPatchPart(part: Record<string, unknown>): void {
+  const allowed = ["files", "hash", "id", "messageID", "sessionID", "type"];
+  if (Object.keys(part).sort().join("\n") !== allowed.sort().join("\n") || !Array.isArray(part.files) || typeof part.hash !== "string" || !part.hash) throw new Error("Snapshot patch part is invalid");
 }
 
 function assertTimeShape(value: unknown, required: boolean): void {

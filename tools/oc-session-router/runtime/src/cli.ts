@@ -54,6 +54,9 @@ const CLI_ERROR_CODES = [
   "UNSAFE_PATH",
   "P0B_REQUIRED",
   "SOURCE_IDENTITY_CHANGED",
+  "PARTICIPANT_FENCE_BLOCKED",
+  "DISPATCH_LEASE_BLOCKED",
+  "SNAPSHOT_BASELINE_BLOCKED",
   "OUTPUT_CHANNEL_BLOCKED",
   "BLOCKED",
 ] as const;
@@ -630,6 +633,9 @@ function classifyCliError(error: unknown, fallback: CliErrorCode = "BLOCKED"): C
   if (/link|junction|reparse|escapes (?:root|KnownFolder authority|protected control root|router root)|unsafe path|must (?:be|remain) an ordinary (?:absolute )?file|cannot be a link/i.test(message)) return "UNSAFE_PATH";
   if (/KnownFolder|LocalAppData|fixed (?:router|control) root|control registry differs from the KnownFolder authority/i.test(message)) return "ROOT_AUTHORITY_BLOCKED";
   if (/P0B|dispatch is disabled/i.test(message)) return "P0B_REQUIRED";
+  if (/Participant transport|Shared session fence/i.test(message)) return "PARTICIPANT_FENCE_BLOCKED";
+  if (/dispatch lease|dispatch-leases/i.test(message)) return "DISPATCH_LEASE_BLOCKED";
+  if (/Snapshot|message collection shape/i.test(message)) return "SNAPSHOT_BASELINE_BLOCKED";
   if (fallback === "STATE_STORE_BLOCKED") return stateStoreErrorCode(error);
   return fallback;
 }

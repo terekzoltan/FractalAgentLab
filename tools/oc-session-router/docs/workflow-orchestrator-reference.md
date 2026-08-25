@@ -80,7 +80,10 @@ directory-scoped command registry, command set, server/origin fingerprints, targ
 and worktree hashes, and authorized session/command hashes. SSE support is probed
 and hashed but never enabled. `/command` response text is authoritative first;
 inert lifecycle/reasoning parts are closed-schema checked and hash-audited, while
-active tool or unknown parts fail closed. GET snapshot data is private diagnostic
+active tool or unknown part types fail closed. Completed historical `tool` and
+`patch` parts from a mature participant session are identity-checked and reduced
+to content hashes only; they are never interpreted as terminal output. GET
+snapshot data is private diagnostic
 evidence unless assistant message ID, parent, session, baseline, and terminal hash
 correlate exactly. Snapshot failure never causes a resend.
 
