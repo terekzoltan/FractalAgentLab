@@ -11,6 +11,7 @@ import {
   SharedSessionFence,
   buildSharedFenceBinding,
   capabilityAuthorizationUseSha256,
+  isP0bProofCompatibleWithInstalledServer,
   parseCapabilityReceipt,
   parseControlRegistry,
   parseRetentionPolicy,
@@ -85,6 +86,19 @@ function acceptedP0bProof(): P0bProofReceipt {
     raw_session_id_persisted: false, raw_response_persisted: false, raw_reasoning_persisted: false, raw_event_payload_persisted: false,
   };
 }
+
+test("P0B server proof is reusable only for a forward patch on the same compatibility line", () => {
+  const proof = acceptedP0bProof();
+  const installed = (server_version: string, server_binary_sha256 = "2".repeat(64)) => ({ server_version, server_binary_sha256 });
+  assert.equal(isP0bProofCompatibleWithInstalledServer(proof, installed("1.18.19")), true);
+  assert.equal(isP0bProofCompatibleWithInstalledServer(proof, installed("1.18.22", "9".repeat(64))), true);
+  assert.equal(isP0bProofCompatibleWithInstalledServer(proof, installed("1.18.19", "9".repeat(64))), false);
+  assert.equal(isP0bProofCompatibleWithInstalledServer(proof, installed("1.18.18", "9".repeat(64))), false);
+  assert.equal(isP0bProofCompatibleWithInstalledServer(proof, installed("1.19.0", "9".repeat(64))), false);
+  assert.equal(isP0bProofCompatibleWithInstalledServer(proof, installed("2.18.0", "9".repeat(64))), false);
+  assert.equal(isP0bProofCompatibleWithInstalledServer(proof, installed("1.18.20-beta.1", "9".repeat(64))), false);
+  assert.equal(isP0bProofCompatibleWithInstalledServer({ ...proof, opencode_server_version: "not-semver" }, installed("1.18.22", "9".repeat(64))), false);
+});
 
 test("P0B protected capability is closed, short-lived, AWC 4.1.1-only, and directory-bound", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-control-"));
@@ -173,6 +187,24 @@ test("P0B protected capability is closed, short-lived, AWC 4.1.1-only, and direc
     const productionRegistry = parseControlRegistry({ ...registryValue, mode: "PRODUCTION_RESPONSE_FIRST", targets: { "synthetic-p0b": productionTarget } });
     const productionResolved = await resolveProtectedCapability({ registry: productionRegistry, registry_path: registryPath, protected_control_root: control, target_id: "synthetic-p0b", target: productionTarget, request: stageRequest(), now: fixedNow, credentials: () => ({ username: "owner-process", password: "process-secret" }), executable_attestation_sha256: productionProof.executable_attestation_sha256, probe: { probe: async () => live } });
     assert.equal(productionResolved.mode, "PRODUCTION_RESPONSE_FIRST");
+
+    const patchLive: CapabilityProbeProjection = {
+      ...live,
+      server_version: "1.18.22",
+      server_binary_sha256: "7".repeat(64),
+      server_instance_identity_sha256: "6".repeat(64),
+    };
+    const patchTarget: RegistryTarget = { ...productionTarget, server: { ...productionTarget.server, binary_sha256: patchLive.server_binary_sha256 } };
+    const patchGrant = {
+      ...productionGrant,
+      server_version: patchLive.server_version,
+      server_binary_sha256: patchLive.server_binary_sha256,
+      server_instance_identity_sha256: patchLive.server_instance_identity_sha256,
+    } as const;
+    writeFileSync(path.join(control, target.capability_receipt_path!), JSON.stringify(patchGrant));
+    const patchRegistry = parseControlRegistry({ ...registryValue, mode: "PRODUCTION_RESPONSE_FIRST", targets: { "synthetic-p0b": patchTarget } });
+    const patchResolved = await resolveProtectedCapability({ registry: patchRegistry, registry_path: registryPath, protected_control_root: control, target_id: "synthetic-p0b", target: patchTarget, request: stageRequest(), now: fixedNow, credentials: () => ({ username: "owner-process", password: "process-secret" }), executable_attestation_sha256: productionProof.executable_attestation_sha256, probe: { probe: async () => patchLive } });
+    assert.equal(patchResolved.server_binary_sha256, patchLive.server_binary_sha256);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

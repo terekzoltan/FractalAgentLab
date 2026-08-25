@@ -26,6 +26,9 @@ not send; invocation never selects sources. Runtime `0.2.0` defaults to
 `DISABLED`. `P0B_ISOLATED` is one-use synthetic-only, and production requires a
 separate nonzero P0B proof-bound receipt. Active modes require AWC `4.1.1`; SSE is
 always disabled. Keep OpenCode sharing disabled in config and process environment.
+Forward patch updates on the same strict OpenCode `major.minor` line reuse that
+proof only with a fresh exact current live capability receipt; every wider or
+ambiguous compatibility change requires a new isolated P0B.
 Bind the synthetic target beneath the registry-owned, reparse-free
 `p0b_isolation_root`; its domain hash must match the capability receipt.
 

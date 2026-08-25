@@ -13,7 +13,7 @@ import {
   type StageRequest,
 } from "./contracts.js";
 import { validateOrigin } from "./transport.js";
-import { readP0bProofReceipt } from "./p0b-proof.js";
+import { readP0bProofReceipt, type P0bProofReceipt } from "./p0b-proof.js";
 
 export const ROUTER_PROTOCOL_IDENTITY = "fal-explicit-stage-router/v1" as const;
 export const SUPPORTED_AWC_CONTRACTS = ["awc-3.1", "awc-4.1.1"] as const;
@@ -136,6 +136,31 @@ export interface ResolvedCapability {
   server_binary_sha256?: string;
   target_directory_sha256?: string;
   command_timeout_ms?: number;
+}
+
+export function isP0bProofCompatibleWithInstalledServer(
+  proof: Pick<P0bProofReceipt, "opencode_server_version" | "server_binary_sha256">,
+  installed: Pick<CapabilityReceipt, "server_version" | "server_binary_sha256">,
+): boolean {
+  if (proof.opencode_server_version === installed.server_version) {
+    return proof.server_binary_sha256 === installed.server_binary_sha256;
+  }
+  const proven = strictPatchVersion(proof.opencode_server_version);
+  const current = strictPatchVersion(installed.server_version);
+  return proven !== undefined && current !== undefined
+    && proven.major === current.major
+    && proven.minor === current.minor
+    && current.patch > proven.patch;
+}
+
+function strictPatchVersion(value: string): { major: number; minor: number; patch: number } | undefined {
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(value);
+  if (!match) return undefined;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  const patch = Number(match[3]);
+  if (![major, minor, patch].every(Number.isSafeInteger)) return undefined;
+  return { major, minor, patch };
 }
 
 export interface SharedFenceBinding {
@@ -394,7 +419,7 @@ export async function resolveProtectedCapability(options: {
     const executableAttestationSha256 = options.executable_attestation_sha256;
     if (!executableAttestationSha256) throw new Error("Production install requires the launcher-attested executable identity");
     assertSha256(executableAttestationSha256, "executable attestation SHA-256");
-    if (!proof.accepted || proof.router_protocol_identity !== ROUTER_PROTOCOL_IDENTITY || proof.runtime_release_version !== "0.2.0" || proof.executable_attestation_sha256 !== executableAttestationSha256 || proof.server_binary_sha256 !== receipt.server_binary_sha256 || proof.opencode_server_version !== receipt.server_version || proof.sse_enabled !== false) throw new Error("Production install P0B proof binding mismatch");
+    if (!proof.accepted || proof.router_protocol_identity !== ROUTER_PROTOCOL_IDENTITY || proof.runtime_release_version !== "0.2.0" || proof.executable_attestation_sha256 !== executableAttestationSha256 || !isP0bProofCompatibleWithInstalledServer(proof, receipt) || proof.sse_enabled !== false) throw new Error("Production install P0B proof binding mismatch");
   }
   if (options.request.expected_contract_version !== "awc-4.1.1" || !receipt.compatible_awc_contracts.includes("awc-4.1.1")) throw new Error("Active production modes require current AWC 4.1.1 compatibility");
   if (!receipt.authorized_commands.includes(command)) throw new Error("Capability receipt does not admit the requested command");
@@ -493,7 +518,7 @@ export async function resolveCompactProtectedAuthority(options: {
     const attestation = options.executable_attestation_sha256;
     if (!attestation) throw new Error("Production Compact install requires launcher-attested executable identity");
     assertSha256(attestation, "executable attestation SHA-256");
-    if (!proof.accepted || proof.router_protocol_identity !== ROUTER_PROTOCOL_IDENTITY || proof.runtime_release_version !== "0.2.0" || proof.executable_attestation_sha256 !== attestation || proof.server_binary_sha256 !== receipt.server_binary_sha256 || proof.opencode_server_version !== receipt.server_version || proof.sse_enabled !== false) throw new Error("Production Compact P0B proof binding mismatch");
+    if (!proof.accepted || proof.router_protocol_identity !== ROUTER_PROTOCOL_IDENTITY || proof.runtime_release_version !== "0.2.0" || proof.executable_attestation_sha256 !== attestation || !isP0bProofCompatibleWithInstalledServer(proof, receipt) || proof.sse_enabled !== false) throw new Error("Production Compact P0B proof binding mismatch");
   }
   const credentials = options.credentials();
   if (!credentials.username || !credentials.password) throw new Error("Process-scoped OpenCode authentication is unavailable");

@@ -109,6 +109,13 @@ Delivery /seq-next
   bound to a nonzero accepted P0B proof. Active modes require AWC `4.1.1`; legacy
   AWC `3.1` inputs never authorize production. SSE may be probed for evidence but
   `enabled` remains false.
+- Routine forward OpenCode patch updates on the same strict `major.minor` line
+  reuse the accepted transport proof only after a fresh read-only installed
+  capability receipt binds the current binary, server instance, health,
+  OpenAPI, command registry, target directory, session set, and authorized
+  commands. Exact-version binary drift, downgrade, minor/major change,
+  prerelease/nonstandard version, router-attestation change, or live-probe drift
+  fails closed and requires a new isolated P0B proof.
 - Lifecycle dispatch and Compact share the same persistent participant fence.
   The runtime holds an OS-level `FileShare.None` lease through response handling
   and rechecks it with protected authority immediately before POST.
