@@ -49,7 +49,8 @@ It is not project truth and does not grant workflow authority.
 - Installed `/command` is response-first. Audited `step-start`, `step-finish`,
   reasoning, and synthetic/ignored text are hashed but not treated as output;
   tool/subtask/file/patch/unknown parts fail closed. Snapshot history is ordered
-  chronologically and the latest pre-send message is the baseline. If the POST
+  chronologically, follows only the server-provided opaque next cursor within a
+  finite page cap, and treats the latest pre-send message as the baseline. If the POST
   response is lost after delivery, `resolve-stage` may accept exactly one strict
   terminal bound to exactly one post-baseline root user message whose text equals
   the installed command template expanded with the pinned argument. Any missing,

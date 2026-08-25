@@ -98,8 +98,9 @@ Delivery /seq-next
 - The synchronous `/command` assistant response is the primary candidate. A
   timeout or 5xx leaves the operation `UNCERTAIN`; `resolve-stage` is read-only and
   cannot resend. It may be repeated after the addressed session becomes idle.
-  Installed message history is interpreted chronologically with the latest
-  pre-send message as baseline. When no synchronous receipt exists, recovery
+  Installed message history is interpreted chronologically, paged only through
+  the server-provided opaque cursor under fixed page/byte caps, and uses the
+  latest pre-send message as baseline. When no synchronous receipt exists, recovery
   requires exactly one post-baseline root user message equal to the current
   installed command template expanded with the pinned argument, plus exactly one
   strict terminal assistant child that passes current authority, privacy, lineage,

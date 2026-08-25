@@ -252,9 +252,9 @@ test("installed snapshot reader pages backward to the exact baseline within boun
     assert.equal(endpoint.searchParams.get("limit"), "40");
     if (messageReads === 1) {
       assert.equal(endpoint.searchParams.has("before"), false);
-      return new Response(JSON.stringify([terminal, ...fillers]));
+      return new Response(JSON.stringify([terminal, ...fillers]), { headers: { "x-next-cursor": "cursor-page-2" } });
     }
-    assert.equal(endpoint.searchParams.get("before"), "assistant-terminal");
+    assert.equal(endpoint.searchParams.get("before"), "cursor-page-2");
     return new Response(JSON.stringify([baselineMessage, commandRoot]));
   });
   const binding = { origin: "http://127.0.0.1:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password", directory };

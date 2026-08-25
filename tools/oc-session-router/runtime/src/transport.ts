@@ -246,7 +246,7 @@ export class InstalledSnapshotClient {
   constructor(private readonly fetchImpl: FetchLike = fetch, private readonly maximumBytes = 4 * 1024 * 1024) {}
 
   async captureBaseline(binding: TransportBinding, timeoutMs: number): Promise<SnapshotBaseline> {
-    const messages = await this.readMessagePage(binding, timeoutMs, 1);
+    const messages = (await this.readMessagePage(binding, timeoutMs, 1)).messages;
     const latest = messages.at(-1)?.info.id ?? "EMPTY";
     return { message_id: latest, identity_sha256: snapshotSetIdentity(messages), captured_at: new Date().toISOString() };
   }
@@ -286,7 +286,8 @@ export class InstalledSnapshotClient {
     const seen = new Set<string>();
     let before: string | undefined;
     for (let page = 0; page < maximumPages; page += 1) {
-      const current = await this.readMessagePage(binding, timeoutMs, pageSize, before);
+      const currentPage = await this.readMessagePage(binding, timeoutMs, pageSize, before);
+      const current = currentPage.messages;
       if (current.length === 0) break;
       for (const message of current) {
         if (seen.has(message.info.id)) throw new Error("Snapshot pagination contains a duplicate message");
@@ -295,12 +296,13 @@ export class InstalledSnapshotClient {
       }
       if (baselineMessageId === "EMPTY" || current.some((message) => message.info.id === baselineMessageId)) break;
       if (current.length < pageSize) break;
-      before = current[0]!.info.id;
+      if (!currentPage.next_cursor) break;
+      before = currentPage.next_cursor;
     }
     return messages.sort((left, right) => (left.info.created_at ?? 0) - (right.info.created_at ?? 0));
   }
 
-  private async readMessagePage(binding: TransportBinding, timeoutMs: number, limit: number, before?: string): Promise<CommandResponse[]> {
+  private async readMessagePage(binding: TransportBinding, timeoutMs: number, limit: number, before?: string): Promise<{ messages: CommandResponse[]; next_cursor?: string }> {
     assertPrivateTransportBinding(binding);
     const origin = validateOrigin(binding.origin);
     const endpoint = new URL(`/session/${encodeURIComponent(binding.session_id)}/message`, origin);
@@ -310,13 +312,15 @@ export class InstalledSnapshotClient {
     const response = await this.fetchImpl(endpoint, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(timeoutMs), headers: { authorization: basicAuthorization(binding.username, binding.password), accept: "application/json" } });
     if (response.status >= 300 && response.status < 400) throw new Error("Snapshot redirect is forbidden");
     if (!response.ok) throw new Error("Snapshot read failed");
+    const nextCursor = response.headers.get("x-next-cursor") ?? undefined;
+    if (nextCursor !== undefined && !/^[A-Za-z0-9_-]{1,2048}$/.test(nextCursor)) throw new Error("Snapshot next cursor is invalid");
     const bytes = await readBoundedBody(response, this.maximumBytes);
     const parsed = parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
     const rawMessages = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && Array.isArray((parsed as Record<string, unknown>).messages) ? (parsed as Record<string, unknown>).messages as unknown[] : undefined;
     if (!rawMessages) throw new Error("Snapshot message collection shape is unsupported");
     const messages = rawMessages.map(parseSnapshotMessage).sort((left, right) => (left.info.created_at ?? 0) - (right.info.created_at ?? 0));
     for (const message of messages) if (message.info.sessionID !== binding.session_id || message.parts.some((part) => part.sessionID !== binding.session_id || part.messageID !== message.info.id)) throw new Error("Snapshot message identity mismatch");
-    return messages;
+    return { messages, ...(nextCursor === undefined ? {} : { next_cursor: nextCursor }) };
   }
 
   private async readExpandedCommandPrompt(binding: TransportBinding, expected: { name: string; argument: string }, timeoutMs: number): Promise<string> {
