@@ -426,7 +426,7 @@ export async function resolveProtectedCapability(options: {
   const credentials = options.credentials();
   if (!credentials.username || !credentials.password) throw new Error("Process-scoped OpenCode authentication is unavailable");
   const live = await options.probe.probe({ origin: options.target.server.origin, username: credentials.username, password: credentials.password, directory: targetDirectory, expected_binary_sha256: expectedBinarySha256, required_commands: [command], timeout_ms: 15_000 });
-  if (live.server_version !== receipt.server_version || live.server_binary_sha256 !== receipt.server_binary_sha256 || live.server_instance_identity_sha256 !== receipt.server_instance_identity_sha256 || live.target_directory_sha256 !== receipt.target_directory_sha256 || live.health_identity_sha256 !== receipt.health_identity_sha256 || live.doc_sha256 !== receipt.doc_sha256 || live.command_registry_sha256 !== receipt.command_registry_sha256 || canonicalize(live.supported_commands) !== canonicalize(receipt.supported_commands) || canonicalize(live.sse) !== canonicalize(receipt.sse)) throw new Error("Installed server capability drifted from protected receipt");
+  if (!installedCapabilityMatchesReceipt(live, receipt)) throw new Error("Installed server capability drifted from protected receipt");
   const authorizationUseSha256 = capabilityAuthorizationUseSha256(receipt);
   return {
     mode: receipt.mode,
@@ -523,7 +523,7 @@ export async function resolveCompactProtectedAuthority(options: {
   const credentials = options.credentials();
   if (!credentials.username || !credentials.password) throw new Error("Process-scoped OpenCode authentication is unavailable");
   const live = await options.probe.probe({ origin: target.server.origin, username: credentials.username, password: credentials.password, directory: targetRoot, expected_binary_sha256: expectedBinarySha256, required_commands: ["after-compact"], timeout_ms: 15_000 });
-  if (live.server_version !== receipt.server_version || live.server_binary_sha256 !== receipt.server_binary_sha256 || live.server_instance_identity_sha256 !== receipt.server_instance_identity_sha256 || live.target_directory_sha256 !== receipt.target_directory_sha256 || live.health_identity_sha256 !== receipt.health_identity_sha256 || live.doc_sha256 !== receipt.doc_sha256 || live.command_registry_sha256 !== receipt.command_registry_sha256 || canonicalize(live.supported_commands) !== canonicalize(receipt.supported_commands) || canonicalize(live.sse) !== canonicalize(receipt.sse)) throw new Error("Installed Compact server capability drifted from protected receipt");
+  if (!installedCapabilityMatchesReceipt(live, receipt)) throw new Error("Installed Compact server capability drifted from protected receipt");
   return {
     schema_version: "compact-protected-authority.v1",
     router_protocol_identity: ROUTER_PROTOCOL_IDENTITY,
@@ -542,6 +542,24 @@ export async function resolveCompactProtectedAuthority(options: {
     authorization_use_sha256: receipt.mode === "P0B_ISOLATED" ? capabilityAuthorizationUseSha256(receipt) : "0".repeat(64),
     command_timeout_ms: receipt.command_timeout_ms,
   };
+}
+
+function installedCapabilityMatchesReceipt(live: CapabilityProbeProjection, receipt: CapabilityReceipt): boolean {
+  // A one-use P0B grant stays bound to the exact synthetic server process that
+  // was reviewed. A durable production install instead admits a clean restart
+  // of the same measured server; the current process identity is still carried
+  // in ResolvedCapability and must remain byte-identical across the individual
+  // dispatch's baseline, immediate pre-POST, and post-response revalidations.
+  const exactInstanceRequired = receipt.mode === "P0B_ISOLATED";
+  return live.server_version === receipt.server_version
+    && live.server_binary_sha256 === receipt.server_binary_sha256
+    && (!exactInstanceRequired || live.server_instance_identity_sha256 === receipt.server_instance_identity_sha256)
+    && live.target_directory_sha256 === receipt.target_directory_sha256
+    && live.health_identity_sha256 === receipt.health_identity_sha256
+    && live.doc_sha256 === receipt.doc_sha256
+    && live.command_registry_sha256 === receipt.command_registry_sha256
+    && canonicalize(live.supported_commands) === canonicalize(receipt.supported_commands)
+    && canonicalize(live.sse) === canonicalize(receipt.sse);
 }
 
 export function buildSharedFenceBinding(targetRoot: string, privateSessionId: string): SharedFenceBinding {

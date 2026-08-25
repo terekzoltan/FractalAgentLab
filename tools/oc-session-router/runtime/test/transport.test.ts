@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { sha256 } from "../src/contracts.js";
-import { CommandClient, InstalledCapabilityProbe, InstalledSnapshotClient, reconcileSnapshot, type FetchLike } from "../src/transport.js";
+import { CommandClient, InstalledCapabilityProbe, InstalledSnapshotClient, _test, reconcileSnapshot, type FetchLike } from "../src/transport.js";
 
 const session = "session-fixture";
 const responseBody = {
@@ -118,6 +118,20 @@ test("installed capability probe binds target directory and records SSE without 
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("installed capability probe hashes complete command semantics independent of response ordering", () => {
+  const first = [
+    { name: "terv-review", description: "review", template: "exact review body" },
+    { name: "implement", description: "implement", template: "exact implementation body" },
+  ];
+  const restarted = [
+    { template: "exact implementation body", name: "implement", description: "implement" },
+    { template: "exact review body", description: "review", name: "terv-review" },
+  ];
+  assert.deepEqual(_test.parseCommandRegistry(first), _test.parseCommandRegistry(restarted));
+  assert.equal(_test.commandRegistryIdentity(first), _test.commandRegistryIdentity(restarted));
+  assert.notEqual(_test.commandRegistryIdentity(first), _test.commandRegistryIdentity([{ ...first[0], template: "changed body" }, first[1]]));
 });
 
 test("installed response lifecycle parts are audited while only authoritative text is extracted", async () => {

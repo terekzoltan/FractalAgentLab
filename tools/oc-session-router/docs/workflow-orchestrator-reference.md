@@ -68,17 +68,20 @@ fence is held, after immediate drift revalidation and before POST. Any attempted
 POST outcome consumes the grant. The post-send P0B proof is a separate sanitized
 receipt, so proof is not circular authorization. `PRODUCTION_RESPONSE_FIRST`
 requires a `PRODUCTION_INSTALL` receipt bound to a nonzero accepted P0B proof.
-The proof is transport evidence, not an exact patch-version lease: a strictly
-newer patch on the same OpenCode `major.minor` line may reuse it after the
-current server passes the full read-only installed-capability measurement.
+The proof is transport evidence, not an exact process or patch-version lease.
+An ordinary restart of the same server reuses production authority after full
+read-only stable-capability measurement; the new process identity is then pinned
+only for the current dispatch. A strictly newer patch on the same OpenCode
+`major.minor` line may reuse the proof after a fresh install receipt.
 Exact-version binary drift, downgrade, minor/major change, prerelease or
-nonstandard versions, router-attestation change, and live measurement drift all
-remain fail-closed new-proof boundaries.
+nonstandard versions, router-attestation change, and stable live measurement
+drift all remain fail-closed new-proof boundaries.
 
-The installed capability probe binds health/version, OpenAPI, the
-directory-scoped command registry, command set, server/origin fingerprints, target
-and worktree hashes, and authorized session/command hashes. SSE support is probed
-and hashed but never enabled. `/command` response text is authoritative first;
+The installed capability probe binds health/version, OpenAPI, the complete
+directory-scoped command definitions in canonical name order, binary/origin,
+target and worktree hashes, and authorized session/command hashes. Process
+identity is a per-dispatch race fence rather than durable production admission.
+SSE support is probed and hashed but never enabled. `/command` response text is authoritative first;
 inert lifecycle/reasoning parts are closed-schema checked and hash-audited, while
 active tool or unknown part types fail closed. Completed historical `tool` and
 `patch` parts from a mature participant session are identity-checked and reduced

@@ -133,7 +133,8 @@ export class InstalledCapabilityProbe implements CapabilityProbe {
     ]);
     const sse = await this.probeSse(origin, authorization, input.directory, Math.min(input.timeout_ms, 5_000));
     const health = parseHealth(parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(healthBytes)));
-    const supportedCommands = parseCommandRegistry(parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(commandBytes)));
+    const commandRegistry = parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(commandBytes));
+    const supportedCommands = parseCommandRegistry(commandRegistry);
     for (const required of input.required_commands) if (!supportedCommands.includes(required)) throw new Error("Installed command registry lacks the requested command");
     const instance = this.measureServerInstance(origin, input.expected_binary_sha256);
     const directoryItem = lstatSync(input.directory);
@@ -144,7 +145,9 @@ export class InstalledCapabilityProbe implements CapabilityProbe {
       target_directory_sha256: sha256(`fal-router-target-directory/v1\n${realpathSync(input.directory)}`),
       health_identity_sha256: sha256(canonicalize(health)),
       doc_sha256: sha256(docBytes),
-      command_registry_sha256: sha256(commandBytes),
+      // Bind the complete semantic command definitions, not restart-sensitive
+      // response ordering, JSON member order, or serialization whitespace.
+      command_registry_sha256: commandRegistryIdentity(commandRegistry),
       supported_commands: supportedCommands,
       sse,
     };
@@ -513,6 +516,22 @@ function parseCommandRegistry(value: unknown): string[] {
   return names;
 }
 
+function commandRegistryIdentity(value: unknown): string {
+  const entries = commandRegistryEntries(value);
+  return sha256(canonicalize({ domain: "fal-router-command-registry/v2", entries }));
+}
+
+function commandRegistryEntries(value: unknown): Array<Record<string, unknown>> {
+  const entries = Array.isArray(value) ? value : value && typeof value === "object" && Array.isArray((value as Record<string, unknown>).commands) ? (value as Record<string, unknown>).commands as unknown[] : undefined;
+  if (!entries) throw new Error("Installed command registry shape is unsupported");
+  const records = entries.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) || typeof (entry as Record<string, unknown>).name !== "string" || !(entry as Record<string, unknown>).name) throw new Error("Installed command registry entry is invalid");
+    return entry as Record<string, unknown>;
+  }).sort((left, right) => (left.name as string).localeCompare(right.name as string));
+  if (new Set(records.map((entry) => entry.name)).size !== records.length) throw new Error("Installed command registry contains duplicate commands");
+  return records;
+}
+
 function snapshotSetIdentity(messages: readonly CommandResponse[]): string {
   return sha256(canonicalize(messages.map((message) => ({
     id_sha256: sha256(message.info.id),
@@ -529,4 +548,4 @@ export function reconcileSnapshot(candidates: readonly SnapshotCandidate[], expe
   return { status: "UNCERTAIN", reason: matches.length === 0 ? "no exactly correlated candidate" : "multiple exactly correlated candidates" };
 }
 
-export const _test = { parseHealth, parseCommandRegistry, snapshotSetIdentity };
+export const _test = { parseHealth, parseCommandRegistry, commandRegistryIdentity, snapshotSetIdentity };

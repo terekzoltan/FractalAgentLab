@@ -38,11 +38,14 @@ It is not project truth and does not grant workflow authority.
   P0B proof-bound install receipt). The protected receipt path is registry-owned,
   never request- or environment-selectable. No real-project P0B send is part of
   the offline suite.
-- An accepted P0B transport proof survives only forward OpenCode patch updates
-  on the same strict `major.minor` line. Exact-version reuse still requires the
-  exact proven binary; downgrade, minor/major change, prerelease/nonstandard
-  version, router-attestation change, or any failed current live capability
-  measurement requires a new isolated P0B proof.
+- An accepted P0B transport proof survives an ordinary server restart and
+  forward OpenCode patch updates on the same strict `major.minor` line.
+  Production admission binds stable server semantics; each dispatch separately
+  pins the current server process from its baseline through immediate pre-POST
+  and post-response revalidation. Exact-version reuse still requires the exact
+  proven binary. Downgrade, minor/major change, prerelease/nonstandard version,
+  router-attestation change, or a stable capability mismatch requires a new
+  isolated P0B proof.
 - Installed `/command` is response-first. Audited `step-start`, `step-finish`,
   reasoning, and synthetic/ignored text are hashed but not treated as output;
   tool/subtask/file/patch/unknown parts fail closed. Snapshot GET is diagnostic

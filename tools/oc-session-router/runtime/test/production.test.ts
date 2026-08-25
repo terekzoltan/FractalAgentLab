@@ -188,6 +188,15 @@ test("P0B protected capability is closed, short-lived, AWC 4.1.1-only, and direc
     const productionResolved = await resolveProtectedCapability({ registry: productionRegistry, registry_path: registryPath, protected_control_root: control, target_id: "synthetic-p0b", target: productionTarget, request: stageRequest(), now: fixedNow, credentials: () => ({ username: "owner-process", password: "process-secret" }), executable_attestation_sha256: productionProof.executable_attestation_sha256, probe: { probe: async () => live } });
     assert.equal(productionResolved.mode, "PRODUCTION_RESPONSE_FIRST");
 
+    const restartedLive = { ...live, server_instance_identity_sha256: "5".repeat(64) };
+    const restartedResolved = await resolveProtectedCapability({ registry: productionRegistry, registry_path: registryPath, protected_control_root: control, target_id: "synthetic-p0b", target: productionTarget, request: stageRequest(), now: fixedNow, credentials: () => ({ username: "owner-process", password: "process-secret" }), executable_attestation_sha256: productionProof.executable_attestation_sha256, probe: { probe: async () => restartedLive } });
+    assert.equal(restartedResolved.mode, "PRODUCTION_RESPONSE_FIRST");
+    assert.equal(restartedResolved.server_instance_identity_sha256, restartedLive.server_instance_identity_sha256);
+
+    writeFileSync(path.join(control, target.capability_receipt_path!), JSON.stringify(grant));
+    await assert.rejects(() => resolveProtectedCapability({ registry, registry_path: registryPath, protected_control_root: control, target_id: "synthetic-p0b", target, request: stageRequest(), now: fixedNow, credentials: () => ({ username: "owner-process", password: "process-secret" }), probe: { probe: async () => restartedLive } }), /capability drifted/);
+    writeFileSync(path.join(control, target.capability_receipt_path!), JSON.stringify(productionGrant));
+
     const patchLive: CapabilityProbeProjection = {
       ...live,
       server_version: "1.18.22",
