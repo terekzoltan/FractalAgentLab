@@ -1085,6 +1085,74 @@ test("resolve-stage reconciles a crash-left DISPATCHING operation without sendin
   }
 });
 
+test("resolve-stage recovers one exact command-root terminal after an uncertain POST without resending", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-command-root-reconcile-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let calls = 0;
+    const store = new StateStore(root);
+    const resolver = new FakeResolver();
+    resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+    resolver.fenceTargetRoot = root;
+    const recovered = {
+      id: "assistant-recovered",
+      parent_id: "user-command-root",
+      session_id: resolver.recipientSessionId,
+      text: planReviewSource(),
+      after_baseline: true,
+      command_root_correlated: true,
+    };
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      calls += 1;
+      throw new Error("delivery unknown");
+    }), {
+      captureBaseline: async () => ({ message_id: "assistant-baseline", identity_sha256: sha256("assistant-baseline"), captured_at: new Date().toISOString() }),
+      collect: async () => [recovered],
+    });
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const uncertain = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+    assert.equal(uncertain.operation_status, "UNCERTAIN");
+
+    const reconciled = await engine.resolveStage(created.run_id, uncertain.operation_id);
+    assert.equal(reconciled.operation_status, "SUCCEEDED", JSON.stringify(reconciled));
+    assert.equal(reconciled.transport_status, "TRANSCRIPT_RECONCILED");
+    assert.deepEqual(reconciled.allowed_next, ["PLAN_REVISION"]);
+    assert.equal(calls, 1);
+    assert.equal(store.loadOperation(created.run_id, uncertain.operation_id).status, "SUCCEEDED");
+    assert.match(readFileSync(path.join(root, "runs", created.run_id, "operations", uncertain.operation_id, "terminal.md"), "utf8"), /Plan artifact: plan-1/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("resolve-stage keeps command-root recovery uncertain when strict terminals are ambiguous", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-command-root-ambiguous-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let calls = 0;
+    const store = new StateStore(root);
+    const resolver = new FakeResolver();
+    resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+    resolver.fenceTargetRoot = root;
+    const candidate = (id: string) => ({ id, parent_id: "user-command-root", session_id: resolver.recipientSessionId, text: resolver.sourceContent, after_baseline: true, command_root_correlated: true });
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      calls += 1;
+      throw new Error("delivery unknown");
+    }), {
+      captureBaseline: async () => ({ message_id: "assistant-baseline", identity_sha256: sha256("assistant-baseline"), captured_at: new Date().toISOString() }),
+      collect: async () => [candidate("assistant-one"), candidate("assistant-two")],
+    });
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const uncertain = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+    const reconciled = await engine.resolveStage(created.run_id, uncertain.operation_id);
+    assert.equal(reconciled.operation_status, "UNCERTAIN");
+    assert.equal(reconciled.transport_status, "NO_SEND");
+    assert.equal(calls, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("P0B production mode reaches response-first stage engine and consumes its grant once", { skip: process.platform !== "win32" }, async () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-p0b-engine-"));
   try {

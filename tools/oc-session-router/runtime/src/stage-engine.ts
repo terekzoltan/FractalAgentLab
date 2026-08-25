@@ -330,14 +330,21 @@ export class StageEngine {
         try { parseOutputShape(operation.invocation.requested_stage, text); return true; } catch { return false; }
       },
     });
-    if (exactCorrelation && resolution.status === "TRANSCRIPT_RECONCILED" && resolution.candidate && this.resolver && transportReceipt) {
+    const commandRootCandidates = transportReceipt ? [] : candidates.filter((candidate) => {
+      if (candidate.command_root_correlated !== true || sha256(candidate.session_id) !== operation.invocation.recipient_session_sha256) return false;
+      try { parseOutputShape(operation.invocation.requested_stage, candidate.text); return true; } catch { return false; }
+    });
+    const receiptCandidate = exactCorrelation && resolution.status === "TRANSCRIPT_RECONCILED" ? resolution.candidate : undefined;
+    const commandRootCandidate = !transportReceipt && commandRootCandidates.length === 1 ? commandRootCandidates[0] : undefined;
+    const recoveredCandidate = receiptCandidate ?? commandRootCandidate;
+    if (recoveredCandidate && this.resolver) {
       try {
         const loaded = this.store.loadRun(runId);
         const resolved = await this.resolver.resolveStageAuthority(loaded.authority, stageRequest);
         if (authoritySha256(resolved.run_authority) !== operation.invocation.run_authority_sha256 || resolved.capability.identity_sha256 !== operation.invocation.capability_receipt_sha256 || resolved.capability.snapshot_correlation !== "EXACT_PARENT_LINK") throw new Error("Snapshot production authority drifted");
         assertPrivateTransportBinding(resolved.transport);
-        assertArtifactSafe(resolution.candidate.text, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
-        const parsed = parseOutputShape(operation.invocation.requested_stage, resolution.candidate.text);
+        assertArtifactSafe(recoveredCandidate.text, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
+        const parsed = parseOutputShape(operation.invocation.requested_stage, recoveredCandidate.text);
         assertSourceLineage(stageRequest, resolved.sources, loaded.authority, resolved.worktree);
         assertOutputSourceLineage(stageRequest, resolved.sources, parsed.terminal, parsed.fields, resolved.worktree);
         validateOutputBinding(parsed, {
@@ -348,9 +355,16 @@ export class StageEngine {
           plan: operation.invocation.plan_identity,
           plan_class: operation.invocation.plan_class,
         });
-        const artifact = `${resolution.candidate.text.replace(/\r\n/g, "\n").trim()}\n`;
+        const artifact = `${recoveredCandidate.text.replace(/\r\n/g, "\n").trim()}\n`;
         this.store.writeArtifact(runId, operationId, "terminal", artifact);
-        const succeeded = makeResult(operation.invocation, operationId, "SUCCEEDED", "TRANSCRIPT_RECONCILED", "VALID", "BOUND", "VALID", allowedNext(operation.invocation.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), "exact installed snapshot correlation validated", sha256(transportReceipt.message_id), transportReceipt.response_sha256);
+        const responseEvidenceSha256 = transportReceipt?.response_sha256 ?? sha256(canonicalize({
+          domain: "fal-router-command-root-transcript-recovery/v1",
+          command_body_sha256: operation.invocation.command_body_sha256,
+          message_id_sha256: sha256(recoveredCandidate.id),
+          parent_id_sha256: sha256(recoveredCandidate.parent_id),
+          terminal_sha256: sha256(recoveredCandidate.text),
+        }));
+        const succeeded = makeResult(operation.invocation, operationId, "SUCCEEDED", "TRANSCRIPT_RECONCILED", "VALID", "BOUND", "VALID", allowedNext(operation.invocation.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), transportReceipt ? "exact installed response correlation validated" : "exact installed command-root transcript correlation validated", sha256(recoveredCandidate.id), responseEvidenceSha256);
         this.store.updateResult(runId, operationId, succeeded);
         this.store.updateOperation(runId, operationId, operation.revision, { status: "SUCCEEDED" });
         return succeeded;
@@ -359,7 +373,7 @@ export class StageEngine {
         // privacy, shape, binding, or finalization failure remains non-success.
       }
     }
-    const result = makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "AMBIGUOUS", "UNVALIDATED", "UNVALIDATED", [], "", exactCorrelation ? "correlated snapshot failed authoritative validation" : "snapshot evidence is diagnostic without an exact installed response correlation");
+    const result = makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "AMBIGUOUS", "UNVALIDATED", "UNVALIDATED", [], "", exactCorrelation || commandRootCandidates.length === 1 ? "correlated snapshot failed authoritative validation" : "snapshot evidence is diagnostic without one exact installed response or command-root correlation");
     this.store.updateResult(runId, operationId, result);
     this.store.updateOperation(runId, operationId, operation.revision, { status: "UNCERTAIN" });
     return result;
@@ -641,7 +655,7 @@ function renderSources(sources: readonly ResolvedSource[]): string {
   return sources.map((source, index) => `--- FAL SOURCE ${index} ${source.binding.logical_identity} ${source.binding.sha256} ---\n${source.content.replace(/\r\n/g, "\n").trimEnd()}\n--- END FAL SOURCE ${index} ---`).join("\n");
 }
 
-function renderCommandArgument(request: StageRequest, sources: readonly ResolvedSource[]): string {
+export function renderCommandArgument(request: StageRequest, sources: readonly ResolvedSource[]): string {
   if (request.requested_stage !== "STEP_REVIEW") return renderSources(sources);
   const reviewMode = reviewModeForRequest(request);
   const envelope = canonicalize({

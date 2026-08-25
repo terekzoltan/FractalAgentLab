@@ -332,6 +332,10 @@ directories and are not active resume points.
 - Persist atomic pre-send intent, then the returned transport/message identity.
 - Bound POST and wait durations.
 - On timeout or interruption, reconcile transcript and intent read-only.
+- Treat installed history as chronological: capture the latest pre-send message
+  as baseline and inspect only later messages. Without a synchronous receipt,
+  accept only one exact installed-template-plus-argument command root and one
+  strict terminal assistant child after full current-authority validation.
 - Resend only when absence is proven. Ambiguity remains pending/uncertain.
 - On resume, revalidate target, candidate, hashes, registry/approval pins, stage,
   output class, and completed steps.

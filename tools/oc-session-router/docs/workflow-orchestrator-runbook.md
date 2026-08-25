@@ -97,10 +97,16 @@ Delivery /seq-next
   deterministic argument bytes.
 - The synchronous `/command` assistant response is the primary candidate. A
   timeout or 5xx leaves the operation `UNCERTAIN`; `resolve-stage` is read-only and
-  cannot resend. Installed `step-start`/`step-finish` and explicitly audited
-  reasoning parts are hashed and ignored; tool, subtask, file, patch, and unknown
-  parts are rejected. Snapshot GET is diagnostic unless the synchronous assistant
-  ID, parent ID, session hash, and normalized terminal hash all match exactly.
+  cannot resend. It may be repeated after the addressed session becomes idle.
+  Installed message history is interpreted chronologically with the latest
+  pre-send message as baseline. When no synchronous receipt exists, recovery
+  requires exactly one post-baseline root user message equal to the current
+  installed command template expanded with the pinned argument, plus exactly one
+  strict terminal assistant child that passes current authority, privacy, lineage,
+  and output-binding validation. Installed `step-start`/`step-finish` and
+  explicitly audited reasoning parts are hashed and ignored; ambiguous roots,
+  multiple strict terminals, tool/subtask/file/patch/unknown parts, or any drift
+  remain `UNCERTAIN` without resend.
 - `DISABLED` is the default kill switch. `P0B_ISOLATED` admits only a short-lived,
   one-use synthetic grant; it is consumed immediately before the sole POST and
   stays consumed after timeout, 4xx/5xx, malformed response, or crash. A later

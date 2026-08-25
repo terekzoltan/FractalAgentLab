@@ -184,6 +184,56 @@ test("installed snapshot reader is GET-only, directory-bound, and preserves exac
   assert.match(snapshot.message_set_sha256, /^[a-f0-9]{64}$/);
 });
 
+test("installed snapshot reader uses chronological baseline and exact expanded command root", async () => {
+  let messageReads = 0;
+  const directory = "C:\\synthetic-target";
+  const oldAssistant = { info: { id: "assistant-old", role: "assistant", sessionID: session, parentID: "user-old", time: { created: 1, completed: 2 } }, parts: [{ id: "text-old", type: "text", text: "OLD", messageID: "assistant-old", sessionID: session }] };
+  const baselineAssistant = { info: { id: "assistant-baseline", role: "assistant", sessionID: session, parentID: "user-baseline", time: { created: 3, completed: 4 } }, parts: [{ id: "text-baseline", type: "text", text: "BASELINE", messageID: "assistant-baseline", sessionID: session }] };
+  const commandRoot = { info: { id: "user-command", role: "user", sessionID: session, time: { created: 5 } }, parts: [{ id: "text-command", type: "text", text: "Canonical prompt\nSOURCE", messageID: "user-command", sessionID: session }] };
+  const progress = { info: { id: "assistant-progress", role: "assistant", sessionID: session, parentID: "user-command", time: { created: 6, completed: 7 } }, parts: [{ id: "text-progress", type: "text", text: "PROGRESS", messageID: "assistant-progress", sessionID: session }] };
+  const terminal = { info: { id: "assistant-terminal", role: "assistant", sessionID: session, parentID: "user-command", time: { created: 8, completed: 9 } }, parts: [{ id: "text-terminal", type: "text", text: "EPIC IMPLEMENTATION PLAN", messageID: "assistant-terminal", sessionID: session }] };
+  const fake: FetchLike = async (input, init) => {
+    const endpoint = new URL(String(input));
+    assert.equal(init?.method, "GET");
+    assert.equal(endpoint.searchParams.get("directory"), directory);
+    if (endpoint.pathname === "/command") return new Response(JSON.stringify([{ description: "fixture", template: "Canonical prompt\n$ARGUMENTS", name: "seq-next" }]));
+    if (!endpoint.pathname.endsWith("/message")) throw new Error("unexpected endpoint");
+    messageReads += 1;
+    return new Response(JSON.stringify(messageReads === 1
+      ? [baselineAssistant, oldAssistant]
+      : [terminal, oldAssistant, commandRoot, progress, baselineAssistant]));
+  };
+  const client = new InstalledSnapshotClient(fake);
+  const binding = { origin: "http://127.0.0.1:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password", directory };
+  const baseline = await client.captureBaseline(binding, 1000);
+  assert.equal(baseline.message_id, "assistant-baseline");
+  const snapshot = await client.collect(binding, baseline, "EXACT_PARENT_LINK", 1000, { name: "seq-next", argument: "SOURCE" });
+  assert.equal(snapshot.baseline_present, true);
+  assert.deepEqual(snapshot.candidates, [
+    { id: "assistant-progress", parent_id: "user-command", session_id: session, text: "PROGRESS", after_baseline: true, command_root_correlated: true },
+    { id: "assistant-terminal", parent_id: "user-command", session_id: session, text: "EPIC IMPLEMENTATION PLAN", after_baseline: true, command_root_correlated: true },
+  ]);
+});
+
+test("installed snapshot reader fails closed when the exact command root is ambiguous", async () => {
+  const directory = "C:\\synthetic-target";
+  const baselineMessage = { info: { id: "assistant-baseline", role: "assistant", sessionID: session, parentID: "user-baseline", time: { created: 1, completed: 2 } }, parts: [{ id: "text-baseline", type: "text", text: "BASELINE", messageID: "assistant-baseline", sessionID: session }] };
+  const roots = [3, 4].map((created) => ({ info: { id: `user-command-${created}`, role: "user", sessionID: session, time: { created } }, parts: [{ id: `text-command-${created}`, type: "text", text: "Prompt\nSOURCE", messageID: `user-command-${created}`, sessionID: session }] }));
+  const terminal = { info: { id: "assistant-terminal", role: "assistant", sessionID: session, parentID: "user-command-4", time: { created: 5, completed: 6 } }, parts: [{ id: "text-terminal", type: "text", text: "TERMINAL", messageID: "assistant-terminal", sessionID: session }] };
+  let reads = 0;
+  const client = new InstalledSnapshotClient(async (input) => {
+    const endpoint = new URL(String(input));
+    if (endpoint.pathname === "/command") return new Response(JSON.stringify([{ name: "seq-next", template: "Prompt\n$ARGUMENTS" }]));
+    reads += 1;
+    return new Response(JSON.stringify(reads === 1 ? [baselineMessage] : [baselineMessage, ...roots, terminal]));
+  });
+  const binding = { origin: "http://127.0.0.1:1", server_fingerprint: "fingerprint", session_id: session, username: "user", password: "password", directory };
+  const baseline = await client.captureBaseline(binding, 1000);
+  const snapshot = await client.collect(binding, baseline, "EXACT_PARENT_LINK", 1000, { name: "seq-next", argument: "SOURCE" });
+  assert.equal(snapshot.candidates.length, 1);
+  assert.equal(snapshot.candidates[0]?.command_root_correlated, undefined);
+});
+
 test("production snapshot history accepts completed tool and patch parts as hash-only inert evidence", async () => {
   const historical = {
     info: { id: "assistant-history", role: "assistant", sessionID: session, parentID: "user-history", time: { created: 1, completed: 2 } },

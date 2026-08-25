@@ -48,9 +48,13 @@ It is not project truth and does not grant workflow authority.
   isolated P0B proof.
 - Installed `/command` is response-first. Audited `step-start`, `step-finish`,
   reasoning, and synthetic/ignored text are hashed but not treated as output;
-  tool/subtask/file/patch/unknown parts fail closed. Snapshot GET is diagnostic
-  unless assistant ID, parent, session, and terminal hash match exactly. SSE is
-  probed and recorded but remains disabled.
+  tool/subtask/file/patch/unknown parts fail closed. Snapshot history is ordered
+  chronologically and the latest pre-send message is the baseline. If the POST
+  response is lost after delivery, `resolve-stage` may accept exactly one strict
+  terminal bound to exactly one post-baseline root user message whose text equals
+  the installed command template expanded with the pinned argument. Any missing,
+  duplicate, or invalid binding remains `UNCERTAIN`; recovery never resends. SSE
+  is probed and recorded but remains disabled.
 - `Prepare-OCRouterStage.ps1` is the bounded no-send source-hash helper. It hashes
   only sources explicitly named by the operator and emits candidate manifest and
   state packet files; invocation remains a separate explicit transaction.

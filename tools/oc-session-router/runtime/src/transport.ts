@@ -19,6 +19,7 @@ export interface CommandResponse {
     role: string;
     sessionID: string;
     parentID?: string;
+    created_at?: number;
   };
   parts: Array<{
     id: string;
@@ -49,6 +50,7 @@ export interface SnapshotCandidate {
   session_id: string;
   text: string;
   after_baseline: boolean;
+  command_root_correlated?: boolean;
 }
 
 export interface SnapshotResolution {
@@ -245,21 +247,34 @@ export class InstalledSnapshotClient {
 
   async captureBaseline(binding: TransportBinding, timeoutMs: number): Promise<SnapshotBaseline> {
     const messages = await this.readMessages(binding, timeoutMs);
-    const latest = messages.find((message) => message.info.role === "assistant")?.info.id ?? "EMPTY";
+    const latest = messages.at(-1)?.info.id ?? "EMPTY";
     return { message_id: latest, identity_sha256: snapshotSetIdentity(messages), captured_at: new Date().toISOString() };
   }
 
-  async collect(binding: TransportBinding, baseline: SnapshotBaseline, _mode: SnapshotCorrelationMode, timeoutMs: number): Promise<SnapshotReadResult> {
+  async collect(binding: TransportBinding, baseline: SnapshotBaseline, _mode: SnapshotCorrelationMode, timeoutMs: number, expectedCommand?: { name: string; argument: string }): Promise<SnapshotReadResult> {
     const messages = await this.readMessages(binding, timeoutMs);
-    const baselineIndex = baseline.message_id === "EMPTY" ? messages.length : messages.findIndex((message) => message.info.id === baseline.message_id);
+    const baselineIndex = baseline.message_id === "EMPTY" ? -1 : messages.findIndex((message) => message.info.id === baseline.message_id);
     const baselinePresent = baseline.message_id === "EMPTY" || baselineIndex >= 0;
-    const postBaseline = baselinePresent ? messages.slice(0, baselineIndex < 0 ? messages.length : baselineIndex) : [];
+    const postBaseline = baselinePresent ? messages.slice(baselineIndex + 1) : [];
+    const expectedPrompt = expectedCommand ? await this.readExpandedCommandPrompt(binding, expectedCommand, timeoutMs) : undefined;
+    const commandRoots = expectedPrompt === undefined ? [] : postBaseline.filter((message) =>
+      message.info.role === "user"
+      && !message.info.parentID
+      && message.parts.filter((part) => part.type === "text" && part.synthetic !== true && part.ignored !== true).map((part) => part.text ?? "").join("") === expectedPrompt,
+    );
     const candidates: SnapshotCandidate[] = [];
     for (const message of postBaseline) {
       if (message.info.role !== "assistant") continue;
       const textParts = message.parts.filter((part) => part.type === "text" && part.synthetic !== true && part.ignored !== true);
       if (textParts.length === 0) continue;
-      candidates.push({ id: message.info.id, parent_id: message.info.parentID ?? "", session_id: message.info.sessionID, text: textParts.map((part) => part.text ?? "").join(""), after_baseline: true });
+      candidates.push({
+        id: message.info.id,
+        parent_id: message.info.parentID ?? "",
+        session_id: message.info.sessionID,
+        text: textParts.map((part) => part.text ?? "").join(""),
+        after_baseline: true,
+        ...(commandRoots.length === 1 && message.info.parentID === commandRoots[0]!.info.id ? { command_root_correlated: true } : {}),
+      });
     }
     return { candidates, baseline_present: baselinePresent, message_set_sha256: snapshotSetIdentity(messages), captured_at: new Date().toISOString() };
   }
@@ -267,7 +282,7 @@ export class InstalledSnapshotClient {
   private async readMessages(binding: TransportBinding, timeoutMs: number): Promise<CommandResponse[]> {
     assertPrivateTransportBinding(binding);
     const origin = validateOrigin(binding.origin);
-    const endpoint = new URL(`/session/${encodeURIComponent(binding.session_id)}/message?limit=100`, origin);
+    const endpoint = new URL(`/session/${encodeURIComponent(binding.session_id)}/message?limit=200`, origin);
     if (binding.directory) endpoint.searchParams.set("directory", binding.directory);
     const response = await this.fetchImpl(endpoint, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(timeoutMs), headers: { authorization: basicAuthorization(binding.username, binding.password), accept: "application/json" } });
     if (response.status >= 300 && response.status < 400) throw new Error("Snapshot redirect is forbidden");
@@ -276,9 +291,22 @@ export class InstalledSnapshotClient {
     const parsed = parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
     const rawMessages = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && Array.isArray((parsed as Record<string, unknown>).messages) ? (parsed as Record<string, unknown>).messages as unknown[] : undefined;
     if (!rawMessages) throw new Error("Snapshot message collection shape is unsupported");
-    const messages = rawMessages.map(parseSnapshotMessage);
+    const messages = rawMessages.map(parseSnapshotMessage).sort((left, right) => (left.info.created_at ?? 0) - (right.info.created_at ?? 0));
     for (const message of messages) if (message.info.sessionID !== binding.session_id || message.parts.some((part) => part.sessionID !== binding.session_id || part.messageID !== message.info.id)) throw new Error("Snapshot message identity mismatch");
     return messages;
+  }
+
+  private async readExpandedCommandPrompt(binding: TransportBinding, expected: { name: string; argument: string }, timeoutMs: number): Promise<string> {
+    if (!binding.directory) throw new Error("Snapshot command-root recovery requires an exact target directory");
+    const origin = validateOrigin(binding.origin);
+    const endpoint = commandRegistryUrl(origin, binding.directory);
+    const response = await this.fetchImpl(endpoint, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(timeoutMs), headers: { authorization: basicAuthorization(binding.username, binding.password), accept: "application/json" } });
+    if (response.status >= 300 && response.status < 400) throw new Error("Snapshot command-registry redirect is forbidden");
+    if (!response.ok) throw new Error("Snapshot command-registry read failed");
+    const bytes = await readBoundedBody(response, this.maximumBytes);
+    const registry = parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    const template = commandTemplate(registry, expected.name);
+    return template.replaceAll("$ARGUMENTS", expected.argument);
   }
 }
 
@@ -423,15 +451,30 @@ function parseSnapshotMessage(value: unknown): CommandResponse {
   const info = response.info as Record<string, unknown>;
   for (const field of ["id", "role", "sessionID"] as const) if (typeof info[field] !== "string" || !info[field]) throw new Error(`Snapshot message ${field} is invalid`);
   if (info.parentID !== undefined && typeof info.parentID !== "string") throw new Error("Snapshot message parentID is invalid");
+  const time = info.time;
+  if (!time || typeof time !== "object" || Array.isArray(time) || !finiteNumber((time as Record<string, unknown>).created)) throw new Error("Snapshot message creation time is invalid");
+  const snapshotInfo = { id: info.id as string, role: info.role as string, sessionID: info.sessionID as string, ...(info.parentID === undefined ? {} : { parentID: info.parentID as string }), created_at: (time as Record<string, unknown>).created as number };
   if (info.role === "assistant") return parseSnapshotAssistantMessage(response, info);
   const parts = response.parts.map((raw, index) => {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(`Snapshot non-assistant part ${index} is invalid`);
     const part = raw as Record<string, unknown>;
     for (const field of ["id", "type", "messageID", "sessionID"] as const) if (typeof part[field] !== "string" || !part[field]) throw new Error(`Snapshot non-assistant part ${field} is invalid`);
     if (part.messageID !== info.id || part.sessionID !== info.sessionID) throw new Error("Snapshot non-assistant part identity mismatch");
-    return { id: part.id as string, type: part.type as string, messageID: part.messageID as string, sessionID: part.sessionID as string, content_sha256: sha256(canonicalize(part)) };
+    if (part.type === "text" && typeof part.text !== "string") throw new Error("Snapshot user text payload is invalid");
+    if (part.synthetic !== undefined && typeof part.synthetic !== "boolean") throw new Error("Snapshot user synthetic flag is invalid");
+    if (part.ignored !== undefined && typeof part.ignored !== "boolean") throw new Error("Snapshot user ignored flag is invalid");
+    return {
+      id: part.id as string,
+      type: part.type as string,
+      messageID: part.messageID as string,
+      sessionID: part.sessionID as string,
+      ...(part.text === undefined ? {} : { text: part.text as string }),
+      ...(part.synthetic === undefined ? {} : { synthetic: part.synthetic as boolean }),
+      ...(part.ignored === undefined ? {} : { ignored: part.ignored as boolean }),
+      content_sha256: sha256(canonicalize(part)),
+    };
   });
-  return { info: { id: info.id as string, role: info.role as string, sessionID: info.sessionID as string, ...(info.parentID === undefined ? {} : { parentID: info.parentID as string }) }, parts };
+  return { info: snapshotInfo, parts };
 }
 
 function parseSnapshotAssistantMessage(response: Record<string, unknown>, info: Record<string, unknown>): CommandResponse {
@@ -449,7 +492,7 @@ function parseSnapshotAssistantMessage(response: Record<string, unknown>, info: 
     else throw new Error(`Snapshot assistant part type ${type} is unsupported`);
     return { id: part.id as string, type, messageID: part.messageID as string, sessionID: part.sessionID as string, content_sha256: sha256(canonicalize(part)) };
   });
-  return { info: { id: info.id as string, role: info.role as string, sessionID: info.sessionID as string, ...(info.parentID === undefined ? {} : { parentID: info.parentID as string }) }, parts };
+  return { info: { id: info.id as string, role: info.role as string, sessionID: info.sessionID as string, ...(info.parentID === undefined ? {} : { parentID: info.parentID as string }), created_at: (time as Record<string, unknown>).created as number }, parts };
 }
 
 function validateCompletedSnapshotToolPart(part: Record<string, unknown>): void {
@@ -519,6 +562,12 @@ function parseCommandRegistry(value: unknown): string[] {
 function commandRegistryIdentity(value: unknown): string {
   const entries = commandRegistryEntries(value);
   return sha256(canonicalize({ domain: "fal-router-command-registry/v2", entries }));
+}
+
+function commandTemplate(value: unknown, commandName: string): string {
+  const matches = commandRegistryEntries(value).filter((entry) => entry.name === commandName);
+  if (matches.length !== 1 || typeof matches[0]!.template !== "string" || !matches[0]!.template.includes("$ARGUMENTS")) throw new Error("Installed command template is unavailable or ambiguous");
+  return matches[0]!.template as string;
 }
 
 function commandRegistryEntries(value: unknown): Array<Record<string, unknown>> {

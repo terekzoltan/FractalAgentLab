@@ -1,5 +1,5 @@
-import { sha256, stageRequestFromInvocation } from "./contracts.js";
-import type { AuthorityResolver, ResolvedStageAuthority, SnapshotReader } from "./stage-engine.js";
+import { parseOutputShape, sha256, stageRequestFromInvocation } from "./contracts.js";
+import { renderCommandArgument, type AuthorityResolver, type ResolvedStageAuthority, type SnapshotReader } from "./stage-engine.js";
 import { StateStore } from "./state-store.js";
 import { InstalledSnapshotClient, isValidTransportIdentity, type SnapshotBaseline, type SnapshotCandidate, type TransportReceipt } from "./transport.js";
 
@@ -32,15 +32,24 @@ export class InstalledSnapshotReader implements SnapshotReader {
       const resolved = await this.resolver.resolveStageAuthority(loaded.authority, stageRequestFromInvocation(operation.invocation));
       if (resolved.capability.mode !== "P0B_ISOLATED" && resolved.capability.mode !== "PRODUCTION_RESPONSE_FIRST") throw new Error("Installed snapshot reader is disabled");
       if (resolved.capability.identity_sha256 !== operation.invocation.capability_receipt_sha256 || sha256(resolved.transport.session_id) !== operation.invocation.recipient_session_sha256) throw new Error("Snapshot authority drifted");
-      const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000);
+      const stageRequest = stageRequestFromInvocation(operation.invocation);
+      const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000, {
+        name: operation.invocation.command_name,
+        argument: renderCommandArgument(stageRequest, resolved.sources),
+      });
       const transportReceipt = this.store.loadTransportReceipt<TransportReceipt>(runId, operationId);
-      const correlated = transportReceipt && isValidTransportIdentity(transportReceipt.parent_id) ? snapshot.candidates.filter((candidate) =>
-        isValidTransportIdentity(candidate.parent_id)
-        && candidate.id === transportReceipt.message_id
-        && candidate.parent_id === transportReceipt.parent_id
-        && sha256(candidate.session_id) === transportReceipt.session_sha256
-        && sha256(candidate.text) === transportReceipt.terminal_sha256,
-      ) : [];
+      const correlated = transportReceipt && isValidTransportIdentity(transportReceipt.parent_id)
+        ? snapshot.candidates.filter((candidate) =>
+          isValidTransportIdentity(candidate.parent_id)
+          && candidate.id === transportReceipt.message_id
+          && candidate.parent_id === transportReceipt.parent_id
+          && sha256(candidate.session_id) === transportReceipt.session_sha256
+          && sha256(candidate.text) === transportReceipt.terminal_sha256,
+        )
+        : snapshot.candidates.filter((candidate) => {
+          if (candidate.command_root_correlated !== true || sha256(candidate.session_id) !== operation.invocation.recipient_session_sha256) return false;
+          try { parseOutputShape(operation.invocation.requested_stage, candidate.text); return true; } catch { return false; }
+        });
       const result = !snapshot.baseline_present ? "BASELINE_MISSING"
         : snapshot.candidates.length === 0 ? "NO_CANDIDATE"
           : correlated.length > 1 ? "AMBIGUOUS"
