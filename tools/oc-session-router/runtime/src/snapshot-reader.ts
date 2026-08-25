@@ -33,11 +33,11 @@ export class InstalledSnapshotReader implements SnapshotReader {
       if (resolved.capability.mode !== "P0B_ISOLATED" && resolved.capability.mode !== "PRODUCTION_RESPONSE_FIRST") throw new Error("Installed snapshot reader is disabled");
       if (resolved.capability.identity_sha256 !== operation.invocation.capability_receipt_sha256 || sha256(resolved.transport.session_id) !== operation.invocation.recipient_session_sha256) throw new Error("Snapshot authority drifted");
       const stageRequest = stageRequestFromInvocation(operation.invocation);
-      const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000, {
+      const transportReceipt = this.store.loadTransportReceipt<TransportReceipt>(runId, operationId);
+      const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000, transportReceipt ? undefined : {
         name: operation.invocation.command_name,
         argument: renderCommandArgument(stageRequest, resolved.sources),
       });
-      const transportReceipt = this.store.loadTransportReceipt<TransportReceipt>(runId, operationId);
       const correlated = transportReceipt && isValidTransportIdentity(transportReceipt.parent_id)
         ? snapshot.candidates.filter((candidate) =>
           isValidTransportIdentity(candidate.parent_id)
