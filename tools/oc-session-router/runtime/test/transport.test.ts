@@ -265,13 +265,14 @@ test("installed snapshot reader pages backward to the exact baseline within boun
   assert.equal(snapshot.candidates.find((candidate) => candidate.id === "assistant-terminal")?.command_root_correlated, true);
 });
 
-test("production snapshot history accepts completed tool and patch parts as hash-only inert evidence", async () => {
+test("production snapshot history accepts completed tool, patch, and compaction parts as hash-only inert evidence", async () => {
   const historical = {
     info: { id: "assistant-history", role: "assistant", sessionID: session, parentID: "user-history", time: { created: 1, completed: 2 } },
     parts: [
       { id: "tool-complete", type: "tool", callID: "call-complete", tool: "read", state: { status: "completed", input: { path: "private" }, output: "private output", title: "Read", metadata: {}, time: { start: 1, end: 2 } }, metadata: {}, messageID: "assistant-history", sessionID: session },
       { id: "tool-error", type: "tool", callID: "call-error", tool: "bash", state: { status: "error", input: { command: "private" }, error: "private error", time: { start: 2, end: 3 } }, metadata: {}, messageID: "assistant-history", sessionID: session },
       { id: "patch-history", type: "patch", files: ["private-file"], hash: "patch-hash", messageID: "assistant-history", sessionID: session },
+      { id: "compaction-history", type: "compaction", auto: true, tail_start_id: "assistant-tail", messageID: "assistant-history", sessionID: session },
       { id: "text-history", type: "text", text: "HISTORICAL TERMINAL", messageID: "assistant-history", sessionID: session },
     ],
   };
@@ -290,6 +291,7 @@ test("production snapshot history remains fail-closed for active tools, incomple
     { info: { ...base.info, time: { created: 1 } }, parts: [{ id: "text", type: "text", text: "INCOMPLETE", messageID: "assistant-history", sessionID: session }] },
     { ...base, parts: [{ id: "unknown", type: "subtask", messageID: "assistant-history", sessionID: session }] },
     { ...base, parts: [{ id: "patch", type: "patch", files: [], hash: "hash", unexpected: true, messageID: "assistant-history", sessionID: session }] },
+    { ...base, parts: [{ id: "compaction", type: "compaction", auto: true, tail_start_id: "bad identity with spaces", messageID: "assistant-history", sessionID: session }] },
     { ...base, parts: [{ id: "text", type: "text", text: "DRIFT", messageID: "assistant-other", sessionID: session }] },
   ];
   for (const history of rejected) {

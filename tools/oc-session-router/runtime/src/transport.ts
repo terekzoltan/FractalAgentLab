@@ -516,6 +516,7 @@ function parseSnapshotAssistantMessage(response: Record<string, unknown>, info: 
     if (["text", "reasoning", "step-start", "step-finish"].includes(type)) return parseCommandResponse({ info, parts: [part] }).parts[0]!;
     if (type === "tool") validateCompletedSnapshotToolPart(part);
     else if (type === "patch") validateSnapshotPatchPart(part);
+    else if (type === "compaction") validateSnapshotCompactionPart(part);
     else throw new Error(`Snapshot assistant part type ${type} is unsupported`);
     return { id: part.id as string, type, messageID: part.messageID as string, sessionID: part.sessionID as string, content_sha256: sha256(canonicalize(part)) };
   });
@@ -545,6 +546,11 @@ function validateCompletedSnapshotToolPart(part: Record<string, unknown>): void 
 function validateSnapshotPatchPart(part: Record<string, unknown>): void {
   const allowed = ["files", "hash", "id", "messageID", "sessionID", "type"];
   if (Object.keys(part).sort().join("\n") !== allowed.sort().join("\n") || !Array.isArray(part.files) || typeof part.hash !== "string" || !part.hash) throw new Error("Snapshot patch part is invalid");
+}
+
+function validateSnapshotCompactionPart(part: Record<string, unknown>): void {
+  const allowed = ["auto", "id", "messageID", "sessionID", "tail_start_id", "type"];
+  if (Object.keys(part).sort().join("\n") !== allowed.sort().join("\n") || typeof part.auto !== "boolean" || typeof part.tail_start_id !== "string" || !isValidTransportIdentity(part.tail_start_id)) throw new Error("Snapshot compaction part is invalid");
 }
 
 function assertTimeShape(value: unknown, required: boolean): void {
