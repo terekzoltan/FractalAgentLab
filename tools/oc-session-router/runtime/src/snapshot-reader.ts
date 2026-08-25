@@ -31,7 +31,7 @@ export class InstalledSnapshotReader implements SnapshotReader {
       if (!intent.baseline || intent.operation_id !== operationId) throw new Error("Operation has no exact pre-send snapshot baseline");
       const resolved = await this.resolver.resolveStageAuthority(loaded.authority, stageRequestFromInvocation(operation.invocation));
       if (resolved.capability.mode !== "P0B_ISOLATED" && resolved.capability.mode !== "PRODUCTION_RESPONSE_FIRST") throw new Error("Installed snapshot reader is disabled");
-      if (resolved.capability.identity_sha256 !== operation.invocation.capability_receipt_sha256 || sha256(resolved.transport.session_id) !== operation.invocation.recipient_session_sha256) throw new Error("Snapshot authority drifted");
+      if (sha256(resolved.transport.session_id) !== operation.invocation.recipient_session_sha256) throw new Error("Snapshot authority drifted");
       const stageRequest = stageRequestFromInvocation(operation.invocation);
       const transportReceipt = this.store.loadTransportReceipt<TransportReceipt>(runId, operationId);
       const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000, transportReceipt ? undefined : {

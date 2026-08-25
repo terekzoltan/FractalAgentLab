@@ -29,6 +29,7 @@ class FakeResolver implements AuthorityResolver {
   resolutionCalls = 0;
   driftOnResolutionCall = 0;
   capabilityMode: "DISABLED" | "FIXTURE_ONLY" | "P0B_ISOLATED" | "PRODUCTION_RESPONSE_FIRST" = "FIXTURE_ONLY";
+  capabilityIdentityGeneration = "";
   capabilityDriftOnCall = 0;
   worktreeAfterResponse?: WorktreeProof;
   nextCommand = "/terv-review";
@@ -82,7 +83,7 @@ class FakeResolver implements AuthorityResolver {
 
   private capability(mode: typeof this.capabilityMode): ResolvedStageAuthority["capability"] {
     return mode === "P0B_ISOLATED" || mode === "PRODUCTION_RESPONSE_FIRST"
-      ? { mode, identity_sha256: sha256(mode), router_protocol_identity: ROUTER_PROTOCOL_IDENTITY, snapshot_correlation: "EXACT_PARENT_LINK", sse_enabled: false, retention_policy_sha256: "7".repeat(64), live_probe_sha256: "8".repeat(64), ...(mode === "P0B_ISOLATED" ? { authorization_use_sha256: sha256(mode) } : {}), server_instance_identity_sha256: sha256("fixture-live-instance"), server_binary_sha256: sha256("fixture-server-binary"), target_directory_sha256: sha256("fixture-target-directory"), command_timeout_ms: 300_000 }
+      ? { mode, identity_sha256: sha256(`${mode}${this.capabilityIdentityGeneration}`), router_protocol_identity: ROUTER_PROTOCOL_IDENTITY, snapshot_correlation: "EXACT_PARENT_LINK", sse_enabled: false, retention_policy_sha256: "7".repeat(64), live_probe_sha256: "8".repeat(64), ...(mode === "P0B_ISOLATED" ? { authorization_use_sha256: sha256(mode) } : {}), server_instance_identity_sha256: sha256("fixture-live-instance"), server_binary_sha256: sha256("fixture-server-binary"), target_directory_sha256: sha256("fixture-target-directory"), command_timeout_ms: 300_000 }
       : { mode, identity_sha256: sha256(mode) };
   }
 
@@ -1112,6 +1113,7 @@ test("resolve-stage recovers one exact command-root terminal after an uncertain 
     const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
     const uncertain = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
     assert.equal(uncertain.operation_status, "UNCERTAIN");
+    resolver.capabilityIdentityGeneration = "-rotated-after-dispatch";
 
     const reconciled = await engine.resolveStage(created.run_id, uncertain.operation_id);
     assert.equal(reconciled.operation_status, "SUCCEEDED", JSON.stringify(reconciled));
