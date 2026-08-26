@@ -59,6 +59,12 @@ It is not project truth and does not grant workflow authority.
 - `Prepare-OCRouterStage.ps1` is the bounded no-send source-hash helper. It hashes
   only sources explicitly named by the operator and emits candidate manifest and
   state packet files; invocation remains a separate explicit transaction.
+- A successful, valid, bound stage terminal is also an append-only router-owned
+  source candidate for the next allowed stage. `get-run` exposes the exact
+  `next_stage_sources` bindings; dispatch re-derives their content and hash from
+  protected runtime evidence. This permits an in-run `SEQ_NEXT -> PLAN_REVIEW`
+  handoff without rewriting target state or the target manifest. It does not
+  auto-advance, accept arbitrary runtime content, or weaken run authority.
 - All legacy serial, parallel, packet, latest-output routing, message, question,
   review-fix, polling, and resume senders fail closed. Historical runs remain
   readable but are not resumable.

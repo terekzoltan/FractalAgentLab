@@ -91,6 +91,17 @@ Delivery /seq-next
   Create one immutable run, then invoke exactly one explicit stage. The router
   returns allowed-next metadata and stops; the Orchestrator chooses any later
   stage in a separate transaction.
+- Before a later in-run stage, call `get-run`. If `next_stage_sources` contains
+  the requested stage, copy those exact bindings into `expected_sources`. These
+  sources are derived only from earlier `SUCCEEDED / VALID / BOUND` terminal
+  evidence in the same run and are revalidated before POST. For example, a
+  successful `/seq-next` plan becomes the exact `PLAN` input to `/terv-review`;
+  no target manifest edit or follow-on run is required for that handoff.
+- Router-owned output promotion is source adoption, not stage execution:
+  `auto_advance` remains false, every command remains an explicit transaction,
+  and missing, conflicting, tampered, cross-run, or invalid predecessor evidence
+  blocks before POST. Target-owned sources remain required for any source class
+  that no successful predecessor output can supply.
 - The launcher accepts only request/run/operation identities. Protected process
   configuration supplies the runtime root and control registry; the engine, not
   the request, resolves target authority, origin, recipient, sources, command, and

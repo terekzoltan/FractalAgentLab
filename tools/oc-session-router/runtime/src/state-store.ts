@@ -231,6 +231,13 @@ export class StateStore {
     }
   }
 
+  readArtifact(runId: string, operationId: string, name: string): string {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    assertFilesystemId(name, "artifact name");
+    return readFileSync(this.resolve("runs", runId, "operations", operationId, `${name}.md`), "utf8");
+  }
+
   acquireLease(leaseKey: string, holder: DispatchLeaseDocument): () => void {
     assertSha256(holder.server_fingerprint_sha256, "server fingerprint sha256");
     assertSha256(holder.session_sha256, "session sha256");

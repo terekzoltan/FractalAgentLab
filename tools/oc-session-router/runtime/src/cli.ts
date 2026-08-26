@@ -34,7 +34,7 @@ import {
   type ControlRegistry,
   type RegistryTarget,
 } from "./control-plane.js";
-import { StageEngine, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "./stage-engine.js";
+import { StageEngine, promotedSourcesForStage, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "./stage-engine.js";
 import { StateStore } from "./state-store.js";
 import { InstalledSnapshotReader } from "./snapshot-reader.js";
 import { CommandClient, InstalledCapabilityProbe, InstalledSnapshotClient } from "./transport.js";
@@ -84,6 +84,7 @@ class FileAuthorityResolver implements AuthorityResolver {
     private readonly protectedControlRoot?: string,
     private readonly capabilityProbe: CapabilityProbe = new InstalledCapabilityProbe(),
     private readonly rootAuthorityClass: "FIXTURE_ONLY" | "OS_KNOWN_FOLDER" | "P0B_TEST_ONLY" = "FIXTURE_ONLY",
+    private readonly stateStore?: StateStore,
   ) {
     if (!path.isAbsolute(registryPath) || lstatSync(registryPath).isSymbolicLink()) throw new Error("Control registry must be an ordinary absolute file");
     this.loadRegistry();
@@ -228,14 +229,26 @@ class FileAuthorityResolver implements AuthorityResolver {
     const parsed = parseStageSourceManifest(parseStrictJson(manifest.text));
     if (parsed.target_id !== authority.target_id || parsed.epic !== authority.epic || (request.candidate_identity !== "UNDECLARED" && parsed.candidate_identity !== request.candidate_identity)) throw new Error("Stage source manifest authority binding mismatch");
     const matches = parsed.entries.filter((entry) => entry.stage === request.requested_stage && entry.plan_class === request.plan_class);
-    if (matches.length !== 1) throw new Error("Stage source manifest has no unique current stage entry");
+    if (matches.length > 1) throw new Error("Stage source manifest has no unique current stage entry");
     const expectedClasses = requiredSourceClasses(request.requested_stage);
-    if (matches[0]!.sources.length !== expectedClasses.length || matches[0]!.sources.some((source, index) => source.source_class !== expectedClasses[index])) throw new Error("Stage source manifest source classes are invalid for stage");
-    return matches[0]!.sources.map((binding) => {
+    if (matches.length === 1 && (matches[0]!.sources.length !== expectedClasses.length || matches[0]!.sources.some((source, index) => source.source_class !== expectedClasses[index]))) throw new Error("Stage source manifest source classes are invalid for stage");
+    const targetSources = matches.length === 0 ? [] : matches[0]!.sources.map((binding) => {
       const source = this.readTargetFile(root, binding.path);
       if (source.sha256 !== binding.sha256) throw new Error("Stage source manifest hash mismatch");
       return { binding, content: source.text };
     });
+    const promoted = this.stateStore ? promotedSourcesForStage(this.stateStore, request.run_id, request.requested_stage) : [];
+    const resolved = expectedClasses.map((sourceClass, order) => {
+      const targetMatches = targetSources.filter((source) => source.binding.source_class === sourceClass);
+      const promotedMatches = promoted.filter((source) => source.binding.source_class === sourceClass);
+      if (targetMatches.length > 1 || promotedMatches.length > 1) throw new Error("SOURCE_SUBSTITUTION: conflicting target and router-owned source authority");
+      if (targetMatches.length === 1 && promotedMatches.length === 1 && (targetMatches[0]!.binding.sha256 !== promotedMatches[0]!.binding.sha256 || targetMatches[0]!.binding.logical_identity !== promotedMatches[0]!.binding.logical_identity)) throw new Error("SOURCE_SUBSTITUTION: conflicting target and router-owned source authority");
+      const selected = promotedMatches[0] ?? targetMatches[0];
+      if (!selected) throw new Error("Stage source manifest and router-owned outputs do not provide the required stage source");
+      return { binding: { ...selected.binding, order }, content: selected.content };
+    });
+    if (resolved.some((source, index) => source.binding.source_class !== expectedClasses[index])) throw new Error("Stage source manifest source classes are invalid for stage");
+    return resolved;
   }
 
   private loadRegistry(): { registry: ControlRegistry; sha256: string } {
@@ -398,16 +411,16 @@ interface RootAuthorityProof {
   proof_sha256: string;
 }
 
-function productionAuthorityResolver(registryPath: string, explicitTestProof?: RootAuthorityProof): FileAuthorityResolver {
+function productionAuthorityResolver(registryPath: string, explicitTestProof?: RootAuthorityProof, stateStore?: StateStore): FileAuthorityResolver {
   const authority = productionAuthorityContext(registryPath, explicitTestProof);
-  return new FileAuthorityResolver(registryPath, new GitWorktreeReader(PRODUCTION_GIT_EXECUTABLE, PRODUCTION_GIT_SHA256), authority.controlRoot, new InstalledCapabilityProbe(), authority.authorityClass);
+  return new FileAuthorityResolver(registryPath, new GitWorktreeReader(PRODUCTION_GIT_EXECUTABLE, PRODUCTION_GIT_SHA256), authority.controlRoot, new InstalledCapabilityProbe(), authority.authorityClass, stateStore);
 }
 
-function dispatchAuthorityResolver(registryPath: string): FileAuthorityResolver {
+function dispatchAuthorityResolver(registryPath: string, stateStore?: StateStore): FileAuthorityResolver {
   const registry = parseControlRegistry(parseStrictJson(readFileSync(registryPath, "utf8")));
   return registry.schema_version === "router-control-registry.v1"
     ? new FileAuthorityResolver(registryPath, new GitWorktreeReader(PRODUCTION_GIT_EXECUTABLE, PRODUCTION_GIT_SHA256))
-    : productionAuthorityResolver(registryPath);
+    : productionAuthorityResolver(registryPath, undefined, stateStore);
 }
 
 function productionAuthorityContext(registryPath: string, explicitTestProof?: RootAuthorityProof): { controlRoot: string; runtimeRoot: string; authorityClass: RootAuthorityProof["authority_class"] } {
@@ -697,7 +710,7 @@ async function main(): Promise<void> {
   const registryPath = process.env.OC_ROUTER_CONTROL_REGISTRY;
   if ((dispatchOperation || compactOperation) && !registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
   let resolver: FileAuthorityResolver | undefined;
-  if (dispatchOperation) resolver = classified("ROOT_AUTHORITY_BLOCKED", () => dispatchAuthorityResolver(registryPath!));
+  if (dispatchOperation) resolver = classified("ROOT_AUTHORITY_BLOCKED", () => dispatchAuthorityResolver(registryPath!, store));
   else if (operation === "resolve-stage" && registryPath) {
     try { resolver = productionAuthorityResolver(registryPath); }
     catch { resolver = undefined; }

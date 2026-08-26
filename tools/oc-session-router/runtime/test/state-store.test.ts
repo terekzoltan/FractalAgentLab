@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import type { RunAuthority, StageInvocation } from "../src/contracts.js";
-import { authoritySha256 } from "../src/contracts.js";
+import { authoritySha256, sha256 } from "../src/contracts.js";
+import { promotedSourcesForStage } from "../src/stage-engine.js";
 import { StateStore } from "../src/state-store.js";
 
 function makeAuthority(): RunAuthority {
@@ -152,6 +153,52 @@ test("filesystem-bound operation and artifact IDs reject Windows ADS forms", () 
     const operation = store.createOperation("run-1", makeInvocation("op-1"), {}, "1".repeat(64));
     assert.throws(() => store.loadOperation("run-1", "op:ads"), /filesystem-safe/);
     assert.throws(() => store.writeArtifact("run-1", operation.operation_id, "terminal:ads", "x"), /filesystem-safe/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("validated SEQ_NEXT output becomes an exact append-only PLAN source for the next stage", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "router-promoted-source-"));
+  try {
+    const store = new StateStore(root);
+    const authority = { ...makeAuthority(), run_id: "run-promote-1", next_command: "/seq-next" };
+    store.createRun(authority, authoritySha256(authority));
+    const invocation = { ...makeInvocation("op-promote-1"), run_id: authority.run_id, requested_stage: "SEQ_NEXT" as const, canon_phase: "SEQ_NEXT" as const, command_name: "seq-next", plan_identity: "plan-promoted" };
+    const operation = store.createOperation(authority.run_id, invocation, { schema_version: "dispatch-intent.v1" }, sha256("intent"));
+    const terminal = [
+      "EPIC IMPLEMENTATION PLAN", "Target: FractalAgentLab", "Epic: E", "Wave: W", "Accountable Lane / class / profile: Track D / TRACK / track-d",
+      "Prerequisites/current state: ready", "Scope/non-goals: bounded", "Interfaces/ownership: Track D", "Feature -> User Story -> Task: F -> US -> T",
+      "Risks: none", "Ordered implementation plan: T", "Acceptance -> verification -> evidence: AC -> test", "Handoffs/exact blockers: none",
+      "Plan artifact: plan-promoted", "Next route: /terv-review", "Readiness: READY", "",
+    ].join("\n");
+    store.writeArtifact(authority.run_id, operation.operation_id, "terminal", terminal);
+    store.writeResult(authority.run_id, operation.operation_id, { operation_status: "SUCCEEDED", output_status: "VALID", binding_status: "BOUND", terminal_status: "VALID", artifact_sha256: sha256(Buffer.from(terminal, "utf8")), allowed_next: ["PLAN_REVIEW"] });
+    store.updateOperation(authority.run_id, operation.operation_id, operation.revision, { status: "SUCCEEDED" });
+
+    const promoted = promotedSourcesForStage(store, authority.run_id, "PLAN_REVIEW");
+    assert.equal(promoted.length, 1);
+    assert.equal(promoted[0]!.binding.source_class, "PLAN");
+    assert.equal(promoted[0]!.binding.logical_identity, "plan-promoted");
+    assert.equal(promoted[0]!.binding.producer, "FAL_ROUTER_OUTPUT");
+    assert.equal(promoted[0]!.content, terminal);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("router-owned promotion rejects terminal artifact tampering", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "router-promoted-tamper-"));
+  try {
+    const store = new StateStore(root);
+    const authority = { ...makeAuthority(), run_id: "run-promote-2", next_command: "/seq-next" };
+    store.createRun(authority, authoritySha256(authority));
+    const invocation = { ...makeInvocation("op-promote-2"), run_id: authority.run_id, requested_stage: "SEQ_NEXT" as const, canon_phase: "SEQ_NEXT" as const, command_name: "seq-next" };
+    const operation = store.createOperation(authority.run_id, invocation, { schema_version: "dispatch-intent.v1" }, sha256("intent"));
+    store.writeArtifact(authority.run_id, operation.operation_id, "terminal", "tampered\n");
+    store.writeResult(authority.run_id, operation.operation_id, { operation_status: "SUCCEEDED", output_status: "VALID", binding_status: "BOUND", terminal_status: "VALID", artifact_sha256: "f".repeat(64), allowed_next: ["PLAN_REVIEW"] });
+    store.updateOperation(authority.run_id, operation.operation_id, operation.revision, { status: "SUCCEEDED" });
+    assert.throws(() => promotedSourcesForStage(store, authority.run_id, "PLAN_REVIEW"), /artifact hash mismatch/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

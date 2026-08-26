@@ -67,6 +67,15 @@ export interface StageResult {
   auto_advance: false;
 }
 
+interface RouterOwnedSourceCandidate {
+  source_class: SourceClass;
+  logical_identity: string;
+  producer: string;
+  path: string;
+  sha256: string;
+  content: string;
+}
+
 export class StageEngine {
   constructor(
     private readonly store: StateStore,
@@ -91,7 +100,18 @@ export class StageEngine {
 
   getRun(runId: string): unknown {
     const loaded = this.store.loadRun(runId);
-    return { schema_version: "run-projection.v1", run_id: loaded.run.run_id, target_id: loaded.run.target_id, worktree_identity: loaded.run.worktree_identity, run_authority_sha256: loaded.run.run_authority_sha256, review_cycle: loaded.authority.review_cycle, auto_advance: false };
+    const operations = this.store.listOperations(runId);
+    const previous = operations.at(-1);
+    let next_stage_sources: Array<{ requested_stage: StageRequest["requested_stage"]; expected_sources: SourceBinding[] }> = [];
+    if (previous?.status === "SUCCEEDED") {
+      const result = this.store.loadResult(runId, previous.operation_id) as { allowed_next?: unknown };
+      if (Array.isArray(result.allowed_next)) {
+        next_stage_sources = result.allowed_next
+          .filter((stage): stage is StageRequest["requested_stage"] => typeof stage === "string" && Object.hasOwn(SOURCE_CLASSES, stage))
+          .map((requested_stage) => ({ requested_stage, expected_sources: promotedSourcesForStage(this.store, runId, requested_stage).map((source) => source.binding) }));
+      }
+    }
+    return { schema_version: "run-projection.v1", run_id: loaded.run.run_id, target_id: loaded.run.target_id, worktree_identity: loaded.run.worktree_identity, run_authority_sha256: loaded.run.run_authority_sha256, review_cycle: loaded.authority.review_cycle, next_stage_sources, auto_advance: false };
   }
 
   async invokeStage(input: StageRequest): Promise<StageResult> {
@@ -395,6 +415,46 @@ const SOURCE_CLASSES: Record<StageRequest["requested_stage"], readonly SourceCla
   DELIVERY_RESPONSE: ["FINAL_SYNTHESIS"],
   CLOSEOUT: ["FINAL_SYNTHESIS", "DELIVERY_RESPONSE", "PROPOSED_DELTA", "CLOSEOUT_AUTHORITY"],
 };
+
+function routerOwnedSourceCandidates(store: StateStore, runId: string): RouterOwnedSourceCandidate[] {
+  const candidates: RouterOwnedSourceCandidate[] = [];
+  for (const operation of store.listOperations(runId)) {
+    if (operation.status !== "SUCCEEDED") continue;
+    const result = store.loadResult(runId, operation.operation_id) as { operation_status?: unknown; output_status?: unknown; binding_status?: unknown; terminal_status?: unknown; artifact_sha256?: unknown };
+    if (result.operation_status !== "SUCCEEDED" || result.output_status !== "VALID" || result.binding_status !== "BOUND" || result.terminal_status !== "VALID" || typeof result.artifact_sha256 !== "string") throw new Error("Router-owned source producer result is not valid and bound");
+    const content = store.readArtifact(runId, operation.operation_id, "terminal");
+    const contentSha = sha256(Buffer.from(content, "utf8"));
+    if (contentSha !== result.artifact_sha256) throw new Error("Router-owned source artifact hash mismatch");
+    const parsed = parseOutputShape(operation.invocation.requested_stage, content);
+    const base = { producer: "FAL_ROUTER_OUTPUT", path: `router-output/${operation.operation_id}/terminal.md`, sha256: contentSha, content };
+    if (operation.invocation.requested_stage === "SEQ_NEXT") {
+      candidates.push({ ...base, source_class: "PLAN", logical_identity: parsed.fields[parsed.plan_class === "REVIEW_FIX_PLAN" ? "Fix-plan artifact" : "Plan artifact"]! });
+    } else if (operation.invocation.requested_stage === "PLAN_REVIEW") {
+      candidates.push({ ...base, source_class: "META_PLAN_REVIEW", logical_identity: `meta-review-${contentSha.slice(0, 16)}` });
+    } else if (operation.invocation.requested_stage === "PLAN_REVISION") {
+      candidates.push({ ...base, source_class: "REVISED_PLAN", logical_identity: parsed.fields["Final plan artifact"]! });
+    } else if (operation.invocation.requested_stage === "IMPLEMENT") {
+      candidates.push({ ...base, source_class: "IMPLEMENTATION_RESULT", logical_identity: parsed.fields["Candidate identity"]! });
+    } else if (operation.invocation.requested_stage === "STEP_REVIEW") {
+      candidates.push({ ...base, source_class: "FINAL_SYNTHESIS", logical_identity: parsed.fields.Candidate! });
+      const proposedDelta = `${parsed.fields["Proposed closeout delta"]!}\n`;
+      candidates.push({ source_class: "PROPOSED_DELTA", logical_identity: `proposed-delta-${contentSha.slice(0, 16)}`, producer: "FAL_ROUTER_OUTPUT", path: `router-output/${operation.operation_id}/proposed-delta.md`, sha256: sha256(Buffer.from(proposedDelta, "utf8")), content: proposedDelta });
+    } else if (operation.invocation.requested_stage === "DELIVERY_RESPONSE") {
+      if (parsed.terminal === "ACK_ONLY") candidates.push({ ...base, source_class: "DELIVERY_RESPONSE", logical_identity: `delivery-response-${contentSha.slice(0, 16)}` });
+      else candidates.push({ ...base, source_class: "PLAN", logical_identity: parsed.fields["Fix-plan artifact"]! });
+    }
+  }
+  return candidates;
+}
+
+export function promotedSourcesForStage(store: StateStore, runId: string, stage: StageRequest["requested_stage"]): ResolvedSource[] {
+  const candidates = routerOwnedSourceCandidates(store, runId);
+  return SOURCE_CLASSES[stage].flatMap((sourceClass, order) => {
+    const matches = candidates.filter((candidate) => candidate.source_class === sourceClass);
+    const selected = matches.at(-1);
+    return selected ? [{ binding: { path: selected.path, source_class: selected.source_class, logical_identity: selected.logical_identity, producer: selected.producer, sha256: selected.sha256, order }, content: selected.content }] : [];
+  });
+}
 
 function sourceField(text: string, name: string): string {
   const matches = [...text.replace(/\r\n/g, "\n").matchAll(new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*(.+)$`, "gm"))];
