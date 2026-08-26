@@ -65,6 +65,10 @@ It is not project truth and does not grant workflow authority.
   protected runtime evidence. This permits an in-run `SEQ_NEXT -> PLAN_REVIEW`
   handoff without rewriting target state or the target manifest. It does not
   auto-advance, accept arbitrary runtime content, or weaken run authority.
+  An Owner refresh of the operational registry/capability may change the coarse
+  registry projection hash without invalidating that run. The resolver still
+  requires every semantic run-authority field, target source, current capability,
+  recipient, transport, and immediate pre-POST measurement to remain valid.
 - All legacy serial, parallel, packet, latest-output routing, message, question,
   review-fix, polling, and resume senders fail closed. Historical runs remain
   readable but are not resumable.

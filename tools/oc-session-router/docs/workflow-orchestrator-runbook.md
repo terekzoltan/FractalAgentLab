@@ -97,6 +97,10 @@ Delivery /seq-next
   evidence in the same run and are revalidated before POST. For example, a
   successful `/seq-next` plan becomes the exact `PLAN` input to `/terv-review`;
   no target manifest edit or follow-on run is required for that handoff.
+  A restart-time Owner capability/admission refresh likewise needs no new run
+  when every semantic run-authority field remains identical. The fresh registry,
+  capability, recipient, server instance, and transport are still revalidated
+  before operation creation and immediately before POST.
 - Router-owned output promotion is source adoption, not stage execution:
   `auto_advance` remains false, every command remains an explicit transaction,
   and missing, conflicting, tampered, cross-run, or invalid predecessor evidence

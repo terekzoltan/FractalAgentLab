@@ -81,6 +81,11 @@ The installed capability probe binds health/version, OpenAPI, the complete
 directory-scoped command definitions in canonical name order, binary/origin,
 target and worktree hashes, and authorized session/command hashes. Process
 identity is a per-dispatch race fence rather than durable production admission.
+The full registry-file hash is likewise an operational projection, not a
+semantic run field: a protected admission refresh may rotate it while the
+immutable run continues. Continuation requires every other run-authority field
+to match exactly, and binds the fresh capability, recipient, transport, and
+server measurement for the current explicit stage.
 SSE support is probed and hashed but never enabled. `/command` response text is authoritative first;
 inert lifecycle/reasoning parts are closed-schema checked and hash-audited, while
 active tool or unknown part types fail closed. Completed historical `tool` and

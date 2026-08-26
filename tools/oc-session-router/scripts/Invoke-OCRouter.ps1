@@ -49,7 +49,7 @@ function Invoke-WithRouterEnvironment {
 $ErrorActionPreference = 'Stop'
 $RuntimeRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'runtime'
 $AttestationPath = Join-Path $RuntimeRoot 'executable-attestation.json'
-$ExpectedAttestationSha256 = '08a994613557e73843635bd3a179e4dbc63f8dd123616bb379435d3ada8d01b1'
+$ExpectedAttestationSha256 = '939f7dded9c7c6ce4db5ce97dd9e66fea0e4aa6da354c775cb5af90cf853af98'
 
 function Get-Sha256Text {
   param([string]$Text)

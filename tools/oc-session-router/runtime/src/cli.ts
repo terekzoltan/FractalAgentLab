@@ -34,7 +34,7 @@ import {
   type ControlRegistry,
   type RegistryTarget,
 } from "./control-plane.js";
-import { StageEngine, promotedSourcesForStage, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "./stage-engine.js";
+import { StageEngine, promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "./stage-engine.js";
 import { StateStore } from "./state-store.js";
 import { InstalledSnapshotReader } from "./snapshot-reader.js";
 import { CommandClient, InstalledCapabilityProbe, InstalledSnapshotClient } from "./transport.js";
@@ -190,6 +190,7 @@ class FileAuthorityResolver implements AuthorityResolver {
     );
     const target = this.target(runAuthority.target_id, loaded.registry);
     const root = this.targetRoot(loaded.registry, target);
+    if (!runAuthorityMatchesAcrossOperationalRefresh(current, runAuthority)) throw new Error("Current target semantic authority drifted");
     const sources = this.resolveSources(root, current, request);
     const recipient = target.sessions[request.recipient_role];
     if (!recipient?.id) throw new Error("Protected registry has no exact recipient role mapping");
@@ -198,7 +199,7 @@ class FileAuthorityResolver implements AuthorityResolver {
     const password = process.env.OPENCODE_SERVER_PASSWORD;
     if (!username || !password) throw new Error("Process-scoped OpenCode authentication is unavailable");
     return {
-      run_authority: current,
+      run_authority: runAuthority,
       sources,
       transport: { origin: target.server.origin, server_fingerprint: capability.server_instance_identity_sha256 ?? target.server.fingerprint ?? "FIXTURE_ONLY", session_id: recipient.id, username, password, directory: root },
       capability,
@@ -712,7 +713,7 @@ async function main(): Promise<void> {
   let resolver: FileAuthorityResolver | undefined;
   if (dispatchOperation) resolver = classified("ROOT_AUTHORITY_BLOCKED", () => dispatchAuthorityResolver(registryPath!, store));
   else if (operation === "resolve-stage" && registryPath) {
-    try { resolver = productionAuthorityResolver(registryPath); }
+    try { resolver = productionAuthorityResolver(registryPath, undefined, store); }
     catch { resolver = undefined; }
   }
   const snapshots = resolver ? new InstalledSnapshotReader(store, resolver, new InstalledSnapshotClient()) : { collect: async () => [] };

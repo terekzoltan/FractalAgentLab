@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { _test } from "../src/cli.js";
 import { authoritySha256, parseRunRequest, sha256, type RunAuthority, type StageInvocation, type StageRequest } from "../src/contracts.js";
+import { promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh } from "../src/stage-engine.js";
 import { StateStore } from "../src/state-store.js";
 import { GitWorktreeReader } from "../src/worktree-reader.js";
 
@@ -263,6 +264,83 @@ test("FSR-012/017: real resolver reloads protected manifest and stage sources", 
 
     writeFileSync(path.join(target, "ops", "PROJECT_STATE.md"), state(sha256(reordered), false));
     await assert.rejects(() => resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-manifest-3", createdAt: "2026-08-10T00:00:02.000Z" }), /Stage source manifest/);
+  } finally {
+    if (previousUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = previousUsername;
+    if (previousPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = previousPassword;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("operational registry refresh preserves an immutable run and its promoted next-stage source", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-operational-refresh-"));
+  const previousUsername = process.env.OPENCODE_SERVER_USERNAME;
+  const previousPassword = process.env.OPENCODE_SERVER_PASSWORD;
+  try {
+    const target = path.join(root, "target");
+    const runtime = path.join(root, "runtime");
+    mkdirSync(path.join(target, "ops"), { recursive: true });
+    mkdirSync(path.join(target, "plans"), { recursive: true });
+    mkdirSync(runtime);
+    const planning = "PLANNING CONTEXT\nfixture\n";
+    const planningBinding = { path: "plans/context.md", source_class: "PLANNING_CONTEXT", logical_identity: "context-1", producer: "target-state", sha256: sha256(planning), order: 0 };
+    const manifest = JSON.stringify({ schema_version: "stage-source-manifest.v1", target_id: "ringfall", epic: "A4-E", candidate_identity: "UNDECLARED", entries: [{ stage: "SEQ_NEXT", plan_class: "EPIC_PLAN", sources: [planningBinding] }] });
+    writeFileSync(path.join(target, "plans", "context.md"), planning);
+    writeFileSync(path.join(target, "plans", "stage-sources.json"), manifest);
+    writeFileSync(path.join(target, "ops", "Combined.md"), "# Root\n\n## Current\n| A4-E | OPEN |\n");
+    writeFileSync(path.join(target, "ops", "OVERLAY.md"), "overlay\n");
+    writeFileSync(path.join(target, "ops", "ROLE.md"), "role\n");
+    writeFileSync(path.join(target, "ops", "PROJECT_STATE.md"), [
+      "State revision: `s1`", "Configuration identity: `c1`", "Wave: `A4`", "Epic: `A4-E`", "Candidate identity: `UNDECLARED`", "Review cycle: `0`",
+      "Combined selector: `HEADING:Current`", "Pinned artifact: `plans/context.md`", "Pinned artifact logical identity: `context-1`",
+      "Stage source manifest: `plans/stage-sources.json`", `Stage source manifest SHA-256: \`${sha256(manifest)}\``, "Workflow phase: `SEQ_NEXT`", "Next actor: `Track D`", "Next command: `/seq-next`", "",
+    ].join("\n"));
+    const registryPath = path.join(root, "registry.json");
+    const registry = { schema_version: "router-control-registry.v1", targets: { ringfall: {
+      profile_identity: "ringfall-profile", target_identity: "RingFall", worktree_identity: "git:ringfall", accountable: { lane: "Track D", class: "TRACK", profile: "track-d" }, root: target,
+      state_path: "ops/PROJECT_STATE.md", combined_path: "ops/Combined.md", overlay_path: "ops/OVERLAY.md", accountable_role_path: "ops/ROLE.md",
+      server: { origin: "http://127.0.0.1:1", fingerprint: "fixture-before" }, sessions: { Meta: { id: "private-meta-session" }, "Track D": { id: "private-track-session" } },
+    } } };
+    writeFileSync(registryPath, JSON.stringify(registry));
+    process.env.OPENCODE_SERVER_USERNAME = "fixture-user";
+    process.env.OPENCODE_SERVER_PASSWORD = "fixture-password";
+    const store = new StateStore(runtime);
+    const resolver = new _test.FileAuthorityResolver(registryPath, undefined, undefined, undefined, undefined, store);
+    const authority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "ringfall", expected_worktree_identity: "git:ringfall" }, { runId: "run-refresh-1", createdAt: "2026-08-26T00:00:00.000Z" });
+    store.createRun(authority, authoritySha256(authority));
+    const invocation = { schema_version: "stage-invocation.v1", operation_id: "op-seq-next", run_id: authority.run_id, requested_stage: "SEQ_NEXT" } as StageInvocation;
+    const operation = store.createOperation(authority.run_id, invocation, { schema_version: "dispatch-intent.v1" }, sha256("intent"));
+    const terminal = [
+      "EPIC IMPLEMENTATION PLAN", "Target: RingFall", "Epic: A4-E", "Wave: A4", "Accountable Lane / class / profile: Track D / TRACK / track-d",
+      "Prerequisites/current state: ready", "Scope/non-goals: bounded", "Interfaces/ownership: Track D", "Feature -> User Story -> Task: F -> US -> T",
+      "Risks: none", "Ordered implementation plan: T", "Acceptance -> verification -> evidence: AC -> test", "Handoffs/exact blockers: none",
+      "Plan artifact: ringfall-a4-e-plan", "Next route: /terv-review", "Readiness: READY", "",
+    ].join("\n");
+    store.writeArtifact(authority.run_id, operation.operation_id, "terminal", terminal);
+    store.writeResult(authority.run_id, operation.operation_id, { operation_status: "SUCCEEDED", output_status: "VALID", binding_status: "BOUND", terminal_status: "VALID", artifact_sha256: sha256(Buffer.from(terminal, "utf8")), allowed_next: ["PLAN_REVIEW"] });
+    store.updateOperation(authority.run_id, operation.operation_id, operation.revision, { status: "SUCCEEDED" });
+    const promoted = promotedSourcesForStage(store, authority.run_id, "PLAN_REVIEW");
+    const stage: StageRequest = {
+      schema_version: "stage-request.v1", request_id: "request-plan-review", run_id: authority.run_id, issued_at: authority.created_at, issued_by: "orchestrator", run_authority_sha256: authoritySha256(authority),
+      requested_stage: "PLAN_REVIEW", plan_class: "EPIC_PLAN", target_id: authority.target_id, worktree_identity: authority.worktree_identity, state_revision: authority.state_revision,
+      state_sha256: authority.state_sha256, combined_selector: authority.combined_selector, combined_span_sha256: authority.combined_span_sha256, expected_sources: promoted.map((source) => source.binding),
+      wave: authority.wave, epic: authority.epic, accountable_lane: authority.accountable_lane, accountable_class: authority.accountable_class, accountable_profile: authority.accountable_profile,
+      sender_role: "Track D", recipient_role: "Meta", plan_identity: "ringfall-a4-e-plan", candidate_identity: "UNDECLARED", review_cycle: "0", finding_ids: [], review_risk: "focused",
+      project_review_context: "fixture", expected_contract_version: "awc-4.1.1", allowed_side_effect_class: "ADDRESSED_SESSION_COMMAND", configuration_identity: authority.configuration_identity,
+      active_route_generation: authority.active_route_generation,
+    };
+
+    registry.targets.ringfall.server.fingerprint = "fixture-after";
+    writeFileSync(registryPath, JSON.stringify(registry));
+    const refreshed = await resolver.resolveStageAuthority(authority, stage);
+    assert.equal(authoritySha256(refreshed.run_authority), authoritySha256(authority));
+    assert.equal(refreshed.sources[0]!.binding.producer, "FAL_ROUTER_OUTPUT");
+    const current = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "ringfall", expected_worktree_identity: "git:ringfall" }, { runId: authority.run_id, createdAt: authority.created_at });
+    assert.notEqual(current.target_profile_sha256, authority.target_profile_sha256);
+    assert.equal(runAuthorityMatchesAcrossOperationalRefresh(current, authority), true);
+
+    registry.targets.ringfall.profile_identity = "ringfall-profile-drift";
+    writeFileSync(registryPath, JSON.stringify(registry));
+    await assert.rejects(() => resolver.resolveStageAuthority(authority, stage), /semantic authority drifted/);
   } finally {
     if (previousUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = previousUsername;
     if (previousPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = previousPassword;
