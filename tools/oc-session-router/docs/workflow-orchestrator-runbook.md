@@ -117,6 +117,8 @@ Delivery /seq-next
 - The synchronous `/command` assistant response is the primary candidate. A
   timeout or 5xx leaves the operation `UNCERTAIN`; `resolve-stage` is read-only and
   cannot resend. It may be repeated after the addressed session becomes idle.
+  Production lifecycle admission should normally bind a 60-minute command timeout;
+  the bounded policy permits 2-60 minutes. Timeout never authorizes a retry.
   Installed message history is interpreted chronologically, paged only through
   the server-provided opaque cursor under fixed page/byte caps, and uses the
   latest pre-send message as baseline. When no synchronous receipt exists, recovery

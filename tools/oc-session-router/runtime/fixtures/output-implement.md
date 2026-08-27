@@ -7,8 +7,7 @@ Changed artifacts: fixture
 Explicit non-changes: protected surfaces
 Acceptance mapping: PASS
 Checks/results: PASS
-Candidate identity: candidate-fixture
-Worktree limitations: unrelated dirty files preserved
+Candidate identity/worktree limitations: candidate-fixture; unrelated dirty files preserved
 Diff self-review: PASS
 Unresolved risks/findings: none
 Exact route: Meta /step-review

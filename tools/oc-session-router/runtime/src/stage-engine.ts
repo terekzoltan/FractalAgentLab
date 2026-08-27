@@ -350,8 +350,10 @@ export class StageEngine {
         try { parseOutputShape(operation.invocation.requested_stage, text); return true; } catch { return false; }
       },
     });
-    const commandRootCandidates = transportReceipt ? [] : candidates.filter((candidate) => {
-      if (candidate.command_root_correlated !== true || sha256(candidate.session_id) !== operation.invocation.recipient_session_sha256) return false;
+    const rawCommandRootCandidates = transportReceipt ? [] : candidates.filter((candidate) =>
+      candidate.command_root_correlated === true && sha256(candidate.session_id) === operation.invocation.recipient_session_sha256,
+    );
+    const commandRootCandidates = rawCommandRootCandidates.filter((candidate) => {
       try { parseOutputShape(operation.invocation.requested_stage, candidate.text); return true; } catch { return false; }
     });
     const receiptCandidate = exactCorrelation && resolution.status === "TRANSCRIPT_RECONCILED" ? resolution.candidate : undefined;
@@ -393,7 +395,12 @@ export class StageEngine {
         // privacy, shape, binding, or finalization failure remains non-success.
       }
     }
-    const result = makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "AMBIGUOUS", "UNVALIDATED", "UNVALIDATED", [], "", exactCorrelation || commandRootCandidates.length === 1 ? "correlated snapshot failed authoritative validation" : "snapshot evidence is diagnostic without one exact installed response or command-root correlation");
+    const reason = exactCorrelation || commandRootCandidates.length === 1
+      ? "correlated snapshot failed authoritative validation"
+      : rawCommandRootCandidates.length === 1
+        ? "exact command-root response failed the stage terminal contract"
+        : "snapshot evidence is diagnostic without one exact installed response or command-root correlation";
+    const result = makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "AMBIGUOUS", "UNVALIDATED", "UNVALIDATED", [], "", reason);
     this.store.updateResult(runId, operationId, result);
     this.store.updateOperation(runId, operationId, operation.revision, { status: "UNCERTAIN" });
     return result;
@@ -434,7 +441,8 @@ function routerOwnedSourceCandidates(store: StateStore, runId: string): RouterOw
     } else if (operation.invocation.requested_stage === "PLAN_REVISION") {
       candidates.push({ ...base, source_class: "REVISED_PLAN", logical_identity: parsed.fields["Final plan artifact"]! });
     } else if (operation.invocation.requested_stage === "IMPLEMENT") {
-      candidates.push({ ...base, source_class: "IMPLEMENTATION_RESULT", logical_identity: parsed.fields["Candidate identity"]! });
+      if (operation.invocation.candidate_identity === "UNDECLARED") throw new Error("Implementation producer candidate identity is undeclared");
+      candidates.push({ ...base, source_class: "IMPLEMENTATION_RESULT", logical_identity: operation.invocation.candidate_identity });
     } else if (operation.invocation.requested_stage === "STEP_REVIEW") {
       candidates.push({ ...base, source_class: "FINAL_SYNTHESIS", logical_identity: parsed.fields.Candidate! });
       const proposedDelta = `${parsed.fields["Proposed closeout delta"]!}\n`;
@@ -587,7 +595,9 @@ function assertSourceLineage(request: StageRequest, sources: readonly ResolvedSo
     const implementation = byClass.get("IMPLEMENTATION_RESULT")!;
     const parsedImplementation = parseOutputShape("IMPLEMENT", implementation);
     if (request.candidate_identity === "UNDECLARED") throw new Error("Implementation candidate or plan lineage mismatch");
-    validateOutputBinding(parsedImplementation, { ...authorityBinding(authority), candidate: request.candidate_identity, plan: request.plan_identity });
+    const implementationSource = sources.find((source) => source.binding.source_class === "IMPLEMENTATION_RESULT")!;
+    if (implementationSource.binding.logical_identity !== request.candidate_identity) throw new Error("Implementation candidate source lineage mismatch");
+    validateOutputBinding(parsedImplementation, { ...authorityBinding(authority), plan: request.plan_identity });
     const acceptance = acceptanceEvidenceReceipt(byClass.get("ACCEPTANCE_EVIDENCE")!);
     if (acceptance.candidate !== request.candidate_identity) throw new Error("Acceptance evidence candidate lineage mismatch");
     if (reviewMode === "INITIAL") {

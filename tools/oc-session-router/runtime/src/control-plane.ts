@@ -240,7 +240,7 @@ function parseTargets(value: unknown, protectedShape: boolean): Record<string, R
     const binarySha256 = protectedShape ? stringValue(server.binary_sha256, "server binary SHA-256") : undefined;
     if (binarySha256) assertSha256(binarySha256, "server binary SHA-256");
     const commandTimeoutMs = protectedShape ? integerValue(server.command_timeout_ms, "command timeout milliseconds") : undefined;
-    if (commandTimeoutMs !== undefined && (commandTimeoutMs < 120_000 || commandTimeoutMs > 900_000)) throw new Error("Command timeout must be between 120000 and 900000 milliseconds");
+    if (commandTimeoutMs !== undefined && (commandTimeoutMs < 120_000 || commandTimeoutMs > 3_600_000)) throw new Error("Command timeout must be between 120000 and 3600000 milliseconds");
     const sessionsRecord = exactRecord(target.sessions, "target sessions");
     if (Object.keys(sessionsRecord).length === 0) throw new Error("Target sessions cannot be empty");
     const sessions: Record<string, { id: string }> = {};
@@ -309,7 +309,7 @@ export function parseCapabilityReceipt(value: unknown): CapabilityReceipt {
   if (isolationClass !== "SYNTHETIC_TEST_ONLY" && isolationClass !== "PRODUCTION_TARGET") throw new Error("Capability isolation class is invalid");
   for (const field of ["p0b_isolation_root_sha256", "target_identity_sha256", "worktree_identity_sha256", "target_directory_sha256", "origin_sha256", "server_binary_sha256", "server_instance_identity_sha256", "authorized_session_set_sha256", "authorized_command_set_sha256", "health_identity_sha256", "doc_sha256", "command_registry_sha256", "p0b_proof_sha256"] as const) assertSha256(stringValue(record[field], field), field);
   const commandTimeoutMs = integerValue(record.command_timeout_ms, "command timeout milliseconds");
-  if (commandTimeoutMs < 120_000 || commandTimeoutMs > 900_000) throw new Error("Capability command timeout is outside the bounded policy");
+  if (commandTimeoutMs < 120_000 || commandTimeoutMs > 3_600_000) throw new Error("Capability command timeout is outside the bounded policy");
   if (!Array.isArray(record.supported_commands) || record.supported_commands.length === 0 || record.supported_commands.some((item) => typeof item !== "string")) throw new Error("Capability supported commands are invalid");
   const supportedCommands = [...record.supported_commands] as string[];
   for (const command of supportedCommands) assertOpaqueId(command, "supported command");

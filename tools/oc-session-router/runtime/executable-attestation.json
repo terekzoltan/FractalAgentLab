@@ -11,7 +11,7 @@
   "control_plane_verifier_path": "scripts/Initialize-OCRouterControlPlane.ps1",
   "control_plane_verifier_sha256": "3a25e99d30b954275ada439dc31e59b33635646a4a3776dc493843c6a770fb88",
   "compact_lite_script_path": "scripts/invoke-session-compact-lite.ps1",
-  "compact_lite_script_sha256": "c33cbb1ab46200fe172741e1aea03bc003f908d5fdafa12f393025719835e7d8",
+  "compact_lite_script_sha256": "e9888e1adfdae88b2eb4edef7b8d4c15029ed7debe92cc48a4403ffe4592cedd",
   "compact_lite_core_script_path": "scripts/session-compact-lite-core.ps1",
   "compact_lite_core_script_sha256": "aeb44c39a680a64a1d7bb8355f0fe726bc37eecf5b1e297cf3762ddb44682562",
   "compact_flow_core_script_path": "scripts/session-compact-flow-core.ps1",
@@ -25,12 +25,12 @@
   "prepare_stage_script_path": "scripts/Prepare-OCRouterStage.ps1",
   "prepare_stage_script_sha256": "a981d10eb44cf4f90c2f9271925eede58297a085b583541437977ecfd4112542",
   "authority_schema_manifest_identity": "fal-router-authority-schemas-v1",
-  "authority_schema_manifest_sha256": "ce873cd8a4cf179df3ecc707aad6743521273a6d997ebe76948ab3e2e69b0d81",
+  "authority_schema_manifest_sha256": "5083db06250a9cb7ddae008517d029a01d264c79db53f1b68ec4515f0ea97a70",
   "runtime_package_sha256": "bd9c51ef13b981bcbf7d45d283e8e55b49a9b24fcd0d8492c40afac4113c0b96",
   "runtime_lock_sha256": "d1d22b8157b1c370086e824eeae2e0c8e9a433f72c8566982abc007779cec3f7",
   "compiled_entry_path": "dist/src/cli.js",
   "compiled_entry_sha256": "92a7efefd14937c09845ac1d6098e492be534eef10803ec27d4e567e76fed56a",
-  "compiled_manifest_sha256": "525d00322094968d30db1fa1e5b74405e5952d01b686ad80af944807df9d1096",
-  "source_manifest_identity": "fal-explicit-stage-router-source-v26",
-  "source_manifest_sha256": "c9095b0b5fb96d5824e04f9b3480da02d5579cc4be7e5d0e7e38c4ac3402745f"
+  "compiled_manifest_sha256": "f7632af584c06d6782c1a4e6893d6c5cb04bf9c04976681d5fe0a1c9d0188434",
+  "source_manifest_identity": "fal-explicit-stage-router-source-v27",
+  "source_manifest_sha256": "c929ff7edabae05f97f12b8aaae7f03aa7dee300d3f25f5959283529a7c4be3d"
 }

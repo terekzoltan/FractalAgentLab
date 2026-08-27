@@ -117,6 +117,8 @@ test("P0B protected capability is closed, short-lived, AWC 4.1.1-only, and direc
     };
     const registryValue = { schema_version: "router-control-registry.v2", router_protocol_identity: ROUTER_PROTOCOL_IDENTITY, mode: "P0B_ISOLATED", retention_policy_path: "retention-policy.json", p0b_isolation_root: isolationRoot, p0b_isolation_root_sha256: isolationRootSha256, targets: { "synthetic-p0b": target } } as const;
     const registry = parseControlRegistry(registryValue);
+    assert.doesNotThrow(() => parseControlRegistry({ ...registryValue, targets: { "synthetic-p0b": { ...target, server: { ...target.server, command_timeout_ms: 3_600_000 } } } }));
+    assert.throws(() => parseControlRegistry({ ...registryValue, targets: { "synthetic-p0b": { ...target, server: { ...target.server, command_timeout_ms: 3_600_001 } } } }), /between 120000 and 3600000/);
     assert.throws(() => parseControlRegistry({ ...registryValue, mode_from_environment: "P0B_ISOLATED" }), /unknown fields/);
     const aliasTarget = { ...target, target_identity: "synthetic-alias", sessions: { Delivery: { id: target.sessions.Meta!.id } }, capability_receipt_path: "capability-receipts/alias.json" };
     assert.throws(() => parseControlRegistry({ ...registryValue, targets: { "synthetic-p0b": target, "synthetic-alias": aliasTarget } }), /session identity is duplicated/);

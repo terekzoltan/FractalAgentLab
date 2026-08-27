@@ -50,7 +50,7 @@
           "properties": {
             "origin": { "type": "string", "pattern": "^https?://(?:127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]{1,5})?$" },
             "binary_sha256": { "$ref": "#/$defs/sha256" },
-            "command_timeout_ms": { "type": "integer", "minimum": 120000, "maximum": 900000 }
+            "command_timeout_ms": { "type": "integer", "minimum": 120000, "maximum": 3600000 }
           }
         },
         "sessions": {

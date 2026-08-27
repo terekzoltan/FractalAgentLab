@@ -106,9 +106,9 @@ class FakeResolver implements AuthorityResolver {
   }
 }
 
-function resolvedSource(sourceClass: ResolvedSource["binding"]["source_class"], content: string, order: number): ResolvedSource {
+function resolvedSource(sourceClass: ResolvedSource["binding"]["source_class"], content: string, order: number, logicalIdentity?: string): ResolvedSource {
   return {
-    binding: { path: `evidence/source-${order}.md`, source_class: sourceClass, logical_identity: `${sourceClass.toLowerCase()}-${order}`, producer: "target-state", sha256: sha256(content), order },
+    binding: { path: `evidence/source-${order}.md`, source_class: sourceClass, logical_identity: logicalIdentity ?? (sourceClass === "IMPLEMENTATION_RESULT" ? "candidate-1" : `${sourceClass.toLowerCase()}-${order}`), producer: "target-state", sha256: sha256(content), order },
     content,
   };
 }
@@ -126,7 +126,7 @@ function implementationSource(candidate: string, planIdentity = "plan-1"): strin
   return [
     "IMPLEMENTATION RESULT", "Target: fal", "Epic: E", "Accountable Lane / class / profile: Track D / TRACK / track-d",
     `Plan/fix-plan identity: ${planIdentity}`, "Changed artifacts: runtime", "Explicit non-changes: protected", "Acceptance mapping: PASS",
-    "Checks/results: PASS", `Candidate identity: ${candidate}`, "Worktree limitations: none", "Diff self-review: PASS",
+    "Checks/results: PASS", `Candidate identity/worktree limitations: ${candidate}; none`, "Diff self-review: PASS",
     "Unresolved risks/findings: none", "Exact route: Meta /step-review", "REVIEW_READY",
   ].join("\n");
 }
@@ -957,7 +957,7 @@ test("FSR-002 source lineage rejects forged lifecycle receipts before POST", asy
     resolver.nextCommand = "/step-review";
     const implementation = implementationSource("other-candidate");
     const acceptance = "ACCEPTANCE EVIDENCE\nCandidate: `candidate-1`\n";
-    resolver.resolvedSources = [resolvedSource("IMPLEMENTATION_RESULT", implementation, 0), resolvedSource("ACCEPTANCE_EVIDENCE", acceptance, 1)];
+    resolver.resolvedSources = [resolvedSource("IMPLEMENTATION_RESULT", implementation, 0, "other-candidate"), resolvedSource("ACCEPTANCE_EVIDENCE", acceptance, 1)];
     const engine = new StageEngine(new StateStore(root), resolver, new CommandClient(async () => { calls += 1; return new Response(); }));
     const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
     const forged: StageRequest = {

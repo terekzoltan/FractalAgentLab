@@ -257,7 +257,7 @@ export function parseOutputShape(stage: StageName, raw: string): ParsedOutput {
   const required: Partial<Record<StageName, string[]>> = {
     SEQ_NEXT: [...common, "Wave", "Accountable Lane / class / profile", "Prerequisites/current state", "Scope/non-goals", "Interfaces/ownership", "Feature -> User Story -> Task", "Risks", "Ordered implementation plan", "Acceptance -> verification -> evidence", "Handoffs/exact blockers", "Plan artifact", "Next route", "Readiness"],
     PLAN_REVIEW: [...common, "Plan class", "Plan artifact", "Accountable Lane / class / profile", "Overall verdict", "Blocking corrections", "Non-blocking improvements", "Ownership/dependency decision", "Acceptance/evidence decision", "Exact Delivery Lane action"],
-    IMPLEMENT: [...common, "Accountable Lane / class / profile", "Plan/fix-plan identity", "Changed artifacts", "Explicit non-changes", "Acceptance mapping", "Checks/results", "Candidate identity", "Worktree limitations", "Diff self-review", "Unresolved risks/findings", "Exact route"],
+    IMPLEMENT: [...common, "Accountable Lane / class / profile", "Plan/fix-plan identity", "Changed artifacts", "Explicit non-changes", "Acceptance mapping", "Checks/results", "Candidate identity/worktree limitations", "Diff self-review", "Unresolved risks/findings", "Exact route"],
     STEP_REVIEW: [...common, "Candidate", "Accountable Lane / class / profile", "Reviewed scope", "Overall verdict", "Review routing", "Acceptance/evidence matrix", "Accepted findings", "Rejected/downgraded findings", "Verification result", "Proposed closeout delta", "Closeout disposition", "Commit status", "Exact Delivery Lane action"],
     CLOSEOUT: [...common, "Accountable Lane / class / profile", "workflow_verdict", "domain_verdict", "routing_verdict", "next_role_action", "State/Combined/findings/evidence reconciliation", "Candidate identity", "Staged explicit paths", "Verification", "Commit", "Push"],
   };
@@ -271,9 +271,6 @@ export function parseOutputShape(stage: StageName, raw: string): ParsedOutput {
     if (text === "ACK_ONLY") return { kind: stage, terminal: "ACK_ONLY", fields, raw_sha256: sha256(text) };
     if (text.startsWith("FIX_PLAN_REQUIRED")) required.DELIVERY_RESPONSE = [...common, "Candidate", "Accountable Lane / class / profile", "Accepted finding IDs", "Allowed surfaces", "Forbidden surfaces", "Finding -> change -> acceptance/check", "Dependencies", "Fix-plan artifact"];
     else if (!text.startsWith("UNCLEAR\n") || text.split("\n").length < 2) throw new Error("Delivery response must be exact bare ACK_ONLY or a complete FIX_PLAN_REQUIRED/UNCLEAR artifact");
-  }
-  if (stage === "IMPLEMENT" && fields["Candidate identity/worktree limitations"]) {
-    throw new Error("Implementation result must separate candidate identity and worktree limitations");
   }
   for (const field of required[stage] ?? []) if (!fields[field]) throw new Error(`${stage} output is missing required field ${field}`);
   if (stage === "SEQ_NEXT" && !text.endsWith(`Next route: ${fields["Next route"]}\nReadiness: ${fields.Readiness}`)) throw new Error("SEQ_NEXT route and terminal are not the final ordered lines");
@@ -345,7 +342,6 @@ export function validateOutputBinding(parsed: ParsedOutput, expected: { target: 
   compare("Epic", expected.epic, authorityFieldsRequired);
   compare("Accountable Lane / class / profile", expected.lane);
   if (expected.candidate && parsed.kind === "STEP_REVIEW") compare("Candidate", expected.candidate, true);
-  if (expected.candidate && parsed.kind === "IMPLEMENT") compare("Candidate identity", expected.candidate, true);
   if (expected.candidate && parsed.kind === "DELIVERY_RESPONSE" && parsed.terminal === "FIX_PLAN_REQUIRED") compare("Candidate", expected.candidate, true);
   if (expected.candidate && parsed.kind === "CLOSEOUT") compare("Candidate identity", expected.candidate, true);
   if (expected.plan && parsed.kind === "PLAN_REVIEW") compare("Plan artifact", expected.plan, true);

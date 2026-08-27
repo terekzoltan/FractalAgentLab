@@ -62,7 +62,7 @@ test("review-fix plan phases remain distinct", () => {
   assert.equal(resolveCanonPhase("IMPLEMENT", "REVIEW_FIX_PLAN"), "FIX_IMPLEMENT");
 });
 
-test("implementation output requires separate candidate and worktree fields", () => {
+test("implementation output follows the AWC 4.1.1 combined candidate/worktree field", () => {
   const valid = [
     "IMPLEMENTATION RESULT",
     "Target: FractalAgentLab",
@@ -73,8 +73,7 @@ test("implementation output requires separate candidate and worktree fields", ()
     "Explicit non-changes: protected surfaces",
     "Acceptance mapping: PASS",
     "Checks/results: PASS",
-    "Candidate identity: candidate-1",
-    "Worktree limitations: dirty unrelated files preserved",
+    "Candidate identity/worktree limitations: Uncommitted implementation candidate bound to plan-1; dirty unrelated files preserved",
     "Diff self-review: PASS",
     "Unresolved risks/findings: none",
     "Exact route: Meta /step-review",
@@ -82,10 +81,10 @@ test("implementation output requires separate candidate and worktree fields", ()
   ].join("\n");
   const parsed = parseOutputShape("IMPLEMENT", valid);
   validateOutputBinding(parsed, { target: "FractalAgentLab", epic: "E1", lane: "Track D / TRACK / track-d" });
-  assert.equal(parsed.fields["Candidate identity"], "candidate-1");
+  assert.equal(parsed.fields["Candidate identity/worktree limitations"], "Uncommitted implementation candidate bound to plan-1; dirty unrelated files preserved");
 
-  const combined = valid.replace("Candidate identity: candidate-1\nWorktree limitations: dirty unrelated files preserved", "Candidate identity/worktree limitations: candidate-1; dirty");
-  assert.throws(() => parseOutputShape("IMPLEMENT", combined), /must separate/);
+  const noncanonicalSplit = valid.replace("Candidate identity/worktree limitations: Uncommitted implementation candidate bound to plan-1; dirty unrelated files preserved", "Candidate identity: candidate-1\nWorktree limitations: dirty unrelated files preserved");
+  assert.throws(() => parseOutputShape("IMPLEMENT", noncanonicalSplit), /missing required field Candidate identity\/worktree limitations/);
 });
 
 test("binding is independent from shape", () => {
