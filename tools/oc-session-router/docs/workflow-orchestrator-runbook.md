@@ -106,6 +106,10 @@ Delivery /seq-next
   and missing, conflicting, tampered, cross-run, or invalid predecessor evidence
   blocks before POST. Target-owned sources remain required for any source class
   that no successful predecessor output can supply.
+  A successful `PLAN_REVISION` may mint a new opaque final plan identity. The
+  following `IMPLEMENT` request MUST use that promoted `REVISED_PLAN` identity;
+  the earlier revision request's input identity remains provenance and does not
+  override the validated final artifact.
 - The launcher accepts only request/run/operation identities. Protected process
   configuration supplies the runtime root and control registry; the engine, not
   the request, resolves target authority, origin, recipient, sources, command, and

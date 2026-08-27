@@ -287,7 +287,7 @@ export class StageEngine {
     if (previous.status === "SUCCEEDED") {
       const result = this.store.loadResult(request.run_id, previous.operation_id) as { allowed_next?: unknown };
       if (!Array.isArray(result.allowed_next) || !result.allowed_next.includes(request.requested_stage)) throw new Error("Requested stage is not an allowed transition");
-      if (previous.invocation.requested_stage === "PLAN_REVISION" && request.requested_stage === "IMPLEMENT" && (previous.invocation.plan_class !== request.plan_class || previous.invocation.plan_identity !== request.plan_identity)) throw new Error("PLAN_REVISION to IMPLEMENT plan class or identity changed");
+      if (previous.invocation.requested_stage === "PLAN_REVISION" && request.requested_stage === "IMPLEMENT" && previous.invocation.plan_class !== request.plan_class) throw new Error("PLAN_REVISION to IMPLEMENT plan class changed");
       return;
     }
     if (previous.invocation.requested_stage !== request.requested_stage) throw new Error("Failed stage may only be retried as the same explicit stage transition");

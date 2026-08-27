@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { authoritySha256, canonicalize, sha256, type RunAuthority, type RunRequest, type StageRequest } from "../src/contracts.js";
-import { StageEngine, _test as stageTest, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "../src/stage-engine.js";
+import { StageEngine, _test as stageTest, promotedSourcesForStage, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "../src/stage-engine.js";
 import { ROUTER_PROTOCOL_IDENTITY, buildSharedFenceBinding } from "../src/control-plane.js";
 import { StateStore } from "../src/state-store.js";
 import { CommandClient, type FetchLike } from "../src/transport.js";
@@ -494,6 +494,66 @@ test("FSR-010: EPIC and REVIEW_FIX revisions each reach their matching IMPLEMENT
       assert.equal((await engine.invokeStage(stage)).operation_status, "SUCCEEDED");
     }
     assert.equal(calls, 2);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("PLAN_REVISION promotes its final plan identity into the same-run IMPLEMENT edge", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-plan-identity-promotion-"));
+  try {
+    let calls = 0;
+    const finalPlanIdentity = "plan-final-v2";
+    const revisedPlan = new FakeResolver().revisedPlanContent.replaceAll("plan-1", finalPlanIdentity);
+    const resolver = new FakeResolver();
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      calls += 1;
+      const text = calls === 1
+        ? planReviewSource()
+        : calls === 2
+          ? revisedPlan
+          : implementationSource("candidate-1", finalPlanIdentity);
+      return new Response(JSON.stringify({
+        info: { id: `assistant-promotion-${calls}`, role: "assistant", sessionID: "session-meta" },
+        parts: [{ id: `part-promotion-${calls}`, type: "text", text, messageID: `assistant-promotion-${calls}`, sessionID: "session-meta" }],
+      }));
+    }));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const base = request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent));
+    assert.equal((await engine.invokeStage(base)).operation_status, "SUCCEEDED");
+
+    const promotedReview = promotedSourcesForStage(store, created.run_id, "PLAN_REVISION");
+    const revisionSources = [
+      resolvedSource("PLAN", resolver.sourceContent, 0),
+      { ...promotedReview[0]!, binding: { ...promotedReview[0]!.binding, order: 1 } },
+    ];
+    resolver.resolvedSources = revisionSources;
+    const revisionRequest: StageRequest = {
+      ...base,
+      request_id: "request-plan-identity-revision",
+      requested_stage: "PLAN_REVISION",
+      sender_role: "Meta",
+      recipient_role: "Track D",
+      expected_sources: revisionSources.map((source) => source.binding),
+    };
+    assert.equal((await engine.invokeStage(revisionRequest)).operation_status, "SUCCEEDED");
+
+    const promotedPlan = promotedSourcesForStage(store, created.run_id, "IMPLEMENT");
+    resolver.resolvedSources = promotedPlan;
+    const implementRequestV2: StageRequest = {
+      ...base,
+      request_id: "request-plan-identity-implement",
+      requested_stage: "IMPLEMENT",
+      recipient_role: "Track D",
+      plan_identity: finalPlanIdentity,
+      expected_sources: promotedPlan.map((source) => source.binding),
+    };
+    await assert.rejects(() => engine.invokeStage({ ...implementRequestV2, request_id: "request-plan-identity-forged", plan_identity: "forged-final-plan" }), /Revised plan lineage/);
+    assert.equal(store.listOperations(created.run_id).length, 2);
+    assert.equal((await engine.invokeStage(implementRequestV2)).operation_status, "SUCCEEDED");
+    assert.equal(calls, 3);
+    assert.equal(store.listOperations(created.run_id).length, 3);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
