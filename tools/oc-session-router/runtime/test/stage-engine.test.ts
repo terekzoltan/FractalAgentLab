@@ -547,6 +547,7 @@ test("PLAN_REVISION promotes its final plan identity into the same-run IMPLEMENT
       requested_stage: "IMPLEMENT",
       recipient_role: "Track D",
       plan_identity: finalPlanIdentity,
+      candidate_identity: "candidate-1",
       expected_sources: promotedPlan.map((source) => source.binding),
     };
     await assert.rejects(() => engine.invokeStage({ ...implementRequestV2, request_id: "request-plan-identity-forged", plan_identity: "forged-final-plan" }), /Revised plan lineage/);
@@ -554,6 +555,48 @@ test("PLAN_REVISION promotes its final plan identity into the same-run IMPLEMENT
     assert.equal((await engine.invokeStage(implementRequestV2)).operation_status, "SUCCEEDED");
     assert.equal(calls, 3);
     assert.equal(store.listOperations(created.run_id).length, 3);
+    const promotedReviewSources = promotedSourcesForStage(store, created.run_id, "STEP_REVIEW");
+    assert.deepEqual(promotedReviewSources.map((source) => source.binding.source_class), ["IMPLEMENTATION_RESULT", "ACCEPTANCE_EVIDENCE"]);
+    assert.equal(promotedReviewSources[0]!.binding.logical_identity, "candidate-1");
+    assert.match(promotedReviewSources[1]!.content, /^ACCEPTANCE EVIDENCE\nCandidate: candidate-1\nReview mode: INITIAL\nRepaired finding IDs: \[\]\n/m);
+    assert.match(promotedReviewSources[1]!.content, /Acceptance mapping: PASS/);
+    assert.match(promotedReviewSources[1]!.content, /Checks\/results: PASS/);
+    assert.equal(promotedReviewSources[1]!.binding.sha256, sha256(promotedReviewSources[1]!.content));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("IMPLEMENT promotion preserves FIX_RECHECK acceptance lineage", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-fix-recheck-acceptance-promotion-"));
+  try {
+    const resolver = new FakeResolver();
+    resolver.nextCommand = "/implement";
+    resolver.reviewCycle = "1";
+    resolver.revisedPlanContent = reviewFixRevisionSource();
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => new Response(JSON.stringify({
+      info: { id: "assistant-fix-implement", role: "assistant", sessionID: "session-meta" },
+      parts: [{ id: "part-fix-implement", type: "text", text: implementationSource("candidate-1", "fix-plan-1"), messageID: "assistant-fix-implement", sessionID: "session-meta" }],
+    }))));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const stage: StageRequest = {
+      ...request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)),
+      request_id: "request-fix-recheck-implement",
+      requested_stage: "IMPLEMENT",
+      recipient_role: "Track D",
+      plan_class: "REVIEW_FIX_PLAN",
+      plan_identity: "fix-plan-1",
+      candidate_identity: "candidate-1",
+      review_cycle: "1",
+      finding_ids: ["FSR-010"],
+      expected_sources: [{ path: "plans/revised.md", source_class: "REVISED_PLAN", logical_identity: "fix-plan-1", producer: "target-state", sha256: sha256(resolver.revisedPlanContent), order: 0 }],
+    };
+    assert.equal((await engine.invokeStage(stage)).operation_status, "SUCCEEDED");
+    const promoted = promotedSourcesForStage(store, created.run_id, "STEP_REVIEW");
+    assert.deepEqual(promoted.map((source) => source.binding.source_class), ["IMPLEMENTATION_RESULT", "ACCEPTANCE_EVIDENCE"]);
+    assert.match(promoted[1]!.content, /Review mode: FIX_RECHECK/);
+    assert.match(promoted[1]!.content, /Repaired finding IDs: \["FSR-010"\]/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -1183,6 +1226,9 @@ test("resolve-stage recovers one exact command-root terminal after an uncertain 
     assert.equal(calls, 1);
     assert.equal(store.loadOperation(created.run_id, uncertain.operation_id).status, "SUCCEEDED");
     assert.match(readFileSync(path.join(root, "runs", created.run_id, "operations", uncertain.operation_id, "terminal.md"), "utf8"), /Plan artifact: plan-1/);
+    const repeated = await engine.resolveStage(created.run_id, uncertain.operation_id);
+    assert.deepEqual(repeated, reconciled);
+    assert.equal(calls, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

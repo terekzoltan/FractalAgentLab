@@ -65,6 +65,10 @@ It is not project truth and does not grant workflow authority.
   protected runtime evidence. This permits an in-run `SEQ_NEXT -> PLAN_REVIEW`
   handoff without rewriting target state or the target manifest. It does not
   auto-advance, accept arbitrary runtime content, or weaken run authority.
+  A validated `IMPLEMENT` terminal also yields a separate hash-bound
+  `ACCEPTANCE_EVIDENCE` projection from its canonical acceptance/check fields
+  and protected candidate/review lineage, so same-run `STEP_REVIEW` receives
+  both required sources without inventing target evidence.
   An Owner refresh of the operational registry/capability may change the coarse
   registry projection hash without invalidating that run. The resolver still
   requires every semantic run-authority field, target source, current capability,

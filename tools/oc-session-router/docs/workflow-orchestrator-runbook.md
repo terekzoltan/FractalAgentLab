@@ -110,6 +110,10 @@ Delivery /seq-next
   following `IMPLEMENT` request MUST use that promoted `REVISED_PLAN` identity;
   the earlier revision request's input identity remains provenance and does not
   override the validated final artifact.
+  A successful `IMPLEMENT` promotes both its validated terminal and a derived,
+  hash-bound acceptance receipt. The receipt contains only the protected
+  candidate/review lineage plus the terminal's canonical `Acceptance mapping`
+  and `Checks/results`; it is not an independent acceptance verdict.
 - The launcher accepts only request/run/operation identities. Protected process
   configuration supplies the runtime root and control registry; the engine, not
   the request, resolves target authority, origin, recipient, sources, command, and
@@ -119,6 +123,9 @@ Delivery /seq-next
   cannot resend. It may be repeated after the addressed session becomes idle.
   Production lifecycle admission should normally bind a 60-minute command timeout;
   the bounded policy permits 2-60 minutes. Timeout never authorizes a retry.
+  Repeating `resolve-stage` after an operation is already `SUCCEEDED` is
+  idempotent and returns the stored validated result without another snapshot
+  read, state mutation, or transport action.
   Installed message history is interpreted chronologically, paged only through
   the server-provided opaque cursor under fixed page/byte caps, and uses the
   latest pre-send message as baseline. When no synchronous receipt exists, recovery

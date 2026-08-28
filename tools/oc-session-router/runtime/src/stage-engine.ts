@@ -321,6 +321,21 @@ export class StageEngine {
 
   async resolveStage(runId: string, operationId: string): Promise<StageResult> {
     let operation = this.store.loadOperation(runId, operationId);
+    if (operation.status === "SUCCEEDED") {
+      const stored = this.store.loadResult(runId, operationId) as Partial<StageResult>;
+      if (
+        stored.schema_version !== "stage-result.v1" ||
+        stored.run_id !== runId ||
+        stored.operation_id !== operationId ||
+        stored.operation_status !== "SUCCEEDED" ||
+        stored.output_status !== "VALID" ||
+        stored.binding_status !== "BOUND" ||
+        stored.terminal_status !== "VALID" ||
+        !Array.isArray(stored.allowed_next) ||
+        stored.auto_advance !== false
+      ) throw new Error("Stored successful operation result is invalid");
+      return stored as StageResult;
+    }
     if (!["DISPATCHING", "ACTIVE", "UNCERTAIN", "RECONCILING"].includes(operation.status)) throw new Error("Operation is not reconcilable");
     if (!this.snapshots) throw new Error("Snapshot reconciliation capability is unavailable");
     if (operation.status !== "RECONCILING") operation = this.store.updateOperation(runId, operationId, operation.revision, { status: "RECONCILING" });
@@ -443,6 +458,26 @@ function routerOwnedSourceCandidates(store: StateStore, runId: string): RouterOw
     } else if (operation.invocation.requested_stage === "IMPLEMENT") {
       if (operation.invocation.candidate_identity === "UNDECLARED") throw new Error("Implementation producer candidate identity is undeclared");
       candidates.push({ ...base, source_class: "IMPLEMENTATION_RESULT", logical_identity: operation.invocation.candidate_identity });
+      const reviewMode = operation.invocation.review_cycle === "0" ? "INITIAL" : "FIX_RECHECK";
+      const acceptanceEvidence = [
+        "ACCEPTANCE EVIDENCE",
+        `Candidate: ${operation.invocation.candidate_identity}`,
+        `Review mode: ${reviewMode}`,
+        `Repaired finding IDs: ${canonicalize(operation.invocation.finding_ids)}`,
+        `Acceptance mapping: ${parsed.fields["Acceptance mapping"]!}`,
+        `Checks/results: ${parsed.fields["Checks/results"]!}`,
+        "Evidence producer: FAL_ROUTER_OUTPUT",
+        "",
+      ].join("\n");
+      const acceptanceSha = sha256(Buffer.from(acceptanceEvidence, "utf8"));
+      candidates.push({
+        source_class: "ACCEPTANCE_EVIDENCE",
+        logical_identity: `acceptance-evidence-${acceptanceSha.slice(0, 16)}`,
+        producer: "FAL_ROUTER_OUTPUT",
+        path: `router-output/${operation.operation_id}/acceptance-evidence.md`,
+        sha256: acceptanceSha,
+        content: acceptanceEvidence,
+      });
     } else if (operation.invocation.requested_stage === "STEP_REVIEW") {
       candidates.push({ ...base, source_class: "FINAL_SYNTHESIS", logical_identity: parsed.fields.Candidate! });
       const proposedDelta = `${parsed.fields["Proposed closeout delta"]!}\n`;

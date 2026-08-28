@@ -118,7 +118,9 @@ projection is append-only and same-run: it binds producer operation, source
 class, logical identity, SHA-256, and consumer order. `get-run` returns only the
 sanitized exact bindings under `next_stage_sources`; the resolver reloads the
 protected terminal and verifies the successful result and artifact hash before
-use. This is the normal bridge for generated lifecycle artifacts such as
+use. For `IMPLEMENT`, the router additionally projects a deterministic
+`ACCEPTANCE_EVIDENCE` receipt from the validated output's acceptance/check
+fields and protected candidate/review lineage. This is the normal bridge for generated lifecycle artifacts such as
 `SEQ_NEXT -> PLAN -> PLAN_REVIEW`. It never rewrites target authority, invents
 missing non-output evidence, or sends automatically. If target and router-owned
 authority conflict for the same class, dispatch fails closed.
