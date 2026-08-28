@@ -572,7 +572,8 @@ const SOURCE_CLASSES: Record<StageRequest["requested_stage"], readonly SourceCla
   CLOSEOUT: ["FINAL_SYNTHESIS", "DELIVERY_RESPONSE", "PROPOSED_DELTA", "CLOSEOUT_AUTHORITY"],
 };
 
-function routerOwnedSourceCandidates(store: StateStore, runId: string): RouterOwnedSourceCandidate[] {
+function routerOwnedSourceCandidates(store: StateStore, runId: string, requiredSourceClasses: readonly SourceClass[]): RouterOwnedSourceCandidate[] {
+  const required = new Set(requiredSourceClasses);
   const candidates: RouterOwnedSourceCandidate[] = [];
   for (const operation of store.listOperations(runId)) {
     if (operation.status !== "SUCCEEDED") continue;
@@ -585,53 +586,58 @@ function routerOwnedSourceCandidates(store: StateStore, runId: string): RouterOw
     const parsed = parseOutputShape(operation.invocation.requested_stage, content);
     const base = { producer: "FAL_ROUTER_OUTPUT", path: `router-output/${operation.operation_id}/terminal.md`, sha256: contentSha, content };
     if (operation.invocation.requested_stage === "SEQ_NEXT") {
-      candidates.push({ ...base, source_class: "PLAN", logical_identity: parsed.fields[parsed.plan_class === "REVIEW_FIX_PLAN" ? "Fix-plan artifact" : "Plan artifact"]! });
+      if (required.has("PLAN")) candidates.push({ ...base, source_class: "PLAN", logical_identity: parsed.fields[parsed.plan_class === "REVIEW_FIX_PLAN" ? "Fix-plan artifact" : "Plan artifact"]! });
     } else if (operation.invocation.requested_stage === "PLAN_REVIEW") {
-      candidates.push({ ...base, source_class: "META_PLAN_REVIEW", logical_identity: `meta-review-${contentSha.slice(0, 16)}` });
+      if (required.has("META_PLAN_REVIEW")) candidates.push({ ...base, source_class: "META_PLAN_REVIEW", logical_identity: `meta-review-${contentSha.slice(0, 16)}` });
     } else if (operation.invocation.requested_stage === "PLAN_REVISION") {
-      candidates.push({ ...base, source_class: "REVISED_PLAN", logical_identity: parsed.fields["Final plan artifact"]! });
+      if (required.has("REVISED_PLAN")) candidates.push({ ...base, source_class: "REVISED_PLAN", logical_identity: parsed.fields["Final plan artifact"]! });
     } else if (operation.invocation.requested_stage === "IMPLEMENT") {
       if (operation.invocation.candidate_identity === "UNDECLARED") throw new Error("Implementation producer candidate identity is undeclared");
-      candidates.push({ ...base, source_class: "IMPLEMENTATION_RESULT", logical_identity: operation.invocation.candidate_identity });
-      const frozenScope = frozenCandidateScopeReceipt(store, runId, operation);
-      const reviewMode = operation.invocation.review_cycle === "0" ? "INITIAL" : "FIX_RECHECK";
-      const acceptanceEvidence = [
-        "ACCEPTANCE EVIDENCE",
-        `Candidate: ${operation.invocation.candidate_identity}`,
-        `Candidate paths: ${canonicalize(frozenScope.candidatePaths)}`,
-        `Frozen candidate scope SHA-256: ${frozenScope.sha256}`,
-        `Review mode: ${reviewMode}`,
-        `Repaired finding IDs: ${canonicalize(operation.invocation.finding_ids)}`,
-        `Acceptance mapping: ${parsed.fields["Acceptance mapping"]!}`,
-        `Checks/results: ${parsed.fields["Checks/results"]!}`,
-        "Evidence producer: FAL_ROUTER_OUTPUT",
-        "",
-      ].join("\n");
-      const acceptanceSha = sha256(Buffer.from(acceptanceEvidence, "utf8"));
-      candidates.push({
-        source_class: "ACCEPTANCE_EVIDENCE",
-        logical_identity: `acceptance-evidence-${acceptanceSha.slice(0, 16)}`,
-        producer: "FAL_ROUTER_OUTPUT",
-        path: `router-output/${operation.operation_id}/acceptance-evidence.md`,
-        sha256: acceptanceSha,
-        content: acceptanceEvidence,
-      });
+      if (required.has("IMPLEMENTATION_RESULT")) candidates.push({ ...base, source_class: "IMPLEMENTATION_RESULT", logical_identity: operation.invocation.candidate_identity });
+      if (required.has("ACCEPTANCE_EVIDENCE")) {
+        const frozenScope = frozenCandidateScopeReceipt(store, runId, operation);
+        const reviewMode = operation.invocation.review_cycle === "0" ? "INITIAL" : "FIX_RECHECK";
+        const acceptanceEvidence = [
+          "ACCEPTANCE EVIDENCE",
+          `Candidate: ${operation.invocation.candidate_identity}`,
+          `Candidate paths: ${canonicalize(frozenScope.candidatePaths)}`,
+          `Frozen candidate scope SHA-256: ${frozenScope.sha256}`,
+          `Review mode: ${reviewMode}`,
+          `Repaired finding IDs: ${canonicalize(operation.invocation.finding_ids)}`,
+          `Acceptance mapping: ${parsed.fields["Acceptance mapping"]!}`,
+          `Checks/results: ${parsed.fields["Checks/results"]!}`,
+          "Evidence producer: FAL_ROUTER_OUTPUT",
+          "",
+        ].join("\n");
+        const acceptanceSha = sha256(Buffer.from(acceptanceEvidence, "utf8"));
+        candidates.push({
+          source_class: "ACCEPTANCE_EVIDENCE",
+          logical_identity: `acceptance-evidence-${acceptanceSha.slice(0, 16)}`,
+          producer: "FAL_ROUTER_OUTPUT",
+          path: `router-output/${operation.operation_id}/acceptance-evidence.md`,
+          sha256: acceptanceSha,
+          content: acceptanceEvidence,
+        });
+      }
     } else if (operation.invocation.requested_stage === "STEP_REVIEW") {
-      candidates.push({ ...base, source_class: "FINAL_SYNTHESIS", logical_identity: parsed.fields.Candidate! });
-      const proposedDelta = `${parsed.fields["Proposed closeout delta"]!}\n`;
-      candidates.push({ source_class: "PROPOSED_DELTA", logical_identity: `proposed-delta-${contentSha.slice(0, 16)}`, producer: "FAL_ROUTER_OUTPUT", path: `router-output/${operation.operation_id}/proposed-delta.md`, sha256: sha256(Buffer.from(proposedDelta, "utf8")), content: proposedDelta });
+      if (required.has("FINAL_SYNTHESIS")) candidates.push({ ...base, source_class: "FINAL_SYNTHESIS", logical_identity: parsed.fields.Candidate! });
+      if (required.has("PROPOSED_DELTA")) {
+        const proposedDelta = `${parsed.fields["Proposed closeout delta"]!}\n`;
+        candidates.push({ source_class: "PROPOSED_DELTA", logical_identity: `proposed-delta-${contentSha.slice(0, 16)}`, producer: "FAL_ROUTER_OUTPUT", path: `router-output/${operation.operation_id}/proposed-delta.md`, sha256: sha256(Buffer.from(proposedDelta, "utf8")), content: proposedDelta });
+      }
     } else if (operation.invocation.requested_stage === "DELIVERY_RESPONSE") {
-      if (parsed.terminal === "ACK_ONLY") candidates.push({ ...base, source_class: "DELIVERY_RESPONSE", logical_identity: `delivery-response-${contentSha.slice(0, 16)}` });
-      else candidates.push({ ...base, source_class: "PLAN", logical_identity: parsed.fields["Fix-plan artifact"]! });
+      if (parsed.terminal === "ACK_ONLY") {
+        if (required.has("DELIVERY_RESPONSE")) candidates.push({ ...base, source_class: "DELIVERY_RESPONSE", logical_identity: `delivery-response-${contentSha.slice(0, 16)}` });
+      } else if (required.has("PLAN")) candidates.push({ ...base, source_class: "PLAN", logical_identity: parsed.fields["Fix-plan artifact"]! });
     }
   }
   const ownerSource = store.loadOwnerSource(runId);
-  if (ownerSource) candidates.push({ ...ownerSource.binding, content: ownerSource.content });
+  if (ownerSource && required.has("CLOSEOUT_AUTHORITY")) candidates.push({ ...ownerSource.binding, content: ownerSource.content });
   return candidates;
 }
 
 export function promotedSourcesForStage(store: StateStore, runId: string, stage: StageRequest["requested_stage"]): ResolvedSource[] {
-  const candidates = routerOwnedSourceCandidates(store, runId);
+  const candidates = routerOwnedSourceCandidates(store, runId, SOURCE_CLASSES[stage]);
   return SOURCE_CLASSES[stage].flatMap((sourceClass, order) => {
     const matches = candidates.filter((candidate) => candidate.source_class === sourceClass);
     const selected = matches.at(-1);

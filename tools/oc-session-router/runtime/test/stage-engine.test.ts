@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -672,6 +672,22 @@ test("v29 green lifecycle projects complete router sources and declares the Owne
     assert.equal((await engine.invokeStage({ ...base, request_id: "request-lifecycle-implement", requested_stage: "IMPLEMENT", recipient_role: "Track D", candidate_identity: "candidate-1", expected_sources: resolver.resolvedSources.map((source) => source.binding) })).operation_status, "SUCCEEDED");
     resolver.resolvedSources = projected("STEP_REVIEW");
     assert.equal((await engine.invokeStage({ ...base, request_id: "request-lifecycle-step-review", requested_stage: "STEP_REVIEW", candidate_identity: "candidate-1", expected_sources: resolver.resolvedSources.map((source) => source.binding) })).operation_status, "SUCCEEDED");
+
+    // A v28 implementation has no frozen candidate-scope receipt. Once its
+    // STEP_REVIEW already succeeded, DELIVERY_RESPONSE needs only the exact
+    // FINAL_SYNTHESIS and must not rematerialize obsolete acceptance evidence.
+    const implementation = store.listOperations(created.run_id).find((operation) => operation.invocation.requested_stage === "IMPLEMENT")!;
+    const scopePath = store.resolve("runs", created.run_id, "operations", implementation.operation_id, "candidate-scope.md");
+    const scopeBytes = readFileSync(scopePath);
+    const implementationResult = store.loadResult(created.run_id, implementation.operation_id) as Record<string, unknown>;
+    const { candidate_scope_sha256: _legacyMissingScope, ...legacyImplementationResult } = implementationResult;
+    unlinkSync(scopePath);
+    store.updateResult(created.run_id, implementation.operation_id, legacyImplementationResult);
+    assert.deepEqual((engine.getRun(created.run_id) as { next_stage_sources: Array<{ requested_stage: string }> }).next_stage_sources.map((entry) => entry.requested_stage), ["DELIVERY_RESPONSE"]);
+    assert.throws(() => promotedSourcesForStage(store, created.run_id, "STEP_REVIEW"), /lacks frozen candidate scope evidence/);
+    writeFileSync(scopePath, scopeBytes, { flag: "wx" });
+    store.updateResult(created.run_id, implementation.operation_id, implementationResult);
+
     resolver.resolvedSources = projected("DELIVERY_RESPONSE");
     const delivery = await engine.invokeStage({ ...base, request_id: "request-lifecycle-delivery", requested_stage: "DELIVERY_RESPONSE", sender_role: "Meta", recipient_role: "Track D", candidate_identity: "candidate-1", expected_sources: resolver.resolvedSources.map((source) => source.binding) });
     assert.deepEqual(delivery.allowed_next, []);
