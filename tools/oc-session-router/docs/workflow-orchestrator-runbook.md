@@ -80,10 +80,12 @@ Delivery /seq-next
 -> Delivery /implement
 -> Meta /step-review
 -> Delivery /step-review-utan
--> FIX_PLAN_REQUIRED loop or ACK_ONLY -> Meta /closeout-commit
+-> FIX_PLAN_REQUIRED -> new incremented review-cycle run
+   or ACK_ONLY -> Owner no-send closeout-authority install
+               -> same-run Meta /closeout-commit
 ```
 
-`/terv-review` is one direct Meta pass and its canonical envelope includes `Plan class`. `/terv-review-utan` normally ends `PLAN_REVISION_COMPLETE` and `IMPLEMENT_READY`; `IMPLEMENT_BLOCKED` is exceptional. The corrected plan and summary repeat Target, Epic, lane, and one opaque final plan identity byte-identically, then route directly to `/implement`. Every final step-review color routes through `/step-review-utan`. Only exact `ACK_ONLY` is closeout-eligible. `FIX_PLAN_REQUIRED ... FIX_PLAN_READY_FOR_IMPLEMENT` declares fix-plan completeness and routes once through Meta `/terv-review` plus Delivery `/terv-review-utan`; only the resulting ready revision routes to `/implement`. `UNCLEAR` routes upward. Meta color never substitutes for the Delivery response class.
+`/terv-review` is one direct Meta pass and its canonical envelope includes `Plan class`. `/terv-review-utan` normally ends `PLAN_REVISION_COMPLETE` and `IMPLEMENT_READY`; `IMPLEMENT_BLOCKED` is exceptional. The corrected plan and summary repeat Target, Epic, lane, and one opaque final plan identity byte-identically, then route directly to `/implement`. Every final step-review color routes through `/step-review-utan`. Only exact `ACK_ONLY` is closeout-eligible. `FIX_PLAN_REQUIRED ... FIX_PLAN_READY_FOR_IMPLEMENT` declares fix-plan completeness and establishes `REVIEW_FIX_PLAN` lineage, but it ends the current immutable review-cycle run. Start a follow-on run with an incremented `Review cycle`, the exact accepted finding IDs, and that fix plan; then route once through Meta `/terv-review` plus Delivery `/terv-review-utan`. Only the resulting ready revision routes to `/implement`. `UNCLEAR` routes upward. Meta color never substitutes for the Delivery response class.
 
 ## Transport law
 
@@ -101,6 +103,29 @@ Delivery /seq-next
   when every semantic run-authority field remains identical. The fresh registry,
   capability, recipient, server instance, and transport are still revalidated
   before operation creation and immediately before POST.
+- Treat `next_stage_sources` as dispatch-ready only when it contains the complete
+  ordered source set. When `continuation_requirements` instead names
+  `TARGET_SOURCE_REQUIRED`, perform the target/Owner preflight for the listed
+  source classes and do not send the stage yet. Preserve the exact
+  `available_stage_sources` bindings as evidence; they are not readiness.
+  `FOLLOW_ON_RUN_REQUIRED` means the current review cycle is complete and
+  immutable; create the named repair successor run after adopting every listed
+  source and incrementing its review cycle. `OWNER_SOURCE_REQUIRED` after
+  `ACK_ONLY` is different: keep the same run and invoke the Owner-only, no-send
+  `install-closeout-authority` operation. It validates the current worktree and
+  stores only the fresh authority in protected FAL runtime; it does not write the
+  target repository. Re-run `get-run`, then use the complete projected CLOSEOUT
+  packet for one explicit Meta `/closeout-commit` stage.
+  The supported launcher form is
+  `Invoke-OCRouter.ps1 -Operation install-closeout-authority -RequestPath <intent.json>`;
+  it never performs a POST or creates a lifecycle operation.
+  Never infer `CLOSEOUT_AUTHORITY` from router output or synthesize Owner commit
+  authority. Use `CLOSEOUT_AUTHORITY` v2 and copy its `candidate_paths` from the
+  frozen reviewed candidate scope. For a commit, authorize the exact union of frozen candidate paths
+  and synthesis-enumerated governance-delta paths with an empty index. Do not
+  pre-stage them: Meta `/closeout-commit` applies the delta, stages the exact
+  union, and commits. Protected changed paths must equal the authority-bound
+  candidate paths; any ambient unrelated path blocks before POST.
 - Router-owned output promotion is source adoption, not stage execution:
   `auto_advance` remains false, every command remains an explicit transaction,
   and missing, conflicting, tampered, cross-run, or invalid predecessor evidence
@@ -110,17 +135,30 @@ Delivery /seq-next
   following `IMPLEMENT` request MUST use that promoted `REVISED_PLAN` identity;
   the earlier revision request's input identity remains provenance and does not
   override the validated final artifact.
+  When consecutive stages require the same target-owned source class, `get-run`
+  may carry forward the exact binding already validated by the preceding
+  successful stage. The resolver still reloads and hashes its current bytes
+  immediately before dispatch; no state or manifest rewrite is implied.
   A successful `IMPLEMENT` promotes both its validated terminal and a derived,
   hash-bound acceptance receipt. The receipt contains only the protected
   candidate/review lineage plus the terminal's canonical `Acceptance mapping`
   and `Checks/results`; it is not an independent acceptance verdict.
+  The terminal's `Candidate identity/worktree limitations` field must begin with
+  the request's exact candidate token. The next character, when present, must be
+  outside the opaque-ID alphabet; no new punctuation grammar is imposed on Canon.
+  For closeout, a non-`NONE` `Proposed closeout delta` is the Canon's exact
+  minified JSON array of `{path,field,value}` objects, not a path-only array;
+  compare it as an exact set, independent of entry order.
 - The launcher accepts only request/run/operation identities. Protected process
   configuration supplies the runtime root and control registry; the engine, not
   the request, resolves target authority, origin, recipient, sources, command, and
   deterministic argument bytes.
 - The synchronous `/command` assistant response is the primary candidate. A
   timeout or 5xx leaves the operation `UNCERTAIN`; `resolve-stage` is read-only and
-  cannot resend. It may be repeated after the addressed session becomes idle.
+  cannot resend. In production its default bounded wait polls the same operation's
+  GET history for up to 60 minutes and exits as soon as one exact terminal is
+  available. Do not create a replacement operation or run while this reconciliation
+  is waiting; an explicit shorter operator wait may be selected when needed.
   Production lifecycle admission should normally bind a 60-minute command timeout;
   the bounded policy permits 2-60 minutes. Timeout never authorizes a retry.
   Repeating `resolve-stage` after an operation is already `SUCCEEDED` is
@@ -268,6 +306,6 @@ route-ready output are reference-only. No active Orchestrator route invokes them
 
 ## Closeout and cold references
 
-After exact `ACK_ONLY`, `/closeout-commit` may apply only synthesis-enumerated governance/closeout deltas, verify and stage explicit target paths, and commit without push. Behavior-changing source, tests, config, runbooks, commands, skills, and policy must already be in the frozen reviewed candidate. Target and FAL transactions remain separate.
+After exact `ACK_ONLY`, install the fresh Owner closeout authority in protected runtime without a target write, then use the same run's complete CLOSEOUT projection. `/closeout-commit` may apply only synthesis-enumerated governance/closeout deltas, verify and stage explicit target paths, and commit without push. Behavior-changing source, tests, config, runbooks, commands, skills, and policy must already be in the frozen reviewed candidate. Target and FAL transactions remain separate.
 
 Open `workflow-orchestrator-reference.md` selectively for: stage-aware output selection; native review envelopes and receipts; wrapper/runtime artifacts; parallel lanes; legacy-frontier blocking; ACK and compact guards; or incident recovery. See `../config/README.md` only when adding target review-domain mappings or exact Owner budget envelopes. Canon role, output, hydration, recovery, closeout, and FAL-adapter runbooks override contradictory cold legacy text.

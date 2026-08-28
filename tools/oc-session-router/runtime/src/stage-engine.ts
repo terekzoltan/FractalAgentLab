@@ -12,6 +12,7 @@ import {
   sha256,
   stageRequestFromInvocation,
   validateOutputBinding,
+  type CloseoutAuthorityInstallRequest,
   type RunAuthority,
   type RunRequest,
   type SourceBinding,
@@ -20,7 +21,7 @@ import {
   type StageRequest,
 } from "./contracts.js";
 import { ROUTER_PROTOCOL_IDENTITY, SharedSessionFence, type ResolvedCapability, type SharedFenceBinding, type SharedFenceLease } from "./control-plane.js";
-import { StateStore } from "./state-store.js";
+import { StateStore, type OperationDocument } from "./state-store.js";
 import { CommandClient, assertPrivateTransportBinding, reconcileSnapshot, type SnapshotBaseline, type SnapshotCandidate, type TransportBinding } from "./transport.js";
 import { worktreeProofSha256, type WorktreeProof } from "./worktree-reader.js";
 
@@ -43,6 +44,7 @@ export interface AuthorityResolver {
   deriveRunAuthority(request: RunRequest, identity: { runId: string; createdAt: string }): Promise<RunAuthority>;
   resolveStageCapability(runAuthority: RunAuthority, request: StageRequest): Promise<ResolvedStageAuthority["capability"]>;
   resolveStageAuthority(runAuthority: RunAuthority, request: StageRequest): Promise<ResolvedStageAuthority>;
+  resolveCloseoutPreflight(runAuthority: RunAuthority): Promise<{ run_authority: RunAuthority; worktree: WorktreeProof }>;
 }
 
 export interface SnapshotReader {
@@ -63,8 +65,16 @@ export interface StageResult {
   artifact_sha256: string;
   message_id_sha256: string;
   response_sha256: string;
+  candidate_scope_sha256?: string;
   reason: string;
   auto_advance: false;
+}
+
+export interface ResolveStageOptions {
+  wait_ms?: number;
+  poll_interval_ms?: number;
+  now?: () => number;
+  sleep?: (milliseconds: number) => Promise<void>;
 }
 
 interface RouterOwnedSourceCandidate {
@@ -74,6 +84,12 @@ interface RouterOwnedSourceCandidate {
   path: string;
   sha256: string;
   content: string;
+}
+
+interface ProposedDeltaEntry {
+  path: string;
+  field: string;
+  value: string;
 }
 
 export class StageEngine {
@@ -98,20 +114,73 @@ export class StageEngine {
     return { run_id: runId, run_authority_sha256: digest, auto_advance: false };
   }
 
+  async installCloseoutAuthority(request: CloseoutAuthorityInstallRequest): Promise<unknown> {
+    if (!this.resolver) throw new Error("Authority resolver is unavailable for closeout authority installation");
+    const loaded = this.store.loadRun(request.run_id);
+    const previous = this.store.listOperations(request.run_id).at(-1);
+    if (!previous || previous.operation_id !== request.delivery_operation_id || previous.status !== "SUCCEEDED" || previous.invocation.requested_stage !== "DELIVERY_RESPONSE") throw new Error("Closeout authority installation requires the exact successful Delivery response operation");
+    const delivery = parseOutputShape("DELIVERY_RESPONSE", this.store.readArtifact(request.run_id, previous.operation_id, "terminal"));
+    if (delivery.terminal !== "ACK_ONLY" || previous.invocation.candidate_identity === "UNDECLARED") throw new Error("Closeout authority installation requires exact candidate-bound ACK_ONLY");
+    const implementation = this.store.listOperations(request.run_id).filter((operation) => operation.status === "SUCCEEDED" && operation.invocation.requested_stage === "IMPLEMENT").at(-1);
+    if (!implementation || implementation.sequence >= previous.sequence || implementation.invocation.candidate_identity !== previous.invocation.candidate_identity) throw new Error("Closeout authority installation requires the exact successful candidate implementation");
+    const frozenScope = frozenCandidateScopeReceipt(this.store, request.run_id, implementation);
+    const preflight = await this.resolver.resolveCloseoutPreflight(loaded.authority);
+    if (!runAuthorityMatchesAcrossOperationalRefresh(preflight.run_authority, loaded.authority)) throw new Error("Closeout authority installation target authority drifted");
+    if (canonicalize(frozenScope.candidatePaths) !== canonicalize([...preflight.worktree.changed_paths].sort())) throw new Error("Current worktree differs from the frozen reviewed candidate scope");
+    const materializedAuthority = materializeCloseoutAuthorityIntent(request.closeout_authority, previous.invocation, preflight.worktree, frozenScope.candidatePaths);
+    const content = `${canonicalize(materializedAuthority)}\n`;
+    const contentSha = sha256(Buffer.from(content, "utf8"));
+    const binding: SourceBinding = { path: "owner-sources/closeout-authority.json", source_class: "CLOSEOUT_AUTHORITY", logical_identity: `closeout-authority-${contentSha.slice(0, 16)}`, producer: "FAL_OWNER_RUNTIME", sha256: contentSha, order: 3 };
+    const predecessorSources = promotedSourcesForStage(this.store, request.run_id, "CLOSEOUT").filter((source) => source.binding.source_class !== "CLOSEOUT_AUTHORITY");
+    if (predecessorSources.length !== 3) throw new Error("Closeout authority installation requires the exact synthesis, acknowledgement, and delta sources");
+    const closeoutRequest: StageRequest = {
+      ...stageRequestFromInvocation(previous.invocation),
+      requested_stage: "CLOSEOUT",
+      sender_role: loaded.authority.accountable_lane,
+      recipient_role: "Meta",
+      expected_sources: [...predecessorSources.map((source) => source.binding), binding],
+    };
+    assertSourceLineage(closeoutRequest, [...predecessorSources, { binding, content }], loaded.authority, preflight.worktree);
+    const installed = this.store.installOwnerSource(request.run_id, previous.operation_id, binding, content);
+    return { schema_version: "closeout-authority-install-receipt.v1", run_id: request.run_id, delivery_operation_id: previous.operation_id, binding: installed.binding, worktree_proof_sha256: worktreeProofSha256(preflight.worktree), status: "INSTALLED", auto_advance: false };
+  }
+
   getRun(runId: string): unknown {
     const loaded = this.store.loadRun(runId);
     const operations = this.store.listOperations(runId);
     const previous = operations.at(-1);
     let next_stage_sources: Array<{ requested_stage: StageRequest["requested_stage"]; expected_sources: SourceBinding[] }> = [];
+    let available_stage_sources: Array<{ requested_stage: StageRequest["requested_stage"]; expected_sources: SourceBinding[] }> = [];
+    let continuation_requirements: Array<{ requested_stage: StageRequest["requested_stage"]; requirement: "TARGET_SOURCE_REQUIRED" | "OWNER_SOURCE_REQUIRED" | "FOLLOW_ON_RUN_REQUIRED"; source_classes: SourceClass[]; reason: string }> = [];
     if (previous?.status === "SUCCEEDED") {
-      const result = this.store.loadResult(runId, previous.operation_id) as { allowed_next?: unknown };
-      if (Array.isArray(result.allowed_next)) {
-        next_stage_sources = result.allowed_next
-          .filter((stage): stage is StageRequest["requested_stage"] => typeof stage === "string" && Object.hasOwn(SOURCE_CLASSES, stage))
-          .map((requested_stage) => ({ requested_stage, expected_sources: promotedSourcesForStage(this.store, runId, requested_stage).map((source) => source.binding) }));
+      const { allowedNextStages, continuationReason } = this.storedContinuation(runId, previous);
+      if (allowedNextStages.length > 0) {
+        for (const requested_stage of allowedNextStages.filter((stage): stage is StageRequest["requested_stage"] => typeof stage === "string" && Object.hasOwn(SOURCE_CLASSES, stage))) {
+          const promoted = promotedSourcesForStage(this.store, runId, requested_stage);
+          const projected = SOURCE_CLASSES[requested_stage].flatMap((sourceClass, order) => {
+            const routerOwned = promoted.find((source) => source.binding.source_class === sourceClass)?.binding;
+            if (routerOwned) return [{ ...routerOwned, order }];
+            const carried = previous.invocation.expected_sources.find((source) => source.source_class === sourceClass);
+            return carried ? [{ ...carried, order }] : [];
+          });
+          const projectedClasses = new Set(projected.map((source) => source.source_class));
+          const missing = SOURCE_CLASSES[requested_stage].filter((sourceClass) => !projectedClasses.has(sourceClass));
+          if (missing.length === 0) next_stage_sources.push({ requested_stage, expected_sources: projected });
+          else {
+            if (projected.length > 0) available_stage_sources.push({ requested_stage, expected_sources: projected });
+            continuation_requirements.push({ requested_stage, requirement: "TARGET_SOURCE_REQUIRED", source_classes: [...missing], reason: "Protected target or Owner source preflight is required before this stage" });
+          }
+        }
+      }
+      if (continuationReason === "FOLLOW_ON_REVIEW_CYCLE_RUN_REQUIRED") {
+        continuation_requirements.push({ requested_stage: "PLAN_REVIEW", requirement: "FOLLOW_ON_RUN_REQUIRED", source_classes: ["PLAN"], reason: "A new immutable run with a monotonically incremented review cycle and exact accepted finding lineage is required" });
+      } else if (continuationReason === "OWNER_CLOSEOUT_AUTHORITY_REQUIRED") {
+        const available = promotedSourcesForStage(this.store, runId, "CLOSEOUT");
+        if (available.length > 0) available_stage_sources.push({ requested_stage: "CLOSEOUT", expected_sources: available.map((source) => source.binding) });
+        continuation_requirements.push({ requested_stage: "CLOSEOUT", requirement: "OWNER_SOURCE_REQUIRED", source_classes: ["CLOSEOUT_AUTHORITY"], reason: "Install one fresh Owner closeout authority in the protected runtime before explicit same-run closeout dispatch" });
       }
     }
-    return { schema_version: "run-projection.v1", run_id: loaded.run.run_id, target_id: loaded.run.target_id, worktree_identity: loaded.run.worktree_identity, run_authority_sha256: loaded.run.run_authority_sha256, review_cycle: loaded.authority.review_cycle, next_stage_sources, auto_advance: false };
+    return { schema_version: "run-projection.v1", run_id: loaded.run.run_id, target_id: loaded.run.target_id, worktree_identity: loaded.run.worktree_identity, run_authority_sha256: loaded.run.run_authority_sha256, review_cycle: loaded.authority.review_cycle, next_stage_sources, available_stage_sources, continuation_requirements, auto_advance: false };
   }
 
   async invokeStage(input: StageRequest): Promise<StageResult> {
@@ -121,6 +190,7 @@ export class StageEngine {
     if (loaded.run.run_authority_sha256 !== request.run_authority_sha256 || authoritySha256(loaded.authority) !== request.run_authority_sha256) throw new Error("Run authority hash mismatch");
     if (request.target_id !== loaded.authority.target_id || request.worktree_identity !== loaded.authority.worktree_identity) throw new Error("Stage request run binding mismatch");
     this.assertRequestAuthority(request, loaded.authority);
+    this.assertTransition(request);
     const capability = await this.resolver.resolveStageCapability(loaded.authority, request);
     if (!["FIXTURE_ONLY", "P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(capability.mode)) throw new Error("Production command dispatch is disabled until a reviewed P0B capability transaction");
     if (capability.mode !== "FIXTURE_ONLY" && (capability.router_protocol_identity !== ROUTER_PROTOCOL_IDENTITY || capability.sse_enabled !== false || !capability.snapshot_correlation || !capability.server_instance_identity_sha256 || !capability.target_directory_sha256 || capability.command_timeout_ms === undefined)) throw new Error("Production capability contract is incomplete");
@@ -134,7 +204,6 @@ export class StageEngine {
     if (!sameSources(request.expected_sources, resolvedBindings)) throw new Error("SOURCE_SUBSTITUTION: expected sources differ from current protected authority");
     for (const source of resolved.sources) if (sha256(Buffer.from(source.content, "utf8")) !== source.binding.sha256) throw new Error("Source content hash mismatch");
     assertSourceLineage(request, resolved.sources, loaded.authority, resolved.worktree);
-    this.assertTransition(request);
     const argument = renderCommandArgument(request, resolved.sources);
     for (const source of resolved.sources) assertArtifactSafe(source.content, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
     assertArtifactSafe(argument, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
@@ -226,15 +295,18 @@ export class StageEngine {
           target: loaded.authority.target_identity,
           epic: loaded.authority.epic,
           lane: `${loaded.authority.accountable_lane} / ${loaded.authority.accountable_class} / ${loaded.authority.accountable_profile}`,
-          ...(request.candidate_identity === "UNDECLARED" || !["STEP_REVIEW", "CLOSEOUT"].includes(request.requested_stage) ? {} : { candidate: request.candidate_identity }),
+          ...(request.candidate_identity === "UNDECLARED" || !["IMPLEMENT", "STEP_REVIEW", "CLOSEOUT"].includes(request.requested_stage) ? {} : { candidate: request.candidate_identity }),
           plan: request.plan_identity,
           plan_class: request.plan_class,
         });
+        const candidateScope = request.requested_stage === "IMPLEMENT"
+          ? await this.captureCandidateScope(loaded.authority, request, operationId)
+          : undefined;
         const artifact = request.requested_stage === "CLOSEOUT" && parsed.fields.Commit?.startsWith("sha=")
           ? closeoutDurableProjection(receipt.terminal_markdown, parsed.fields.Commit)
           : `${receipt.terminal_markdown.replace(/\r\n/g, "\n").trim()}\n`;
         this.store.writeArtifact(request.run_id, operationId, "terminal", artifact);
-        const result = makeResult(request, operationId, "SUCCEEDED", "RESPONSE_ACCEPTED", "VALID", "BOUND", "VALID", allowedNext(request.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), "synchronous response validated", sha256(receipt.message_id), receipt.response_sha256);
+        const result = makeResult(request, operationId, "SUCCEEDED", "RESPONSE_ACCEPTED", "VALID", "BOUND", "VALID", allowedNext(request.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), successReason(request.requested_stage, parsed.terminal, "synchronous response validated"), sha256(receipt.message_id), receipt.response_sha256, candidateScope?.sha256);
         this.store.writeResult(request.run_id, operationId, result);
         this.store.updateOperation(request.run_id, operationId, operation.revision, { status: "SUCCEEDED" });
         this.store.settleSemanticAction(semanticKey, request.run_id, operationId, "CONSUMED");
@@ -276,6 +348,26 @@ export class StageEngine {
     }
   }
 
+  private async captureCandidateScope(authority: RunAuthority, request: StageRequest, operationId: string): Promise<{ content: string; sha256: string }> {
+    if (!this.resolver || request.candidate_identity === "UNDECLARED") throw new Error("Implementation candidate scope cannot be frozen without protected authority");
+    const preflight = await this.resolver.resolveCloseoutPreflight(authority);
+    if (!runAuthorityMatchesAcrossOperationalRefresh(preflight.run_authority, authority)) throw new Error("Candidate scope target authority drifted");
+    if (preflight.worktree.staged_paths.length !== 0) throw new Error("Candidate scope cannot be frozen with a pre-staged index");
+    const candidatePaths = [...preflight.worktree.changed_paths].sort();
+    for (const candidatePath of candidatePaths) assertSafeRelativePath(candidatePath, "candidate scope path");
+    const content = `${canonicalize({
+      schema_version: "frozen-candidate-scope.v1",
+      implementation_operation_id: operationId,
+      candidate_identity: request.candidate_identity,
+      worktree_identity: request.worktree_identity,
+      candidate_paths: candidatePaths,
+      worktree_proof_sha256: worktreeProofSha256(preflight.worktree),
+    })}\n`;
+    const digest = sha256(Buffer.from(content, "utf8"));
+    this.store.writeArtifact(request.run_id, operationId, "candidate-scope", content);
+    return { content, sha256: digest };
+  }
+
   private assertTransition(request: StageRequest): void {
     const operations = this.store.listOperations(request.run_id);
     const previous = operations.at(-1);
@@ -285,12 +377,28 @@ export class StageEngine {
       return;
     }
     if (previous.status === "SUCCEEDED") {
-      const result = this.store.loadResult(request.run_id, previous.operation_id) as { allowed_next?: unknown };
-      if (!Array.isArray(result.allowed_next) || !result.allowed_next.includes(request.requested_stage)) throw new Error("Requested stage is not an allowed transition");
+      const { allowedNextStages } = this.storedContinuation(request.run_id, previous);
+      if (!allowedNextStages.includes(request.requested_stage)) throw new Error("Requested stage is not an allowed transition");
       if (previous.invocation.requested_stage === "PLAN_REVISION" && request.requested_stage === "IMPLEMENT" && previous.invocation.plan_class !== request.plan_class) throw new Error("PLAN_REVISION to IMPLEMENT plan class changed");
       return;
     }
     if (previous.invocation.requested_stage !== request.requested_stage) throw new Error("Failed stage may only be retried as the same explicit stage transition");
+  }
+
+  private storedContinuation(runId: string, operation: OperationDocument): { allowedNextStages: unknown[]; continuationReason: string } {
+    const result = this.store.loadResult(runId, operation.operation_id) as { allowed_next?: unknown; reason?: unknown };
+    let allowedNextStages = Array.isArray(result.allowed_next) ? result.allowed_next : [];
+    let continuationReason = typeof result.reason === "string" ? result.reason : "";
+    if (operation.invocation.requested_stage !== "DELIVERY_RESPONSE") return { allowedNextStages, continuationReason };
+    const terminal = parseOutputShape("DELIVERY_RESPONSE", this.store.readArtifact(runId, operation.operation_id, "terminal")).terminal;
+    if (terminal === "FIX_PLAN_REQUIRED") return { allowedNextStages: [], continuationReason: "FOLLOW_ON_REVIEW_CYCLE_RUN_REQUIRED" };
+    if (terminal === "ACK_ONLY") {
+      const installed = this.store.loadOwnerSource(runId);
+      return installed?.predecessor_operation_id === operation.operation_id
+        ? { allowedNextStages: ["CLOSEOUT"], continuationReason: "OWNER_CLOSEOUT_AUTHORITY_INSTALLED" }
+        : { allowedNextStages: [], continuationReason: "OWNER_CLOSEOUT_AUTHORITY_REQUIRED" };
+    }
+    return { allowedNextStages, continuationReason };
   }
 
   private assertRequestAuthority(request: StageRequest, authority: RunAuthority): void {
@@ -319,7 +427,7 @@ export class StageEngine {
     if (request.sender_role !== expectedSender) throw new Error("Stage request sender role does not match protected stage authority");
   }
 
-  async resolveStage(runId: string, operationId: string): Promise<StageResult> {
+  async resolveStage(runId: string, operationId: string, options: ResolveStageOptions = {}): Promise<StageResult> {
     let operation = this.store.loadOperation(runId, operationId);
     if (operation.status === "SUCCEEDED") {
       const stored = this.store.loadResult(runId, operationId) as Partial<StageResult>;
@@ -339,14 +447,6 @@ export class StageEngine {
     if (!["DISPATCHING", "ACTIVE", "UNCERTAIN", "RECONCILING"].includes(operation.status)) throw new Error("Operation is not reconcilable");
     if (!this.snapshots) throw new Error("Snapshot reconciliation capability is unavailable");
     if (operation.status !== "RECONCILING") operation = this.store.updateOperation(runId, operationId, operation.revision, { status: "RECONCILING" });
-    let candidates: SnapshotCandidate[] = [];
-    try {
-      candidates = await this.snapshots.collect(runId, operationId);
-    } catch {
-      // Snapshot access is diagnostic. A missing, malformed, or drifted read
-      // can never turn a crash-left dispatch into either a resend or success.
-      candidates = [];
-    }
     const transportReceipt = this.store.loadTransportReceipt<{
       schema_version: "minimized-transport-receipt.v1";
       message_id: string;
@@ -357,23 +457,44 @@ export class StageEngine {
     }>(runId, operationId);
     const exactCorrelation = operation.invocation.snapshot_correlation === "EXACT_PARENT_LINK" && transportReceipt !== undefined;
     const stageRequest = stageRequestFromInvocation(operation.invocation);
-    const resolution = reconcileSnapshot(candidates, {
-      sessionSha256: operation.invocation.recipient_session_sha256,
-      parentId: transportReceipt?.parent_id ?? "NO_RESPONSE_PARENT_AVAILABLE",
-      ...(transportReceipt ? { messageId: transportReceipt.message_id, terminalSha256: transportReceipt.terminal_sha256 } : {}),
-      terminal: (text) => {
-        try { parseOutputShape(operation.invocation.requested_stage, text); return true; } catch { return false; }
-      },
-    });
-    const rawCommandRootCandidates = transportReceipt ? [] : candidates.filter((candidate) =>
-      candidate.command_root_correlated === true && sha256(candidate.session_id) === operation.invocation.recipient_session_sha256,
-    );
-    const commandRootCandidates = rawCommandRootCandidates.filter((candidate) => {
-      try { parseOutputShape(operation.invocation.requested_stage, candidate.text); return true; } catch { return false; }
-    });
-    const receiptCandidate = exactCorrelation && resolution.status === "TRANSCRIPT_RECONCILED" ? resolution.candidate : undefined;
-    const commandRootCandidate = !transportReceipt && commandRootCandidates.length === 1 ? commandRootCandidates[0] : undefined;
-    const recoveredCandidate = receiptCandidate ?? commandRootCandidate;
+    const waitMs = boundedResolveWait(options.wait_ms ?? 0);
+    const pollIntervalMs = boundedResolvePoll(options.poll_interval_ms ?? 5_000);
+    const now = options.now ?? Date.now;
+    const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+    const deadline = now() + waitMs;
+    let candidates: SnapshotCandidate[] = [];
+    let rawCommandRootCandidates: SnapshotCandidate[] = [];
+    let commandRootCandidates: SnapshotCandidate[] = [];
+    let recoveredCandidate: SnapshotCandidate | undefined;
+    do {
+      try {
+        candidates = await this.snapshots.collect(runId, operationId);
+      } catch {
+        // Snapshot access is read-only evidence. A transient read failure may be
+        // retried inside this one bounded reconciliation call, but it can never
+        // become a lifecycle resend or success without exact correlation.
+        candidates = [];
+      }
+      const resolution = reconcileSnapshot(candidates, {
+        sessionSha256: operation.invocation.recipient_session_sha256,
+        parentId: transportReceipt?.parent_id ?? "NO_RESPONSE_PARENT_AVAILABLE",
+        ...(transportReceipt ? { messageId: transportReceipt.message_id, terminalSha256: transportReceipt.terminal_sha256 } : {}),
+        terminal: (text) => {
+          try { parseOutputShape(operation.invocation.requested_stage, text); return true; } catch { return false; }
+        },
+      });
+      rawCommandRootCandidates = transportReceipt ? [] : candidates.filter((candidate) =>
+        candidate.command_root_correlated === true && sha256(candidate.session_id) === operation.invocation.recipient_session_sha256,
+      );
+      commandRootCandidates = rawCommandRootCandidates.filter((candidate) => {
+        try { parseOutputShape(operation.invocation.requested_stage, candidate.text); return true; } catch { return false; }
+      });
+      const receiptCandidate = exactCorrelation && resolution.status === "TRANSCRIPT_RECONCILED" ? resolution.candidate : undefined;
+      const commandRootCandidate = !transportReceipt && commandRootCandidates.length === 1 ? commandRootCandidates[0] : undefined;
+      recoveredCandidate = receiptCandidate ?? commandRootCandidate;
+      if (recoveredCandidate || now() >= deadline) break;
+      await sleep(Math.min(pollIntervalMs, Math.max(1, deadline - now())));
+    } while (now() <= deadline);
     if (recoveredCandidate && this.resolver) {
       try {
         const loaded = this.store.loadRun(runId);
@@ -388,10 +509,13 @@ export class StageEngine {
           target: loaded.authority.target_identity,
           epic: loaded.authority.epic,
           lane: `${loaded.authority.accountable_lane} / ${loaded.authority.accountable_class} / ${loaded.authority.accountable_profile}`,
-          ...(operation.invocation.candidate_identity === "UNDECLARED" || !["STEP_REVIEW", "CLOSEOUT"].includes(operation.invocation.requested_stage) ? {} : { candidate: operation.invocation.candidate_identity }),
+          ...(operation.invocation.candidate_identity === "UNDECLARED" || !["IMPLEMENT", "STEP_REVIEW", "CLOSEOUT"].includes(operation.invocation.requested_stage) ? {} : { candidate: operation.invocation.candidate_identity }),
           plan: operation.invocation.plan_identity,
           plan_class: operation.invocation.plan_class,
         });
+        const candidateScope = operation.invocation.requested_stage === "IMPLEMENT"
+          ? await this.captureCandidateScope(loaded.authority, stageRequest, operationId)
+          : undefined;
         const artifact = `${recoveredCandidate.text.replace(/\r\n/g, "\n").trim()}\n`;
         this.store.writeArtifact(runId, operationId, "terminal", artifact);
         const responseEvidenceSha256 = transportReceipt?.response_sha256 ?? sha256(canonicalize({
@@ -401,7 +525,7 @@ export class StageEngine {
           parent_id_sha256: sha256(recoveredCandidate.parent_id),
           terminal_sha256: sha256(recoveredCandidate.text),
         }));
-        const succeeded = makeResult(operation.invocation, operationId, "SUCCEEDED", "TRANSCRIPT_RECONCILED", "VALID", "BOUND", "VALID", allowedNext(operation.invocation.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), transportReceipt ? "exact installed response correlation validated" : "exact installed command-root transcript correlation validated", sha256(recoveredCandidate.id), responseEvidenceSha256);
+        const succeeded = makeResult(operation.invocation, operationId, "SUCCEEDED", "TRANSCRIPT_RECONCILED", "VALID", "BOUND", "VALID", allowedNext(operation.invocation.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), successReason(operation.invocation.requested_stage, parsed.terminal, transportReceipt ? "exact installed response correlation validated" : "exact installed command-root transcript correlation validated"), sha256(recoveredCandidate.id), responseEvidenceSha256, candidateScope?.sha256);
         this.store.updateResult(runId, operationId, succeeded);
         this.store.updateOperation(runId, operationId, operation.revision, { status: "SUCCEEDED" });
         return succeeded;
@@ -420,6 +544,16 @@ export class StageEngine {
     this.store.updateOperation(runId, operationId, operation.revision, { status: "UNCERTAIN" });
     return result;
   }
+}
+
+function boundedResolveWait(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 3_600_000) throw new Error("Resolve wait must be between 0 and 3600000 milliseconds");
+  return value;
+}
+
+function boundedResolvePoll(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 250 || value > 30_000) throw new Error("Resolve poll interval must be between 250 and 30000 milliseconds");
+  return value;
 }
 
 export function runAuthorityMatchesAcrossOperationalRefresh(current: RunAuthority, original: RunAuthority): boolean {
@@ -442,7 +576,8 @@ function routerOwnedSourceCandidates(store: StateStore, runId: string): RouterOw
   const candidates: RouterOwnedSourceCandidate[] = [];
   for (const operation of store.listOperations(runId)) {
     if (operation.status !== "SUCCEEDED") continue;
-    const result = store.loadResult(runId, operation.operation_id) as { operation_status?: unknown; output_status?: unknown; binding_status?: unknown; terminal_status?: unknown; artifact_sha256?: unknown };
+    if (operation.invocation.requested_stage === "CLOSEOUT") continue;
+    const result = store.loadResult(runId, operation.operation_id) as { operation_status?: unknown; output_status?: unknown; binding_status?: unknown; terminal_status?: unknown; artifact_sha256?: unknown; candidate_scope_sha256?: unknown };
     if (result.operation_status !== "SUCCEEDED" || result.output_status !== "VALID" || result.binding_status !== "BOUND" || result.terminal_status !== "VALID" || typeof result.artifact_sha256 !== "string") throw new Error("Router-owned source producer result is not valid and bound");
     const content = store.readArtifact(runId, operation.operation_id, "terminal");
     const contentSha = sha256(Buffer.from(content, "utf8"));
@@ -458,10 +593,13 @@ function routerOwnedSourceCandidates(store: StateStore, runId: string): RouterOw
     } else if (operation.invocation.requested_stage === "IMPLEMENT") {
       if (operation.invocation.candidate_identity === "UNDECLARED") throw new Error("Implementation producer candidate identity is undeclared");
       candidates.push({ ...base, source_class: "IMPLEMENTATION_RESULT", logical_identity: operation.invocation.candidate_identity });
+      const frozenScope = frozenCandidateScopeReceipt(store, runId, operation);
       const reviewMode = operation.invocation.review_cycle === "0" ? "INITIAL" : "FIX_RECHECK";
       const acceptanceEvidence = [
         "ACCEPTANCE EVIDENCE",
         `Candidate: ${operation.invocation.candidate_identity}`,
+        `Candidate paths: ${canonicalize(frozenScope.candidatePaths)}`,
+        `Frozen candidate scope SHA-256: ${frozenScope.sha256}`,
         `Review mode: ${reviewMode}`,
         `Repaired finding IDs: ${canonicalize(operation.invocation.finding_ids)}`,
         `Acceptance mapping: ${parsed.fields["Acceptance mapping"]!}`,
@@ -487,6 +625,8 @@ function routerOwnedSourceCandidates(store: StateStore, runId: string): RouterOw
       else candidates.push({ ...base, source_class: "PLAN", logical_identity: parsed.fields["Fix-plan artifact"]! });
     }
   }
+  const ownerSource = store.loadOwnerSource(runId);
+  if (ownerSource) candidates.push({ ...ownerSource.binding, content: ownerSource.content });
   return candidates;
 }
 
@@ -519,12 +659,23 @@ function planReceipt(plan: string, request: StageRequest, authority: RunAuthorit
   return { planClass, planIdentity: parsed.fields[identityField]! };
 }
 
-function parseProposedDelta(value: string): string[] {
+function parseProposedDelta(value: string): ProposedDeltaEntry[] {
   if (value === "NONE") return [];
   const parsed = parseStrictJson(value);
-  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((entry) => typeof entry !== "string") || new Set(parsed).size !== parsed.length) throw new Error("Proposed closeout delta is malformed");
-  for (const entry of parsed as string[]) assertSafeRelativePath(entry, "proposed closeout path");
-  return parsed as string[];
+  if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("Proposed closeout delta is malformed");
+  const entries = parsed.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error("Proposed closeout delta is malformed");
+    const record = entry as Record<string, unknown>;
+    if (canonicalize(Object.keys(record).sort()) !== canonicalize(["field", "path", "value"]) || typeof record.path !== "string" || typeof record.field !== "string" || typeof record.value !== "string" || !record.field.trim() || !record.value.trim()) throw new Error("Proposed closeout delta is malformed");
+    assertSafeRelativePath(record.path, "proposed closeout path");
+    return { path: record.path, field: record.field, value: record.value };
+  });
+  if (new Set(entries.map((entry) => canonicalize([entry.path, entry.field]))).size !== entries.length) throw new Error("Proposed closeout delta contains contradictory or duplicate path-field entries");
+  return entries.sort((left, right) => {
+    const leftKey = canonicalize([left.path, left.field, left.value]);
+    const rightKey = canonicalize([right.path, right.field, right.value]);
+    return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  });
 }
 
 function parseAcceptedFindingIds(value: string): string[] {
@@ -534,16 +685,18 @@ function parseAcceptedFindingIds(value: string): string[] {
   return canonicalFindingIds(findings.map((finding) => (finding as { id: string }).id));
 }
 
-function synthesisReceipt(synthesis: string, request: StageRequest, authority: RunAuthority): { candidate: string; findingIds: string[]; disposition: string; proposedDelta: string[] } {
+function synthesisReceipt(synthesis: string, request: StageRequest, authority: RunAuthority): { candidate: string; findingIds: string[]; disposition: string; proposedDelta: ProposedDeltaEntry[]; proposedDeltaPaths: string[] } {
   const output = parseOutputShape("STEP_REVIEW", synthesis);
   validateOutputBinding(output, { ...authorityBinding(authority), candidate: request.candidate_identity });
   const parsed = output.fields["Accepted findings"]!;
   const findingIds = parseAcceptedFindingIds(parsed);
+  const proposedDelta = parseProposedDelta(output.fields["Proposed closeout delta"]!);
   return {
     candidate: output.fields.Candidate!,
     findingIds,
     disposition: output.fields["Closeout disposition"]!,
-    proposedDelta: parseProposedDelta(output.fields["Proposed closeout delta"]!),
+    proposedDelta,
+    proposedDeltaPaths: [...new Set(proposedDelta.map((entry) => entry.path))].sort(),
   };
 }
 
@@ -558,6 +711,23 @@ function acceptanceEvidenceReceipt(content: string): { candidate: string; review
   return { candidate: sourceField(text, "Candidate"), ...(reviewMode ? { reviewMode } : {}), repairedFindingIds };
 }
 
+function frozenCandidateScopeReceipt(store: StateStore, runId: string, operation: OperationDocument): { candidatePaths: string[]; sha256: string } {
+  const result = store.loadResult(runId, operation.operation_id) as { candidate_scope_sha256?: unknown };
+  if (typeof result.candidate_scope_sha256 !== "string" || !/^[a-f0-9]{64}$/.test(result.candidate_scope_sha256)) throw new Error("Successful implementation lacks frozen candidate scope evidence");
+  const content = store.readArtifact(runId, operation.operation_id, "candidate-scope");
+  if (sha256(Buffer.from(content, "utf8")) !== result.candidate_scope_sha256) throw new Error("Frozen candidate scope artifact hash mismatch");
+  const parsed = parseStrictJson(content);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Frozen candidate scope evidence is malformed");
+  const scope = parsed as Record<string, unknown>;
+  const expectedKeys = ["candidate_identity", "candidate_paths", "implementation_operation_id", "schema_version", "worktree_identity", "worktree_proof_sha256"];
+  if (canonicalize(Object.keys(scope).sort()) !== canonicalize(expectedKeys) || scope.schema_version !== "frozen-candidate-scope.v1" || scope.implementation_operation_id !== operation.operation_id || scope.candidate_identity !== operation.invocation.candidate_identity || scope.worktree_identity !== operation.invocation.worktree_identity || typeof scope.worktree_proof_sha256 !== "string" || !/^[a-f0-9]{64}$/.test(scope.worktree_proof_sha256)) throw new Error("Frozen candidate scope evidence binding mismatch");
+  if (!Array.isArray(scope.candidate_paths) || scope.candidate_paths.some((entry) => typeof entry !== "string") || new Set(scope.candidate_paths).size !== scope.candidate_paths.length) throw new Error("Frozen candidate scope paths are invalid");
+  const candidatePaths = [...(scope.candidate_paths as string[])].sort();
+  for (const candidatePath of candidatePaths) assertSafeRelativePath(candidatePath, "frozen candidate scope path");
+  if (canonicalize(scope.candidate_paths) !== canonicalize(candidatePaths)) throw new Error("Frozen candidate scope paths are not canonical");
+  return { candidatePaths, sha256: result.candidate_scope_sha256 };
+}
+
 function reviewModeForRequest(request: StageRequest): "INITIAL" | "FIX_RECHECK" {
   if (!/^(0|[1-9][0-9]*)$/.test(request.review_cycle)) throw new Error("STEP_REVIEW review cycle is invalid");
   if (request.review_cycle === "0") {
@@ -569,30 +739,43 @@ function reviewModeForRequest(request: StageRequest): "INITIAL" | "FIX_RECHECK" 
 }
 
 interface CloseoutAuthorityReceipt {
+  candidatePaths: string[];
   allowedPaths: string[];
   commitScope: { mode: "NO_COMMIT"; reason: string } | { mode: "COMMIT"; paths: string[] };
+}
+
+function materializeCloseoutAuthorityIntent(intent: Record<string, unknown>, request: Pick<StageRequest, "candidate_identity" | "worktree_identity">, worktree: WorktreeProof, frozenCandidatePaths: readonly string[]): Record<string, unknown> {
+  const expectedKeys = ["allowed_paths", "candidate_identity", "candidate_paths", "commit_scope", "global_apply", "restart", "schema_version", "staging_precondition", "worktree_identity"];
+  if (canonicalize(Object.keys(intent).sort()) !== canonicalize(expectedKeys) || intent.schema_version !== "closeout-authority-intent.v1" || intent.candidate_identity !== request.candidate_identity || intent.worktree_identity !== request.worktree_identity || !Array.isArray(intent.candidate_paths) || intent.candidate_paths.some((entry) => typeof entry !== "string") || new Set(intent.candidate_paths).size !== intent.candidate_paths.length) throw new Error("Closeout authority intent mismatch");
+  const intentCandidatePaths = [...(intent.candidate_paths as string[])].sort();
+  for (const candidatePath of intentCandidatePaths) assertSafeRelativePath(candidatePath, "closeout candidate path");
+  if (canonicalize(intentCandidatePaths) !== canonicalize(frozenCandidatePaths)) throw new Error("Closeout candidate paths differ from the frozen reviewed scope");
+  return { ...intent, candidate_paths: [...frozenCandidatePaths], schema_version: "closeout-authority.v2", worktree_proof_sha256: worktreeProofSha256(worktree) };
 }
 
 function closeoutAuthorityReceipt(text: string, request: StageRequest, authority?: RunAuthority, worktree?: WorktreeProof): CloseoutAuthorityReceipt {
   const parsed = parseStrictJson(text);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Closeout authority envelope mismatch");
   const envelope = parsed as Record<string, unknown>;
-  const expectedKeys = ["allowed_paths", "candidate_identity", "commit_scope", "global_apply", "restart", "schema_version", "staging_precondition", "worktree_identity", "worktree_proof_sha256"];
+  const expectedKeys = ["allowed_paths", "candidate_identity", "candidate_paths", "commit_scope", "global_apply", "restart", "schema_version", "staging_precondition", "worktree_identity", "worktree_proof_sha256"];
   if (canonicalize(Object.keys(envelope).sort()) !== canonicalize(expectedKeys)) throw new Error("Closeout authority envelope mismatch");
-  if (!worktree || envelope.schema_version !== "closeout-authority.v1" || envelope.candidate_identity !== request.candidate_identity || envelope.worktree_identity !== request.worktree_identity || (authority && envelope.worktree_identity !== authority.worktree_identity) || envelope.worktree_proof_sha256 !== worktreeProofSha256(worktree) || envelope.global_apply !== false || envelope.restart !== false) throw new Error("Closeout authority envelope mismatch");
+  if (!worktree || envelope.schema_version !== "closeout-authority.v2" || envelope.candidate_identity !== request.candidate_identity || envelope.worktree_identity !== request.worktree_identity || (authority && envelope.worktree_identity !== authority.worktree_identity) || envelope.worktree_proof_sha256 !== worktreeProofSha256(worktree) || envelope.global_apply !== false || envelope.restart !== false) throw new Error("Closeout authority envelope mismatch");
+  if (!Array.isArray(envelope.candidate_paths) || envelope.candidate_paths.some((entry) => typeof entry !== "string") || new Set(envelope.candidate_paths).size !== envelope.candidate_paths.length) throw new Error("Closeout authority candidate paths are invalid");
+  const candidatePaths = [...(envelope.candidate_paths as string[])].sort();
+  for (const candidatePath of candidatePaths) assertSafeRelativePath(candidatePath, "closeout candidate path");
   if (!Array.isArray(envelope.allowed_paths) || envelope.allowed_paths.some((entry) => typeof entry !== "string") || new Set(envelope.allowed_paths).size !== envelope.allowed_paths.length) throw new Error("Closeout authority allowed paths are invalid");
-  const allowedPaths = envelope.allowed_paths as string[];
+  const allowedPaths = [...(envelope.allowed_paths as string[])].sort();
   for (const allowedPath of allowedPaths) assertSafeRelativePath(allowedPath, "closeout allowed path");
   const scope = envelope.commit_scope;
   if (!scope || typeof scope !== "object" || Array.isArray(scope)) throw new Error("Closeout authority commit scope is invalid");
   const commitScope = scope as Record<string, unknown>;
   if (commitScope.mode === "NO_COMMIT") {
-    if (canonicalize(Object.keys(commitScope).sort()) !== canonicalize(["mode", "reason"]) || typeof commitScope.reason !== "string" || !commitScope.reason.trim() || envelope.staging_precondition !== "EMPTY" || worktree.staged_paths.length !== 0 || !worktree.status_clean) throw new Error("Closeout NO_COMMIT authority is invalid");
-    return { allowedPaths, commitScope: { mode: "NO_COMMIT", reason: commitScope.reason.trim() } };
+    if (canonicalize(Object.keys(commitScope).sort()) !== canonicalize(["mode", "reason"]) || typeof commitScope.reason !== "string" || !commitScope.reason.trim() || candidatePaths.length !== 0 || allowedPaths.length !== 0 || envelope.staging_precondition !== "EMPTY" || worktree.staged_paths.length !== 0 || !worktree.status_clean) throw new Error("Closeout NO_COMMIT authority is invalid");
+    return { candidatePaths, allowedPaths, commitScope: { mode: "NO_COMMIT", reason: commitScope.reason.trim() } };
   }
   if (commitScope.mode === "COMMIT") {
-    if (canonicalize(Object.keys(commitScope).sort()) !== canonicalize(["mode", "paths"]) || !Array.isArray(commitScope.paths) || commitScope.paths.some((entry) => typeof entry !== "string") || canonicalize(commitScope.paths) !== canonicalize(allowedPaths) || canonicalize(commitScope.paths) !== canonicalize(worktree.staged_paths) || envelope.staging_precondition !== "EXACT" || worktree.has_unstaged_or_untracked) throw new Error("Closeout COMMIT authority is invalid");
-    return { allowedPaths, commitScope: { mode: "COMMIT", paths: commitScope.paths as string[] } };
+    if (canonicalize(Object.keys(commitScope).sort()) !== canonicalize(["mode", "paths"]) || !Array.isArray(commitScope.paths) || commitScope.paths.length === 0 || commitScope.paths.some((entry) => typeof entry !== "string") || new Set(commitScope.paths).size !== commitScope.paths.length || canonicalize([...(commitScope.paths as string[])].sort()) !== canonicalize(allowedPaths) || canonicalize(candidatePaths) !== canonicalize([...worktree.changed_paths].sort()) || envelope.staging_precondition !== "EMPTY" || worktree.staged_paths.length !== 0) throw new Error("Closeout COMMIT authority is invalid");
+    return { candidatePaths, allowedPaths, commitScope: { mode: "COMMIT", paths: [...(commitScope.paths as string[])].sort() } };
   }
   throw new Error("Closeout authority commit scope is invalid");
 }
@@ -652,7 +835,13 @@ function assertSourceLineage(request: StageRequest, sources: readonly ResolvedSo
       const proposedDelta = parseProposedDelta(byClass.get("PROPOSED_DELTA")!.trim());
       if (canonicalize(proposedDelta) !== canonicalize(receipt.proposedDelta)) throw new Error("Closeout proposed delta lineage mismatch");
       const closeout = closeoutAuthorityReceipt(byClass.get("CLOSEOUT_AUTHORITY")!, request, authority, worktree);
-      if (closeout.commitScope.mode === "NO_COMMIT" ? proposedDelta.length !== 0 : canonicalize(closeout.commitScope.paths) !== canonicalize(proposedDelta)) throw new Error("Closeout commit scope is not authorized by synthesis proposed delta");
+      if (closeout.commitScope.mode === "NO_COMMIT") {
+        if (proposedDelta.length !== 0) throw new Error("Closeout commit scope is not authorized by synthesis proposed delta");
+      } else {
+        const commitPaths = closeout.commitScope.paths;
+        const exactCommitPaths = [...new Set([...closeout.candidatePaths, ...receipt.proposedDeltaPaths])].sort();
+        if (canonicalize(commitPaths) !== canonicalize(exactCommitPaths)) throw new Error("Closeout commit scope is not the exact candidate and synthesis-delta union");
+      }
     }
   }
   if (request.requested_stage === "SEQ_NEXT") assertFindingLineage(request, []);
@@ -689,7 +878,7 @@ function assertOutputSourceLineage(request: StageRequest, sources: readonly Reso
       if (fields.Commit !== `NO_COMMIT reason=${receipt.commitScope.reason}` || fields["Staged explicit paths"] !== "NONE") throw new Error("Closeout result does not match NO_COMMIT authority");
     } else {
       const staged = parseStrictJson(fields["Staged explicit paths"] ?? "");
-      if (!Array.isArray(staged) || staged.some((entry) => typeof entry !== "string") || canonicalize(staged) !== canonicalize(receipt.commitScope.paths) || !fields.Commit?.startsWith("sha=")) throw new Error("Closeout result does not match COMMIT authority");
+      if (!Array.isArray(staged) || staged.some((entry) => typeof entry !== "string") || new Set(staged).size !== staged.length || canonicalize([...(staged as string[])].sort()) !== canonicalize(receipt.commitScope.paths) || !fields.Commit?.startsWith("sha=")) throw new Error("Closeout result does not match COMMIT authority");
     }
   }
 }
@@ -719,7 +908,7 @@ function assertResolvedStagePostResponse(current: ResolvedStageAuthority, baseli
   if (canonicalize(current.transport) !== canonicalize(baseline.transport) || canonicalize(current.capability) !== canonicalize(baseline.capability) || canonicalize(current.shared_fence ?? null) !== canonicalize(baseline.shared_fence ?? null) || canonicalize(current.privacy) !== canonicalize(baseline.privacy)) throw new Error("Closeout protected binding drifted");
   const reportedPaths = parseStrictJson(fields["Staged explicit paths"] ?? "");
   if (!Array.isArray(reportedPaths) || reportedPaths.some((entry) => typeof entry !== "string")) throw new Error("Closeout committed path postcondition failed");
-  if (!current.worktree || !baseline.worktree || current.worktree.head_sha256 !== sha256(commit[1]!) || current.worktree.head_tree_sha256 !== sha256(commit[2]!) || current.worktree.head_parent_count !== 1 || current.worktree.sole_parent_sha256 !== baseline.worktree.head_sha256 || canonicalize(current.worktree.committed_paths) !== canonicalize([...reportedPaths].sort()) || !current.worktree.status_clean || current.worktree.staged_paths.length !== 0 || current.worktree.has_unstaged_or_untracked) throw new Error("Closeout committed worktree postcondition failed");
+  if (!current.worktree || !baseline.worktree || current.worktree.head_sha256 !== sha256(commit[1]!) || current.worktree.head_tree_sha256 !== sha256(commit[2]!) || current.worktree.head_parent_count !== 1 || current.worktree.sole_parent_sha256 !== baseline.worktree.head_sha256 || canonicalize([...current.worktree.committed_paths].sort()) !== canonicalize([...(reportedPaths as string[])].sort()) || !current.worktree.status_clean || current.worktree.staged_paths.length !== 0 || current.worktree.has_unstaged_or_untracked) throw new Error("Closeout committed worktree postcondition failed");
   if (canonicalize(current.worktree) === canonicalize(baseline.worktree ?? null)) throw new Error("Closeout COMMIT did not change worktree authority");
 }
 
@@ -788,13 +977,19 @@ function allowedNext(stage: StageRequest["requested_stage"], terminal: string): 
   if (stage === "PLAN_REVISION" && terminal === "IMPLEMENT_READY") return ["IMPLEMENT"];
   if (stage === "IMPLEMENT" && terminal === "REVIEW_READY") return ["STEP_REVIEW"];
   if (stage === "STEP_REVIEW") return ["DELIVERY_RESPONSE"];
-  if (stage === "DELIVERY_RESPONSE" && terminal === "ACK_ONLY") return ["CLOSEOUT"];
-  if (stage === "DELIVERY_RESPONSE" && terminal === "FIX_PLAN_REQUIRED") return ["PLAN_REVIEW"];
+  if (stage === "DELIVERY_RESPONSE" && terminal === "ACK_ONLY") return [];
+  if (stage === "DELIVERY_RESPONSE" && terminal === "FIX_PLAN_REQUIRED") return [];
   return [];
 }
 
-function makeResult(request: Pick<StageRequest, "run_id">, operationId: string, operationStatus: string, transportStatus: string, outputStatus: string, bindingStatus: string, terminalStatus: string, allowed: string[], artifactSha: string, reason: string, messageIdSha = "", responseSha = ""): StageResult {
-  return { schema_version: "stage-result.v1", run_id: request.run_id, operation_id: operationId, operation_status: operationStatus, transport_status: transportStatus, output_status: outputStatus, binding_status: bindingStatus, terminal_status: terminalStatus, allowed_next: allowed, artifact_sha256: artifactSha, message_id_sha256: messageIdSha, response_sha256: responseSha, reason, auto_advance: false };
+function successReason(stage: StageRequest["requested_stage"], terminal: string, fallback: string): string {
+  if (stage === "DELIVERY_RESPONSE" && terminal === "FIX_PLAN_REQUIRED") return "FOLLOW_ON_REVIEW_CYCLE_RUN_REQUIRED";
+  if (stage === "DELIVERY_RESPONSE" && terminal === "ACK_ONLY") return "OWNER_CLOSEOUT_AUTHORITY_REQUIRED";
+  return fallback;
 }
 
-export const _test = { assertSourceLineage, assertOutputSourceLineage, assertResolvedStagePostResponse, SOURCE_CLASSES };
+function makeResult(request: Pick<StageRequest, "run_id">, operationId: string, operationStatus: string, transportStatus: string, outputStatus: string, bindingStatus: string, terminalStatus: string, allowed: string[], artifactSha: string, reason: string, messageIdSha = "", responseSha = "", candidateScopeSha?: string): StageResult {
+  return { schema_version: "stage-result.v1", run_id: request.run_id, operation_id: operationId, operation_status: operationStatus, transport_status: transportStatus, output_status: outputStatus, binding_status: bindingStatus, terminal_status: terminalStatus, allowed_next: allowed, artifact_sha256: artifactSha, message_id_sha256: messageIdSha, response_sha256: responseSha, ...(candidateScopeSha ? { candidate_scope_sha256: candidateScopeSha } : {}), reason, auto_advance: false };
+}
+
+export const _test = { assertSourceLineage, assertOutputSourceLineage, assertResolvedStagePostResponse, closeoutAuthorityReceipt, parseProposedDelta, SOURCE_CLASSES };

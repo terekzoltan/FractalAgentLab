@@ -7,6 +7,7 @@ import {
   assertOpaqueId,
   assertSha256,
   canonicalize,
+  parseCloseoutAuthorityInstallRequest,
   parseRunRequest,
   parseStageSourceManifest,
   parseStrictJson,
@@ -209,6 +210,19 @@ class FileAuthorityResolver implements AuthorityResolver {
     };
   }
 
+  async resolveCloseoutPreflight(runAuthority: RunAuthority): Promise<{ run_authority: RunAuthority; worktree: ReturnType<GitWorktreeReader["inspect"]> }> {
+    if (!this.worktreeReader) throw new Error("Protected Git worktree reader is unavailable");
+    const loaded = this.loadRegistry();
+    const current = this.deriveRunAuthorityFromRegistry(
+      { schema_version: "run-request.v1", target_id: runAuthority.target_id, expected_worktree_identity: runAuthority.worktree_identity },
+      { runId: runAuthority.run_id, createdAt: runAuthority.created_at },
+      loaded,
+    );
+    if (!runAuthorityMatchesAcrossOperationalRefresh(current, runAuthority)) throw new Error("Current target semantic authority drifted");
+    const root = this.targetRoot(loaded.registry, this.target(runAuthority.target_id, loaded.registry));
+    return { run_authority: current, worktree: this.worktreeReader.inspect(root) };
+  }
+
   private async resolveCapability(registry: ControlRegistry, targetId: string, target: RegistryTarget, request: StageRequest): Promise<ResolvedStageAuthority["capability"]> {
     if (registry.schema_version === "router-control-registry.v1") return { mode: "FIXTURE_ONLY", identity_sha256: sha256("FIXTURE_ONLY") };
     return resolveProtectedCapability({
@@ -238,13 +252,29 @@ class FileAuthorityResolver implements AuthorityResolver {
       if (source.sha256 !== binding.sha256) throw new Error("Stage source manifest hash mismatch");
       return { binding, content: source.text };
     });
+    const manifestBindings = parsed.entries.flatMap((entry) => entry.sources);
+    const priorSuccessful = this.stateStore?.listOperations(request.run_id).filter((operation) => operation.status === "SUCCEEDED").at(-1);
+    const carriedTargetSources = priorSuccessful && Array.isArray(priorSuccessful.invocation.expected_sources)
+      ? priorSuccessful.invocation.expected_sources.flatMap((binding) => {
+          const requested = request.expected_sources.some((expected) => canonicalize(expected) === canonicalize(binding));
+          const manifestBound = manifestBindings.some((manifestBinding) => canonicalize(manifestBinding) === canonicalize(binding));
+          if (!requested || !manifestBound || binding.producer === "FAL_ROUTER_OUTPUT") return [];
+          const source = this.readTargetFile(root, binding.path);
+          if (source.sha256 !== binding.sha256) throw new Error("Carried target source hash mismatch");
+          return [{ binding, content: source.text }];
+        })
+      : [];
     const promoted = this.stateStore ? promotedSourcesForStage(this.stateStore, request.run_id, request.requested_stage) : [];
     const resolved = expectedClasses.map((sourceClass, order) => {
       const targetMatches = targetSources.filter((source) => source.binding.source_class === sourceClass);
+      const carriedMatches = carriedTargetSources.filter((source) => source.binding.source_class === sourceClass);
       const promotedMatches = promoted.filter((source) => source.binding.source_class === sourceClass);
-      if (targetMatches.length > 1 || promotedMatches.length > 1) throw new Error("SOURCE_SUBSTITUTION: conflicting target and router-owned source authority");
-      if (targetMatches.length === 1 && promotedMatches.length === 1 && (targetMatches[0]!.binding.sha256 !== promotedMatches[0]!.binding.sha256 || targetMatches[0]!.binding.logical_identity !== promotedMatches[0]!.binding.logical_identity)) throw new Error("SOURCE_SUBSTITUTION: conflicting target and router-owned source authority");
-      const selected = promotedMatches[0] ?? targetMatches[0];
+      if (targetMatches.length > 1 || carriedMatches.length > 1 || promotedMatches.length > 1) throw new Error("SOURCE_SUBSTITUTION: conflicting target and router-owned source authority");
+      const targetCandidates = [...targetMatches, ...carriedMatches];
+      if (targetCandidates.length > 1 && canonicalize(targetCandidates[0]!.binding) !== canonicalize(targetCandidates[1]!.binding)) throw new Error("SOURCE_SUBSTITUTION: conflicting current and carried target source authority");
+      const targetSelected = targetCandidates[0];
+      if (targetSelected && promotedMatches.length === 1 && (targetSelected.binding.sha256 !== promotedMatches[0]!.binding.sha256 || targetSelected.binding.logical_identity !== promotedMatches[0]!.binding.logical_identity)) throw new Error("SOURCE_SUBSTITUTION: conflicting target and router-owned source authority");
+      const selected = promotedMatches[0] ?? targetSelected;
       if (!selected) throw new Error("Stage source manifest and router-owned outputs do not provide the required stage source");
       return { binding: { ...selected.binding, order }, content: selected.content };
     });
@@ -420,7 +450,7 @@ function productionAuthorityResolver(registryPath: string, explicitTestProof?: R
 function dispatchAuthorityResolver(registryPath: string, stateStore?: StateStore): FileAuthorityResolver {
   const registry = parseControlRegistry(parseStrictJson(readFileSync(registryPath, "utf8")));
   return registry.schema_version === "router-control-registry.v1"
-    ? new FileAuthorityResolver(registryPath, new GitWorktreeReader(PRODUCTION_GIT_EXECUTABLE, PRODUCTION_GIT_SHA256))
+    ? new FileAuthorityResolver(registryPath, new GitWorktreeReader(PRODUCTION_GIT_EXECUTABLE, PRODUCTION_GIT_SHA256), undefined, undefined, "FIXTURE_ONLY", stateStore)
     : productionAuthorityResolver(registryPath, undefined, stateStore);
 }
 
@@ -700,18 +730,19 @@ function writeCliRowToFd(fd: 1 | 2, row: string): void {
 
 async function main(): Promise<void> {
   const operation = process.argv[2];
-  if (!operation || !["new-run", "invoke-stage", "resolve-stage", "get-run", "purge-retention", "write-p0b-proof", "resolve-compact-authority", "consume-compact-authority"].includes(operation)) throw new ClassifiedCliError("REQUEST_INVALID");
+  if (!operation || !["new-run", "invoke-stage", "install-closeout-authority", "resolve-stage", "get-run", "purge-retention", "write-p0b-proof", "resolve-compact-authority", "consume-compact-authority"].includes(operation)) throw new ClassifiedCliError("REQUEST_INVALID");
   const args = classified("REQUEST_INVALID", () => argumentsMap(process.argv.slice(3)));
   classified("REQUEST_INVALID", () => validateOperationArguments(operation, args));
   const runtimeRoot = process.env.OC_ROUTER_RUNTIME_ROOT;
   if (!runtimeRoot) throw new ClassifiedCliError("STATE_STORE_BLOCKED");
   const store = classified("STATE_STORE_BLOCKED", () => new ClassifiedStateStore(runtimeRoot));
   const dispatchOperation = operation === "new-run" || operation === "invoke-stage";
+  const authorityOperation = dispatchOperation || operation === "install-closeout-authority";
   const compactOperation = operation === "resolve-compact-authority" || operation === "consume-compact-authority";
   const registryPath = process.env.OC_ROUTER_CONTROL_REGISTRY;
-  if ((dispatchOperation || compactOperation) && !registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
+  if ((authorityOperation || compactOperation) && !registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
   let resolver: FileAuthorityResolver | undefined;
-  if (dispatchOperation) resolver = classified("ROOT_AUTHORITY_BLOCKED", () => dispatchAuthorityResolver(registryPath!, store));
+  if (authorityOperation) resolver = classified("ROOT_AUTHORITY_BLOCKED", () => dispatchAuthorityResolver(registryPath!, store));
   else if (operation === "resolve-stage" && registryPath) {
     try { resolver = productionAuthorityResolver(registryPath, undefined, store); }
     catch { resolver = undefined; }
@@ -727,8 +758,12 @@ async function main(): Promise<void> {
   } else if (operation === "invoke-stage") {
     const request = classified("REQUEST_INVALID", () => parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     result = await classifiedAsync("BLOCKED", () => engine.invokeStage(request));
+  } else if (operation === "install-closeout-authority") {
+    const request = classified("REQUEST_INVALID", () => parseCloseoutAuthorityInstallRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
+    result = await classifiedAsync("RUN_AUTHORITY_BLOCKED", () => engine.installCloseoutAuthority(request));
   } else if (operation === "resolve-stage") {
-    result = await classifiedAsync("STATE_STORE_BLOCKED", () => engine.resolveStage(required(args, "--run-id"), required(args, "--operation-id")));
+    const waitMs = classified("REQUEST_INVALID", () => boundedIntegerArgument(args.get("--wait-ms") ?? "0", "--wait-ms", 0, 3_600_000));
+    result = await classifiedAsync("STATE_STORE_BLOCKED", () => engine.resolveStage(required(args, "--run-id"), required(args, "--operation-id"), { wait_ms: waitMs }));
   } else if (operation === "get-run") {
     result = classified("STATE_STORE_BLOCKED", () => engine.getRun(required(args, "--run-id")));
   } else if (compactOperation) {
@@ -763,7 +798,7 @@ async function main(): Promise<void> {
 }
 
 function validateOperationArguments(operation: string, args: Map<string, string>): void {
-  const requiredKeys = operation === "new-run" || operation === "invoke-stage"
+  const requiredKeys = operation === "new-run" || operation === "invoke-stage" || operation === "install-closeout-authority"
     ? ["--request"]
     : operation === "resolve-stage"
       ? ["--run-id", "--operation-id"]
@@ -776,9 +811,16 @@ function validateOperationArguments(operation: string, args: Map<string, string>
             : operation === "consume-compact-authority"
               ? ["--target-id", "--recipient-role", "--attempt-id"]
               : [];
-  const allowed = new Set(requiredKeys);
+  const allowed = new Set([...requiredKeys, ...(operation === "resolve-stage" ? ["--wait-ms"] : [])]);
   for (const key of args.keys()) if (!allowed.has(key)) throw new Error(`Argument ${key} is not allowed for ${operation}`);
   for (const key of requiredKeys) if (!args.get(key)) throw new Error(`Argument ${key} is required for ${operation}`);
+}
+
+function boundedIntegerArgument(value: string, name: string, minimum: number, maximum: number): number {
+  if (!/^(?:0|[1-9]\d*)$/.test(value)) throw new Error(`${name} must be a decimal integer`);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) throw new Error(`${name} is outside the supported range`);
+  return parsed;
 }
 
 function purgeProtectedRuntimeEvidence(registryPath: string, runtimeRoot: string): unknown {

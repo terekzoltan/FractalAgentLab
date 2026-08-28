@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory=$true)]
-  [ValidateSet('new-run','invoke-stage','resolve-stage','get-run','purge-retention','write-p0b-proof','resolve-compact-authority','consume-compact-authority')]
+  [ValidateSet('new-run','invoke-stage','install-closeout-authority','resolve-stage','get-run','purge-retention','write-p0b-proof','resolve-compact-authority','consume-compact-authority')]
   [string]$Operation,
 
   [string]$RequestPath,
@@ -9,6 +9,9 @@ param(
   [string]$TargetId,
   [string]$RecipientRole,
   [string]$CompactAttemptId,
+
+  [ValidateRange(0,3600)]
+  [int]$ResolveWaitSeconds = 3600,
 
   [Parameter(DontShow=$true)]
   [switch]$InternalCompactHandoff,
@@ -49,7 +52,7 @@ function Invoke-WithRouterEnvironment {
 $ErrorActionPreference = 'Stop'
 $RuntimeRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'runtime'
 $AttestationPath = Join-Path $RuntimeRoot 'executable-attestation.json'
-$ExpectedAttestationSha256 = '981a9872c0b6701acf2f52b12e0533050fd1816c7c5b92bbf8a7c08d1b46ab3d'
+$ExpectedAttestationSha256 = '17842418fc459213d8368ea11e42830761a292f0ae96869919bd6c44b6a39012'
 
 function Get-Sha256Text {
   param([string]$Text)
@@ -192,9 +195,14 @@ switch ($Operation) {
     if ([string]::IsNullOrWhiteSpace($RequestPath)) { throw 'invoke-stage requires -RequestPath.' }
     $Arguments += @('--request', (Resolve-Path -LiteralPath $RequestPath).Path)
   }
+  'install-closeout-authority' {
+    if ([string]::IsNullOrWhiteSpace($RequestPath)) { throw 'install-closeout-authority requires -RequestPath.' }
+    $Arguments += @('--request', (Resolve-Path -LiteralPath $RequestPath).Path)
+  }
   'resolve-stage' {
     if ([string]::IsNullOrWhiteSpace($RunId) -or [string]::IsNullOrWhiteSpace($OperationId)) { throw 'resolve-stage requires -RunId and -OperationId.' }
-    $Arguments += @('--run-id', $RunId, '--operation-id', $OperationId)
+    $EffectiveResolveWaitSeconds = if ([string]::IsNullOrWhiteSpace($TestOnlyKnownFolderRoot)) { $ResolveWaitSeconds } else { 0 }
+    $Arguments += @('--run-id', $RunId, '--operation-id', $OperationId, '--wait-ms', ([string]($EffectiveResolveWaitSeconds * 1000)))
   }
   'get-run' {
     if ([string]::IsNullOrWhiteSpace($RunId)) { throw 'get-run requires -RunId.' }

@@ -54,6 +54,13 @@ export interface RunRequest {
   expected_worktree_identity: string;
 }
 
+export interface CloseoutAuthorityInstallRequest {
+  schema_version: "closeout-authority-install.v1";
+  run_id: string;
+  delivery_operation_id: string;
+  closeout_authority: Record<string, unknown>;
+}
+
 export interface RunAuthority {
   schema_version: "run-authority.v1";
   run_id: string;
@@ -145,11 +152,12 @@ export interface ParsedOutput {
 }
 
 const OPAQUE_ID = /^[A-Za-z0-9][A-Za-z0-9._@:+~-]{0,199}$/;
+const OPAQUE_ID_CHAR = /^[A-Za-z0-9._@:+~-]$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const SAFE_RELATIVE_PATH = /^(?![A-Za-z]:)(?![\\/])(?!.*(?:^|[\\/])\.\.(?:[\\/]|$))(?!.*:)[^\0]+$/;
 
 export function assertOpaqueId(value: string, label: string): void {
-  if (!OPAQUE_ID.test(value)) throw new Error(`${label} is not a valid opaque ID`);
+  if (typeof value !== "string" || !OPAQUE_ID.test(value)) throw new Error(`${label} is not a valid opaque ID`);
 }
 
 export function canonicalFindingIds(values: readonly string[]): string[] {
@@ -285,7 +293,6 @@ export function parseOutputShape(stage: StageName, raw: string): ParsedOutput {
   if (stage === "IMPLEMENT" && !text.endsWith(`Exact route: ${fields["Exact route"]}\n${terminalMatches[0]?.[0]}`)) throw new Error("IMPLEMENT route and terminal are not the final ordered lines");
   if (stage === "IMPLEMENT") {
     assertOpaqueId(fields["Plan/fix-plan identity"]!, "Plan/fix-plan identity");
-    assertOpaqueId(fields["Candidate identity"]!, "Candidate identity");
     if (terminalMatches[0]?.[0] === "REVIEW_READY" && fields["Exact route"] !== "Meta /step-review") throw new Error("IMPLEMENT REVIEW_READY route must be Meta /step-review");
   }
   if (stage === "STEP_REVIEW" && !text.endsWith(`Exact Delivery Lane action: ${fields["Exact Delivery Lane action"]}`)) throw new Error("STEP_REVIEW action is not the final line");
@@ -344,9 +351,21 @@ export function validateOutputBinding(parsed: ParsedOutput, expected: { target: 
   if (expected.candidate && parsed.kind === "STEP_REVIEW") compare("Candidate", expected.candidate, true);
   if (expected.candidate && parsed.kind === "DELIVERY_RESPONSE" && parsed.terminal === "FIX_PLAN_REQUIRED") compare("Candidate", expected.candidate, true);
   if (expected.candidate && parsed.kind === "CLOSEOUT") compare("Candidate identity", expected.candidate, true);
+  if (expected.candidate && parsed.kind === "IMPLEMENT") assertImplementationCandidateBinding(parsed.fields, expected.candidate);
   if (expected.plan && parsed.kind === "PLAN_REVIEW") compare("Plan artifact", expected.plan, true);
   if (expected.plan && parsed.kind === "IMPLEMENT") compare("Plan/fix-plan identity", expected.plan, true);
-  if (expected.plan_class && parsed.plan_class !== undefined && parsed.plan_class !== expected.plan_class) throw new Error("Plan class binding mismatch");
+  if (parsed.kind === "DELIVERY_RESPONSE" && parsed.terminal === "FIX_PLAN_REQUIRED") {
+    if (parsed.plan_class !== "REVIEW_FIX_PLAN") throw new Error("FIX_PLAN_REQUIRED must establish REVIEW_FIX_PLAN lineage");
+  } else if (expected.plan_class && parsed.plan_class !== undefined && parsed.plan_class !== expected.plan_class) {
+    throw new Error("Plan class binding mismatch");
+  }
+}
+
+function assertImplementationCandidateBinding(fields: Readonly<Record<string, string>>, expectedCandidate: string): void {
+  const value = fields["Candidate identity/worktree limitations"];
+  if (typeof value !== "string") throw new Error("Candidate identity/worktree limitations binding missing");
+  assertOpaqueId(expectedCandidate, "Candidate identity");
+  if (!value.startsWith(expectedCandidate) || (value.length > expectedCandidate.length && OPAQUE_ID_CHAR.test(value[expectedCandidate.length]!))) throw new Error("Candidate identity/worktree limitations binding mismatch");
 }
 
 function canonicalTargetLabel(value: string): string {
@@ -510,6 +529,17 @@ export function parseRunRequest(value: unknown): RunRequest {
   const worktree = requireString(record, "expected_worktree_identity");
   assertOpaqueId(targetId, "target_id");
   return { schema_version: "run-request.v1", target_id: targetId, expected_worktree_identity: worktree };
+}
+
+export function parseCloseoutAuthorityInstallRequest(value: unknown): CloseoutAuthorityInstallRequest {
+  const record = requireRecord(value, "closeout authority install request");
+  requireExactKeys(record, ["schema_version", "run_id", "delivery_operation_id", "closeout_authority"], "closeout authority install request");
+  if (record.schema_version !== "closeout-authority-install.v1") throw new Error("Closeout authority install request schema mismatch");
+  const runId = requireString(record, "run_id");
+  const deliveryOperationId = requireString(record, "delivery_operation_id");
+  assertFilesystemId(runId, "run_id");
+  assertFilesystemId(deliveryOperationId, "delivery_operation_id");
+  return { schema_version: "closeout-authority-install.v1", run_id: runId, delivery_operation_id: deliveryOperationId, closeout_authority: requireRecord(record.closeout_authority, "closeout_authority") };
 }
 
 export function parseStageRequest(value: unknown): StageRequest {

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   authoritySha256,
   canonicalize,
+  parseCloseoutAuthorityInstallRequest,
   parseOutputShape,
   parseStageSourceManifest,
   parseStageRequest,
@@ -14,6 +15,13 @@ import {
   validateOutputBinding,
   type RunAuthority,
 } from "../src/contracts.js";
+
+test("v29 closeout authority install request is exact and bounded", () => {
+  const parsed = parseCloseoutAuthorityInstallRequest({ schema_version: "closeout-authority-install.v1", run_id: "run-1", delivery_operation_id: "op-1", closeout_authority: { schema_version: "closeout-authority-intent.v1" } });
+  assert.equal(parsed.run_id, "run-1");
+  assert.throws(() => parseCloseoutAuthorityInstallRequest({ ...parsed, target_root: "C:\\foreign" }), /unknown fields/);
+  assert.throws(() => parseCloseoutAuthorityInstallRequest({ ...parsed, run_id: "../escape" }), /valid opaque ID/);
+});
 
 const fixtures = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../fixtures");
 
@@ -73,7 +81,7 @@ test("implementation output follows the AWC 4.1.1 combined candidate/worktree fi
     "Explicit non-changes: protected surfaces",
     "Acceptance mapping: PASS",
     "Checks/results: PASS",
-    "Candidate identity/worktree limitations: Uncommitted implementation candidate bound to plan-1; dirty unrelated files preserved",
+    "Candidate identity/worktree limitations: candidate-1; uncommitted candidate, dirty unrelated files preserved",
     "Diff self-review: PASS",
     "Unresolved risks/findings: none",
     "Exact route: Meta /step-review",
@@ -81,10 +89,17 @@ test("implementation output follows the AWC 4.1.1 combined candidate/worktree fi
   ].join("\n");
   const parsed = parseOutputShape("IMPLEMENT", valid);
   validateOutputBinding(parsed, { target: "FractalAgentLab", epic: "E1", lane: "Track D / TRACK / track-d" });
-  assert.equal(parsed.fields["Candidate identity/worktree limitations"], "Uncommitted implementation candidate bound to plan-1; dirty unrelated files preserved");
+  assert.equal(parsed.fields["Candidate identity/worktree limitations"], "candidate-1; uncommitted candidate, dirty unrelated files preserved");
+  assert.doesNotThrow(() => validateOutputBinding(parsed, { target: "FractalAgentLab", epic: "E1", lane: "Track D / TRACK / track-d", candidate: "candidate-1" }));
+  assert.throws(() => validateOutputBinding(parsed, { target: "FractalAgentLab", epic: "E1", lane: "Track D / TRACK / track-d", candidate: "candidate-other" }), /Candidate identity\/worktree limitations binding mismatch/);
 
-  const noncanonicalSplit = valid.replace("Candidate identity/worktree limitations: Uncommitted implementation candidate bound to plan-1; dirty unrelated files preserved", "Candidate identity: candidate-1\nWorktree limitations: dirty unrelated files preserved");
+  const noncanonicalSplit = valid.replace("Candidate identity/worktree limitations: candidate-1; uncommitted candidate, dirty unrelated files preserved", "Candidate identity: candidate-1\nWorktree limitations: dirty unrelated files preserved");
   assert.throws(() => parseOutputShape("IMPLEMENT", noncanonicalSplit), /missing required field Candidate identity\/worktree limitations/);
+  const legacyFreeForm = parseOutputShape("IMPLEMENT", valid.replace("candidate-1; uncommitted candidate", "candidate-1 uncommitted candidate"));
+  assert.doesNotThrow(() => validateOutputBinding(legacyFreeForm, { target: "FractalAgentLab", epic: "E1", lane: "Track D / TRACK / track-d", candidate: "candidate-1" }));
+  const exactOnly = parseOutputShape("IMPLEMENT", valid.replace("candidate-1; uncommitted candidate, dirty unrelated files preserved", "candidate-1"));
+  assert.doesNotThrow(() => validateOutputBinding(exactOnly, { target: "FractalAgentLab", epic: "E1", lane: "Track D / TRACK / track-d", candidate: "candidate-1" }));
+  assert.throws(() => validateOutputBinding(parseOutputShape("IMPLEMENT", valid.replace("candidate-1;", "candidate-1-other;")), { target: "FractalAgentLab", epic: "E1", lane: "Track D / TRACK / track-d", candidate: "candidate-1" }), /binding mismatch/);
 });
 
 test("binding is independent from shape", () => {

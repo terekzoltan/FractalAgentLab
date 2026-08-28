@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -9,7 +9,7 @@ import { _test } from "../src/cli.js";
 import { authoritySha256, parseRunRequest, sha256, type RunAuthority, type StageInvocation, type StageRequest } from "../src/contracts.js";
 import { promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh } from "../src/stage-engine.js";
 import { StateStore } from "../src/state-store.js";
-import { GitWorktreeReader } from "../src/worktree-reader.js";
+import { GitWorktreeReader, worktreeProofSha256 } from "../src/worktree-reader.js";
 
 test("target state and exact Combined heading remain authority", () => {
   const state = "State revision: `s1`\nCombined selector: `HEADING:3. Current`\n";
@@ -348,6 +348,183 @@ test("operational registry refresh preserves an immutable run and its promoted n
   }
 });
 
+test("v29 real resolver revalidates one carried target PLAN binding in a follow-on review cycle", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-v29-real-carry-"));
+  const previousUsername = process.env.OPENCODE_SERVER_USERNAME;
+  const previousPassword = process.env.OPENCODE_SERVER_PASSWORD;
+  try {
+    const target = path.join(root, "target");
+    const runtime = path.join(root, "runtime");
+    mkdirSync(path.join(target, "ops"), { recursive: true });
+    mkdirSync(path.join(target, "plans"), { recursive: true });
+    mkdirSync(runtime);
+    const plan = [
+      "FIX_PLAN_REQUIRED", "Target: fal", "Epic: E", "Candidate: candidate-1", "Accountable Lane / class / profile: Track D / TRACK / track-d",
+      'Accepted finding IDs: ["FSR-002"]', "Allowed surfaces: runtime", "Forbidden surfaces: protected",
+      "Finding -> change -> acceptance/check: FSR-002 -> repair -> focused test", "Dependencies: none", "Fix-plan artifact: fix-plan-1",
+      "FIX_PLAN_READY_FOR_IMPLEMENT", "",
+    ].join("\n");
+    const planBinding = { path: "plans/fix-plan.md", source_class: "PLAN", logical_identity: "fix-plan-1", producer: "target-state", sha256: sha256(plan), order: 0 } as const;
+    const manifest = JSON.stringify({ schema_version: "stage-source-manifest.v1", target_id: "fal", epic: "E", candidate_identity: "candidate-1", entries: [{ stage: "PLAN_REVIEW", plan_class: "REVIEW_FIX_PLAN", sources: [planBinding] }] });
+    writeFileSync(path.join(target, "plans", "fix-plan.md"), plan);
+    writeFileSync(path.join(target, "plans", "stage-sources.json"), manifest);
+    writeFileSync(path.join(target, "ops", "Combined.md"), "# Root\n\n## Current\n| E | FIX_REVIEW |\n");
+    writeFileSync(path.join(target, "ops", "OVERLAY.md"), "overlay\n");
+    writeFileSync(path.join(target, "ops", "ROLE.md"), "role\n");
+    writeFileSync(path.join(target, "ops", "PROJECT_STATE.md"), [
+      "State revision: `s1`", "Configuration identity: `c1`", "Wave: `W`", "Epic: `E`", "Candidate identity: `candidate-1`", "Review cycle: `1`",
+      "Combined selector: `HEADING:Current`", "Pinned artifact: `plans/fix-plan.md`", "Pinned artifact logical identity: `fix-plan-1`",
+      "Stage source manifest: `plans/stage-sources.json`", `Stage source manifest SHA-256: \`${sha256(manifest)}\``, "Workflow phase: `PLAN_REVIEW`", "Next actor: `Meta`", "Next command: `/terv-review`", "",
+    ].join("\n"));
+    const registryPath = path.join(root, "registry.json");
+    writeFileSync(registryPath, JSON.stringify({ schema_version: "router-control-registry.v1", targets: { fal: {
+      profile_identity: "profile-v29", target_identity: "fal", worktree_identity: "git:a", accountable: { lane: "Track D", class: "TRACK", profile: "track-d" }, root: target,
+      state_path: "ops/PROJECT_STATE.md", combined_path: "ops/Combined.md", overlay_path: "ops/OVERLAY.md", accountable_role_path: "ops/ROLE.md",
+      server: { origin: "http://127.0.0.1:1", fingerprint: "fixture" }, sessions: { Meta: { id: "session-meta" }, "Track D": { id: "session-track" } },
+    } } }));
+    process.env.OPENCODE_SERVER_USERNAME = "fixture-user";
+    process.env.OPENCODE_SERVER_PASSWORD = "fixture-password";
+    const store = new StateStore(runtime);
+    const resolver = new _test.FileAuthorityResolver(registryPath, undefined, undefined, undefined, undefined, store);
+    const authority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-v29-real-carry", createdAt: "2026-08-28T00:00:00.000Z" });
+    store.createRun(authority, authoritySha256(authority));
+    const reviewRequest: StageRequest = {
+      schema_version: "stage-request.v1", request_id: "request-v29-real-review", run_id: authority.run_id, issued_at: authority.created_at, issued_by: "orchestrator", run_authority_sha256: authoritySha256(authority),
+      requested_stage: "PLAN_REVIEW", plan_class: "REVIEW_FIX_PLAN", target_id: authority.target_id, worktree_identity: authority.worktree_identity, state_revision: authority.state_revision,
+      state_sha256: authority.state_sha256, combined_selector: authority.combined_selector, combined_span_sha256: authority.combined_span_sha256, expected_sources: [planBinding],
+      wave: authority.wave, epic: authority.epic, accountable_lane: authority.accountable_lane, accountable_class: authority.accountable_class, accountable_profile: authority.accountable_profile,
+      sender_role: "Track D", recipient_role: "Meta", plan_identity: "fix-plan-1", candidate_identity: "candidate-1", review_cycle: "1", finding_ids: ["FSR-002"], review_risk: "focused",
+      project_review_context: "fixture", expected_contract_version: "awc-4.1.1", allowed_side_effect_class: "ADDRESSED_SESSION_COMMAND", configuration_identity: authority.configuration_identity,
+      active_route_generation: authority.active_route_generation,
+    };
+    const invocation = { ...reviewRequest, schema_version: "stage-invocation.v1", operation_id: "op-v29-real-review" } as unknown as StageInvocation;
+    const operation = store.createOperation(authority.run_id, invocation, { schema_version: "dispatch-intent.v1" }, sha256("intent-v29-real-carry"));
+    const metaReview = [
+      "META PLAN REVIEW", "Target: fal", "Epic: E", "Plan class: REVIEW_FIX_PLAN", "Plan artifact: fix-plan-1",
+      "Accountable Lane / class / profile: Track D / TRACK / track-d", "Overall verdict: GREEN", "Blocking corrections: none", "Non-blocking improvements: none",
+      "Ownership/dependency decision: accepted", "Acceptance/evidence decision: accepted", "Exact Delivery Lane action: invoke /terv-review-utan with this review", "",
+    ].join("\n");
+    store.writeArtifact(authority.run_id, operation.operation_id, "terminal", metaReview);
+    store.writeResult(authority.run_id, operation.operation_id, { operation_status: "SUCCEEDED", output_status: "VALID", binding_status: "BOUND", terminal_status: "VALID", artifact_sha256: sha256(Buffer.from(metaReview, "utf8")), allowed_next: ["PLAN_REVISION"] });
+    store.updateOperation(authority.run_id, operation.operation_id, operation.revision, { status: "SUCCEEDED" });
+    const promoted = promotedSourcesForStage(store, authority.run_id, "PLAN_REVISION");
+    const revisionRequest: StageRequest = { ...reviewRequest, request_id: "request-v29-real-revision", requested_stage: "PLAN_REVISION", sender_role: "Meta", recipient_role: "Track D", expected_sources: [planBinding, ...promoted.map((source) => source.binding)] };
+    const resolved = await resolver.resolveStageAuthority(authority, revisionRequest);
+    assert.deepEqual(resolved.sources.map((source) => source.binding.source_class), ["PLAN", "META_PLAN_REVIEW"]);
+    assert.equal(resolved.sources[0]!.content, plan);
+    assert.equal(resolved.sources[1]!.content, metaReview);
+  } finally {
+    if (previousUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = previousUsername;
+    if (previousPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = previousPassword;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("v29 CLI installs closeout authority only in protected runtime and launcher exposes the no-send route", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-v29-cli-owner-install-"));
+  try {
+    const target = path.join(root, "target");
+    const runtime = path.join(root, "runtime");
+    mkdirSync(path.join(target, "ops"), { recursive: true });
+    mkdirSync(path.join(target, "plans"), { recursive: true });
+    mkdirSync(path.join(target, "src"), { recursive: true });
+    mkdirSync(runtime);
+    const pinned = "PINNED\n";
+    const manifest = JSON.stringify({ schema_version: "stage-source-manifest.v1", target_id: "fal", epic: "E", candidate_identity: "candidate-1", entries: [{ stage: "DELIVERY_RESPONSE", plan_class: "EPIC_PLAN", sources: [{ path: "plans/pinned.md", source_class: "FINAL_SYNTHESIS", logical_identity: "candidate-1", producer: "target-state", sha256: sha256(pinned), order: 0 }] }] });
+    writeFileSync(path.join(target, "plans", "pinned.md"), pinned);
+    writeFileSync(path.join(target, "plans", "stage-sources.json"), manifest);
+    writeFileSync(path.join(target, "ops", "Combined.md"), "# Root\n\n## Current\n| E | REVIEWED |\n");
+    writeFileSync(path.join(target, "ops", "OVERLAY.md"), "overlay\n");
+    writeFileSync(path.join(target, "ops", "ROLE.md"), "role\n");
+    writeFileSync(path.join(target, "src", "candidate.ts"), "export const value = 1;\n");
+    writeFileSync(path.join(target, "ops", "PROJECT_STATE.md"), [
+      "State revision: `s1`", "Configuration identity: `c1`", "Wave: `W`", "Epic: `E`", "Candidate identity: `candidate-1`", "Review cycle: `0`",
+      "Combined selector: `HEADING:Current`", "Pinned artifact: `plans/pinned.md`", "Pinned artifact logical identity: `plan-1`",
+      "Stage source manifest: `plans/stage-sources.json`", `Stage source manifest SHA-256: \`${sha256(manifest)}\``, "Workflow phase: `DELIVERY_RESPONSE`", "Next actor: `Track D`", "Next command: `/step-review-utan`", "",
+    ].join("\n"));
+    const registryPath = path.join(root, "registry.json");
+    writeFileSync(registryPath, JSON.stringify({ schema_version: "router-control-registry.v1", targets: { fal: {
+      profile_identity: "profile-v29", target_identity: "fal", worktree_identity: "git:a", accountable: { lane: "Track D", class: "TRACK", profile: "track-d" }, root: target,
+      state_path: "ops/PROJECT_STATE.md", combined_path: "ops/Combined.md", overlay_path: "ops/OVERLAY.md", accountable_role_path: "ops/ROLE.md",
+      server: { origin: "http://127.0.0.1:1", fingerprint: "fixture" }, sessions: { Meta: { id: "session-meta" }, "Track D": { id: "session-track" } },
+    } } }));
+    const lookup = spawnSync(process.platform === "win32" ? "where.exe" : "which", ["git"], { encoding: "utf8", shell: false });
+    assert.equal(lookup.status, 0, lookup.stderr);
+    const gitPath = lookup.stdout.split(/\r?\n/).find(Boolean)!;
+    const git = (...args: string[]) => {
+      const result = spawnSync(gitPath, ["-C", target, ...args], { encoding: "utf8", shell: false });
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout;
+    };
+    git("init");
+    git("config", "user.email", "fixture@example.invalid");
+    git("config", "user.name", "Fixture");
+    git("add", ".");
+    git("commit", "-m", "fixture");
+    writeFileSync(path.join(target, "src", "candidate.ts"), "export const value = 2;\n");
+    const worktree = new GitWorktreeReader(gitPath, sha256(readFileSync(gitPath))).inspect(target);
+    assert.deepEqual(worktree.changed_paths, ["src/candidate.ts"]);
+
+    const store = new StateStore(runtime);
+    const resolver = new _test.FileAuthorityResolver(registryPath, new GitWorktreeReader(gitPath, sha256(readFileSync(gitPath))), undefined, undefined, undefined, store);
+    const authority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-v29-cli-install", createdAt: "2026-08-28T00:00:00.000Z" });
+    store.createRun(authority, authoritySha256(authority));
+    const invocation = (operationId: string, requestedStage: StageRequest["requested_stage"]): StageInvocation => ({
+      schema_version: "stage-invocation.v1", operation_id: operationId, request_id: `request-${operationId}`, run_id: authority.run_id, issued_at: authority.created_at, issued_by: "orchestrator",
+      run_authority_sha256: authoritySha256(authority), requested_stage: requestedStage, plan_class: "EPIC_PLAN", target_id: authority.target_id, worktree_identity: authority.worktree_identity,
+      state_revision: authority.state_revision, state_sha256: authority.state_sha256, combined_selector: authority.combined_selector, combined_span_sha256: authority.combined_span_sha256,
+      expected_sources: [], wave: authority.wave, epic: authority.epic, accountable_lane: authority.accountable_lane, accountable_class: authority.accountable_class, accountable_profile: authority.accountable_profile,
+      sender_role: requestedStage === "DELIVERY_RESPONSE" ? "Meta" : "Track D", recipient_role: requestedStage === "STEP_REVIEW" ? "Meta" : "Track D", plan_identity: "plan-1", candidate_identity: "candidate-1",
+      review_cycle: "0", finding_ids: [], review_risk: "focused", project_review_context: "fixture", expected_contract_version: "awc-4.1.1", allowed_side_effect_class: "ADDRESSED_SESSION_COMMAND",
+      configuration_identity: authority.configuration_identity, active_route_generation: authority.active_route_generation, canon_phase: requestedStage === "IMPLEMENT" ? "IMPLEMENT" : requestedStage === "STEP_REVIEW" ? "STEP_REVIEW" : "REVIEW_RESPONSE",
+      command_name: requestedStage === "IMPLEMENT" ? "implement" : requestedStage === "STEP_REVIEW" ? "step-review" : "step-review-utan", command_argument_sha256: sha256(operationId), command_body_sha256: sha256(`${operationId}-body`), semantic_key: sha256(`${operationId}-semantic`), recipient_session_sha256: sha256("fixture-session"),
+    });
+    const persistSuccess = (stageInvocation: StageInvocation, terminal: string, extraResult: Record<string, unknown> = {}) => {
+      const operation = store.createOperation(authority.run_id, stageInvocation, { schema_version: "dispatch-intent.v1" }, sha256(`${stageInvocation.operation_id}-intent`));
+      store.writeArtifact(authority.run_id, operation.operation_id, "terminal", terminal);
+      store.writeResult(authority.run_id, operation.operation_id, { schema_version: "stage-result.v1", run_id: authority.run_id, operation_id: operation.operation_id, operation_status: "SUCCEEDED", transport_status: "RESPONSE_ACCEPTED", output_status: "VALID", binding_status: "BOUND", terminal_status: "VALID", allowed_next: [], artifact_sha256: sha256(Buffer.from(terminal, "utf8")), message_id_sha256: sha256(operation.operation_id), response_sha256: sha256(`${operation.operation_id}-response`), reason: "fixture", auto_advance: false, ...extraResult });
+      store.updateOperation(authority.run_id, operation.operation_id, operation.revision, { status: "SUCCEEDED" });
+      return operation;
+    };
+    const implementation = [
+      "IMPLEMENTATION RESULT", "Target: fal", "Epic: E", "Accountable Lane / class / profile: Track D / TRACK / track-d", "Plan/fix-plan identity: plan-1",
+      "Changed artifacts: src/candidate.ts", "Explicit non-changes: governance", "Acceptance mapping: PASS", "Checks/results: PASS", "Candidate identity/worktree limitations: candidate-1; none",
+      "Diff self-review: PASS", "Unresolved risks/findings: none", "Exact route: Meta /step-review", "REVIEW_READY",
+    ].join("\n");
+    const implementationInvocation = invocation("op-v29-cli-implement", "IMPLEMENT");
+    const scopeContent = `${JSON.stringify({ schema_version: "frozen-candidate-scope.v1", implementation_operation_id: implementationInvocation.operation_id, candidate_identity: "candidate-1", worktree_identity: "git:a", candidate_paths: ["src/candidate.ts"], worktree_proof_sha256: worktreeProofSha256(worktree) })}\n`;
+    const implementationOperation = persistSuccess(implementationInvocation, implementation, { candidate_scope_sha256: sha256(Buffer.from(scopeContent, "utf8")) });
+    store.writeArtifact(authority.run_id, implementationOperation.operation_id, "candidate-scope", scopeContent);
+    const synthesis = [
+      "FINAL STEP REVIEW SYNTHESIS", "Target: fal", "Epic: E", "Candidate: candidate-1", "Accountable Lane / class / profile: Track D / TRACK / track-d", "Reviewed scope: src/candidate.ts",
+      "Overall verdict: GREEN", "Review routing: fixture", "Acceptance/evidence matrix: PASS", "Accepted findings: NONE", "Rejected/downgraded findings: NONE", "Verification result: PASS",
+      "Proposed closeout delta: NONE", "Closeout disposition: ALLOWED", "Commit status: DEFERRED_TO_CLOSEOUT", "Exact Delivery Lane action: invoke /step-review-utan with this exact synthesis",
+    ].join("\n");
+    persistSuccess(invocation("op-v29-cli-review", "STEP_REVIEW"), synthesis);
+    const deliveryOperation = persistSuccess(invocation("op-v29-cli-delivery", "DELIVERY_RESPONSE"), "ACK_ONLY\n");
+    const requestPath = path.join(root, "install.json");
+    writeFileSync(requestPath, JSON.stringify({ schema_version: "closeout-authority-install.v1", run_id: authority.run_id, delivery_operation_id: deliveryOperation.operation_id, closeout_authority: {
+      schema_version: "closeout-authority-intent.v1", candidate_identity: "candidate-1", candidate_paths: ["src/candidate.ts"], worktree_identity: "git:a", allowed_paths: ["src/candidate.ts"], commit_scope: { mode: "COMMIT", paths: ["src/candidate.ts"] }, staging_precondition: "EMPTY", global_apply: false, restart: false,
+    } }));
+    const beforeStatus = git("status", "--porcelain=v1");
+    const beforeState = readFileSync(path.join(target, "ops", "PROJECT_STATE.md"));
+    const cli = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/cli.js");
+    const installed = spawnSync(process.execPath, [cli, "install-closeout-authority", "--request", requestPath], { encoding: "utf8", env: { ...process.env, OC_ROUTER_RUNTIME_ROOT: runtime, OC_ROUTER_CONTROL_REGISTRY: registryPath } });
+    assert.equal(installed.status, 0, installed.stderr);
+    assert.equal((JSON.parse(installed.stdout) as { status: string; auto_advance: boolean }).status, "INSTALLED");
+    assert.equal((JSON.parse(installed.stdout) as { auto_advance: boolean }).auto_advance, false);
+    assert.equal(store.listOperations(authority.run_id).length, 3);
+    assert.equal(git("status", "--porcelain=v1"), beforeStatus);
+    assert.deepEqual(readFileSync(path.join(target, "ops", "PROJECT_STATE.md")), beforeState);
+    assert.equal(existsSync(store.resolve("runs", authority.run_id, "owner-sources", "closeout-authority.json")), true);
+    const launcher = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../scripts/Invoke-OCRouter.ps1"), "utf8");
+    assert.match(launcher, /ValidateSet\('new-run','invoke-stage','install-closeout-authority'/);
+    assert.match(launcher, /install-closeout-authority'.*RequestPath/s);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("FSR-031: real registry contributes selected and unselected session privacy values", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-registry-privacy-"));
   const previousUsername = process.env.OPENCODE_SERVER_USERNAME;
@@ -439,9 +616,12 @@ test("FSR-025: production-bound CLOSEOUT resolver derives authority from a prote
       active_route_generation: authority.active_route_generation,
     };
     const resolved = await resolver.resolveStageAuthority(authority, request);
+    const closeoutPreflight = await resolver.resolveCloseoutPreflight(authority);
     assert.equal(resolved.capability.mode, "FIXTURE_ONLY");
     assert.equal(resolved.worktree?.status_clean, true);
     assert.deepEqual(resolved.worktree?.staged_paths, []);
+    assert.equal(closeoutPreflight.worktree.status_clean, true);
+    assert.deepEqual(closeoutPreflight.worktree.changed_paths, []);
     assert.equal(resolved.sources.length, 4);
   } finally {
     if (previousUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = previousUsername;

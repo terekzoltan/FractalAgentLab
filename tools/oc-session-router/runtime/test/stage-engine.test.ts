@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { authoritySha256, canonicalize, sha256, type RunAuthority, type RunRequest, type StageRequest } from "../src/contracts.js";
+import { authoritySha256, canonicalize, parseOutputShape, sha256, validateOutputBinding, type RunAuthority, type RunRequest, type StageRequest } from "../src/contracts.js";
 import { StageEngine, _test as stageTest, promotedSourcesForStage, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "../src/stage-engine.js";
 import { ROUTER_PROTOCOL_IDENTITY, buildSharedFenceBinding } from "../src/control-plane.js";
 import { StateStore } from "../src/state-store.js";
@@ -39,7 +39,7 @@ class FakeResolver implements AuthorityResolver {
   privateValues: string[] = [];
   fenceTargetRoot?: string;
   resolvedSources?: ResolvedSource[];
-  worktree: WorktreeProof = { schema_version: "worktree-proof.v1", head_sha256: "1".repeat(64), head_tree_sha256: "9".repeat(64), head_parent_count: 1, sole_parent_sha256: "0".repeat(64), committed_paths: [], index_sha256: "2".repeat(64), status_sha256: "3".repeat(64), staged_paths: [], status_clean: true, has_unstaged_or_untracked: false };
+  worktree: WorktreeProof = { schema_version: "worktree-proof.v1", head_sha256: "1".repeat(64), head_tree_sha256: "9".repeat(64), head_parent_count: 1, sole_parent_sha256: "0".repeat(64), committed_paths: [], index_sha256: "2".repeat(64), status_sha256: "3".repeat(64), changed_paths: [], staged_paths: [], status_clean: true, has_unstaged_or_untracked: false };
 
   async deriveRunAuthority(request: RunRequest, identity: { runId: string; createdAt: string }): Promise<RunAuthority> {
     this.authority = {
@@ -79,6 +79,10 @@ class FakeResolver implements AuthorityResolver {
 
   async resolveStageCapability(_runAuthority: RunAuthority, _request: StageRequest): Promise<ResolvedStageAuthority["capability"]> {
     return this.capability(this.capabilityMode);
+  }
+
+  async resolveCloseoutPreflight(runAuthority: RunAuthority): Promise<{ run_authority: RunAuthority; worktree: WorktreeProof }> {
+    return { run_authority: this.authority ?? runAuthority, worktree: this.worktree };
   }
 
   private capability(mode: typeof this.capabilityMode): ResolvedStageAuthority["capability"] {
@@ -131,10 +135,10 @@ function implementationSource(candidate: string, planIdentity = "plan-1"): strin
   ].join("\n");
 }
 
-function reviewFixRevisionSource(): string {
+function reviewFixRevisionSource(findingId = "FSR-010"): string {
   return [
     "REVISED REVIEW-FIX PLAN", "Target: fal", "Epic: E", "Candidate: candidate-1", "Accountable Lane / class / profile: Track D / TRACK / track-d",
-    'Accepted finding IDs: ["FSR-010"]', "Allowed surfaces: fixture", "Forbidden surfaces: protected", "Finding -> change -> acceptance/check: FSR-010 -> fix -> test",
+    `Accepted finding IDs: ["${findingId}"]`, "Allowed surfaces: fixture", "Forbidden surfaces: protected", `Finding -> change -> acceptance/check: ${findingId} -> fix -> test`,
     "Dependencies: none", "Fix-plan artifact: fix-plan-1", "Next route: /implement", "Readiness: READY", "FIX_PLAN_READY_FOR_IMPLEMENT",
     "DELIVERY PLAN REVISION", "Target: fal", "Epic: E", "Accountable Lane / class / profile: Track D / TRACK / track-d", "Applied review items: all",
     "Rejected/unclear items: none", "Final plan artifact: fix-plan-1", "PLAN_REVISION_COMPLETE", "IMPLEMENT_READY", "",
@@ -147,6 +151,15 @@ function synthesisSource(disposition: "ALLOWED" | "FIX_REQUIRED", findings: stri
     "Reviewed scope: fixture", `Overall verdict: ${disposition === "ALLOWED" ? "GREEN" : "RED"}`, "Review routing: fixture", "Acceptance/evidence matrix: fixture",
     `Accepted findings: ${findings}`, "Rejected/downgraded findings: NONE", "Verification result: PASS", `Proposed closeout delta: ${proposedDelta}`,
     `Closeout disposition: ${disposition}`, "Commit status: DEFERRED_TO_CLOSEOUT", "Exact Delivery Lane action: invoke /step-review-utan with this exact synthesis",
+  ].join("\n");
+}
+
+function fixPlanRequiredSource(candidate = "candidate-1", findingId = "FSR-002"): string {
+  return [
+    "FIX_PLAN_REQUIRED", "Target: fal", "Epic: E", `Candidate: ${candidate}`, "Accountable Lane / class / profile: Track D / TRACK / track-d",
+    `Accepted finding IDs: [\"${findingId}\"]`, "Allowed surfaces: runtime", "Forbidden surfaces: protected",
+    `${"Finding -> change -> acceptance/check"}: ${findingId} -> repair -> focused test`, "Dependencies: none", "Fix-plan artifact: fix-plan-1",
+    "FIX_PLAN_READY_FOR_IMPLEMENT",
   ].join("\n");
 }
 
@@ -385,7 +398,7 @@ test("FSR-017: malformed synthesis and non-ALLOWED closeout fail before POST", a
     const synthesis = synthesisSource("FIX_REQUIRED", '[{"id":"FSR-017"}]');
     resolver.resolvedSources = [
       resolvedSource("FINAL_SYNTHESIS", synthesis, 0), resolvedSource("DELIVERY_RESPONSE", "ACK_ONLY\n", 1), resolvedSource("PROPOSED_DELTA", "NONE\n", 2),
-      resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v1", candidate_identity: "candidate-1", worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(resolver.worktree), allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3),
+      resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "candidate-1", candidate_paths: [], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(resolver.worktree), allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3),
     ];
     const closeoutRun = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
     const closeout: StageRequest = { ...request(closeoutRun.run_id, closeoutRun.run_authority_sha256, sha256(resolver.sourceContent)), request_id: "request-nonallowed-closeout", requested_stage: "CLOSEOUT", recipient_role: "Meta", candidate_identity: "candidate-1", finding_ids: ["FSR-017"], expected_sources: resolver.resolvedSources.map((source) => source.binding) };
@@ -476,7 +489,7 @@ test("FSR-010: EPIC and REVIEW_FIX revisions each reach their matching IMPLEMENT
     let responsePlan = "plan-1";
     const engine = new StageEngine(new StateStore(root), resolver, new CommandClient(async () => {
       calls += 1;
-      return new Response(JSON.stringify({ info: { id: `assistant-class-${calls}`, role: "assistant", sessionID: "session-meta" }, parts: [{ id: `part-class-${calls}`, type: "text", text: implementationSource(`candidate-${calls}`, responsePlan), messageID: `assistant-class-${calls}`, sessionID: "session-meta" }] }));
+      return new Response(JSON.stringify({ info: { id: `assistant-class-${calls}`, role: "assistant", sessionID: "session-meta" }, parts: [{ id: `part-class-${calls}`, type: "text", text: implementationSource("candidate-1", responsePlan), messageID: `assistant-class-${calls}`, sessionID: "session-meta" }] }));
     }));
     for (const item of [
       { planClass: "EPIC_PLAN" as const, planIdentity: "plan-1", source: resolver.revisedPlanContent },
@@ -558,7 +571,7 @@ test("PLAN_REVISION promotes its final plan identity into the same-run IMPLEMENT
     const promotedReviewSources = promotedSourcesForStage(store, created.run_id, "STEP_REVIEW");
     assert.deepEqual(promotedReviewSources.map((source) => source.binding.source_class), ["IMPLEMENTATION_RESULT", "ACCEPTANCE_EVIDENCE"]);
     assert.equal(promotedReviewSources[0]!.binding.logical_identity, "candidate-1");
-    assert.match(promotedReviewSources[1]!.content, /^ACCEPTANCE EVIDENCE\nCandidate: candidate-1\nReview mode: INITIAL\nRepaired finding IDs: \[\]\n/m);
+    assert.match(promotedReviewSources[1]!.content, /^ACCEPTANCE EVIDENCE\nCandidate: candidate-1\nCandidate paths: \[\]\nFrozen candidate scope SHA-256: [a-f0-9]{64}\nReview mode: INITIAL\nRepaired finding IDs: \[\]\n/m);
     assert.match(promotedReviewSources[1]!.content, /Acceptance mapping: PASS/);
     assert.match(promotedReviewSources[1]!.content, /Checks\/results: PASS/);
     assert.equal(promotedReviewSources[1]!.binding.sha256, sha256(promotedReviewSources[1]!.content));
@@ -597,6 +610,306 @@ test("IMPLEMENT promotion preserves FIX_RECHECK acceptance lineage", async () =>
     assert.deepEqual(promoted.map((source) => source.binding.source_class), ["IMPLEMENTATION_RESULT", "ACCEPTANCE_EVIDENCE"]);
     assert.match(promoted[1]!.content, /Review mode: FIX_RECHECK/);
     assert.match(promoted[1]!.content, /Repaired finding IDs: \["FSR-010"\]/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("v29 green lifecycle projects complete router sources and declares the Owner closeout source boundary", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-v29-green-lifecycle-"));
+  try {
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.nextCommand = "/seq-next";
+    const closeoutCommitSha = "a".repeat(40);
+    const closeoutTree = "b".repeat(40);
+    const closeoutResponse = [
+      "CLOSEOUT + COMMIT RESULT", "Target: fal", "Epic: E", "Accountable Lane / class / profile: Track D / TRACK / track-d",
+      "workflow_verdict: COMPLETE", "domain_verdict: ACCEPTED", "routing_verdict: CLOSED", "next_role_action: NONE",
+      "State/Combined/findings/evidence reconciliation: result=PASS; details=reconciled", "Candidate identity: candidate-1",
+      'Staged explicit paths: ["ops/PROJECT_STATE.md","src/candidate.ts"]', `Verification: result=PASS; candidate=candidate-1; committed_tree=${closeoutTree}; details=verified`,
+      `Commit: sha=${closeoutCommitSha}; tree=${closeoutTree}; message=closeout`, "Push: NOT_PERFORMED",
+    ].join("\n");
+    const responses = [
+      resolver.sourceContent,
+      planReviewSource(),
+      resolver.revisedPlanContent,
+      implementationSource("candidate-1"),
+      synthesisSource("ALLOWED", "NONE", '[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"}]'),
+      "ACK_ONLY",
+      closeoutResponse,
+    ];
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      const text = responses[calls++]!;
+      return new Response(JSON.stringify({
+        info: { id: `assistant-lifecycle-${calls}`, role: "assistant", sessionID: "session-meta" },
+        parts: [{ id: `part-lifecycle-${calls}`, type: "text", text, messageID: `assistant-lifecycle-${calls}`, sessionID: "session-meta" }],
+      }));
+    }));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const base = request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent));
+    const planningSource = resolvedSource("PLANNING_CONTEXT", resolver.sourceContent, 0);
+    resolver.resolvedSources = [planningSource];
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-lifecycle-seq", requested_stage: "SEQ_NEXT", recipient_role: "Track D", expected_sources: [planningSource.binding] })).operation_status, "SUCCEEDED");
+
+    const projected = (stage: StageRequest["requested_stage"]): ResolvedSource[] => {
+      const sources = promotedSourcesForStage(store, created.run_id, stage);
+      const projection = engine.getRun(created.run_id) as { next_stage_sources: Array<{ requested_stage: string; expected_sources: StageRequest["expected_sources"] }>; available_stage_sources: unknown[]; continuation_requirements: unknown[] };
+      assert.deepEqual(projection.next_stage_sources, [{ requested_stage: stage, expected_sources: sources.map((source) => source.binding) }]);
+      assert.deepEqual(projection.available_stage_sources, []);
+      assert.deepEqual(projection.continuation_requirements, []);
+      return sources;
+    };
+
+    resolver.resolvedSources = projected("PLAN_REVIEW");
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-lifecycle-plan-review", expected_sources: resolver.resolvedSources.map((source) => source.binding) })).operation_status, "SUCCEEDED");
+    resolver.resolvedSources = projected("PLAN_REVISION");
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-lifecycle-plan-revision", requested_stage: "PLAN_REVISION", sender_role: "Meta", recipient_role: "Track D", expected_sources: resolver.resolvedSources.map((source) => source.binding) })).operation_status, "SUCCEEDED");
+    resolver.resolvedSources = projected("IMPLEMENT");
+    const beforeCloseout: WorktreeProof = { ...resolver.worktree, changed_paths: ["src/candidate.ts"], status_clean: false, has_unstaged_or_untracked: true, status_sha256: "6".repeat(64) };
+    resolver.worktree = beforeCloseout;
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-lifecycle-implement", requested_stage: "IMPLEMENT", recipient_role: "Track D", candidate_identity: "candidate-1", expected_sources: resolver.resolvedSources.map((source) => source.binding) })).operation_status, "SUCCEEDED");
+    resolver.resolvedSources = projected("STEP_REVIEW");
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-lifecycle-step-review", requested_stage: "STEP_REVIEW", candidate_identity: "candidate-1", expected_sources: resolver.resolvedSources.map((source) => source.binding) })).operation_status, "SUCCEEDED");
+    resolver.resolvedSources = projected("DELIVERY_RESPONSE");
+    const delivery = await engine.invokeStage({ ...base, request_id: "request-lifecycle-delivery", requested_stage: "DELIVERY_RESPONSE", sender_role: "Meta", recipient_role: "Track D", candidate_identity: "candidate-1", expected_sources: resolver.resolvedSources.map((source) => source.binding) });
+    assert.deepEqual(delivery.allowed_next, []);
+    assert.equal(delivery.reason, "OWNER_CLOSEOUT_AUTHORITY_REQUIRED");
+
+    // A stored v28 ACK receipt advertised same-run CLOSEOUT. v29 normalizes it
+    // from the bound terminal without mutating the old receipt.
+    store.updateResult(created.run_id, delivery.operation_id, { ...delivery, allowed_next: ["CLOSEOUT"], reason: "synchronous response validated" });
+
+    const closeout = engine.getRun(created.run_id) as { next_stage_sources: unknown[]; available_stage_sources: Array<{ requested_stage: string; expected_sources: StageRequest["expected_sources"] }>; continuation_requirements: Array<{ requested_stage: string; requirement: string; source_classes: string[] }> };
+    assert.deepEqual(closeout.next_stage_sources, []);
+    assert.deepEqual(closeout.available_stage_sources, [{ requested_stage: "CLOSEOUT", expected_sources: promotedSourcesForStage(store, created.run_id, "CLOSEOUT").map((source) => source.binding) }]);
+    assert.deepEqual(closeout.continuation_requirements, [{ requested_stage: "CLOSEOUT", requirement: "OWNER_SOURCE_REQUIRED", source_classes: ["CLOSEOUT_AUTHORITY"], reason: "Install one fresh Owner closeout authority in the protected runtime before explicit same-run closeout dispatch" }]);
+    await assert.rejects(() => engine.invokeStage({ ...base, request_id: "request-illegal-same-run-closeout", requested_stage: "CLOSEOUT", recipient_role: "Meta", candidate_identity: "candidate-1", expected_sources: closeout.available_stage_sources[0]!.expected_sources }), /not an allowed transition/);
+    const ownerSourcePath = store.resolve("runs", created.run_id, "owner-sources", "closeout-authority.json");
+    await assert.rejects(() => engine.installCloseoutAuthority({
+      schema_version: "closeout-authority-install.v1",
+      run_id: created.run_id,
+      delivery_operation_id: "op-wrong",
+      closeout_authority: { schema_version: "closeout-authority-intent.v1", candidate_identity: "candidate-1", candidate_paths: ["src/candidate.ts"], worktree_identity: "git:abc", allowed_paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"], commit_scope: { mode: "COMMIT", paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"] }, staging_precondition: "EMPTY", global_apply: false, restart: false },
+    }), /exact successful Delivery response operation/);
+    assert.equal(existsSync(ownerSourcePath), false);
+    resolver.worktree = { ...beforeCloseout, changed_paths: ["notes/ambient.txt", "src/candidate.ts"], status_sha256: "8".repeat(64) };
+    await assert.rejects(() => engine.installCloseoutAuthority({
+      schema_version: "closeout-authority-install.v1",
+      run_id: created.run_id,
+      delivery_operation_id: delivery.operation_id,
+      closeout_authority: { schema_version: "closeout-authority-intent.v1", candidate_identity: "candidate-1", candidate_paths: ["notes/ambient.txt", "src/candidate.ts"], worktree_identity: "git:abc", allowed_paths: ["notes/ambient.txt", "ops/PROJECT_STATE.md", "src/candidate.ts"], commit_scope: { mode: "COMMIT", paths: ["notes/ambient.txt", "ops/PROJECT_STATE.md", "src/candidate.ts"] }, staging_precondition: "EMPTY", global_apply: false, restart: false },
+    }), /frozen reviewed candidate scope/);
+    assert.equal(existsSync(ownerSourcePath), false);
+    resolver.worktree = beforeCloseout;
+    const installRequest = {
+      schema_version: "closeout-authority-install.v1",
+      run_id: created.run_id,
+      delivery_operation_id: delivery.operation_id,
+      closeout_authority: { schema_version: "closeout-authority-intent.v1", candidate_identity: "candidate-1", candidate_paths: ["src/candidate.ts"], worktree_identity: "git:abc", allowed_paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"], commit_scope: { mode: "COMMIT", paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"] }, staging_precondition: "EMPTY", global_apply: false, restart: false },
+    } as const;
+    const install = await engine.installCloseoutAuthority(installRequest) as { status: string; binding: unknown };
+    assert.equal(install.status, "INSTALLED");
+    const installedBytes = readFileSync(ownerSourcePath);
+    const installedDocument = JSON.parse(installedBytes.toString("utf8")) as { installed_at: string };
+    const repeatedInstall = await engine.installCloseoutAuthority(installRequest) as { status: string; binding: unknown };
+    assert.equal(repeatedInstall.status, "INSTALLED");
+    assert.deepEqual(repeatedInstall.binding, install.binding);
+    assert.deepEqual(readFileSync(ownerSourcePath), installedBytes);
+    assert.equal((JSON.parse(readFileSync(ownerSourcePath, "utf8")) as { installed_at: string }).installed_at, installedDocument.installed_at);
+    const tamperedBytes = Buffer.from(installedBytes.toString("utf8").replace("closeout-authority.v2", "closeout-authority.v3"), "utf8");
+    writeFileSync(ownerSourcePath, tamperedBytes);
+    assert.throws(() => engine.getRun(created.run_id), /Installed Owner source receipt is invalid/);
+    writeFileSync(ownerSourcePath, installedBytes);
+    const closeoutSources = projected("CLOSEOUT");
+    resolver.resolvedSources = closeoutSources;
+    resolver.worktreeAfterResponse = { ...beforeCloseout, head_sha256: sha256(closeoutCommitSha), head_tree_sha256: sha256(closeoutTree), head_parent_count: 1, sole_parent_sha256: beforeCloseout.head_sha256, committed_paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"], index_sha256: "7".repeat(64), status_sha256: sha256(Buffer.alloc(0)), changed_paths: [], staged_paths: [], status_clean: true, has_unstaged_or_untracked: false };
+    resolver.resolutionCalls = 0;
+    const closed = await engine.invokeStage({ ...base, request_id: "request-lifecycle-closeout", requested_stage: "CLOSEOUT", recipient_role: "Meta", candidate_identity: "candidate-1", expected_sources: closeoutSources.map((source) => source.binding) });
+    assert.equal(closed.operation_status, "SUCCEEDED");
+    assert.deepEqual((engine.getRun(created.run_id) as { next_stage_sources: unknown[] }).next_stage_sources, []);
+    assert.equal(calls, 7);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+
+});
+
+test("v29 FIX_PLAN_REQUIRED ends the immutable cycle with an explicit follow-on run requirement", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-v29-fix-boundary-"));
+  try {
+    const resolver = new FakeResolver();
+    resolver.nextCommand = "/step-review-utan";
+    const synthesis = synthesisSource("FIX_REQUIRED", '[{"id":"FSR-002"}]');
+    resolver.resolvedSources = [resolvedSource("FINAL_SYNTHESIS", synthesis, 0)];
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => new Response(JSON.stringify({
+      info: { id: "assistant-fix-boundary", role: "assistant", sessionID: "session-meta" },
+      parts: [{ id: "part-fix-boundary", type: "text", text: fixPlanRequiredSource(), messageID: "assistant-fix-boundary", sessionID: "session-meta" }],
+    }))));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const base = request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent));
+    const parsedFix = parseOutputShape("DELIVERY_RESPONSE", fixPlanRequiredSource());
+    assert.doesNotThrow(() => validateOutputBinding(parsedFix, { target: "fal", epic: "E", lane: "Track D / TRACK / track-d", candidate: "candidate-1", plan: "plan-1", plan_class: "EPIC_PLAN" }));
+    assert.doesNotThrow(() => stageTest.assertOutputSourceLineage({ ...base, requested_stage: "DELIVERY_RESPONSE", sender_role: "Meta", recipient_role: "Track D", candidate_identity: "candidate-1", finding_ids: ["FSR-002"], expected_sources: resolver.resolvedSources!.map((source) => source.binding) }, resolver.resolvedSources!, parsedFix.terminal, parsedFix.fields));
+    const result = await engine.invokeStage({
+      ...base,
+      request_id: "request-fix-boundary",
+      requested_stage: "DELIVERY_RESPONSE",
+      sender_role: "Meta",
+      recipient_role: "Track D",
+      candidate_identity: "candidate-1",
+      finding_ids: ["FSR-002"],
+      expected_sources: resolver.resolvedSources.map((source) => source.binding),
+    });
+    assert.equal(result.operation_status, "SUCCEEDED");
+    assert.deepEqual(result.allowed_next, []);
+    assert.equal(result.reason, "FOLLOW_ON_REVIEW_CYCLE_RUN_REQUIRED");
+    // Normalize an already persisted v28 transition without rewriting its
+    // terminal or operation identity.
+    store.updateResult(created.run_id, result.operation_id, { ...result, allowed_next: ["PLAN_REVIEW"], reason: "synchronous response validated" });
+    const projection = engine.getRun(created.run_id) as { next_stage_sources: unknown[]; available_stage_sources: unknown[]; continuation_requirements: Array<{ requested_stage: string; requirement: string; source_classes: string[] }> };
+    assert.deepEqual(projection.next_stage_sources, []);
+    assert.deepEqual(projection.available_stage_sources, []);
+    assert.deepEqual(projection.continuation_requirements, [{ requested_stage: "PLAN_REVIEW", requirement: "FOLLOW_ON_RUN_REQUIRED", source_classes: ["PLAN"], reason: "A new immutable run with a monotonically incremented review cycle and exact accepted finding lineage is required" }]);
+    await assert.rejects(() => engine.invokeStage({ ...base, request_id: "request-illegal-legacy-fix-review", requested_stage: "PLAN_REVIEW", plan_class: "REVIEW_FIX_PLAN", plan_identity: "fix-plan-1", candidate_identity: "candidate-1", finding_ids: ["FSR-002"], expected_sources: [] }), /not an allowed transition/);
+    await assert.rejects(() => engine.installCloseoutAuthority({
+      schema_version: "closeout-authority-install.v1",
+      run_id: created.run_id,
+      delivery_operation_id: result.operation_id,
+      closeout_authority: { schema_version: "closeout-authority-intent.v1", candidate_identity: "candidate-1", candidate_paths: [], worktree_identity: "git:abc", allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false },
+    }), /candidate-bound ACK_ONLY/);
+    assert.equal(existsSync(store.resolve("runs", created.run_id, "owner-sources", "closeout-authority.json")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("v29 closeout authority install rejects failed and uncertain Delivery predecessors without runtime writes", async () => {
+  for (const scenario of ["FAILED_OUTPUT", "UNCERTAIN"] as const) {
+    const root = mkdtempSync(path.join(tmpdir(), `fal-router-v29-install-${scenario.toLowerCase()}-`));
+    try {
+      const resolver = new FakeResolver();
+      resolver.nextCommand = "/step-review-utan";
+      const synthesis = synthesisSource("ALLOWED", "NONE", "NONE");
+      resolver.resolvedSources = [resolvedSource("FINAL_SYNTHESIS", synthesis, 0)];
+      const client = new CommandClient(async () => {
+        if (scenario === "UNCERTAIN") throw new Error("fixture timeout");
+        return new Response(JSON.stringify({
+          info: { id: "assistant-invalid-delivery", role: "assistant", sessionID: "session-meta" },
+          parts: [{ id: "part-invalid-delivery", type: "text", text: "UNCLEAR", messageID: "assistant-invalid-delivery", sessionID: "session-meta" }],
+        }));
+      });
+      const store = new StateStore(root);
+      const engine = new StageEngine(store, resolver, client);
+      const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+      const base = request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent));
+      const result = await engine.invokeStage({
+        ...base,
+        request_id: `request-${scenario.toLowerCase()}-delivery`,
+        requested_stage: "DELIVERY_RESPONSE",
+        sender_role: "Meta",
+        recipient_role: "Track D",
+        candidate_identity: "candidate-1",
+        expected_sources: resolver.resolvedSources.map((source) => source.binding),
+      });
+      assert.equal(result.operation_status, scenario);
+      await assert.rejects(() => engine.installCloseoutAuthority({
+        schema_version: "closeout-authority-install.v1",
+        run_id: created.run_id,
+        delivery_operation_id: result.operation_id,
+        closeout_authority: { schema_version: "closeout-authority-intent.v1", candidate_identity: "candidate-1", candidate_paths: [], worktree_identity: "git:abc", allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false },
+      }), /exact successful Delivery response operation/);
+      assert.equal(existsSync(store.resolve("runs", created.run_id, "owner-sources", "closeout-authority.json")), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("v29 follow-on review-cycle run completes the repaired lifecycle without mutating prior authority", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-v29-follow-on-cycle-"));
+  try {
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.reviewCycle = "1";
+    resolver.nextCommand = "/terv-review";
+    resolver.sourceContent = fixPlanRequiredSource();
+    resolver.revisedPlanContent = reviewFixRevisionSource("FSR-002");
+    const responses = [
+      planReviewSource("REVIEW_FIX_PLAN", "fix-plan-1"),
+      resolver.revisedPlanContent,
+      implementationSource("candidate-1", "fix-plan-1"),
+      synthesisSource("ALLOWED", "NONE"),
+      "ACK_ONLY",
+    ];
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      const text = responses[calls++]!;
+      return new Response(JSON.stringify({
+        info: { id: `assistant-follow-on-${calls}`, role: "assistant", sessionID: "session-meta" },
+        parts: [{ id: `part-follow-on-${calls}`, type: "text", text, messageID: `assistant-follow-on-${calls}`, sessionID: "session-meta" }],
+      }));
+    }));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const base: StageRequest = {
+      ...request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)),
+      plan_class: "REVIEW_FIX_PLAN",
+      plan_identity: "fix-plan-1",
+      candidate_identity: "candidate-1",
+      review_cycle: "1",
+      finding_ids: ["FSR-002"],
+      expected_sources: [resolvedSource("PLAN", resolver.sourceContent, 0, "fix-plan-1").binding],
+    };
+    resolver.resolvedSources = [resolvedSource("PLAN", resolver.sourceContent, 0, "fix-plan-1")];
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-follow-on-review" })).operation_status, "SUCCEEDED");
+
+    const projected = (stage: StageRequest["requested_stage"]): ResolvedSource[] => {
+      const routerSources = promotedSourcesForStage(store, created.run_id, stage);
+      const projection = engine.getRun(created.run_id) as { review_cycle: string; next_stage_sources: Array<{ requested_stage: string; expected_sources: StageRequest["expected_sources"] }> };
+      assert.equal(projection.review_cycle, "1");
+      assert.equal(projection.next_stage_sources[0]?.requested_stage, stage);
+      const expected = projection.next_stage_sources[0]!.expected_sources;
+      return expected.map((binding) => {
+        const routerSource = routerSources.find((source) => source.binding.source_class === binding.source_class);
+        return routerSource ?? { binding, content: resolver.sourceContent };
+      });
+    };
+
+    resolver.resolvedSources = projected("PLAN_REVISION");
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-follow-on-revision", requested_stage: "PLAN_REVISION", sender_role: "Meta", recipient_role: "Track D", expected_sources: resolver.resolvedSources.map((source) => source.binding) })).operation_status, "SUCCEEDED");
+    resolver.resolvedSources = projected("IMPLEMENT");
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-follow-on-implement", requested_stage: "IMPLEMENT", recipient_role: "Track D", expected_sources: resolver.resolvedSources.map((source) => source.binding) })).operation_status, "SUCCEEDED");
+    resolver.resolvedSources = projected("STEP_REVIEW");
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-follow-on-step-review", requested_stage: "STEP_REVIEW", expected_sources: resolver.resolvedSources.map((source) => source.binding) })).operation_status, "SUCCEEDED");
+    resolver.resolvedSources = projected("DELIVERY_RESPONSE");
+    const delivery = await engine.invokeStage({ ...base, request_id: "request-follow-on-delivery", requested_stage: "DELIVERY_RESPONSE", sender_role: "Meta", recipient_role: "Track D", finding_ids: [], expected_sources: resolver.resolvedSources.map((source) => source.binding) });
+    assert.equal(delivery.operation_status, "SUCCEEDED");
+    assert.deepEqual(delivery.allowed_next, []);
+    assert.equal(delivery.reason, "OWNER_CLOSEOUT_AUTHORITY_REQUIRED");
+    assert.equal(calls, 5);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("IMPLEMENT candidate mismatch is consumed as invalid output and never promoted", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-v29-implement-candidate-"));
+  try {
+    const resolver = new FakeResolver();
+    resolver.nextCommand = "/implement";
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => new Response(JSON.stringify({
+      info: { id: "assistant-candidate-mismatch", role: "assistant", sessionID: "session-meta" },
+      parts: [{ id: "part-candidate-mismatch", type: "text", text: implementationSource("candidate-other"), messageID: "assistant-candidate-mismatch", sessionID: "session-meta" }],
+    }))));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const base = request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent));
+    const result = await engine.invokeStage({ ...implementRequest(base, resolver, "request-candidate-mismatch"), candidate_identity: "candidate-1" });
+    assert.equal(result.operation_status, "FAILED_OUTPUT");
+    assert.equal(result.reason, "OUTPUT_VALIDATION_FAILED");
+    assert.deepEqual(promotedSourcesForStage(store, created.run_id, "STEP_REVIEW"), []);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -1090,28 +1403,65 @@ test("FSR-002 ordered source and closeout lineage matrix", async () => {
     resolvedSource("FINAL_SYNTHESIS", allowedSynthesis, 0),
     resolvedSource("DELIVERY_RESPONSE", "ACK_ONLY\n", 1),
     resolvedSource("PROPOSED_DELTA", "NONE\n", 2),
-    resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v1", candidate_identity: "candidate-1", worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(resolver.worktree), allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3),
+    resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "candidate-1", candidate_paths: [], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(resolver.worktree), allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3),
   ];
   const closeoutRequest: StageRequest = { ...base, requested_stage: "CLOSEOUT", recipient_role: "Meta", candidate_identity: "candidate-1", expected_sources: closeoutSources.map((source) => source.binding) };
   assert.doesNotThrow(() => stageTest.assertSourceLineage(closeoutRequest, closeoutSources, authority, resolver.worktree));
   assert.doesNotThrow(() => stageTest.assertOutputSourceLineage(closeoutRequest, closeoutSources, "NOT_PERFORMED", { Commit: "NO_COMMIT reason=fixture", "Staged explicit paths": "NONE" }, resolver.worktree));
   assert.throws(() => stageTest.assertOutputSourceLineage(closeoutRequest, closeoutSources, "NOT_PERFORMED", { Commit: "NO_COMMIT reason=forged", "Staged explicit paths": "NONE" }, resolver.worktree), /NO_COMMIT authority/);
-  const dirtyProof: WorktreeProof = { ...resolver.worktree, status_clean: false, has_unstaged_or_untracked: true, status_sha256: "6".repeat(64) };
+  const dirtyProof: WorktreeProof = { ...resolver.worktree, changed_paths: ["src/candidate.ts"], status_clean: false, has_unstaged_or_untracked: true, status_sha256: "6".repeat(64) };
   const dirtySources = [...closeoutSources];
-  dirtySources[3] = resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v1", candidate_identity: "candidate-1", worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(dirtyProof), allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3);
+  dirtySources[3] = resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "candidate-1", candidate_paths: ["src/candidate.ts"], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(dirtyProof), allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3);
   assert.throws(() => stageTest.assertSourceLineage(closeoutRequest, dirtySources, authority, dirtyProof), /NO_COMMIT authority/);
   assert.throws(() => stageTest.assertSourceLineage(closeoutRequest, closeoutSources.slice(0, 3), authority), /missing, reordered, or invalid/);
   const commitSources = [...closeoutSources];
-  commitSources[0] = resolvedSource("FINAL_SYNTHESIS", synthesisSource("ALLOWED", "NONE", '["ops/PROJECT_STATE.md"]'), 0);
-  commitSources[2] = resolvedSource("PROPOSED_DELTA", '["ops/PROJECT_STATE.md"]\n', 2);
-  const commitProof: WorktreeProof = { ...resolver.worktree, staged_paths: ["ops/PROJECT_STATE.md"], index_sha256: "4".repeat(64), status_sha256: "5".repeat(64) };
-  commitSources[3] = resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v1", candidate_identity: "candidate-1", worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(commitProof), allowed_paths: ["ops/PROJECT_STATE.md"], commit_scope: { mode: "COMMIT", paths: ["ops/PROJECT_STATE.md"] }, staging_precondition: "EXACT", global_apply: false, restart: false }), 3);
+  commitSources[0] = resolvedSource("FINAL_SYNTHESIS", synthesisSource("ALLOWED", "NONE", '[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"}]'), 0);
+  commitSources[2] = resolvedSource("PROPOSED_DELTA", '[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"}]\n', 2);
+  const commitProof: WorktreeProof = { ...resolver.worktree, changed_paths: ["src/candidate.ts"], status_clean: false, has_unstaged_or_untracked: true, status_sha256: "5".repeat(64) };
+  commitSources[3] = resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "candidate-1", candidate_paths: ["src/candidate.ts"], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(commitProof), allowed_paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"], commit_scope: { mode: "COMMIT", paths: ["src/candidate.ts", "ops/PROJECT_STATE.md"] }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3);
   assert.doesNotThrow(() => stageTest.assertSourceLineage(closeoutRequest, commitSources, authority, commitProof));
-  assert.doesNotThrow(() => stageTest.assertOutputSourceLineage(closeoutRequest, commitSources, "NOT_PERFORMED", { Commit: `sha=${"a".repeat(40)}; tree=${"b".repeat(40)}; message=fixture`, "Staged explicit paths": '["ops/PROJECT_STATE.md"]' }, commitProof));
+  const ambientUnrelatedProof = { ...commitProof, changed_paths: ["notes/unrelated.txt", "src/candidate.ts"], status_sha256: "7".repeat(64) };
+  const ambientAbsorptionSources = [...commitSources];
+  ambientAbsorptionSources[3] = resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "candidate-1", candidate_paths: ["src/candidate.ts"], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(ambientUnrelatedProof), allowed_paths: ["notes/unrelated.txt", "ops/PROJECT_STATE.md", "src/candidate.ts"], commit_scope: { mode: "COMMIT", paths: ["notes/unrelated.txt", "ops/PROJECT_STATE.md", "src/candidate.ts"] }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3);
+  assert.throws(() => stageTest.assertSourceLineage(closeoutRequest, ambientAbsorptionSources, authority, ambientUnrelatedProof), /COMMIT authority/);
+  const extraScopeSources = [...commitSources];
+  extraScopeSources[3] = resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "candidate-1", candidate_paths: ["src/candidate.ts"], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(commitProof), allowed_paths: ["docs/extra.md", "ops/PROJECT_STATE.md", "src/candidate.ts"], commit_scope: { mode: "COMMIT", paths: ["docs/extra.md", "ops/PROJECT_STATE.md", "src/candidate.ts"] }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3);
+  assert.throws(() => stageTest.assertSourceLineage(closeoutRequest, extraScopeSources, authority, commitProof), /exact candidate and synthesis-delta union/);
+  const preStagedProof = { ...commitProof, staged_paths: ["src/candidate.ts"], index_sha256: "4".repeat(64) };
+  const preStagedSources = [...commitSources];
+  preStagedSources[3] = resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "candidate-1", candidate_paths: ["src/candidate.ts"], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(preStagedProof), allowed_paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"], commit_scope: { mode: "COMMIT", paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"] }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3);
+  assert.throws(() => stageTest.assertSourceLineage(closeoutRequest, preStagedSources, authority, preStagedProof), /COMMIT authority/);
+  const orderedDelta = '[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"},{"path":"ops/PROJECT_STATE.md","field":"Next action","value":"NONE"}]';
+  const permutedDelta = '[{"path":"ops/PROJECT_STATE.md","field":"Next action","value":"NONE"},{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"}]';
+  const permutedDeltaSources = [...commitSources];
+  permutedDeltaSources[0] = resolvedSource("FINAL_SYNTHESIS", synthesisSource("ALLOWED", "NONE", orderedDelta), 0);
+  permutedDeltaSources[2] = resolvedSource("PROPOSED_DELTA", `${permutedDelta}\n`, 2);
+  assert.doesNotThrow(() => stageTest.assertSourceLineage(closeoutRequest, permutedDeltaSources, authority, commitProof));
+  const valueDriftSources = [...permutedDeltaSources];
+  valueDriftSources[2] = resolvedSource("PROPOSED_DELTA", `${permutedDelta.replace('"value":"NONE"', '"value":"Track B /seq-next"')}\n`, 2);
+  assert.throws(() => stageTest.assertSourceLineage(closeoutRequest, valueDriftSources, authority, commitProof), /delta lineage mismatch/);
+  assert.doesNotThrow(() => stageTest.assertOutputSourceLineage(closeoutRequest, commitSources, "NOT_PERFORMED", { Commit: `sha=${"a".repeat(40)}; tree=${"b".repeat(40)}; message=fixture`, "Staged explicit paths": '["src/candidate.ts","ops/PROJECT_STATE.md"]' }, commitProof));
   assert.throws(() => stageTest.assertOutputSourceLineage(closeoutRequest, commitSources, "NOT_PERFORMED", { Commit: `sha=${"a".repeat(40)}; tree=${"b".repeat(40)}; message=fixture`, "Staged explicit paths": '["other.md"]' }, commitProof), /COMMIT authority/);
   const forgedAuthority = [...closeoutSources];
-  forgedAuthority[3] = resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v1", candidate_identity: "other", worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(resolver.worktree), allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3);
+  forgedAuthority[3] = resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "other", candidate_paths: [], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(resolver.worktree), allowed_paths: [], commit_scope: { mode: "NO_COMMIT", reason: "fixture" }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3);
   assert.throws(() => stageTest.assertSourceLineage(closeoutRequest, forgedAuthority, authority, resolver.worktree), /authority envelope/);
+});
+
+test("v29 proposed closeout delta follows the canonical path-field-value contract", () => {
+  const canonical = '[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"}]';
+  assert.deepEqual(stageTest.parseProposedDelta(canonical), [{ path: "ops/PROJECT_STATE.md", field: "Epic status", value: "CLOSED" }]);
+  assert.deepEqual(stageTest.parseProposedDelta('[{"value":"CLOSED","field":"Epic status","path":"ops/PROJECT_STATE.md"}]'), [{ path: "ops/PROJECT_STATE.md", field: "Epic status", value: "CLOSED" }]);
+  assert.deepEqual(stageTest.parseProposedDelta("NONE"), []);
+  assert.throws(() => stageTest.parseProposedDelta('["ops/PROJECT_STATE.md"]'), /malformed/);
+  assert.throws(() => stageTest.parseProposedDelta('[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED","extra":true}]'), /malformed/);
+  assert.throws(() => stageTest.parseProposedDelta('[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"},{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"}]'), /duplicate/);
+  assert.throws(() => stageTest.parseProposedDelta('[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"OPEN"},{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"}]'), /contradictory/);
+  assert.throws(() => stageTest.parseProposedDelta('[{"path":"../outside.md","field":"Epic status","value":"CLOSED"}]'), /safe relative path/);
+
+  const resolver = new FakeResolver();
+  const closeoutRequest = { candidate_identity: "candidate-1", worktree_identity: "git:abc" } as StageRequest;
+  const proof = { ...resolver.worktree, changed_paths: ["ops/Z.md"], status_clean: false, has_unstaged_or_untracked: true };
+  assert.deepEqual(stageTest.closeoutAuthorityReceipt(JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "candidate-1", candidate_paths: ["ops/Z.md"], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(proof), allowed_paths: ["ops/A.md", "ops/Z.md"], commit_scope: { mode: "COMMIT", paths: ["ops/Z.md", "ops/A.md"] }, staging_precondition: "EMPTY", global_apply: false, restart: false }), closeoutRequest, undefined, proof).commitScope, { mode: "COMMIT", paths: ["ops/A.md", "ops/Z.md"] });
 });
 
 test("FSR-030: COMMIT CLOSEOUT accepts only the authorized changed postcondition", async () => {
@@ -1121,19 +1471,19 @@ test("FSR-030: COMMIT CLOSEOUT accepts only the authorized changed postcondition
     const resolver = new FakeResolver();
     resolver.nextCommand = "/closeout-commit";
     const commitSha = "a".repeat(40);
-    const before: WorktreeProof = { ...resolver.worktree, staged_paths: ["ops/PROJECT_STATE.md"], status_clean: false, has_unstaged_or_untracked: false };
+    const before: WorktreeProof = { ...resolver.worktree, changed_paths: ["src/candidate.ts"], status_clean: false, has_unstaged_or_untracked: true };
     resolver.worktree = before;
-    resolver.worktreeAfterResponse = { ...before, head_sha256: sha256(commitSha), head_tree_sha256: sha256("b".repeat(40)), head_parent_count: 1, sole_parent_sha256: before.head_sha256, committed_paths: ["ops/PROJECT_STATE.md"], index_sha256: "7".repeat(64), status_sha256: sha256(Buffer.alloc(0)), staged_paths: [], status_clean: true, has_unstaged_or_untracked: false };
-    const synthesis = synthesisSource("ALLOWED", "NONE", '["ops/PROJECT_STATE.md"]');
+    resolver.worktreeAfterResponse = { ...before, head_sha256: sha256(commitSha), head_tree_sha256: sha256("b".repeat(40)), head_parent_count: 1, sole_parent_sha256: before.head_sha256, committed_paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"], index_sha256: "7".repeat(64), status_sha256: sha256(Buffer.alloc(0)), changed_paths: [], staged_paths: [], status_clean: true, has_unstaged_or_untracked: false };
+    const synthesis = synthesisSource("ALLOWED", "NONE", '[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"}]');
     resolver.resolvedSources = [
-      resolvedSource("FINAL_SYNTHESIS", synthesis, 0), resolvedSource("DELIVERY_RESPONSE", "ACK_ONLY\n", 1), resolvedSource("PROPOSED_DELTA", '["ops/PROJECT_STATE.md"]\n', 2),
-      resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v1", candidate_identity: "candidate-1", worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(before), allowed_paths: ["ops/PROJECT_STATE.md"], commit_scope: { mode: "COMMIT", paths: ["ops/PROJECT_STATE.md"] }, staging_precondition: "EXACT", global_apply: false, restart: false }), 3),
+      resolvedSource("FINAL_SYNTHESIS", synthesis, 0), resolvedSource("DELIVERY_RESPONSE", "ACK_ONLY\n", 1), resolvedSource("PROPOSED_DELTA", '[{"path":"ops/PROJECT_STATE.md","field":"Epic status","value":"CLOSED"}]\n', 2),
+      resolvedSource("CLOSEOUT_AUTHORITY", JSON.stringify({ schema_version: "closeout-authority.v2", candidate_identity: "candidate-1", candidate_paths: ["src/candidate.ts"], worktree_identity: "git:abc", worktree_proof_sha256: worktreeProofSha256(before), allowed_paths: ["ops/PROJECT_STATE.md", "src/candidate.ts"], commit_scope: { mode: "COMMIT", paths: ["src/candidate.ts", "ops/PROJECT_STATE.md"] }, staging_precondition: "EMPTY", global_apply: false, restart: false }), 3),
     ];
     const response = [
       "CLOSEOUT + COMMIT RESULT", "Target: fal", "Epic: E", "Accountable Lane / class / profile: Track D / TRACK / track-d",
       "workflow_verdict: COMPLETE", "domain_verdict: ACCEPTED", "routing_verdict: CLOSED", "next_role_action: NONE",
       "State/Combined/findings/evidence reconciliation: result=PASS; details=reconciled", "Candidate identity: candidate-1",
-      'Staged explicit paths: ["ops/PROJECT_STATE.md"]', `Verification: result=PASS; candidate=candidate-1; committed_tree=${"b".repeat(40)}; details=verified`,
+      'Staged explicit paths: ["ops/PROJECT_STATE.md","src/candidate.ts"]', `Verification: result=PASS; candidate=candidate-1; committed_tree=${"b".repeat(40)}; details=verified`,
       `Commit: sha=${commitSha}; tree=${"b".repeat(40)}; message=closeout`, "Push: NOT_PERFORMED",
     ].join("\n");
     const engine = new StageEngine(new StateStore(root), resolver, new CommandClient(async () => {
@@ -1145,7 +1495,7 @@ test("FSR-030: COMMIT CLOSEOUT accepts only the authorized changed postcondition
     const baselineResolved = await resolver.resolveStageAuthority(resolver.authority!, stage);
     const postResolved = await resolver.resolveStageAuthority(resolver.authority!, stage);
     const postResolvedFinal = await resolver.resolveStageAuthority(resolver.authority!, stage);
-    const closeoutFields = { Commit: `sha=${commitSha}; tree=${"b".repeat(40)}; message=closeout`, "Staged explicit paths": '["ops/PROJECT_STATE.md"]' };
+    const closeoutFields = { Commit: `sha=${commitSha}; tree=${"b".repeat(40)}; message=closeout`, "Staged explicit paths": '["ops/PROJECT_STATE.md","src/candidate.ts"]' };
     assert.doesNotThrow(() => stageTest.assertResolvedStagePostResponse(postResolvedFinal, baselineResolved, stage, closeoutFields, created.run_authority_sha256));
     assert.throws(() => stageTest.assertResolvedStagePostResponse({ ...postResolvedFinal, worktree: { ...postResolvedFinal.worktree!, head_tree_sha256: sha256("c".repeat(40)) } }, baselineResolved, stage, closeoutFields, created.run_authority_sha256), /postcondition failed/);
     assert.throws(() => stageTest.assertResolvedStagePostResponse({ ...postResolvedFinal, worktree: { ...postResolvedFinal.worktree!, committed_paths: ["other.md"] } }, baselineResolved, stage, closeoutFields, created.run_authority_sha256), /postcondition failed/);
@@ -1159,6 +1509,10 @@ test("FSR-030: COMMIT CLOSEOUT accepts only the authorized changed postcondition
     assert.match(terminal, /CLOSEOUT DURABLE PROJECTION/);
     assert.doesNotMatch(terminal, new RegExp(commitSha));
     assert.doesNotMatch(terminal, new RegExp("b".repeat(40)));
+    assert.deepEqual(engine.getRun(created.run_id), {
+      schema_version: "run-projection.v1", run_id: created.run_id, target_id: "fal", worktree_identity: "git:abc", run_authority_sha256: created.run_authority_sha256,
+      review_cycle: "0", next_stage_sources: [], available_stage_sources: [], continuation_requirements: [], auto_advance: false,
+    });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -1229,6 +1583,47 @@ test("resolve-stage recovers one exact command-root terminal after an uncertain 
     const repeated = await engine.resolveStage(created.run_id, uncertain.operation_id);
     assert.deepEqual(repeated, reconciled);
     assert.equal(calls, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("resolve-stage waits read-only for one late exact command-root terminal without resending", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-late-command-root-reconcile-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let sends = 0;
+    let reads = 0;
+    const store = new StateStore(root);
+    const resolver = new FakeResolver();
+    resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+    resolver.fenceTargetRoot = root;
+    const recovered = {
+      id: "assistant-late-recovered",
+      parent_id: "user-command-root",
+      session_id: resolver.recipientSessionId,
+      text: planReviewSource(),
+      after_baseline: true,
+      command_root_correlated: true,
+    };
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      sends += 1;
+      throw new Error("delivery unknown");
+    }), {
+      captureBaseline: async () => ({ message_id: "assistant-baseline", identity_sha256: sha256("assistant-baseline"), captured_at: new Date().toISOString() }),
+      collect: async () => {
+        reads += 1;
+        return reads === 1 ? [] : [recovered];
+      },
+    });
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const uncertain = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+    const reconciled = await engine.resolveStage(created.run_id, uncertain.operation_id, { wait_ms: 1_000, poll_interval_ms: 250, sleep: async () => undefined });
+    assert.equal(reads, 2);
+    assert.equal(reconciled.operation_status, "SUCCEEDED", JSON.stringify(reconciled));
+    assert.equal(reconciled.transport_status, "TRANSCRIPT_RECONCILED");
+    assert.equal(sends, 1);
+    assert.equal(store.listOperations(created.run_id).length, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

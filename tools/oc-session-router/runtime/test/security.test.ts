@@ -84,6 +84,7 @@ test("FSR-024: all-session exact and encoded private values fail closed", () => 
 test("CLI rejects endpoint and session overrides", () => {
   assert.throws(() => _test.validateOperationArguments("invoke-stage", new Map([["--request", "r.json"], ["--server", "http://attacker"]])), /not allowed/);
   assert.throws(() => _test.validateOperationArguments("new-run", new Map([["--request", "r.json"], ["--session", "foreign"]])), /not allowed/);
+  assert.throws(() => _test.validateOperationArguments("install-closeout-authority", new Map([["--request", "r.json"], ["--target-root", "foreign"]])), /not allowed/);
 });
 
 test("runtime root must be pre-created and contained", () => {

@@ -15,7 +15,8 @@ It is not project truth and does not grant workflow authority.
 ## Safety boundary
 
 - `scripts/Invoke-OCRouter.ps1` is the sole lifecycle command entrypoint. It runs
-  exactly one `new-run`, `invoke-stage`, `resolve-stage`, or `get-run` operation,
+  exactly one `new-run`, `invoke-stage`, `install-closeout-authority`,
+  `resolve-stage`, or `get-run` operation,
   emits JSON with `auto_advance: false`, and never installs or builds at dispatch.
 - The TypeScript core under `runtime/` derives run and stage authority from the
   protected registry plus current target state, Combined span, pinned artifact,
@@ -54,8 +55,11 @@ It is not project truth and does not grant workflow authority.
   response is lost after delivery, `resolve-stage` may accept exactly one strict
   terminal bound to exactly one post-baseline root user message whose text equals
   the installed command template expanded with the pinned argument. Any missing,
-  duplicate, or invalid binding remains `UNCERTAIN`; recovery never resends. SSE
-  is probed and recorded but remains disabled.
+  duplicate, or invalid binding remains `UNCERTAIN`; recovery never resends.
+  Production reconciliation waits, by default, for at most the protected
+  60-minute window and polls only GET history for that same operation. It exits
+  immediately on exact correlation and never creates a new run, operation, or
+  lifecycle send. SSE is probed and recorded but remains disabled.
 - `Prepare-OCRouterStage.ps1` is the bounded no-send source-hash helper. It hashes
   only sources explicitly named by the operator and emits candidate manifest and
   state packet files; invocation remains a separate explicit transaction.
@@ -65,10 +69,41 @@ It is not project truth and does not grant workflow authority.
   protected runtime evidence. This permits an in-run `SEQ_NEXT -> PLAN_REVIEW`
   handoff without rewriting target state or the target manifest. It does not
   auto-advance, accept arbitrary runtime content, or weaken run authority.
-  A validated `IMPLEMENT` terminal also yields a separate hash-bound
-  `ACCEPTANCE_EVIDENCE` projection from its canonical acceptance/check fields
-  and protected candidate/review lineage, so same-run `STEP_REVIEW` receives
-  both required sources without inventing target evidence.
+  A validated `IMPLEMENT` terminal also freezes the protected Git
+  `changed_paths` set as hash-bound router evidence and yields a separate
+  `ACCEPTANCE_EVIDENCE` projection containing that exact candidate scope plus
+  its canonical acceptance/check fields and review lineage. Same-run
+  `STEP_REVIEW` therefore reviews both required sources without inventing
+  target evidence. Later worktree dirt cannot retroactively enlarge this set.
+  `get-run` exposes a separate `continuation_requirements` entry when an allowed
+  successor still needs target- or Owner-owned authority. It never advertises a
+  partial `next_stage_sources` set as dispatch-ready. After `ACK_ONLY`, the same
+  immutable run pauses with `OWNER_SOURCE_REQUIRED`: the router retains the
+  exact synthesis, delivery response, and delta under `available_stage_sources`.
+  The Owner installs one fresh `CLOSEOUT_AUTHORITY` v2 through the protected,
+  no-send `install-closeout-authority` operation. No target file, manifest, or
+  lifecycle state is changed by that install. Its `candidate_paths` is copied
+  from the frozen reviewed candidate scope and is distinct from ambient
+  worktree dirt. After validation, `get-run` exposes the complete four-source
+  CLOSEOUT packet under `next_stage_sources`. Commit authority names the exact union of the frozen
+  candidate paths and synthesis-enumerated governance-delta paths. The index must
+  be empty before POST; the candidate may remain unstaged. The Meta closeout
+  command alone applies the governance delta, stages that exact union, and
+  commits it. The protected worktree proof exposes the exact pre-POST changed
+  paths and requires them to equal `candidate_paths`, so an unrelated dirty path blocks before delivery rather than being
+  absorbed or discovered after commit.
+  A validated `FIX_PLAN_REQUIRED` response ends the current immutable review
+  cycle. It establishes `REVIEW_FIX_PLAN` lineage and requires a new follow-on
+  run with a monotonically incremented review cycle and exact finding lineage;
+  the router never mutates cycle authority in place.
+  Within that follow-on run, a successful stage may carry forward an exact
+  target source binding it already validated when the successor requires the
+  same source class. Content and hash are still re-resolved before the next POST;
+  this is binding reuse, not source trust or authority mutation.
+  Non-`NONE` `Proposed closeout delta` values use the Canon's exact minified
+  JSON array of `{path,field,value}` objects. Legacy path-only arrays are
+  rejected rather than silently losing field/value intent. Array order is not
+  semantic; the exact path/field/value set remains byte-value bound.
   An Owner refresh of the operational registry/capability may change the coarse
   registry projection hash without invalidating that run. The resolver still
   requires every semantic run-authority field, target source, current capability,

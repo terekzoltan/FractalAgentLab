@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { RunAuthority, StageInvocation } from "./contracts.js";
-import { assertFilesystemId, assertSha256 } from "./contracts.js";
+import type { RunAuthority, SourceBinding, StageInvocation } from "./contracts.js";
+import { assertFilesystemId, assertOpaqueId, assertSafeRelativePath, assertSha256, canonicalize, sha256 } from "./contracts.js";
 
 export type OperationStatus = "CREATED" | "DISPATCHING" | "ACTIVE" | "RECONCILING" | "WAITING_ACTION" | "STALLED_SUSPECTED" | "SUCCEEDED" | "FAILED_OUTPUT" | "FAILED_TRANSPORT" | "UNCERTAIN" | "BLOCKED" | "CANCELLED";
 
@@ -57,6 +57,15 @@ export interface DispatchLeaseDocument {
   holder: string;
   acquired_at: string;
   fencing_generation: string;
+}
+
+export interface InstalledOwnerSourceDocument {
+  schema_version: "installed-owner-source.v1";
+  run_id: string;
+  predecessor_operation_id: string;
+  binding: SourceBinding;
+  content: string;
+  installed_at: string;
 }
 
 const NONTERMINAL = new Set<OperationStatus>(["CREATED", "DISPATCHING", "ACTIVE", "RECONCILING", "WAITING_ACTION", "STALLED_SUSPECTED", "UNCERTAIN"]);
@@ -236,6 +245,41 @@ export class StateStore {
     assertFilesystemId(operationId, "operation_id");
     assertFilesystemId(name, "artifact name");
     return readFileSync(this.resolve("runs", runId, "operations", operationId, `${name}.md`), "utf8");
+  }
+
+  installOwnerSource(runId: string, predecessorOperationId: string, binding: SourceBinding, content: string): InstalledOwnerSourceDocument {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(predecessorOperationId, "predecessor_operation_id");
+    assertSafeRelativePath(binding.path, "installed Owner source path");
+    assertOpaqueId(binding.logical_identity, "installed Owner source logical identity");
+    if (binding.path !== "owner-sources/closeout-authority.json" || binding.source_class !== "CLOSEOUT_AUTHORITY" || binding.producer !== "FAL_OWNER_RUNTIME" || binding.order !== 3 || sha256(Buffer.from(content, "utf8")) !== binding.sha256) throw new Error("Installed Owner source binding is invalid");
+    const directory = this.resolve("runs", runId, "owner-sources");
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const documentPath = this.resolve("runs", runId, "owner-sources", "closeout-authority.json");
+    return this.withExclusiveLock(this.resolve("runs", runId, "owner-source-install.lock"), () => {
+      if (existsSync(documentPath)) {
+        const existing = this.loadOwnerSource(runId);
+        if (!existing) throw new Error("Installed Owner source receipt disappeared");
+        if (existing.predecessor_operation_id !== predecessorOperationId || canonicalize(existing.binding) !== canonicalize(binding) || existing.content !== content) throw new Error("A different Owner closeout authority is already installed");
+        return existing;
+      }
+      const document: InstalledOwnerSourceDocument = { schema_version: "installed-owner-source.v1", run_id: runId, predecessor_operation_id: predecessorOperationId, binding, content, installed_at: new Date().toISOString() };
+      this.writeJsonExclusive(documentPath, document);
+      return document;
+    });
+  }
+
+  loadOwnerSource(runId: string): InstalledOwnerSourceDocument | undefined {
+    assertFilesystemId(runId, "run_id");
+    const documentPath = this.resolve("runs", runId, "owner-sources", "closeout-authority.json");
+    if (!existsSync(documentPath)) return undefined;
+    const document = JSON.parse(readFileSync(documentPath, "utf8")) as InstalledOwnerSourceDocument;
+    if (canonicalize(Object.keys(document).sort()) !== canonicalize(["binding", "content", "installed_at", "predecessor_operation_id", "run_id", "schema_version"]) || document.schema_version !== "installed-owner-source.v1" || document.run_id !== runId || typeof document.content !== "string" || typeof document.installed_at !== "string") throw new Error("Installed Owner source receipt is invalid");
+    assertFilesystemId(document.predecessor_operation_id, "predecessor_operation_id");
+    assertSafeRelativePath(document.binding.path, "installed Owner source path");
+    assertOpaqueId(document.binding.logical_identity, "installed Owner source logical identity");
+    if (document.binding.path !== "owner-sources/closeout-authority.json" || document.binding.source_class !== "CLOSEOUT_AUTHORITY" || document.binding.producer !== "FAL_OWNER_RUNTIME" || document.binding.order !== 3 || sha256(Buffer.from(document.content, "utf8")) !== document.binding.sha256) throw new Error("Installed Owner source receipt is invalid");
+    return document;
   }
 
   acquireLease(leaseKey: string, holder: DispatchLeaseDocument): () => void {

@@ -54,12 +54,14 @@ test("FSR-025: protected real Git reader proves clean, dirty, staged, rename, an
     git("init");
     git("config", "user.email", "fixture@example.invalid");
     git("config", "user.name", "Fixture");
+    git("config", "core.autocrlf", "false");
     writeFileSync(path.join(root, "tracked.txt"), "one\n");
     git("add", "tracked.txt");
     git("commit", "-m", "initial");
     const reader = new GitWorktreeReader(executable.path, executable.sha256);
     const clean = reader.inspect(root);
     assert.equal(clean.status_clean, true);
+    assert.deepEqual(clean.changed_paths, []);
     assert.deepEqual(clean.staged_paths, []);
     assert.equal(clean.head_parent_count, 0);
     assert.equal(clean.sole_parent_sha256, "INELIGIBLE");
@@ -68,9 +70,11 @@ test("FSR-025: protected real Git reader proves clean, dirty, staged, rename, an
     writeFileSync(path.join(root, "tracked.txt"), "two\n");
     const dirty = reader.inspect(root);
     assert.equal(dirty.has_unstaged_or_untracked, true);
+    assert.deepEqual(dirty.changed_paths, ["tracked.txt"]);
     git("add", "tracked.txt");
     const staged = reader.inspect(root);
     assert.deepEqual(staged.staged_paths, ["tracked.txt"]);
+    assert.deepEqual(staged.changed_paths, ["tracked.txt"]);
     assert.equal(staged.has_unstaged_or_untracked, false);
     git("commit", "-m", "second");
     const committed = reader.inspect(root);
@@ -80,11 +84,14 @@ test("FSR-025: protected real Git reader proves clean, dirty, staged, rename, an
     assert.match(committed.head_tree_sha256, /^[a-f0-9]{64}$/);
 
     git("mv", "tracked.txt", "renamed.txt");
-    assert.deepEqual(reader.inspect(root).staged_paths, ["renamed.txt"]);
+    const renamed = reader.inspect(root);
+    assert.deepEqual(renamed.staged_paths, ["renamed.txt"]);
+    assert.deepEqual(renamed.changed_paths, ["renamed.txt", "tracked.txt"]);
     git("reset", "--hard", "HEAD");
     writeFileSync(path.join(root, "untracked.txt"), "new\n");
     const untracked = reader.inspect(root);
     assert.equal(untracked.has_unstaged_or_untracked, true);
+    assert.deepEqual(untracked.changed_paths, ["untracked.txt"]);
     assert.notEqual(untracked.status_sha256, clean.status_sha256);
   } finally {
     rmSync(root, { recursive: true, force: true });

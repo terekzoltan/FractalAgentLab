@@ -135,6 +135,7 @@ test("every operation rejects each missing required key as REQUEST_INVALID", () 
   const operationKeys = [
     ["new-run", ["--request"]],
     ["invoke-stage", ["--request"]],
+    ["install-closeout-authority", ["--request"]],
     ["resolve-stage", ["--run-id", "--operation-id"]],
     ["get-run", ["--run-id"]],
     ["write-p0b-proof", ["--request"]],

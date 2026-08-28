@@ -93,7 +93,10 @@ active tool or unknown part types fail closed. Completed historical `tool` and
 to content hashes only; they are never interpreted as terminal output. GET
 snapshot data is private diagnostic
 evidence unless assistant message ID, parent, session, baseline, and terminal hash
-correlate exactly. Snapshot failure never causes a resend.
+correlate exactly. Production `resolve-stage` performs a bounded GET-only wait for
+the late exact terminal (default and hard maximum: 60 minutes); the immutable run,
+operation, semantic intent, and single-send boundary do not change during that
+wait. Snapshot failure never causes a resend.
 
 The shared target-local fence is
 `.opencode-router/.participant-transport.<sha256("fal-router-private-session-fence/v1\n" + exact-private-session-id)>.lock`.
@@ -124,6 +127,67 @@ fields and protected candidate/review lineage. This is the normal bridge for gen
 `SEQ_NEXT -> PLAN -> PLAN_REVIEW`. It never rewrites target authority, invents
 missing non-output evidence, or sends automatically. If target and router-owned
 authority conflict for the same class, dispatch fails closed.
+
+`get-run` separates complete router-owned handoffs from authority that still
+belongs to the target or Owner. Complete ordered source sets appear under
+`next_stage_sources`. Missing target/Owner classes appear under
+`continuation_requirements` and are not dispatch-ready; the exact validated
+router-owned subset remains under `available_stage_sources` as bounded
+materialization evidence. The ordinary ACK path
+therefore projects the router-owned `FINAL_SYNTHESIS`, `DELIVERY_RESPONSE`, and
+`PROPOSED_DELTA`, then pauses the same immutable run. An Owner-only, no-send
+`install-closeout-authority` operation validates and stores a fresh
+`CLOSEOUT_AUTHORITY` v2 inside the protected FAL runtime. This does not mutate
+target Git, target state, the target manifest, or run authority. Once installed,
+the four exact sources become a complete same-run CLOSEOUT projection. The
+router freezes protected Git `changed_paths` immediately after a validated
+`IMPLEMENT` response and binds that exact path set into the router-generated
+`ACCEPTANCE_EVIDENCE` sent to `STEP_REVIEW`. The later Owner authority copies
+`candidate_paths` only from that hash-bound reviewed scope; the install request
+must match it exactly, and current worktree paths must still be identical.
+Ambient dirty paths therefore never define candidate membership. The router
+never derives commit authority from outputs, accepts an unprotected runtime
+source, or imports cross-run sources implicitly.
+The authority's commit paths are the exact Owner-approved union of the frozen
+candidate paths and synthesis-enumerated governance-delta paths. The pre-POST
+index must be empty; candidate changes remain unstaged until Meta
+`/closeout-commit`. Protected `changed_paths` must equal `candidate_paths`, so
+unrelated dirty work fails before delivery even if a broader commit scope is
+attempted. The command then applies
+only the enumerated governance delta, stages the exact approved union, commits,
+and returns the postcondition receipt.
+
+The install request is closed and intentionally does not accept a target root,
+session, server, worktree proof, source bytes, or lifecycle command:
+
+```json
+{"schema_version":"closeout-authority-install.v1","run_id":"<run>","delivery_operation_id":"<exact ACK operation>","closeout_authority":{"schema_version":"closeout-authority-intent.v1","candidate_identity":"<candidate>","candidate_paths":["<reviewed changed path>"],"worktree_identity":"<protected identity>","allowed_paths":["<exact candidate plus delta path>"],"commit_scope":{"mode":"COMMIT","paths":["<same exact paths>"]},"staging_precondition":"EMPTY","global_apply":false,"restart":false}}
+```
+
+The installer resolves and records the current protected worktree-proof hash
+itself. The caller cannot inject that proof or widen transport authority.
+
+`FIX_PLAN_REQUIRED` is the one lawful plan-class transition from the current
+reviewed plan into `REVIEW_FIX_PLAN`. It terminates the current immutable run and
+projects `FOLLOW_ON_RUN_REQUIRED`, not an in-run `PLAN_REVIEW` edge. The next run
+must bind a monotonically incremented review cycle, the exact accepted finding
+IDs, and the exact fix-plan identity. This keeps the Canon fix loop available
+without retroactively changing frozen run authority.
+After that target-owned fix plan is validated once in the follow-on run, its
+exact source binding may be carried into the immediately projected successor
+that needs the same `PLAN` class. The operational resolver still reloads the
+target file and proves the binding before POST, so carry-forward removes only
+redundant request assembly, not revalidation.
+
+Canonical non-`NONE` `Proposed closeout delta` content is a minified JSON array
+of objects with exactly `path`, `field`, and `value`. Candidate output binding is
+also byte-specific: the canonical `Candidate identity/worktree limitations`
+field begins with the exact candidate token. Any Canon-valid free-form suffix is
+accepted when its first character is outside the opaque-ID alphabet; this preserves exact
+candidate-token binding without inventing a semicolon requirement. Path-only
+deltas, contradictory path/field entries, and candidate prose without the exact
+prefix fail closed. Delta-array order is non-semantic; exact path, field, and
+value membership is not.
 
 ## Authority and safety invariants
 
@@ -407,7 +471,9 @@ artifacts; only a separate authorized `/fal-checkpoint-target` command may apply
 checkpoint. Target acceptance, target closeout, and FAL evidence closeout remain
 separate.
 
-After exact `ACK_ONLY`, `/closeout-commit` may apply only synthesis-enumerated
+After exact `ACK_ONLY`, first complete the same immutable run's four-source
+packet with the no-send Owner authority install. Then `/closeout-commit` may
+apply only synthesis-enumerated
 governance/closeout deltas and commit without push. Behavior-changing source,
 tests, configuration, runbooks, commands, skills, and policy must already belong
 to the frozen reviewed candidate.

@@ -12,6 +12,7 @@ export interface WorktreeProof {
   committed_paths: string[];
   index_sha256: string;
   status_sha256: string;
+  changed_paths: string[];
   staged_paths: string[];
   status_clean: boolean;
   has_unstaged_or_untracked: boolean;
@@ -57,6 +58,7 @@ export class GitWorktreeReader implements WorktreeReader {
     const index = runGit(this.executable, root, ["ls-files", "--stage", "-z"]);
     const status = runGit(this.executable, root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
     const statusRecords = parsePorcelainV1Z(status);
+    const changed = [...new Set(statusRecords.flatMap((record) => record.original_path ? [record.path, record.original_path] : [record.path]))].sort();
     const staged = nulStrings(runGit(this.executable, root, ["diff", "--cached", "--name-only", "-z"]), "staged path");
     if (new Set(staged).size !== staged.length) throw new Error("Git staged path output contains duplicates");
     return {
@@ -68,6 +70,7 @@ export class GitWorktreeReader implements WorktreeReader {
       committed_paths: committed,
       index_sha256: sha256(index),
       status_sha256: sha256(status),
+      changed_paths: changed,
       staged_paths: staged,
       status_clean: statusRecords.length === 0,
       has_unstaged_or_untracked: statusRecords.some((record) => record.status === "??" || record.status[1] !== " "),
