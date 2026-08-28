@@ -15,7 +15,7 @@ It is not project truth and does not grant workflow authority.
 ## Safety boundary
 
 - `scripts/Invoke-OCRouter.ps1` is the sole lifecycle command entrypoint. It runs
-  exactly one `new-run`, `invoke-stage`, `install-closeout-authority`,
+  exactly one `new-run`, `new-follow-on-run`, `invoke-stage`, `install-closeout-authority`,
   `resolve-stage`, or `get-run` operation,
   emits JSON with `auto_advance: false`, and never installs or builds at dispatch.
 - The TypeScript core under `runtime/` derives run and stage authority from the
@@ -95,7 +95,12 @@ It is not project truth and does not grant workflow authority.
   A validated `FIX_PLAN_REQUIRED` response ends the current immutable review
   cycle. It establishes `REVIEW_FIX_PLAN` lineage and requires a new follow-on
   run with a monotonically incremented review cycle and exact finding lineage;
-  the router never mutates cycle authority in place.
+  the router never mutates cycle authority in place. The no-send
+  `new-follow-on-run` operation accepts only the exact predecessor run and
+  Delivery operation identities. It derives the candidate, fix plan, findings,
+  and next cycle from protected terminal evidence, creates one idempotent
+  successor, and projects its first `PLAN_REVIEW` source without rewriting the
+  target repository or sending a lifecycle command.
   Within that follow-on run, a successful stage may carry forward an exact
   target source binding it already validated when the successor requires the
   same source class. Content and hash are still re-resolved before the next POST;

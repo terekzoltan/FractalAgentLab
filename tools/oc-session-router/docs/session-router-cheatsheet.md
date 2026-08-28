@@ -8,6 +8,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Initialize-OCRou
 $env:OPENCODE_SERVER_USERNAME = '<process-only username>'
 $env:OPENCODE_SERVER_PASSWORD = Read-Host 'Process-only local password'
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-OCRouter.ps1 -Operation new-run -RequestPath '<run-request.v1 path>'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-OCRouter.ps1 -Operation new-follow-on-run -RequestPath '<follow-on-run-request.v1 path>'
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-OCRouter.ps1 -Operation invoke-stage -RequestPath '<stage-request.v1 path>'
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-OCRouter.ps1 -Operation resolve-stage -RunId '<run ID>' -OperationId '<operation ID>'
 ```

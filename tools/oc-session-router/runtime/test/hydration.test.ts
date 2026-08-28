@@ -7,7 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { _test } from "../src/cli.js";
 import { authoritySha256, parseRunRequest, sha256, type RunAuthority, type StageInvocation, type StageRequest } from "../src/contracts.js";
-import { promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh } from "../src/stage-engine.js";
+import { StageEngine, promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh } from "../src/stage-engine.js";
 import { StateStore } from "../src/state-store.js";
 import { GitWorktreeReader, worktreeProofSha256 } from "../src/worktree-reader.js";
 
@@ -348,6 +348,88 @@ test("operational registry refresh preserves an immutable run and its promoted n
   }
 });
 
+test("production resolver creates a protected follow-on run from FIX_PLAN_REQUIRED without target-state mutation", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-real-follow-on-"));
+  const previousUsername = process.env.OPENCODE_SERVER_USERNAME;
+  const previousPassword = process.env.OPENCODE_SERVER_PASSWORD;
+  try {
+    const target = path.join(root, "target");
+    const runtime = path.join(root, "runtime");
+    mkdirSync(path.join(target, "ops"), { recursive: true });
+    mkdirSync(path.join(target, "evidence"), { recursive: true });
+    mkdirSync(runtime);
+    const pinned = "fixture\n";
+    const synthesis = "FINAL STEP REVIEW SYNTHESIS\nfixture\n";
+    const manifest = JSON.stringify({ schema_version: "stage-source-manifest.v1", target_id: "fal", epic: "E", candidate_identity: "candidate-1", entries: [{ stage: "DELIVERY_RESPONSE", plan_class: "EPIC_PLAN", sources: [{ path: "evidence/synthesis.md", source_class: "FINAL_SYNTHESIS", logical_identity: "synthesis-1", producer: "target-state", sha256: sha256(synthesis), order: 0 }] }] });
+    writeFileSync(path.join(target, "ops", "PROJECT_STATE.md"), [
+      "State revision: `s1`", "Configuration identity: `c1`", "Wave: `W`", "Epic: `E`", "Combined selector: `HEADING:Current`",
+      "Pinned artifact: `evidence/pinned.md`", "Pinned artifact logical identity: `pinned-1`", "Candidate identity: `candidate-1`", "Review cycle: `0`",
+      "Stage source manifest: `evidence/stage-sources.json`", `Stage source manifest SHA-256: \`${sha256(manifest)}\``, "Workflow phase: `REVIEW_RESPONSE`", "Next actor: `Track D`", "Next command: `/step-review-utan`", "",
+    ].join("\n"));
+    writeFileSync(path.join(target, "ops", "Combined.md"), "# Root\n\n## Current\n| E | OPEN |\n");
+    writeFileSync(path.join(target, "ops", "OVERLAY.md"), "overlay\n");
+    writeFileSync(path.join(target, "ops", "ROLE.md"), "role\n");
+    writeFileSync(path.join(target, "evidence", "pinned.md"), pinned);
+    writeFileSync(path.join(target, "evidence", "synthesis.md"), synthesis);
+    writeFileSync(path.join(target, "evidence", "stage-sources.json"), manifest);
+    const registryPath = path.join(root, "registry.json");
+    writeFileSync(registryPath, JSON.stringify({ schema_version: "router-control-registry.v1", targets: { fal: {
+      profile_identity: "profile-1", target_identity: "fal", worktree_identity: "git:a", accountable: { lane: "Track D", class: "TRACK", profile: "track-d" }, root: target,
+      state_path: "ops/PROJECT_STATE.md", combined_path: "ops/Combined.md", overlay_path: "ops/OVERLAY.md", accountable_role_path: "ops/ROLE.md", require_active_route: false,
+      server: { origin: "http://127.0.0.1:1", fingerprint: "fixture" }, sessions: { Meta: { id: "private-meta" }, "Track D": { id: "private-track" } },
+    } } }));
+    const store = new StateStore(runtime);
+    const resolver = new _test.FileAuthorityResolver(registryPath, undefined, undefined, undefined, "FIXTURE_ONLY", store);
+    const authority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-predecessor", createdAt: "2026-08-28T00:00:00.000Z" });
+    store.createRun(authority, authoritySha256(authority));
+    const invocation = { schema_version: "stage-invocation.v1", operation_id: "op-delivery", run_id: authority.run_id, requested_stage: "DELIVERY_RESPONSE", candidate_identity: "candidate-1", finding_ids: ["FSR-002"] } as StageInvocation;
+    const operation = store.createOperation(authority.run_id, invocation, { schema_version: "dispatch-intent.v1" }, sha256("intent"));
+    const fixPlan = [
+      "FIX_PLAN_REQUIRED", "Target: fal", "Epic: E", "Candidate: candidate-1", "Accountable Lane / class / profile: Track D / TRACK / track-d",
+      'Accepted finding IDs: ["FSR-002"]', "Allowed surfaces: runtime", "Forbidden surfaces: protected", "Finding -> change -> acceptance/check: FSR-002 -> fix -> test",
+      "Dependencies: none", "Fix-plan artifact: fix-plan-1", "FIX_PLAN_READY_FOR_IMPLEMENT", "",
+    ].join("\n");
+    store.writeArtifact(authority.run_id, operation.operation_id, "terminal", fixPlan);
+    store.updateResult(authority.run_id, operation.operation_id, { allowed_next: [], reason: "FOLLOW_ON_REVIEW_CYCLE_RUN_REQUIRED" });
+    store.updateOperation(authority.run_id, operation.operation_id, operation.revision, { status: "SUCCEEDED" });
+    const engine = new StageEngine(store, resolver);
+    const followOnRequest = { schema_version: "follow-on-run-request.v1" as const, predecessor_run_id: authority.run_id, delivery_operation_id: operation.operation_id };
+    const followOn = await engine.newFollowOnRun(followOnRequest);
+    assert.equal(followOn.review_cycle, "1");
+    assert.equal(followOn.next_stage_sources[0]?.expected_sources[0]?.logical_identity, "fix-plan-1");
+    const nextAuthority = store.loadRun(followOn.run_id).authority;
+    assert.equal(nextAuthority.next_command, "/terv-review");
+    const followOnRequestPath = path.join(root, "follow-on-request.json");
+    writeFileSync(followOnRequestPath, JSON.stringify(followOnRequest));
+    const cli = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/cli.js");
+    const cliResult = spawnSync(process.execPath, [cli, "new-follow-on-run", "--request", followOnRequestPath], { encoding: "utf8", env: { ...process.env, OC_ROUTER_RUNTIME_ROOT: runtime, OC_ROUTER_CONTROL_REGISTRY: registryPath } });
+    assert.equal(cliResult.status, 0, cliResult.stderr);
+    const repeated = JSON.parse(cliResult.stdout) as { run_id: string; created: boolean; review_cycle: string };
+    assert.equal(repeated.run_id, followOn.run_id);
+    assert.equal(repeated.created, false);
+    assert.equal(repeated.review_cycle, "1");
+    const request: StageRequest = {
+      schema_version: "stage-request.v1", request_id: "request-follow-on-review", run_id: followOn.run_id, issued_at: "2026-08-28T00:00:01.000Z", issued_by: "orchestrator", run_authority_sha256: followOn.run_authority_sha256,
+      requested_stage: "PLAN_REVIEW", plan_class: "REVIEW_FIX_PLAN", target_id: "fal", worktree_identity: "git:a", state_revision: nextAuthority.state_revision, state_sha256: nextAuthority.state_sha256,
+      combined_selector: nextAuthority.combined_selector, combined_span_sha256: nextAuthority.combined_span_sha256, expected_sources: followOn.next_stage_sources[0]!.expected_sources,
+      wave: "W", epic: "E", accountable_lane: "Track D", accountable_class: "TRACK", accountable_profile: "track-d", sender_role: "Track D", recipient_role: "Meta",
+      plan_identity: "fix-plan-1", candidate_identity: "candidate-1", review_cycle: "1", finding_ids: ["FSR-002"], review_risk: "normal", project_review_context: "fixture",
+      expected_contract_version: "awc-4.1.1", allowed_side_effect_class: "ADDRESSED_SESSION_COMMAND", configuration_identity: nextAuthority.configuration_identity, active_route_generation: nextAuthority.active_route_generation,
+    };
+    process.env.OPENCODE_SERVER_USERNAME = "fixture";
+    process.env.OPENCODE_SERVER_PASSWORD = "fixture";
+    const resolved = await resolver.resolveStageAuthority(nextAuthority, request);
+    assert.equal(resolved.sources.length, 1);
+    assert.equal(resolved.sources[0]?.binding.source_class, "PLAN");
+    assert.equal(resolved.sources[0]?.content, fixPlan);
+    assert.equal(readFileSync(path.join(target, "ops", "PROJECT_STATE.md"), "utf8").includes("Review cycle: `0`"), true);
+  } finally {
+    if (previousUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = previousUsername;
+    if (previousPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = previousPassword;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("v29 real resolver revalidates one carried target PLAN binding in a follow-on review cycle", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-v29-real-carry-"));
   const previousUsername = process.env.OPENCODE_SERVER_USERNAME;
@@ -518,7 +600,7 @@ test("v29 CLI installs closeout authority only in protected runtime and launcher
     assert.deepEqual(readFileSync(path.join(target, "ops", "PROJECT_STATE.md")), beforeState);
     assert.equal(existsSync(store.resolve("runs", authority.run_id, "owner-sources", "closeout-authority.json")), true);
     const launcher = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../scripts/Invoke-OCRouter.ps1"), "utf8");
-    assert.match(launcher, /ValidateSet\('new-run','invoke-stage','install-closeout-authority'/);
+    assert.match(launcher, /ValidateSet\('new-run','new-follow-on-run','invoke-stage','install-closeout-authority'/);
     assert.match(launcher, /install-closeout-authority'.*RequestPath/s);
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -8,6 +8,7 @@ import {
   assertSha256,
   canonicalize,
   parseCloseoutAuthorityInstallRequest,
+  parseFollowOnRunRequest,
   parseRunRequest,
   parseStageSourceManifest,
   parseStrictJson,
@@ -35,7 +36,7 @@ import {
   type ControlRegistry,
   type RegistryTarget,
 } from "./control-plane.js";
-import { StageEngine, promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "./stage-engine.js";
+import { StageEngine, promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh, targetAuthorityMatchesRun, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "./stage-engine.js";
 import { StateStore } from "./state-store.js";
 import { InstalledSnapshotReader } from "./snapshot-reader.js";
 import { CommandClient, InstalledCapabilityProbe, InstalledSnapshotClient } from "./transport.js";
@@ -191,7 +192,8 @@ class FileAuthorityResolver implements AuthorityResolver {
     );
     const target = this.target(runAuthority.target_id, loaded.registry);
     const root = this.targetRoot(loaded.registry, target);
-    if (!runAuthorityMatchesAcrossOperationalRefresh(current, runAuthority)) throw new Error("Current target semantic authority drifted");
+    const authorityMatches = this.stateStore ? targetAuthorityMatchesRun(this.stateStore, current, runAuthority) : runAuthorityMatchesAcrossOperationalRefresh(current, runAuthority);
+    if (!authorityMatches) throw new Error("Current target semantic authority drifted");
     const sources = this.resolveSources(root, current, request);
     const recipient = target.sessions[request.recipient_role];
     if (!recipient?.id) throw new Error("Protected registry has no exact recipient role mapping");
@@ -218,9 +220,10 @@ class FileAuthorityResolver implements AuthorityResolver {
       { runId: runAuthority.run_id, createdAt: runAuthority.created_at },
       loaded,
     );
-    if (!runAuthorityMatchesAcrossOperationalRefresh(current, runAuthority)) throw new Error("Current target semantic authority drifted");
+    const authorityMatches = this.stateStore ? targetAuthorityMatchesRun(this.stateStore, current, runAuthority) : runAuthorityMatchesAcrossOperationalRefresh(current, runAuthority);
+    if (!authorityMatches) throw new Error("Current target semantic authority drifted");
     const root = this.targetRoot(loaded.registry, this.target(runAuthority.target_id, loaded.registry));
-    return { run_authority: current, worktree: this.worktreeReader.inspect(root) };
+    return { run_authority: runAuthority, worktree: this.worktreeReader.inspect(root) };
   }
 
   private async resolveCapability(registry: ControlRegistry, targetId: string, target: RegistryTarget, request: StageRequest): Promise<ResolvedStageAuthority["capability"]> {
@@ -730,13 +733,13 @@ function writeCliRowToFd(fd: 1 | 2, row: string): void {
 
 async function main(): Promise<void> {
   const operation = process.argv[2];
-  if (!operation || !["new-run", "invoke-stage", "install-closeout-authority", "resolve-stage", "get-run", "purge-retention", "write-p0b-proof", "resolve-compact-authority", "consume-compact-authority"].includes(operation)) throw new ClassifiedCliError("REQUEST_INVALID");
+  if (!operation || !["new-run", "new-follow-on-run", "invoke-stage", "install-closeout-authority", "resolve-stage", "get-run", "purge-retention", "write-p0b-proof", "resolve-compact-authority", "consume-compact-authority"].includes(operation)) throw new ClassifiedCliError("REQUEST_INVALID");
   const args = classified("REQUEST_INVALID", () => argumentsMap(process.argv.slice(3)));
   classified("REQUEST_INVALID", () => validateOperationArguments(operation, args));
   const runtimeRoot = process.env.OC_ROUTER_RUNTIME_ROOT;
   if (!runtimeRoot) throw new ClassifiedCliError("STATE_STORE_BLOCKED");
   const store = classified("STATE_STORE_BLOCKED", () => new ClassifiedStateStore(runtimeRoot));
-  const dispatchOperation = operation === "new-run" || operation === "invoke-stage";
+  const dispatchOperation = operation === "new-run" || operation === "new-follow-on-run" || operation === "invoke-stage";
   const authorityOperation = dispatchOperation || operation === "install-closeout-authority";
   const compactOperation = operation === "resolve-compact-authority" || operation === "consume-compact-authority";
   const registryPath = process.env.OC_ROUTER_CONTROL_REGISTRY;
@@ -755,6 +758,9 @@ async function main(): Promise<void> {
   if (operation === "new-run") {
     const request = classified("REQUEST_INVALID", () => parseRunRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     result = await classifiedAsync("RUN_AUTHORITY_BLOCKED", () => engine.newRun(request));
+  } else if (operation === "new-follow-on-run") {
+    const request = classified("REQUEST_INVALID", () => parseFollowOnRunRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
+    result = await classifiedAsync("RUN_AUTHORITY_BLOCKED", () => engine.newFollowOnRun(request));
   } else if (operation === "invoke-stage") {
     const request = classified("REQUEST_INVALID", () => parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     result = await classifiedAsync("BLOCKED", () => engine.invokeStage(request));
@@ -798,7 +804,7 @@ async function main(): Promise<void> {
 }
 
 function validateOperationArguments(operation: string, args: Map<string, string>): void {
-  const requiredKeys = operation === "new-run" || operation === "invoke-stage" || operation === "install-closeout-authority"
+  const requiredKeys = operation === "new-run" || operation === "new-follow-on-run" || operation === "invoke-stage" || operation === "install-closeout-authority"
     ? ["--request"]
     : operation === "resolve-stage"
       ? ["--run-id", "--operation-id"]

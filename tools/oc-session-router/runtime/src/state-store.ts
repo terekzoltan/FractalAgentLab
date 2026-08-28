@@ -68,6 +68,31 @@ export interface InstalledOwnerSourceDocument {
   installed_at: string;
 }
 
+export interface InstalledFollowOnSourceDocument {
+  schema_version: "installed-follow-on-source.v1";
+  run_id: string;
+  predecessor_run_id: string;
+  predecessor_operation_id: string;
+  predecessor_run_authority_sha256: string;
+  base_review_cycle: string;
+  base_next_command: string;
+  predecessor_review_cycle: string;
+  review_cycle: string;
+  candidate_identity: string;
+  finding_ids: string[];
+  binding: SourceBinding;
+  content: string;
+  installed_at: string;
+}
+
+interface FollowOnLinkDocument {
+  schema_version: "follow-on-link.v1";
+  predecessor_run_id: string;
+  predecessor_operation_id: string;
+  run_id: string;
+  run_authority_sha256: string;
+}
+
 const NONTERMINAL = new Set<OperationStatus>(["CREATED", "DISPATCHING", "ACTIVE", "RECONCILING", "WAITING_ACTION", "STALLED_SUSPECTED", "UNCERTAIN"]);
 
 export class StateStore {
@@ -111,6 +136,34 @@ export class StateStore {
     return run;
   }
 
+  createFollowOnRun(authority: RunAuthority, authorityHash: string, source: Omit<InstalledFollowOnSourceDocument, "run_id" | "installed_at">): { run: RunDocument; created: boolean } {
+    assertFilesystemId(source.predecessor_run_id, "predecessor_run_id");
+    assertFilesystemId(source.predecessor_operation_id, "predecessor_operation_id");
+    assertSha256(source.predecessor_run_authority_sha256, "predecessor run authority sha256");
+    const links = this.resolve("follow-on-links");
+    mkdirSync(links, { recursive: true, mode: 0o700 });
+    const key = sha256(canonicalize({ predecessor_run_id: source.predecessor_run_id, predecessor_operation_id: source.predecessor_operation_id }));
+    return this.withExclusiveLock(this.resolve("follow-on-links", `${key}.lock`), () => {
+      const linkPath = this.resolve("follow-on-links", `${key}.json`);
+      if (existsSync(linkPath)) {
+        const link = JSON.parse(readFileSync(linkPath, "utf8")) as FollowOnLinkDocument;
+        const expectedLinkKeys = ["predecessor_operation_id", "predecessor_run_id", "run_authority_sha256", "run_id", "schema_version"];
+        if (canonicalize(Object.keys(link).sort()) !== canonicalize(expectedLinkKeys) || link.schema_version !== "follow-on-link.v1" || link.predecessor_run_id !== source.predecessor_run_id || link.predecessor_operation_id !== source.predecessor_operation_id) throw new Error("Follow-on link receipt is invalid");
+        assertFilesystemId(link.run_id, "follow-on run_id");
+        assertSha256(link.run_authority_sha256, "follow-on run authority sha256");
+        const existing = this.loadRun(link.run_id);
+        const installed = this.loadFollowOnSource(link.run_id);
+        if (!installed || existing.run.run_authority_sha256 !== link.run_authority_sha256 || installed.predecessor_run_id !== source.predecessor_run_id || installed.predecessor_operation_id !== source.predecessor_operation_id) throw new Error("Follow-on link target is invalid");
+        return { run: existing.run, created: false };
+      }
+      const run = this.createRun(authority, authorityHash);
+      this.installFollowOnSource(authority.run_id, source);
+      const link: FollowOnLinkDocument = { schema_version: "follow-on-link.v1", predecessor_run_id: source.predecessor_run_id, predecessor_operation_id: source.predecessor_operation_id, run_id: authority.run_id, run_authority_sha256: authorityHash };
+      this.writeJsonExclusive(linkPath, link);
+      return { run, created: true };
+    });
+  }
+
   loadRun(runId: string): { run: RunDocument; authority: RunAuthority } {
     assertFilesystemId(runId, "run_id");
     const dir = this.resolve("runs", runId);
@@ -118,6 +171,45 @@ export class StateStore {
       run: JSON.parse(readFileSync(path.join(dir, "run.json"), "utf8")) as RunDocument,
       authority: JSON.parse(readFileSync(path.join(dir, "run-authority.json"), "utf8")) as RunAuthority,
     };
+  }
+
+  installFollowOnSource(runId: string, source: Omit<InstalledFollowOnSourceDocument, "run_id" | "installed_at">): InstalledFollowOnSourceDocument {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(source.predecessor_run_id, "predecessor_run_id");
+    assertFilesystemId(source.predecessor_operation_id, "predecessor_operation_id");
+    assertSha256(source.predecessor_run_authority_sha256, "predecessor run authority sha256");
+    assertSafeRelativePath(source.binding.path, "follow-on source path");
+    assertOpaqueId(source.binding.logical_identity, "follow-on source logical identity");
+    assertOpaqueId(source.candidate_identity, "follow-on candidate identity");
+    if (!/^(?:0|[1-9]\d*)$/.test(source.base_review_cycle) || !/^(?:0|[1-9]\d*)$/.test(source.predecessor_review_cycle) || !/^[1-9]\d*$/.test(source.review_cycle) || Number(source.review_cycle) !== Number(source.predecessor_review_cycle) + 1 || !Number.isSafeInteger(Number(source.review_cycle))) throw new Error("Follow-on review cycle is invalid");
+    if (!source.base_next_command.startsWith("/")) throw new Error("Follow-on base command is invalid");
+    if (source.finding_ids.length === 0 || source.finding_ids.some((finding) => typeof finding !== "string") || new Set(source.finding_ids).size !== source.finding_ids.length || canonicalize(source.finding_ids) !== canonicalize([...source.finding_ids].sort())) throw new Error("Follow-on finding lineage is invalid");
+    for (const finding of source.finding_ids) assertOpaqueId(finding, "follow-on finding ID");
+    if (source.binding.path !== "router-predecessor/fix-plan.md" || source.binding.source_class !== "PLAN" || source.binding.producer !== "FAL_ROUTER_OUTPUT" || source.binding.order !== 0 || sha256(Buffer.from(source.content, "utf8")) !== source.binding.sha256) throw new Error("Follow-on source binding is invalid");
+    const documentPath = this.resolve("runs", runId, "follow-on-source.json");
+    const document: InstalledFollowOnSourceDocument = { ...source, schema_version: "installed-follow-on-source.v1", run_id: runId, installed_at: new Date().toISOString() };
+    this.writeJsonExclusive(documentPath, document);
+    return document;
+  }
+
+  loadFollowOnSource(runId: string): InstalledFollowOnSourceDocument | undefined {
+    assertFilesystemId(runId, "run_id");
+    const documentPath = this.resolve("runs", runId, "follow-on-source.json");
+    if (!existsSync(documentPath)) return undefined;
+    const document = JSON.parse(readFileSync(documentPath, "utf8")) as InstalledFollowOnSourceDocument;
+    const expectedKeys = ["base_next_command", "base_review_cycle", "binding", "candidate_identity", "content", "finding_ids", "installed_at", "predecessor_operation_id", "predecessor_review_cycle", "predecessor_run_authority_sha256", "predecessor_run_id", "review_cycle", "run_id", "schema_version"];
+    if (canonicalize(Object.keys(document).sort()) !== canonicalize(expectedKeys) || document.schema_version !== "installed-follow-on-source.v1" || document.run_id !== runId || typeof document.content !== "string" || typeof document.installed_at !== "string") throw new Error("Installed follow-on source receipt is invalid");
+    assertFilesystemId(document.predecessor_run_id, "predecessor_run_id");
+    assertFilesystemId(document.predecessor_operation_id, "predecessor_operation_id");
+    assertSha256(document.predecessor_run_authority_sha256, "predecessor run authority sha256");
+    assertSafeRelativePath(document.binding.path, "follow-on source path");
+    assertOpaqueId(document.binding.logical_identity, "follow-on source logical identity");
+    assertOpaqueId(document.candidate_identity, "follow-on candidate identity");
+    if (!/^(?:0|[1-9]\d*)$/.test(document.base_review_cycle) || !/^(?:0|[1-9]\d*)$/.test(document.predecessor_review_cycle) || !/^[1-9]\d*$/.test(document.review_cycle) || Number(document.review_cycle) !== Number(document.predecessor_review_cycle) + 1 || !Number.isSafeInteger(Number(document.review_cycle)) || !document.base_next_command.startsWith("/")) throw new Error("Installed follow-on source receipt is invalid");
+    if (!Array.isArray(document.finding_ids) || document.finding_ids.length === 0 || document.finding_ids.some((finding) => typeof finding !== "string") || new Set(document.finding_ids).size !== document.finding_ids.length || canonicalize(document.finding_ids) !== canonicalize([...document.finding_ids].sort())) throw new Error("Installed follow-on source receipt is invalid");
+    for (const finding of document.finding_ids) assertOpaqueId(finding, "follow-on finding ID");
+    if (document.binding.path !== "router-predecessor/fix-plan.md" || document.binding.source_class !== "PLAN" || document.binding.producer !== "FAL_ROUTER_OUTPUT" || document.binding.order !== 0 || sha256(Buffer.from(document.content, "utf8")) !== document.binding.sha256) throw new Error("Installed follow-on source receipt is invalid");
+    return document;
   }
 
   createOperation(runId: string, invocation: StageInvocation, intent: unknown, intentSha256: string): OperationDocument {

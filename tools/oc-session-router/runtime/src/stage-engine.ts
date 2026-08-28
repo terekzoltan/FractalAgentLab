@@ -13,6 +13,7 @@ import {
   stageRequestFromInvocation,
   validateOutputBinding,
   type CloseoutAuthorityInstallRequest,
+  type FollowOnRunRequest,
   type RunAuthority,
   type RunRequest,
   type SourceBinding,
@@ -114,6 +115,69 @@ export class StageEngine {
     return { run_id: runId, run_authority_sha256: digest, auto_advance: false };
   }
 
+  async newFollowOnRun(request: FollowOnRunRequest): Promise<{ schema_version: "follow-on-run-result.v1"; run_id: string; run_authority_sha256: string; predecessor_run_id: string; predecessor_operation_id: string; review_cycle: string; next_stage_sources: Array<{ requested_stage: "PLAN_REVIEW"; expected_sources: SourceBinding[] }>; created: boolean; auto_advance: false }> {
+    if (!this.resolver) throw new Error("Authority resolver is unavailable for follow-on run");
+    const predecessor = this.store.loadRun(request.predecessor_run_id);
+    const operations = this.store.listOperations(request.predecessor_run_id);
+    const delivery = operations.at(-1);
+    if (!delivery || delivery.operation_id !== request.delivery_operation_id || delivery.status !== "SUCCEEDED" || delivery.invocation.requested_stage !== "DELIVERY_RESPONSE") throw new Error("Follow-on run requires the exact successful terminal Delivery response operation");
+    const content = this.store.readArtifact(request.predecessor_run_id, request.delivery_operation_id, "terminal");
+    const parsed = parseOutputShape("DELIVERY_RESPONSE", content);
+    if (parsed.terminal !== "FIX_PLAN_REQUIRED") throw new Error("Follow-on run requires exact FIX_PLAN_REQUIRED authority");
+    const findingIds = canonicalFindingIds(parseFindingIdArray(parsed.fields["Accepted finding IDs"] ?? "", "Fix plan"));
+    if (findingIds.length === 0 || canonicalize(findingIds) !== canonicalize(delivery.invocation.finding_ids) || parsed.fields.Candidate !== delivery.invocation.candidate_identity) throw new Error("Follow-on run finding or candidate lineage mismatch");
+    const predecessorCycle = Number(predecessor.authority.review_cycle);
+    if (!Number.isSafeInteger(predecessorCycle) || predecessorCycle < 0 || predecessorCycle >= Number.MAX_SAFE_INTEGER) throw new Error("Predecessor review cycle cannot be incremented safely");
+    const reviewCycle = String(predecessorCycle + 1);
+    const runId = `run-${randomUUID()}`;
+    const createdAt = new Date().toISOString();
+    const current = await this.resolver.deriveRunAuthority(
+      { schema_version: "run-request.v1", target_id: predecessor.authority.target_id, expected_worktree_identity: predecessor.authority.worktree_identity },
+      { runId, createdAt },
+    );
+    const predecessorCurrentIdentity: RunAuthority = { ...current, run_id: predecessor.authority.run_id, created_at: predecessor.authority.created_at };
+    if (!targetAuthorityMatchesRun(this.store, predecessorCurrentIdentity, predecessor.authority)) throw new Error("Current target authority drifted from the predecessor review cycle");
+    const authority: RunAuthority = { ...current, review_cycle: reviewCycle, next_command: "/terv-review" };
+    const normalizedContent = `${content.replace(/\r\n/g, "\n").trim()}\n`;
+    const binding: SourceBinding = {
+      path: "router-predecessor/fix-plan.md",
+      source_class: "PLAN",
+      logical_identity: parsed.fields["Fix-plan artifact"]!,
+      producer: "FAL_ROUTER_OUTPUT",
+      sha256: sha256(Buffer.from(normalizedContent, "utf8")),
+      order: 0,
+    };
+    const digest = authoritySha256(authority);
+    const installed = this.store.createFollowOnRun(authority, digest, {
+      schema_version: "installed-follow-on-source.v1",
+      predecessor_run_id: request.predecessor_run_id,
+      predecessor_operation_id: request.delivery_operation_id,
+      predecessor_run_authority_sha256: predecessor.run.run_authority_sha256,
+      base_review_cycle: current.review_cycle,
+      base_next_command: current.next_command,
+      predecessor_review_cycle: predecessor.authority.review_cycle,
+      review_cycle: reviewCycle,
+      candidate_identity: parsed.fields.Candidate!,
+      finding_ids: findingIds,
+      binding,
+      content: normalizedContent,
+    });
+    const loaded = this.store.loadRun(installed.run.run_id);
+    const source = this.store.loadFollowOnSource(installed.run.run_id);
+    if (!source) throw new Error("Follow-on source receipt was not installed");
+    return {
+      schema_version: "follow-on-run-result.v1",
+      run_id: installed.run.run_id,
+      run_authority_sha256: loaded.run.run_authority_sha256,
+      predecessor_run_id: source.predecessor_run_id,
+      predecessor_operation_id: source.predecessor_operation_id,
+      review_cycle: loaded.authority.review_cycle,
+      next_stage_sources: [{ requested_stage: "PLAN_REVIEW", expected_sources: [{ ...source.binding, order: 0 }] }],
+      created: installed.created,
+      auto_advance: false,
+    };
+  }
+
   async installCloseoutAuthority(request: CloseoutAuthorityInstallRequest): Promise<unknown> {
     if (!this.resolver) throw new Error("Authority resolver is unavailable for closeout authority installation");
     const loaded = this.store.loadRun(request.run_id);
@@ -152,6 +216,8 @@ export class StageEngine {
     let next_stage_sources: Array<{ requested_stage: StageRequest["requested_stage"]; expected_sources: SourceBinding[] }> = [];
     let available_stage_sources: Array<{ requested_stage: StageRequest["requested_stage"]; expected_sources: SourceBinding[] }> = [];
     let continuation_requirements: Array<{ requested_stage: StageRequest["requested_stage"]; requirement: "TARGET_SOURCE_REQUIRED" | "OWNER_SOURCE_REQUIRED" | "FOLLOW_ON_RUN_REQUIRED"; source_classes: SourceClass[]; reason: string }> = [];
+    const followOn = this.store.loadFollowOnSource(runId);
+    if (!previous && followOn) next_stage_sources.push({ requested_stage: "PLAN_REVIEW", expected_sources: [{ ...followOn.binding, order: 0 }] });
     if (previous?.status === "SUCCEEDED") {
       const { allowedNextStages, continuationReason } = this.storedContinuation(runId, previous);
       if (allowedNextStages.length > 0) {
@@ -562,6 +628,14 @@ export function runAuthorityMatchesAcrossOperationalRefresh(current: RunAuthorit
   return canonicalize(currentStable) === canonicalize(originalStable);
 }
 
+export function targetAuthorityMatchesRun(store: StateStore, current: RunAuthority, run: RunAuthority): boolean {
+  const followOn = store.loadFollowOnSource(run.run_id);
+  if (!followOn) return runAuthorityMatchesAcrossOperationalRefresh(current, run);
+  if (followOn.review_cycle !== run.review_cycle || run.next_command !== "/terv-review" || followOn.predecessor_run_authority_sha256 !== store.loadRun(followOn.predecessor_run_id).run.run_authority_sha256) return false;
+  const base: RunAuthority = { ...run, review_cycle: followOn.base_review_cycle, next_command: followOn.base_next_command };
+  return runAuthorityMatchesAcrossOperationalRefresh(current, base);
+}
+
 const SOURCE_CLASSES: Record<StageRequest["requested_stage"], readonly SourceClass[]> = {
   SEQ_NEXT: ["PLANNING_CONTEXT"],
   PLAN_REVIEW: ["PLAN"],
@@ -575,6 +649,8 @@ const SOURCE_CLASSES: Record<StageRequest["requested_stage"], readonly SourceCla
 function routerOwnedSourceCandidates(store: StateStore, runId: string, requiredSourceClasses: readonly SourceClass[]): RouterOwnedSourceCandidate[] {
   const required = new Set(requiredSourceClasses);
   const candidates: RouterOwnedSourceCandidate[] = [];
+  const followOn = store.loadFollowOnSource(runId);
+  if (followOn && required.has("PLAN")) candidates.push({ ...followOn.binding, content: followOn.content });
   for (const operation of store.listOperations(runId)) {
     if (operation.status !== "SUCCEEDED") continue;
     if (operation.invocation.requested_stage === "CLOSEOUT") continue;

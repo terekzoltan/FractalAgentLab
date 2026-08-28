@@ -802,6 +802,55 @@ test("v29 FIX_PLAN_REQUIRED ends the immutable cycle with an explicit follow-on 
   }
 });
 
+test("follow-on run derives the exact fix-plan lineage, increments the cycle, and is idempotent without target mutation", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-follow-on-create-"));
+  try {
+    const resolver = new FakeResolver();
+    resolver.nextCommand = "/step-review-utan";
+    const synthesis = synthesisSource("FIX_REQUIRED", '[{"id":"FSR-002"}]');
+    resolver.resolvedSources = [resolvedSource("FINAL_SYNTHESIS", synthesis, 0)];
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => new Response(JSON.stringify({
+      info: { id: "assistant-follow-on-boundary", role: "assistant", sessionID: "session-meta" },
+      parts: [{ id: "part-follow-on-boundary", type: "text", text: fixPlanRequiredSource(), messageID: "assistant-follow-on-boundary", sessionID: "session-meta" }],
+    }))));
+    const predecessor = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const base = request(predecessor.run_id, predecessor.run_authority_sha256, sha256(resolver.sourceContent));
+    const delivery = await engine.invokeStage({
+      ...base,
+      request_id: "request-follow-on-boundary",
+      requested_stage: "DELIVERY_RESPONSE",
+      sender_role: "Meta",
+      recipient_role: "Track D",
+      candidate_identity: "candidate-1",
+      finding_ids: ["FSR-002"],
+      expected_sources: resolver.resolvedSources.map((source) => source.binding),
+    });
+    assert.equal(delivery.operation_status, "SUCCEEDED");
+    const followOnRequest = { schema_version: "follow-on-run-request.v1" as const, predecessor_run_id: predecessor.run_id, delivery_operation_id: delivery.operation_id };
+    const followOn = await engine.newFollowOnRun(followOnRequest);
+    assert.equal(followOn.created, true);
+    assert.equal(followOn.review_cycle, "1");
+    assert.equal(followOn.next_stage_sources[0]?.requested_stage, "PLAN_REVIEW");
+    assert.equal(followOn.next_stage_sources[0]?.expected_sources[0]?.source_class, "PLAN");
+    assert.equal(followOn.next_stage_sources[0]?.expected_sources[0]?.logical_identity, "fix-plan-1");
+    const installed = store.loadFollowOnSource(followOn.run_id)!;
+    assert.deepEqual(installed.finding_ids, ["FSR-002"]);
+    assert.equal(installed.candidate_identity, "candidate-1");
+    assert.equal(installed.predecessor_review_cycle, "0");
+    assert.equal(installed.review_cycle, "1");
+    assert.equal(store.loadRun(followOn.run_id).authority.next_command, "/terv-review");
+    assert.deepEqual((engine.getRun(followOn.run_id) as { next_stage_sources: unknown[] }).next_stage_sources, followOn.next_stage_sources);
+    const repeated = await engine.newFollowOnRun(followOnRequest);
+    assert.equal(repeated.created, false);
+    assert.equal(repeated.run_id, followOn.run_id);
+    assert.equal(repeated.run_authority_sha256, followOn.run_authority_sha256);
+    assert.equal(store.listOperations(followOn.run_id).length, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("v29 closeout authority install rejects failed and uncertain Delivery predecessors without runtime writes", async () => {
   for (const scenario of ["FAILED_OUTPUT", "UNCERTAIN"] as const) {
     const root = mkdtempSync(path.join(tmpdir(), `fal-router-v29-install-${scenario.toLowerCase()}-`));

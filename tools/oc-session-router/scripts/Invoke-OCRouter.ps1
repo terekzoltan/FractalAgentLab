@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory=$true)]
-  [ValidateSet('new-run','invoke-stage','install-closeout-authority','resolve-stage','get-run','purge-retention','write-p0b-proof','resolve-compact-authority','consume-compact-authority')]
+  [ValidateSet('new-run','new-follow-on-run','invoke-stage','install-closeout-authority','resolve-stage','get-run','purge-retention','write-p0b-proof','resolve-compact-authority','consume-compact-authority')]
   [string]$Operation,
 
   [string]$RequestPath,
@@ -52,7 +52,7 @@ function Invoke-WithRouterEnvironment {
 $ErrorActionPreference = 'Stop'
 $RuntimeRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'runtime'
 $AttestationPath = Join-Path $RuntimeRoot 'executable-attestation.json'
-$ExpectedAttestationSha256 = '9a725d4706fe931fadcbf2e836a5b59a1baf52ef081f36c38f9ca81f51bd3e41'
+$ExpectedAttestationSha256 = 'cfb3a4f3c2bbc7378c1876a115bb30d139d7957cdbc77ea021ceb9718c34302a'
 
 function Get-Sha256Text {
   param([string]$Text)
@@ -189,6 +189,10 @@ $Arguments = @($Entry, $Operation)
 switch ($Operation) {
   'new-run' {
     if ([string]::IsNullOrWhiteSpace($RequestPath)) { throw 'new-run requires -RequestPath.' }
+    $Arguments += @('--request', (Resolve-Path -LiteralPath $RequestPath).Path)
+  }
+  'new-follow-on-run' {
+    if ([string]::IsNullOrWhiteSpace($RequestPath)) { throw 'new-follow-on-run requires -RequestPath.' }
     $Arguments += @('--request', (Resolve-Path -LiteralPath $RequestPath).Path)
   }
   'invoke-stage' {

@@ -173,11 +173,18 @@ projects `FOLLOW_ON_RUN_REQUIRED`, not an in-run `PLAN_REVIEW` edge. The next ru
 must bind a monotonically incremented review cycle, the exact accepted finding
 IDs, and the exact fix-plan identity. This keeps the Canon fix loop available
 without retroactively changing frozen run authority.
-After that target-owned fix plan is validated once in the follow-on run, its
+Create that successor only through `new-follow-on-run`. Its closed request names
+the predecessor run and exact successful Delivery operation; caller-supplied
+cycle, candidate, finding, plan, target, worktree, server, or session fields are
+rejected. The router revalidates the current target base against the predecessor,
+copies the exact protected terminal as the first `PLAN` source, increments the
+cycle, and links the predecessor to one idempotent successor. It performs no
+OpenCode POST and no target-repository mutation.
+After that protected fix plan is validated once in the follow-on run, its
 exact source binding may be carried into the immediately projected successor
 that needs the same `PLAN` class. The operational resolver still reloads the
-target file and proves the binding before POST, so carry-forward removes only
-redundant request assembly, not revalidation.
+protected source receipt and proves the binding before POST, so carry-forward
+removes only redundant request assembly, not revalidation.
 
 Canonical non-`NONE` `Proposed closeout delta` content is a minified JSON array
 of objects with exactly `path`, `field`, and `value`. Candidate output binding is

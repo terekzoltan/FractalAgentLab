@@ -54,6 +54,12 @@ export interface RunRequest {
   expected_worktree_identity: string;
 }
 
+export interface FollowOnRunRequest {
+  schema_version: "follow-on-run-request.v1";
+  predecessor_run_id: string;
+  delivery_operation_id: string;
+}
+
 export interface CloseoutAuthorityInstallRequest {
   schema_version: "closeout-authority-install.v1";
   run_id: string;
@@ -529,6 +535,17 @@ export function parseRunRequest(value: unknown): RunRequest {
   const worktree = requireString(record, "expected_worktree_identity");
   assertOpaqueId(targetId, "target_id");
   return { schema_version: "run-request.v1", target_id: targetId, expected_worktree_identity: worktree };
+}
+
+export function parseFollowOnRunRequest(value: unknown): FollowOnRunRequest {
+  const record = requireRecord(value, "follow-on run request");
+  requireExactKeys(record, ["schema_version", "predecessor_run_id", "delivery_operation_id"], "follow-on run request");
+  if (record.schema_version !== "follow-on-run-request.v1") throw new Error("follow-on run request schema mismatch");
+  const predecessorRunId = requireString(record, "predecessor_run_id");
+  const deliveryOperationId = requireString(record, "delivery_operation_id");
+  assertFilesystemId(predecessorRunId, "predecessor_run_id");
+  assertFilesystemId(deliveryOperationId, "delivery_operation_id");
+  return { schema_version: "follow-on-run-request.v1", predecessor_run_id: predecessorRunId, delivery_operation_id: deliveryOperationId };
 }
 
 export function parseCloseoutAuthorityInstallRequest(value: unknown): CloseoutAuthorityInstallRequest {

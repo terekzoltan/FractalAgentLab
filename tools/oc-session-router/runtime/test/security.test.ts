@@ -4,11 +4,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { _test } from "../src/cli.js";
-import { parseRunRequest, parseStageRequest, parseStrictJson } from "../src/contracts.js";
+import { parseFollowOnRunRequest, parseRunRequest, parseStageRequest, parseStrictJson } from "../src/contracts.js";
 import { StateStore } from "../src/state-store.js";
 
 test("closed request schemas reject authority injection", () => {
   assert.throws(() => parseRunRequest({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a", server: "http://attacker" }), /unknown fields/);
+  assert.throws(() => parseFollowOnRunRequest({ schema_version: "follow-on-run-request.v1", predecessor_run_id: "run-1", delivery_operation_id: "op-1", finding_ids: ["FORGED"] }), /unknown fields/);
   const base = {
     schema_version: "stage-request.v1", request_id: "request-1", run_id: "run-1", issued_at: "2026-08-10T00:00:00Z", issued_by: "o",
     run_authority_sha256: "a".repeat(64), requested_stage: "IMPLEMENT", plan_class: "EPIC_PLAN", target_id: "fal", worktree_identity: "git:a",
@@ -84,6 +85,7 @@ test("FSR-024: all-session exact and encoded private values fail closed", () => 
 test("CLI rejects endpoint and session overrides", () => {
   assert.throws(() => _test.validateOperationArguments("invoke-stage", new Map([["--request", "r.json"], ["--server", "http://attacker"]])), /not allowed/);
   assert.throws(() => _test.validateOperationArguments("new-run", new Map([["--request", "r.json"], ["--session", "foreign"]])), /not allowed/);
+  assert.throws(() => _test.validateOperationArguments("new-follow-on-run", new Map([["--request", "r.json"], ["--review-cycle", "99"]])), /not allowed/);
   assert.throws(() => _test.validateOperationArguments("install-closeout-authority", new Map([["--request", "r.json"], ["--target-root", "foreign"]])), /not allowed/);
 });
 

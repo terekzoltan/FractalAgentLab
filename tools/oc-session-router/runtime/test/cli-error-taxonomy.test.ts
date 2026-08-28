@@ -134,6 +134,7 @@ test("CLI process preserves exit 3 and JSON-only stderr for invalid requests", (
 test("every operation rejects each missing required key as REQUEST_INVALID", () => {
   const operationKeys = [
     ["new-run", ["--request"]],
+    ["new-follow-on-run", ["--request"]],
     ["invoke-stage", ["--request"]],
     ["install-closeout-authority", ["--request"]],
     ["resolve-stage", ["--run-id", "--operation-id"]],

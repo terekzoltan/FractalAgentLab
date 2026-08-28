@@ -109,8 +109,12 @@ Delivery /seq-next
   source classes and do not send the stage yet. Preserve the exact
   `available_stage_sources` bindings as evidence; they are not readiness.
   `FOLLOW_ON_RUN_REQUIRED` means the current review cycle is complete and
-  immutable; create the named repair successor run after adopting every listed
-  source and incrementing its review cycle. `OWNER_SOURCE_REQUIRED` after
+  immutable. Invoke the no-send `new-follow-on-run` operation with only the
+  exact predecessor run and successful `FIX_PLAN_REQUIRED` Delivery operation.
+  The router derives and installs the protected fix-plan source, increments the
+  review cycle, and returns one idempotent successor with a complete
+  `PLAN_REVIEW` projection. Do not create a plain `new-run`, inject findings, or
+  rewrite target state merely to bridge this boundary. `OWNER_SOURCE_REQUIRED` after
   `ACK_ONLY` is different: keep the same run and invoke the Owner-only, no-send
   `install-closeout-authority` operation. It validates the current worktree and
   stores only the fresh authority in protected FAL runtime; it does not write the
@@ -119,6 +123,10 @@ Delivery /seq-next
   The supported launcher form is
   `Invoke-OCRouter.ps1 -Operation install-closeout-authority -RequestPath <intent.json>`;
   it never performs a POST or creates a lifecycle operation.
+  The follow-on launcher form is
+  `Invoke-OCRouter.ps1 -Operation new-follow-on-run -RequestPath <follow-on-run-request.v1.json>`;
+  it also performs no POST and the request contains only
+  `predecessor_run_id` plus `delivery_operation_id`.
   Never infer `CLOSEOUT_AUTHORITY` from router output or synthesize Owner commit
   authority. Use `CLOSEOUT_AUTHORITY` v2 and copy its `candidate_paths` from the
   frozen reviewed candidate scope. For a commit, authorize the exact union of frozen candidate paths
