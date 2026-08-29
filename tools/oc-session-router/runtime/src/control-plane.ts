@@ -14,6 +14,7 @@ import {
 } from "./contracts.js";
 import { validateOrigin } from "./transport.js";
 import { readP0bProofReceipt, type P0bProofReceipt } from "./p0b-proof.js";
+import type { ParticipantLifecycleState } from "./state-store.js";
 
 export const ROUTER_PROTOCOL_IDENTITY = "fal-explicit-stage-router/v1" as const;
 export const SUPPORTED_AWC_CONTRACTS = ["awc-3.1", "awc-4.1.1"] as const;
@@ -176,6 +177,7 @@ export interface CompactProtectedAuthorityPacket {
   mode: ActiveProductionMode;
   target_id: string;
   logical_session_ref: string;
+  lifecycle_intent_state: ParticipantLifecycleState;
   target_root: string;
   origin: string;
   session_id: string;
@@ -478,6 +480,7 @@ export async function resolveCompactProtectedAuthority(options: {
   recipient_role: string;
   probe: CapabilityProbe;
   credentials: () => { username: string; password: string };
+  lifecycle_state: (targetId: string, recipientSessionSha256: string) => ParticipantLifecycleState;
   executable_attestation_sha256?: string;
   now?: Date;
 }): Promise<CompactProtectedAuthorityPacket> {
@@ -525,6 +528,9 @@ export async function resolveCompactProtectedAuthority(options: {
   if (!credentials.username || !credentials.password) throw new Error("Process-scoped OpenCode authentication is unavailable");
   const live = await options.probe.probe({ origin: target.server.origin, username: credentials.username, password: credentials.password, directory: targetRoot, expected_binary_sha256: expectedBinarySha256, required_commands: ["after-compact"], timeout_ms: 15_000 });
   if (!installedCapabilityMatchesReceipt(live, receipt)) throw new Error("Installed Compact server capability drifted from protected receipt");
+  const sessionSha256 = sha256(sessionId);
+  const lifecycleIntentState = options.lifecycle_state(options.target_id, sessionSha256);
+  if (!["SETTLED", "PENDING", "UNCERTAIN"].includes(lifecycleIntentState)) throw new Error("Protected participant lifecycle state is invalid");
   return {
     schema_version: "compact-protected-authority.v1",
     router_protocol_identity: ROUTER_PROTOCOL_IDENTITY,
@@ -532,11 +538,12 @@ export async function resolveCompactProtectedAuthority(options: {
     mode: receipt.mode,
     target_id: options.target_id,
     logical_session_ref: logicalSessionRef,
+    lifecycle_intent_state: lifecycleIntentState,
     target_root: targetRoot,
     origin: target.server.origin,
     session_id: sessionId,
     target_directory_sha256: live.target_directory_sha256,
-    session_sha256: sha256(sessionId),
+    session_sha256: sessionSha256,
     server_binary_sha256: live.server_binary_sha256,
     server_instance_identity_sha256: live.server_instance_identity_sha256,
     capability_receipt_sha256: capabilityFile.sha256,

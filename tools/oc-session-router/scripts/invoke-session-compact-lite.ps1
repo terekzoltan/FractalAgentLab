@@ -212,7 +212,7 @@ function Invoke-CompactLiteProtectedAuthority([string]$Project,[string]$LogicalR
   $statusJson=[string]$output[0]
   Assert-CompactFlowStrictJson $statusJson 'Protected Compact authority status'
   $status=$statusJson|ConvertFrom-Json
-  $expectedStatus=@('authorization_state','authorization_use_sha256','capability_receipt_sha256','command_timeout_ms','handoff_token','logical_session_ref','mode','schema_version','server_binary_sha256','server_instance_identity_sha256','session_sha256','target_directory_sha256','target_id')
+  $expectedStatus=@('authorization_state','authorization_use_sha256','capability_receipt_sha256','command_timeout_ms','handoff_token','lifecycle_intent_state','logical_session_ref','mode','schema_version','server_binary_sha256','server_instance_identity_sha256','session_sha256','target_directory_sha256','target_id')
   if((@($status.PSObject.Properties.Name|Sort-Object)-join"`n")-ne($expectedStatus-join"`n")-or[string]$status.schema_version-cne'compact-protected-authority-status.v1'-or[string]$status.handoff_token-cnotmatch'^[a-f0-9]{32}$'){throw 'Protected Compact authority status is invalid.'}
   $knownFolder=if(-not[string]::IsNullOrWhiteSpace($KnownFolderRoot)){[IO.Path]::GetFullPath($KnownFolderRoot)}else{[Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)}
   $handoffRoot=Resolve-CompactLiteLocalRoot (Join-Path $knownFolder 'FractalAgentLab\oc-router\runtime\compact-authority-handoffs') 'Protected Compact authority handoff root'
@@ -223,17 +223,18 @@ function Invoke-CompactLiteProtectedAuthority([string]$Project,[string]$LogicalR
   try{$json=Get-Content -Raw -LiteralPath $handoffPath}finally{Remove-Item -LiteralPath $handoffPath -Force}
   Assert-CompactFlowStrictJson $json 'Protected Compact authority packet'
   $packet=$json|ConvertFrom-Json
-  $expected=@('authorization_state','authorization_use_sha256','capability_receipt_sha256','command_timeout_ms','logical_session_ref','mode','origin','router_protocol_identity','schema_version','server_binary_sha256','server_instance_identity_sha256','session_id','session_sha256','target_directory_sha256','target_id','target_root')
+  $expected=@('authorization_state','authorization_use_sha256','capability_receipt_sha256','command_timeout_ms','lifecycle_intent_state','logical_session_ref','mode','origin','router_protocol_identity','schema_version','server_binary_sha256','server_instance_identity_sha256','session_id','session_sha256','target_directory_sha256','target_id','target_root')
   if((@($packet.PSObject.Properties.Name|Sort-Object)-join"`n")-ne($expected-join"`n")-or[string]$packet.schema_version-cne'compact-protected-authority.v1'-or[string]$packet.router_protocol_identity-cne'fal-explicit-stage-router/v1'-or[string]$packet.target_id-cne$Project-or[string]$packet.logical_session_ref-cnotmatch'^[A-Za-z0-9._@:+~-]{1,200}$'-or[string]$packet.session_id-cnotmatch'^[A-Za-z0-9_-]{1,160}$'){throw 'Protected Compact authority packet shape or binding is invalid.'}
   foreach($name in @('authorization_use_sha256','capability_receipt_sha256','server_binary_sha256','server_instance_identity_sha256','session_sha256','target_directory_sha256')){if([string]$packet.$name-cnotmatch'^[a-f0-9]{64}$'){throw 'Protected Compact authority packet digest is invalid.'}}
   if([string]$packet.mode-cnotin@('P0B_ISOLATED','PRODUCTION_RESPONSE_FIRST')-or[long]$packet.command_timeout_ms-lt120000-or[long]$packet.command_timeout_ms-gt3600000){throw 'Protected Compact authority packet mode or timeout is invalid.'}
-  foreach($name in @('authorization_state','authorization_use_sha256','capability_receipt_sha256','command_timeout_ms','logical_session_ref','mode','server_binary_sha256','server_instance_identity_sha256','session_sha256','target_directory_sha256','target_id')){if([string]$status.$name-cne[string]$packet.$name){throw 'Protected Compact authority status and handoff differ.'}}
+  if([string]$packet.lifecycle_intent_state-cnotin@('SETTLED','PENDING','UNCERTAIN')){throw 'Protected Compact participant lifecycle state is invalid.'}
+  foreach($name in @('authorization_state','authorization_use_sha256','capability_receipt_sha256','command_timeout_ms','lifecycle_intent_state','logical_session_ref','mode','server_binary_sha256','server_instance_identity_sha256','session_sha256','target_directory_sha256','target_id')){if([string]$status.$name-cne[string]$packet.$name){throw 'Protected Compact authority status and handoff differ.'}}
   if($Consume-and[string]$packet.authorization_state-cnotin@('CONSUMED','NOT_APPLICABLE')){throw 'Protected Compact authorization was not consumed before transport.'}
   if(-not$Consume-and[string]$packet.authorization_state-cne'RESOLVED'){throw 'Protected Compact authority did not resolve cleanly.'}
   return $packet
 }
 function Assert-CompactLiteProtectedAuthorityStable($Expected,$Actual) {
-  foreach($name in @('mode','target_id','logical_session_ref','target_root','origin','session_id','session_sha256','target_directory_sha256','server_binary_sha256','server_instance_identity_sha256','capability_receipt_sha256','authorization_use_sha256','command_timeout_ms')){
+  foreach($name in @('mode','target_id','logical_session_ref','lifecycle_intent_state','target_root','origin','session_id','session_sha256','target_directory_sha256','server_binary_sha256','server_instance_identity_sha256','capability_receipt_sha256','authorization_use_sha256','command_timeout_ms')){
     if([string]$Expected.$name-cne[string]$Actual.$name){throw 'Protected Compact authority drifted before transport.'}
   }
 }
@@ -300,7 +301,7 @@ try{
   $telemetryJson=[string](& (Join-Path $PSScriptRoot 'session-context-status.ps1') @telemetryArgs);Assert-CompactFlowStrictJson $telemetryJson 'Session context telemetry';$telemetry=$telemetryJson|ConvertFrom-Json
   if(-not(Test-Path -LiteralPath $participantDir -PathType Container)){[void](New-Item -ItemType Directory -Path $participantDir)}
   $participantGuard=Open-CompactFlowDirectoryGuard -Path $participantDir
-  $lifecycle=Get-CompactLiteLifecycleIntentState $routerRoot $Target;$prior=if(Test-Path -LiteralPath $runPath -PathType Leaf){(Read-CompactFlowStrictJsonFile $runPath 'Compact Lite ledger').Value}else{$null};$priorDisposition=Get-CompactLitePriorDisposition $prior;$compactState=Get-CompactLiteParticipantCompactState $participantDir
+  $lifecycle=if($legacyAuthority){Get-CompactLiteLifecycleIntentState $routerRoot $Target}else{[string]$protectedAuthority.lifecycle_intent_state};$prior=if(Test-Path -LiteralPath $runPath -PathType Leaf){(Read-CompactFlowStrictJsonFile $runPath 'Compact Lite ledger').Value}else{$null};$priorDisposition=Get-CompactLitePriorDisposition $prior;$compactState=Get-CompactLiteParticipantCompactState $participantDir
   if([string]$priorDisposition.disposition-cne'READY'){$compactPerformed=$null-ne$prior-and$null-ne$prior.result-and[bool]$prior.result.compact_performed;$r=New-CompactLiteResult $Target $RoleHint $EventType $policy $telemetry ([string]$priorDisposition.disposition) ([string]$priorDisposition.reason) $compactPerformed ALREADY_SETTLED NOT_ATTEMPTED;$r|ConvertTo-Json -Depth 10 -Compress;return}
   $persist={
     param($value)

@@ -5,6 +5,7 @@ import type { RunAuthority, SourceBinding, StageInvocation } from "./contracts.j
 import { assertFilesystemId, assertOpaqueId, assertSafeRelativePath, assertSha256, canonicalize, sha256 } from "./contracts.js";
 
 export type OperationStatus = "CREATED" | "DISPATCHING" | "ACTIVE" | "RECONCILING" | "WAITING_ACTION" | "STALLED_SUSPECTED" | "SUCCEEDED" | "FAILED_OUTPUT" | "FAILED_TRANSPORT" | "UNCERTAIN" | "BLOCKED" | "CANCELLED";
+export type ParticipantLifecycleState = "SETTLED" | "PENDING" | "UNCERTAIN";
 
 export interface RunDocument {
   schema_version: "run.v1";
@@ -264,6 +265,33 @@ export class StateStore {
   listOperations(runId: string): OperationDocument[] {
     assertFilesystemId(runId, "run_id");
     return this.listOperationIds(runId).map((operationId) => this.loadOperation(runId, operationId)).sort((left, right) => left.sequence - right.sequence);
+  }
+
+  participantLifecycleState(targetId: string, recipientSessionSha256: string): ParticipantLifecycleState {
+    assertOpaqueId(targetId, "participant target ID");
+    assertSha256(recipientSessionSha256, "participant session SHA-256");
+    const runsDir = this.resolve("runs");
+    if (!existsSync(runsDir)) return "SETTLED";
+    const runIds = readdirSync(runsDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink())
+      .map((entry) => {
+        assertFilesystemId(entry.name, "participant run directory");
+        return entry.name;
+      });
+    if (runIds.length > 1_000) return "UNCERTAIN";
+    let state: ParticipantLifecycleState = "SETTLED";
+    for (const runId of runIds) {
+      const run = this.loadRun(runId).run;
+      if (run.target_id !== targetId) continue;
+      const operations = this.listOperations(runId);
+      if (operations.length > 1_000) return "UNCERTAIN";
+      for (const operation of operations) {
+        if (operation.invocation.recipient_session_sha256 !== recipientSessionSha256) continue;
+        if (operation.status === "UNCERTAIN") return "UNCERTAIN";
+        if (["CREATED", "DISPATCHING", "ACTIVE", "RECONCILING", "WAITING_ACTION", "STALLED_SUSPECTED"].includes(operation.status)) state = "PENDING";
+      }
+    }
+    return state;
   }
 
   loadResult(runId: string, operationId: string): unknown {

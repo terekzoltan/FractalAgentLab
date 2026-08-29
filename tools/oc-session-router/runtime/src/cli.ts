@@ -59,6 +59,7 @@ const CLI_ERROR_CODES = [
   "PARTICIPANT_FENCE_BLOCKED",
   "DISPATCH_LEASE_BLOCKED",
   "SNAPSHOT_BASELINE_BLOCKED",
+  "COMPACT_PREFLIGHT_BLOCKED",
   "OUTPUT_CHANNEL_BLOCKED",
   "BLOCKED",
 ] as const;
@@ -542,6 +543,7 @@ async function resolveCompactAuthorityOperation(options: {
     recipient_role: options.recipientRole,
     probe: options.probe,
     credentials: options.credentials,
+    lifecycle_state: (targetId, recipientSessionSha256) => options.store.participantLifecycleState(targetId, recipientSessionSha256),
     ...(options.executableAttestationSha256 === undefined ? {} : { executable_attestation_sha256: options.executableAttestationSha256 }),
     ...(options.now === undefined ? {} : { now: options.now }),
   });
@@ -566,6 +568,7 @@ function compactAuthorityStatus(packet: CompactProtectedAuthorityPacket, handoff
     mode: packet.mode,
     target_id: packet.target_id,
     logical_session_ref: packet.logical_session_ref,
+    lifecycle_intent_state: packet.lifecycle_intent_state,
     target_directory_sha256: packet.target_directory_sha256,
     session_sha256: packet.session_sha256,
     server_binary_sha256: packet.server_binary_sha256,
@@ -836,7 +839,7 @@ async function main(): Promise<void> {
   } else if (operation === "invoke-stage") {
     const request = classified("REQUEST_INVALID", () => parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     if (!registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
-    classified("BLOCKED", () => runCompactLiteHook(request, "before_dispatch", registryPath));
+    classified("COMPACT_PREFLIGHT_BLOCKED", () => runCompactLiteHook(request, "before_dispatch", registryPath));
     result = await classifiedAsync("BLOCKED", () => engine.invokeStage(request));
     try { runCompactLiteHook(request, "after_stage_output", registryPath); }
     catch { /* A completed lifecycle result stays authoritative; the next mandatory preflight re-evaluates pressure. */ }

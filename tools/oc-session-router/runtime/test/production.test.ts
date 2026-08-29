@@ -277,10 +277,11 @@ test("Compact authority derives protected target and case-insensitive unique ses
       assert.deepEqual(input.required_commands, ["after-compact"]);
       return live;
     } };
-    const common = { registry, registry_path: registryPath, protected_control_root: control, target_id: "compact-target", probe, credentials: () => ({ username: "owner-process", password: "process-secret" }), now: fixedNow } as const;
+    const common = { registry, registry_path: registryPath, protected_control_root: control, target_id: "compact-target", probe, credentials: () => ({ username: "owner-process", password: "process-secret" }), lifecycle_state: () => "SETTLED" as const, now: fixedNow } as const;
     const exact = await resolveCompactProtectedAuthority({ ...common, recipient_role: "Meta" });
     const alias = await resolveCompactProtectedAuthority({ ...common, recipient_role: "mEtA" });
     assert.equal(exact.logical_session_ref, "Meta");
+    assert.equal(exact.lifecycle_intent_state, "SETTLED");
     assert.equal(alias.session_id, exact.session_id);
     assert.equal(exact.session_id, "session-protected-compact");
     assert.notEqual(exact.session_id, "caller-local-map-must-not-authorize");

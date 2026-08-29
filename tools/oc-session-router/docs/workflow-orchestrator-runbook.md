@@ -270,7 +270,10 @@ KnownFolder control plane. Target-local `sessions.json` and caller `-Server` are
 dry-run/test expectations and cannot authorize a production POST. It requires
 policy-selected pressure, participant `idle`,
 summarize availability, and no participant-scoped pending or uncertain lifecycle
-or compact intent. It persists one minimal intent, requires one attributable
+or compact intent. Production participant lifecycle intent is derived only from
+the owner-protected router runtime for the exact target and session; historical
+target-local ledgers remain legacy/dry-run diagnostics and cannot permanently
+block a production preflight. It persists one minimal intent, requires one attributable
 marker, consumes any P0B grant after intent while the private-session fence is
 held, revalidates the measured authority immediately before both POSTs, invokes
 `/after-compact <project-id> <role>` once, accepts `RESTORED` or `DEGRADED`, and

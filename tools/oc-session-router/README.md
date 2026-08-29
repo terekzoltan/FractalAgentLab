@@ -59,7 +59,12 @@ It is not project truth and does not grant workflow authority.
   Production reconciliation waits, by default, for at most the protected
   60-minute window and polls only GET history for that same operation. It exits
   immediately on exact correlation and never creates a new run, operation, or
-  lifecycle send. SSE is probed and recorded but remains disabled.
+  lifecycle send. A recovered terminal may normalize only the exact protected
+  target-root provenance from its single `Target:` field; the raw output is not
+  persisted, a digest-only sanitization receipt is written, and every other
+  private sentinel still fails closed. New `SEQ_NEXT` dispatches explicitly
+  require the canonical target name without path, branch, endpoint, or credential
+  provenance. SSE is probed and recorded but remains disabled.
 - `Prepare-OCRouterStage.ps1` is the bounded no-send source-hash helper. It hashes
   only sources explicitly named by the operator and emits candidate manifest and
   state packet files; invocation remains a separate explicit transaction.

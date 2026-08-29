@@ -535,6 +535,7 @@ export class StageEngine {
     let commandRootCandidates: SnapshotCandidate[] = [];
     let recoveredCandidate: SnapshotCandidate | undefined;
     let recoveredFromCommandRoot = false;
+    let recoveryValidationReason = "";
     do {
       try {
         candidates = await this.snapshots.collect(runId, operationId);
@@ -571,8 +572,11 @@ export class StageEngine {
         const resolved = await this.resolver.resolveStageAuthority(loaded.authority, stageRequest);
         if (!runAuthorityMatchesAcrossOperationalRefresh(resolved.run_authority, loaded.authority) || !["P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(resolved.capability.mode) || resolved.capability.snapshot_correlation !== "EXACT_PARENT_LINK") throw new Error("Snapshot production authority drifted");
         assertPrivateTransportBinding(resolved.transport);
-        assertArtifactSafe(recoveredCandidate.text, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
-        const parsed = parseOutputShape(operation.invocation.requested_stage, recoveredCandidate.text);
+        if (!resolved.transport.directory) throw new Error("Snapshot production target directory missing");
+        const normalized = normalizeRecoveredTerminalTarget(recoveredCandidate.text, loaded.authority.target_identity, resolved.transport.directory);
+        assertArtifactSafe(normalized.privacyProbeText, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
+        assertArtifactSafe(normalized.text, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
+        const parsed = parseOutputShape(operation.invocation.requested_stage, normalized.text);
         assertSourceLineage(stageRequest, resolved.sources, loaded.authority, resolved.worktree);
         assertOutputSourceLineage(stageRequest, resolved.sources, parsed.terminal, parsed.fields, resolved.worktree);
         validateOutputBinding(parsed, {
@@ -586,8 +590,17 @@ export class StageEngine {
         const candidateScope = operation.invocation.requested_stage === "IMPLEMENT"
           ? await this.captureCandidateScope(loaded.authority, stageRequest, operationId)
           : undefined;
-        const artifact = `${recoveredCandidate.text.replace(/\r\n/g, "\n").trim()}\n`;
+        const artifact = `${normalized.text.replace(/\r\n/g, "\n").trim()}\n`;
         this.store.writeArtifact(runId, operationId, "terminal", artifact);
+        if (normalized.targetProvenanceSanitized) {
+          this.store.writeArtifact(runId, operationId, "recovery-sanitization", `${canonicalize({
+            schema_version: "recovered-output-sanitization-receipt.v1",
+            rule: "EXACT_TARGET_PROVENANCE_ONLY",
+            raw_terminal_sha256: sha256(recoveredCandidate.text),
+            sanitized_terminal_sha256: sha256(normalized.text),
+            raw_output_persisted: false,
+          })}\n`);
+        }
         const responseEvidenceSha256 = transportReceipt && !recoveredFromCommandRoot ? transportReceipt.response_sha256 : sha256(canonicalize({
           domain: "fal-router-command-root-transcript-recovery/v1",
           command_body_sha256: operation.invocation.command_body_sha256,
@@ -610,13 +623,14 @@ export class StageEngine {
         });
         this.store.updateOperation(runId, operationId, operation.revision, { status: "SUCCEEDED" });
         return succeeded;
-      } catch {
+      } catch (error) {
         // Exact correlation is necessary but not sufficient; any authority,
         // privacy, shape, binding, or finalization failure remains non-success.
+        recoveryValidationReason = safeRecoveryValidationReason(error);
       }
     }
     const reason = exactCorrelation || commandRootCandidates.length === 1
-      ? "correlated snapshot failed authoritative validation"
+      ? recoveryValidationReason || "CORRELATED_SNAPSHOT_VALIDATION_FAILED"
       : rawCommandRootCandidates.length === 1
         ? "exact command-root response failed the stage terminal contract"
         : "snapshot evidence is diagnostic without one exact installed response or command-root correlation";
@@ -1040,6 +1054,40 @@ function assertArtifactSafe(markdown: string, transport: TransportBinding, absol
   }
 }
 
+function normalizeRecoveredTerminalTarget(raw: string, expectedTarget: string, exactTargetRoot: string): { text: string; privacyProbeText: string; targetProvenanceSanitized: boolean } {
+  const text = raw.replace(/\r\n/g, "\n").trim();
+  const lines = text.split("\n");
+  const targetLines = lines.map((line, index) => ({ line, index })).filter(({ line }) => /^Target:\s*/.test(line));
+  if (targetLines.length !== 1) return { text, privacyProbeText: text, targetProvenanceSanitized: false };
+  const targetLine = targetLines[0]!;
+  const value = targetLine.line.replace(/^Target:\s*/, "");
+  const canonical = (candidate: string): string => candidate.trim().replace(/\s+repository$/i, "").toLocaleLowerCase("en-US");
+  if (canonical(value) === canonical(expectedTarget)) return { text, privacyProbeText: text, targetProvenanceSanitized: false };
+  const prefix = `${expectedTarget} repository at `;
+  if (!value.toLocaleLowerCase("en-US").startsWith(prefix.toLocaleLowerCase("en-US"))) return { text, privacyProbeText: text, targetProvenanceSanitized: false };
+  const provenance = value.slice(prefix.length);
+  const acceptedRoots = new Set([exactTargetRoot, exactTargetRoot.replace(/\\/g, "/")]);
+  const matchedRoot = [...acceptedRoots].find((root) => provenance.toLocaleLowerCase("en-US").startsWith(`\`${root}\``.toLocaleLowerCase("en-US")));
+  if (!matchedRoot) return { text, privacyProbeText: text, targetProvenanceSanitized: false };
+  const suffix = provenance.slice(matchedRoot.length + 2);
+  if (suffix && !suffix.startsWith(";")) return { text, privacyProbeText: text, targetProvenanceSanitized: false };
+  const privacyProbeLines = [...lines];
+  privacyProbeLines[targetLine.index] = `Target: ${expectedTarget} repository at \`<TARGET_ROOT>\`${suffix}`;
+  lines[targetLine.index] = `Target: ${expectedTarget}`;
+  return { text: lines.join("\n"), privacyProbeText: privacyProbeLines.join("\n"), targetProvenanceSanitized: true };
+}
+
+function safeRecoveryValidationReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (/private transport sentinel/i.test(message)) return "PRIVATE_OUTPUT_REJECTED";
+  if (/Target binding/i.test(message)) return "TARGET_BINDING_FAILED";
+  if (/authority|capability|transport binding|privacy|worktree.*drift/i.test(message)) return "AUTHORITY_REVALIDATION_FAILED";
+  if (/source|lineage/i.test(message)) return "SOURCE_LINEAGE_FAILED";
+  if (/shape|required field|terminal|canonical plan header|route and terminal|output has no unique/i.test(message)) return "OUTPUT_SHAPE_FAILED";
+  if (/binding|candidate|plan identity|finding/i.test(message)) return "OUTPUT_BINDING_FAILED";
+  return "CORRELATED_SNAPSHOT_FINALIZATION_FAILED";
+}
+
 function closeoutDurableProjection(markdown: string, commitField: string): string {
   const match = /^sha=([a-f0-9]{40}|[a-f0-9]{64});\s*tree=([a-f0-9]{40}|[a-f0-9]{64});/.exec(commitField);
   if (!match) throw new Error("Closeout durable projection requires validated commit identity");
@@ -1068,6 +1116,9 @@ function renderSources(sources: readonly ResolvedSource[]): string {
 }
 
 export function renderCommandArgument(request: StageRequest, sources: readonly ResolvedSource[]): string {
+  if (request.requested_stage === "SEQ_NEXT") {
+    return `--- FAL VERIFIED OUTPUT FIELD BINDING ---\nTarget field must be exact: ${request.target_id}\nDo not append a repository path, branch, endpoint, credential, or other provenance to the Target field.\n--- END FAL VERIFIED OUTPUT FIELD BINDING ---\n${renderSources(sources)}`;
+  }
   if (request.requested_stage !== "STEP_REVIEW") return renderSources(sources);
   const reviewMode = reviewModeForRequest(request);
   const envelope = canonicalize({
@@ -1104,4 +1155,4 @@ function makeResult(request: Pick<StageRequest, "run_id">, operationId: string, 
   return { schema_version: "stage-result.v1", run_id: request.run_id, operation_id: operationId, operation_status: operationStatus, transport_status: transportStatus, output_status: outputStatus, binding_status: bindingStatus, terminal_status: terminalStatus, allowed_next: allowed, artifact_sha256: artifactSha, message_id_sha256: messageIdSha, response_sha256: responseSha, ...(candidateScopeSha ? { candidate_scope_sha256: candidateScopeSha } : {}), reason, auto_advance: false };
 }
 
-export const _test = { assertSourceLineage, assertOutputSourceLineage, assertResolvedStagePostResponse, closeoutAuthorityReceipt, parseProposedDelta, SOURCE_CLASSES };
+export const _test = { assertSourceLineage, assertOutputSourceLineage, assertResolvedStagePostResponse, closeoutAuthorityReceipt, parseProposedDelta, normalizeRecoveredTerminalTarget, safeRecoveryValidationReason, SOURCE_CLASSES };

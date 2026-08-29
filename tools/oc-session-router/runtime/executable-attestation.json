@@ -11,7 +11,7 @@
   "control_plane_verifier_path": "scripts/Initialize-OCRouterControlPlane.ps1",
   "control_plane_verifier_sha256": "3a25e99d30b954275ada439dc31e59b33635646a4a3776dc493843c6a770fb88",
   "compact_lite_script_path": "scripts/invoke-session-compact-lite.ps1",
-  "compact_lite_script_sha256": "e9888e1adfdae88b2eb4edef7b8d4c15029ed7debe92cc48a4403ffe4592cedd",
+  "compact_lite_script_sha256": "8b7e37517fff981960549f785161d11a9bc8e8a9e69822e8c5b08ce601112ff1",
   "compact_lite_core_script_path": "scripts/session-compact-lite-core.ps1",
   "compact_lite_core_script_sha256": "aeb44c39a680a64a1d7bb8355f0fe726bc37eecf5b1e297cf3762ddb44682562",
   "compact_flow_core_script_path": "scripts/session-compact-flow-core.ps1",
@@ -29,8 +29,8 @@
   "runtime_package_sha256": "bd9c51ef13b981bcbf7d45d283e8e55b49a9b24fcd0d8492c40afac4113c0b96",
   "runtime_lock_sha256": "d1d22b8157b1c370086e824eeae2e0c8e9a433f72c8566982abc007779cec3f7",
   "compiled_entry_path": "dist/src/cli.js",
-  "compiled_entry_sha256": "c7b55ebf8b74d6d3f29d3ef987e2db17323ec4c66c39281b8ad3aea64e7c2a96",
-  "compiled_manifest_sha256": "97003af69a7929611888666e5bdd1137f5787e98a5556d942ae1f003efb9f68b",
-  "source_manifest_identity": "fal-explicit-stage-router-source-v31",
-  "source_manifest_sha256": "9a3e35c46345292c848422260201a9628f8f2a1bcb4ef50691518583437c8f55"
+  "compiled_entry_sha256": "7b17ef66adbf970dcfba9e58d3f0dde86f6571bdfa91541b62ebf4a5bcd7795f",
+  "compiled_manifest_sha256": "5790767915a7734c6c803098714ad2798b337f54411905fb9e603cce367e61da",
+  "source_manifest_identity": "fal-explicit-stage-router-source-v32",
+  "source_manifest_sha256": "a951047455a7335a207ab9aea673aa917bdd073a27b1e59862dabb526b7cbdad"
 }

@@ -118,6 +118,30 @@ test("CAS, one nonterminal operation, and terminal immutability", () => {
   }
 });
 
+test("protected participant lifecycle state ignores legacy ledgers and follows exact runtime operations", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-participant-state-"));
+  try {
+    const store = new StateStore(root);
+    const authority = makeAuthority();
+    store.createRun(authority, authoritySha256(authority));
+    const session = "a".repeat(64);
+    const otherSession = "b".repeat(64);
+    assert.equal(store.participantLifecycleState("fal", session), "SETTLED");
+
+    const created = store.createOperation("run-1", makeInvocation("op-1"), {}, "1".repeat(64));
+    assert.equal(store.participantLifecycleState("fal", session), "PENDING");
+    assert.equal(store.participantLifecycleState("fal", otherSession), "SETTLED");
+    assert.equal(store.participantLifecycleState("other-target", session), "SETTLED");
+
+    const uncertain = store.updateOperation("run-1", "op-1", created.revision, { status: "UNCERTAIN" });
+    assert.equal(store.participantLifecycleState("fal", session), "UNCERTAIN");
+    store.updateOperation("run-1", "op-1", uncertain.revision, { status: "SUCCEEDED" });
+    assert.equal(store.participantLifecycleState("fal", session), "SETTLED");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("containment rejects traversal", () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-path-"));
   try {

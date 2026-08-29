@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { authoritySha256, canonicalize, parseOutputShape, sha256, validateOutputBinding, type RunAuthority, type RunRequest, type StageRequest } from "../src/contracts.js";
-import { StageEngine, _test as stageTest, promotedSourcesForStage, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "../src/stage-engine.js";
+import { StageEngine, _test as stageTest, promotedSourcesForStage, renderCommandArgument, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "../src/stage-engine.js";
 import { ROUTER_PROTOCOL_IDENTITY, buildSharedFenceBinding } from "../src/control-plane.js";
 import { StateStore } from "../src/state-store.js";
 import { CommandClient, type FetchLike } from "../src/transport.js";
@@ -12,6 +12,7 @@ import { worktreeProofSha256, type WorktreeProof } from "../src/worktree-reader.
 
 class FakeResolver implements AuthorityResolver {
   authority?: RunAuthority;
+  targetIdentity = "fal";
   sourceContent = [
     "EPIC IMPLEMENTATION PLAN", "Target: fal", "Epic: E", "Wave: W", "Accountable Lane / class / profile: Track D / TRACK / track-d",
     "Prerequisites/current state: ready", "Scope/non-goals: fixture", "Interfaces/ownership: fixture", "Feature -> User Story -> Task: F -> US -> T",
@@ -47,7 +48,7 @@ class FakeResolver implements AuthorityResolver {
       run_id: identity.runId,
       created_at: identity.createdAt,
       target_id: request.target_id,
-      target_identity: "fal",
+      target_identity: this.targetIdentity,
       worktree_identity: request.expected_worktree_identity,
       wave: "W",
       epic: "E",
@@ -219,6 +220,13 @@ function request(runId: string, authorityHash: string, sourceSha: string): Stage
     active_route_generation: "generation-0",
   };
 }
+
+test("SEQ_NEXT command envelope requires the exact canonical target field", () => {
+  const base = request("run-1", "a".repeat(64), "b".repeat(64));
+  const argument = renderCommandArgument({ ...base, requested_stage: "SEQ_NEXT", target_id: "worldsim" }, []);
+  assert.match(argument, /Target field must be exact: worldsim/);
+  assert.match(argument, /Do not append a repository path, branch, endpoint, credential, or other provenance/);
+});
 
 test("one explicit stage uses one response and never auto-advances", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-engine-"));
@@ -1731,6 +1739,69 @@ test("resolve-stage recovers one exact command-root terminal after an uncertain 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("resolve-stage sanitizes only exact protected target provenance before persisting a recovered terminal", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-target-provenance-recovery-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let calls = 0;
+    const store = new StateStore(root);
+    const resolver = new FakeResolver();
+    resolver.targetIdentity = "WorldSim";
+    resolver.sourceContent = resolver.sourceContent.replace("Target: fal", "Target: WorldSim");
+    resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+    resolver.fenceTargetRoot = root;
+    resolver.privateValues = [root];
+    const recoveredText = planReviewSource().replace(
+      "Target: fal",
+      `Target: WorldSim repository at \`${root}\`; routed branch \`feature/fal-router-adoption\` at \`abc123\``,
+    );
+    const recovered = {
+      id: "assistant-worldsim-recovered",
+      parent_id: "user-command-root",
+      session_id: resolver.recipientSessionId,
+      text: recoveredText,
+      after_baseline: true,
+      command_root_correlated: true,
+    };
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      calls += 1;
+      throw new Error("delivery unknown");
+    }), {
+      captureBaseline: async () => ({ message_id: "assistant-baseline", identity_sha256: sha256("assistant-baseline"), captured_at: new Date().toISOString() }),
+      collect: async () => [recovered],
+    });
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "worldsim", expected_worktree_identity: "git:abc" });
+    const uncertain = await engine.invokeStage({ ...request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)), target_id: "worldsim" });
+    assert.equal(uncertain.operation_status, "UNCERTAIN");
+
+    const reconciled = await engine.resolveStage(created.run_id, uncertain.operation_id);
+    assert.equal(reconciled.operation_status, "SUCCEEDED", JSON.stringify(reconciled));
+    assert.equal(reconciled.transport_status, "TRANSCRIPT_RECONCILED");
+    assert.equal(calls, 1);
+    const operationRoot = path.join(root, "runs", created.run_id, "operations", uncertain.operation_id);
+    const terminal = readFileSync(path.join(operationRoot, "terminal.md"), "utf8");
+    assert.match(terminal, /^Target: WorldSim$/m);
+    assert.equal(terminal.includes(root), false);
+    const receipt = JSON.parse(readFileSync(path.join(operationRoot, "recovery-sanitization.md"), "utf8")) as Record<string, unknown>;
+    assert.equal(receipt.rule, "EXACT_TARGET_PROVENANCE_ONLY");
+    assert.equal(receipt.raw_output_persisted, false);
+    assert.equal(receipt.raw_terminal_sha256, sha256(recoveredText));
+    assert.equal(receipt.sanitized_terminal_sha256, sha256(terminal.trim()));
+    assert.equal(allPersistentText(operationRoot).includes(root), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("recovered target normalization does not conceal unrelated private material", () => {
+  const root = "C:\\EGYETEM\\FUNSTUFF\\WorldSim";
+  const raw = `META PLAN REVIEW\nTarget: WorldSim repository at \`${root}\`; credential Basic c2VjcmV0\n`;
+  const normalized = stageTest.normalizeRecoveredTerminalTarget(raw, "WorldSim", root);
+  assert.equal(normalized.targetProvenanceSanitized, true);
+  assert.match(normalized.privacyProbeText, /Basic c2VjcmV0/);
+  assert.equal(normalized.privacyProbeText.includes(root), false);
 });
 
 test("resolve-stage waits read-only for one late exact command-root terminal without resending", async () => {
