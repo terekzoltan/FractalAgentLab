@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { authoritySha256, canonicalize, parseOutputShape, sha256, validateOutputBinding, type RunAuthority, type RunRequest, type StageRequest } from "../src/contracts.js";
-import { StageEngine, _test as stageTest, promotedSourcesForStage, renderCommandArgument, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "../src/stage-engine.js";
+import { StageEngine, _test as stageTest, promotedSourcesForStage, renderCommandArgument, renderPersistedCommandArgument, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "../src/stage-engine.js";
 import { ROUTER_PROTOCOL_IDENTITY, buildSharedFenceBinding } from "../src/control-plane.js";
 import { StateStore } from "../src/state-store.js";
 import { CommandClient, type FetchLike } from "../src/transport.js";
@@ -226,6 +226,16 @@ test("SEQ_NEXT command envelope requires the exact canonical target field", () =
   const argument = renderCommandArgument({ ...base, requested_stage: "SEQ_NEXT", target_id: "worldsim" }, []);
   assert.match(argument, /Target field must be exact: worldsim/);
   assert.match(argument, /Do not append a repository path, branch, endpoint, credential, or other provenance/);
+});
+
+test("persisted SEQ_NEXT command roots select only a hash-matched reviewed renderer", () => {
+  const base = { ...request("run-1", "a".repeat(64), "b".repeat(64)), requested_stage: "SEQ_NEXT" as const, target_id: "worldsim" };
+  const sources = [resolvedSource("PLANNING_CONTEXT", "bounded planning context", 0)];
+  const current = renderCommandArgument(base, sources);
+  const legacy = `--- FAL SOURCE 0 ${sources[0]!.binding.logical_identity} ${sources[0]!.binding.sha256} ---\nbounded planning context\n--- END FAL SOURCE 0 ---`;
+  assert.equal(renderPersistedCommandArgument(base, sources, sha256(current)), current);
+  assert.equal(renderPersistedCommandArgument(base, sources, sha256(legacy)), legacy);
+  assert.throws(() => renderPersistedCommandArgument(base, sources, "f".repeat(64)), /cannot be reconstructed/);
 });
 
 test("one explicit stage uses one response and never auto-advances", async () => {

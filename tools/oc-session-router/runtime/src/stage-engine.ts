@@ -1134,6 +1134,16 @@ export function renderCommandArgument(request: StageRequest, sources: readonly R
   return `--- FAL VERIFIED REVIEW ENVELOPE ---\n${envelope}\n--- END FAL VERIFIED REVIEW ENVELOPE ---\n${renderSources(sources)}`;
 }
 
+export function renderPersistedCommandArgument(request: StageRequest, sources: readonly ResolvedSource[], expectedSha256: string): string {
+  const current = renderCommandArgument(request, sources);
+  if (sha256(current) === expectedSha256) return current;
+  if (request.requested_stage === "SEQ_NEXT") {
+    const legacy = renderSources(sources);
+    if (sha256(legacy) === expectedSha256) return legacy;
+  }
+  throw new Error("Persisted command argument cannot be reconstructed from reviewed renderers");
+}
+
 function allowedNext(stage: StageRequest["requested_stage"], terminal: string): string[] {
   if (stage === "SEQ_NEXT" && terminal === "READY") return ["PLAN_REVIEW"];
   if (stage === "PLAN_REVIEW") return ["PLAN_REVISION"];

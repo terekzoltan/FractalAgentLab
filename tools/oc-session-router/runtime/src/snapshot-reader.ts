@@ -1,5 +1,5 @@
 import { parseOutputShape, sha256, stageRequestFromInvocation } from "./contracts.js";
-import { renderCommandArgument, type AuthorityResolver, type ResolvedStageAuthority, type SnapshotReader } from "./stage-engine.js";
+import { renderPersistedCommandArgument, type AuthorityResolver, type ResolvedStageAuthority, type SnapshotReader } from "./stage-engine.js";
 import { StateStore } from "./state-store.js";
 import { InstalledSnapshotClient, isValidTransportIdentity, type SnapshotBaseline, type SnapshotCandidate, type TransportReceipt } from "./transport.js";
 
@@ -41,7 +41,7 @@ export class InstalledSnapshotReader implements SnapshotReader {
       const commandRootRequired = needsCommandRootCorrelation(Boolean(transportReceipt), this.store.hasFailedOutputRecovery(runId, operationId));
       const expectedCommand = commandRootRequired ? {
         name: operation.invocation.command_name,
-        argument: renderCommandArgument(stageRequest, resolved.sources),
+        argument: renderPersistedCommandArgument(stageRequest, resolved.sources, operation.invocation.command_argument_sha256),
       } : undefined;
       const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000, expectedCommand);
       const correlated = transportReceipt && isValidTransportIdentity(transportReceipt.parent_id)

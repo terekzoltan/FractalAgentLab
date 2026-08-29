@@ -64,7 +64,11 @@ It is not project truth and does not grant workflow authority.
   persisted, a digest-only sanitization receipt is written, and every other
   private sentinel still fails closed. New `SEQ_NEXT` dispatches explicitly
   require the canonical target name without path, branch, endpoint, or credential
-  provenance. SSE is probed and recorded but remains disabled.
+  provenance. Reconciliation reconstructs a persisted command root only through
+  a finite reviewed renderer set and selects it by the invocation's exact saved
+  argument hash, so later envelope improvements cannot invalidate an older send
+  or authorize an unrecognized historical shape. SSE is probed and recorded but
+  remains disabled.
 - `Prepare-OCRouterStage.ps1` is the bounded no-send source-hash helper. It hashes
   only sources explicitly named by the operator and emits candidate manifest and
   state packet files; invocation remains a separate explicit transaction.
