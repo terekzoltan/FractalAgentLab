@@ -34,7 +34,7 @@ export class InstalledSnapshotReader implements SnapshotReader {
       if (sha256(resolved.transport.session_id) !== operation.invocation.recipient_session_sha256) throw new Error("Snapshot authority drifted");
       const stageRequest = stageRequestFromInvocation(operation.invocation);
       const transportReceipt = this.store.loadTransportReceipt<TransportReceipt>(runId, operationId);
-      const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000, transportReceipt ? undefined : {
+      const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000, {
         name: operation.invocation.command_name,
         argument: renderCommandArgument(stageRequest, resolved.sources),
       });

@@ -161,7 +161,14 @@ Delivery /seq-next
   configuration supplies the runtime root and control registry; the engine, not
   the request, resolves target authority, origin, recipient, sources, command, and
   deterministic argument bytes.
-- The synchronous `/command` assistant response is the primary candidate. A
+- The synchronous `/command` assistant response is the primary candidate. If an
+  accepted response is non-canonical after OpenCode automatic compact/resume, one
+  read-only `resolve-stage` may recover exactly one strict assistant child of the
+  frozen expanded command root. This exception is available only for
+  `FAILED_OUTPUT / RESPONSE_ACCEPTED / OUTPUT_VALIDATION_FAILED`; it revalidates
+  current authority, privacy, source lineage, shape, and binding, preserves the
+  original failure digest, and never resends. Missing, stale, or multiple strict
+  children remain failed closed. A
   timeout or 5xx leaves the operation `UNCERTAIN`; `resolve-stage` is read-only and
   cannot resend. In production its default bounded wait polls the same operation's
   GET history for up to 60 minutes and exits as soon as one exact terminal is
@@ -251,9 +258,13 @@ For the explicit-stage runtime, repair means a new target-authoritative artifact
 and a later explicit operation after state revalidation. Never edit operation
 state, replay a legacy wrapper, or substitute compact/latest-output text.
 
-Compact Lite is the sole active automatic compact path. Invoke
-`invoke-session-compact-lite.ps1` only at `before_dispatch`, `after_stage_output`,
-or `epic_closeout`. Non-dry operation resolves the target root, server instance,
+Compact Lite is the sole active automatic compact path. The production
+`Invoke-OCRouter.ps1 -Operation invoke-stage` launcher now performs the
+`before_dispatch` Compact Lite hook before operation creation and the
+`after_stage_output` hook after the settled stage result. The Orchestrator must
+not skip, duplicate, or separately emulate those two checks. Invoke
+`invoke-session-compact-lite.ps1` directly only for `epic_closeout`, an explicitly
+named operator diagnostic, or a test/dry-run. Non-dry operation resolves the target root, server instance,
 private session, timeout, and capability grant only through the attested fixed
 KnownFolder control plane. Target-local `sessions.json` and caller `-Server` are
 dry-run/test expectations and cannot authorize a production POST. It requires

@@ -731,6 +731,78 @@ function writeCliRowToFd(fd: 1 | 2, row: string): void {
   writeFileSync(fd, row, { encoding: "utf8" });
 }
 
+type CompactHookEvent = "before_dispatch" | "after_stage_output";
+
+function compactProfileForStage(request: StageRequest): { profileId: string; logicalSessionRef: string; roleHint: string } {
+  const metaStage = new Set(["PLAN_REVIEW", "STEP_REVIEW", "CLOSEOUT"]).has(request.requested_stage);
+  const profileId = metaStage ? `${request.target_id}.meta` : request.accountable_profile;
+  const prefix = `${request.target_id}.`;
+  if (!profileId.startsWith(prefix) || profileId.length <= prefix.length) throw new Error("Compact profile does not belong to the target project");
+  const logicalSessionRef = profileId.slice(prefix.length);
+  assertOpaqueId(profileId, "Compact profile ID");
+  assertOpaqueId(logicalSessionRef, "Compact logical session reference");
+  if (!request.recipient_role.trim()) throw new Error("Compact role hint is empty");
+  return { profileId, logicalSessionRef, roleHint: request.recipient_role };
+}
+
+function runCompactLiteHook(request: StageRequest, eventType: CompactHookEvent, registryPath: string): unknown {
+  const registry = parseControlRegistry(parseStrictJson(readFileSync(registryPath, "utf8")));
+  if (registry.schema_version !== "router-control-registry.v2" || registry.mode !== "PRODUCTION_RESPONSE_FIRST") return { disposition: "NOT_APPLICABLE" };
+  const target = registry.targets[request.target_id];
+  if (!target) throw new Error("Compact target is absent from protected authority");
+  const targetRoot = resolveProtectedTargetDirectory(registry, target.root, "Compact target directory");
+  const { profileId, logicalSessionRef, roleHint } = compactProfileForStage(request);
+  const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+  const routerRoot = path.resolve(moduleDirectory, "..", "..", "..");
+  const compactScript = path.join(routerRoot, "scripts", "invoke-session-compact-lite.ps1");
+  const canonRoot = path.resolve(routerRoot, "..", "..", "..", "Agent-Workflow-Canon");
+  const canonContract = path.join(canonRoot, "canon", "CANONICAL-CONTRACT.json");
+  const projectProfile = path.join(canonRoot, "registry", "projects", `${request.target_id}.json`);
+  const userProfile = process.env.USERPROFILE;
+  if (!userProfile || !path.isAbsolute(userProfile)) throw new Error("Compact global policy root is unavailable");
+  const globalPolicy = path.join(userProfile, ".config", "opencode", "workflow-compact-policy.json");
+  for (const [candidate, label] of [[compactScript, "Compact Lite script"], [canonContract, "Canon contract"], [projectProfile, "project profile"], [globalPolicy, "global Compact policy"]] as const) {
+    if (!lstatSync(candidate).isFile() || lstatSync(candidate).isSymbolicLink()) throw new Error(`${label} is missing or unsafe`);
+  }
+  const attemptId = `router-${eventType === "before_dispatch" ? "pre" : "post"}-${sha256(canonicalize({ run_id: request.run_id, request_id: request.request_id, stage: request.requested_stage, profile_id: profileId })).slice(0, 32)}`;
+  const compactArguments = [
+    "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", compactScript,
+    "-ProjectId", request.target_id,
+    "-ProfileId", profileId,
+    "-AttemptId", attemptId,
+    "-CanonRoot", canonRoot,
+    "-CanonContractSha256", sha256(readFileSync(canonContract)),
+    "-ProjectProfileSha256", sha256(readFileSync(projectProfile)),
+    "-Target", logicalSessionRef,
+    "-RoleHint", roleHint,
+    "-EventType", eventType,
+    "-GlobalPolicyPath", globalPolicy,
+    "-GlobalPolicySha256", sha256(readFileSync(globalPolicy)),
+  ];
+  const projectPolicy = path.join(targetRoot, ".fal", "compact-policy.json");
+  try {
+    const stat = lstatSync(projectPolicy);
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("Project Compact policy is unsafe");
+    compactArguments.push("-ProjectPolicyPath", projectPolicy, "-ProjectPolicySha256", sha256(readFileSync(projectPolicy)));
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? (error as { code?: unknown }).code : undefined;
+    if (code !== "ENOENT") throw error;
+  }
+  const allowedEnvironment = new Set(["SystemRoot", "WINDIR", "TEMP", "TMP", "USERPROFILE", "HOME", "LOCALAPPDATA", "APPDATA", "OPENCODE_SERVER_USERNAME", "OPENCODE_SERVER_PASSWORD"]);
+  const childEnvironment = Object.fromEntries(Object.entries(process.env).filter(([name, value]) => allowedEnvironment.has(name) && value !== undefined)) as NodeJS.ProcessEnv;
+  const child = spawnSync(FENCE_BROKER_EXECUTABLE, compactArguments, { cwd: targetRoot, env: childEnvironment, encoding: "utf8", windowsHide: true, timeout: 900_000, maxBuffer: 1_048_576 });
+  if (child.error || child.status !== 0 || child.signal || !child.stdout.trim() || child.stderr.trim()) throw new Error("Compact Lite hook failed");
+  const output = parseStrictJson(child.stdout.trim());
+  if (!output || typeof output !== "object" || Array.isArray(output)) throw new Error("Compact Lite hook output is invalid");
+  const result = output as Record<string, unknown>;
+  if (result.schema_version !== "compact-lite-result/v1" || result.contract !== "opencode-compact-lite/v1" || result.logical_session_ref !== logicalSessionRef || result.role_hint !== roleHint || result.event_type !== eventType || result.workflow_command_sent !== false || result.terminal !== true) throw new Error("Compact Lite hook result binding is invalid");
+  const privacy = result.privacy;
+  const privacyKeys = ["absolute_roots_emitted", "credentials_emitted", "endpoints_emitted", "ports_emitted", "raw_session_ids_emitted", "transcripts_emitted"];
+  if (!privacy || typeof privacy !== "object" || Array.isArray(privacy) || canonicalize(Object.keys(privacy).sort()) !== canonicalize(privacyKeys) || Object.values(privacy).some((value) => value !== false)) throw new Error("Compact Lite hook privacy result is invalid");
+  if (eventType === "before_dispatch" && !["CONTINUE", "COMPACTED_RESTORED", "COMPACTED_DEGRADED", "ALREADY_COMPACTED"].includes(String(result.disposition))) throw new Error("Compact Lite pre-dispatch boundary is not ready");
+  return output;
+}
+
 async function main(): Promise<void> {
   const operation = process.argv[2];
   if (!operation || !["new-run", "new-follow-on-run", "invoke-stage", "install-closeout-authority", "resolve-stage", "get-run", "purge-retention", "write-p0b-proof", "resolve-compact-authority", "consume-compact-authority"].includes(operation)) throw new ClassifiedCliError("REQUEST_INVALID");
@@ -763,7 +835,11 @@ async function main(): Promise<void> {
     result = await classifiedAsync("RUN_AUTHORITY_BLOCKED", () => engine.newFollowOnRun(request));
   } else if (operation === "invoke-stage") {
     const request = classified("REQUEST_INVALID", () => parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
+    if (!registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
+    classified("BLOCKED", () => runCompactLiteHook(request, "before_dispatch", registryPath));
     result = await classifiedAsync("BLOCKED", () => engine.invokeStage(request));
+    try { runCompactLiteHook(request, "after_stage_output", registryPath); }
+    catch { /* A completed lifecycle result stays authoritative; the next mandatory preflight re-evaluates pressure. */ }
   } else if (operation === "install-closeout-authority") {
     const request = classified("REQUEST_INVALID", () => parseCloseoutAuthorityInstallRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     result = await classifiedAsync("RUN_AUTHORITY_BLOCKED", () => engine.installCloseoutAuthority(request));
@@ -862,4 +938,4 @@ if (isEntry) {
   });
 }
 
-export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };
+export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, compactProfileForStage, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };

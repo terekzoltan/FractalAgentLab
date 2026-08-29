@@ -22,6 +22,7 @@ import {
   type CapabilityProbeProjection,
   type RegistryTarget,
   type RetentionPolicy,
+  _test as controlPlaneTest,
 } from "../src/control-plane.js";
 import { _test as cliTest } from "../src/cli.js";
 import { parseP0bProofReceipt, p0bProofSha256, readP0bProofReceipt, writeP0bProofReceipt, type P0bProofReceipt } from "../src/p0b-proof.js";
@@ -222,6 +223,8 @@ test("P0B protected capability is closed, short-lived, AWC 4.1.1-only, and direc
 });
 
 test("Compact authority derives protected target and case-insensitive unique session, then consumes stable P0B authority once", async () => {
+  assert.equal(controlPlaneTest.normalizeLogicalSessionReference("Track D"), "track-d");
+  assert.equal(controlPlaneTest.normalizeLogicalSessionReference("SMR Diagnostic Delivery"), "smr-diagnostic-delivery");
   const sandboxTemp = path.join(process.cwd(), ".test-tmp");
   mkdirSync(sandboxTemp, { recursive: true });
   const root = mkdtempSync(path.join(sandboxTemp, "fal-router-compact-authority-"));

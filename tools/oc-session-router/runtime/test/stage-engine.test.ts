@@ -1127,6 +1127,86 @@ test("received but invalid output is FAILED_OUTPUT, not delivery uncertainty", a
   }
 });
 
+test("resolve-stage recovers one exact valid command-root child after an accepted invalid post-compact response", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-failed-output-command-root-recovery-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let sends = 0;
+    const store = new StateStore(root);
+    const resolver = new FakeResolver();
+    resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+    resolver.fenceTargetRoot = root;
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      sends += 1;
+      return new Response(JSON.stringify({
+        info: { id: "assistant-post-compact", role: "assistant", sessionID: resolver.recipientSessionId, parentID: "user-auto-resume" },
+        parts: [{ id: "part-post-compact", type: "text", text: "The reviewed plan is ready, but Plan mode prevents implementation.", messageID: "assistant-post-compact", sessionID: resolver.recipientSessionId }],
+      }), { status: 200 });
+    }), {
+      captureBaseline: async () => ({ message_id: "assistant-baseline", identity_sha256: sha256("assistant-baseline"), captured_at: new Date().toISOString() }),
+      collect: async () => [{
+        id: "assistant-canonical-direct-child",
+        parent_id: "user-exact-command-root",
+        session_id: resolver.recipientSessionId,
+        text: planReviewSource(),
+        after_baseline: true,
+        command_root_correlated: true,
+      }],
+    });
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const failed = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+    assert.equal(failed.operation_status, "FAILED_OUTPUT");
+    assert.equal(failed.reason, "OUTPUT_VALIDATION_FAILED");
+
+    const recovered = await engine.resolveStage(created.run_id, failed.operation_id);
+    assert.equal(recovered.operation_status, "SUCCEEDED", JSON.stringify(recovered));
+    assert.equal(recovered.transport_status, "TRANSCRIPT_RECONCILED");
+    assert.deepEqual(recovered.allowed_next, ["PLAN_REVISION"]);
+    assert.equal(sends, 1);
+    const operationRoot = path.join(root, "runs", created.run_id, "operations", failed.operation_id);
+    assert.match(readFileSync(path.join(operationRoot, "terminal.md"), "utf8"), /META PLAN REVIEW/);
+    assert.match(readFileSync(path.join(operationRoot, "failed-output-recovery-origin.json"), "utf8"), /"original_status":"FAILED_OUTPUT"/);
+    assert.match(readFileSync(path.join(operationRoot, "failed-output-recovery-receipt.json"), "utf8"), /"result":"RECOVERED"/);
+    assert.equal((recovered as typeof recovered & { response_sha256: string }).response_sha256 === sha256("unrelated"), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("failed-output command-root recovery stays failed closed when valid direct children are ambiguous", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-failed-output-ambiguous-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let sends = 0;
+    const store = new StateStore(root);
+    const resolver = new FakeResolver();
+    resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+    resolver.fenceTargetRoot = root;
+    const candidate = (id: string) => ({ id, parent_id: "user-exact-command-root", session_id: resolver.recipientSessionId, text: planReviewSource(), after_baseline: true, command_root_correlated: true });
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      sends += 1;
+      return new Response(JSON.stringify({
+        info: { id: "assistant-invalid-final", role: "assistant", sessionID: resolver.recipientSessionId, parentID: "user-auto-resume" },
+        parts: [{ id: "part-invalid-final", type: "text", text: "progress only", messageID: "assistant-invalid-final", sessionID: resolver.recipientSessionId }],
+      }), { status: 200 });
+    }), {
+      captureBaseline: async () => ({ message_id: "assistant-baseline", identity_sha256: sha256("assistant-baseline"), captured_at: new Date().toISOString() }),
+      collect: async () => [candidate("assistant-valid-one"), candidate("assistant-valid-two")],
+    });
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const failed = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+    const unresolved = await engine.resolveStage(created.run_id, failed.operation_id);
+    assert.equal(unresolved.operation_status, "FAILED_OUTPUT");
+    assert.equal(store.loadOperation(created.run_id, failed.operation_id).status, "FAILED_OUTPUT");
+    assert.equal(sends, 1);
+    const operationRoot = path.join(root, "runs", created.run_id, "operations", failed.operation_id);
+    assert.equal(existsSync(path.join(operationRoot, "terminal.md")), false);
+    assert.match(readFileSync(path.join(operationRoot, "failed-output-recovery-receipt.json"), "utf8"), /"result":"NOT_RECOVERED"/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("FSR-015: recipient remap and authority generation distinguish semantic actions", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-semantic-generation-"));
   try {

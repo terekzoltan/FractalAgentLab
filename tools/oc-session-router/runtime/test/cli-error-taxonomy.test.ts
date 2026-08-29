@@ -27,6 +27,18 @@ test("CLI exposes only the reviewed finite error-code vocabulary", () => {
   assert.deepEqual(_test.CLI_ERROR_CODES, EXPECTED_CODES);
 });
 
+test("production compact hooks select Meta or the exact accountable delivery profile", () => {
+  const base = {
+    target_id: "ringfall",
+    requested_stage: "PLAN_REVIEW",
+    accountable_profile: "ringfall.track-d",
+    recipient_role: "Meta",
+  } as Parameters<typeof _test.compactProfileForStage>[0];
+  assert.deepEqual(_test.compactProfileForStage(base), { profileId: "ringfall.meta", logicalSessionRef: "meta", roleHint: "Meta" });
+  assert.deepEqual(_test.compactProfileForStage({ ...base, requested_stage: "PLAN_REVISION", recipient_role: "Track D" }), { profileId: "ringfall.track-d", logicalSessionRef: "track-d", roleHint: "Track D" });
+  assert.throws(() => _test.compactProfileForStage({ ...base, requested_stage: "PLAN_REVISION", accountable_profile: "worldsim.track-d", recipient_role: "Track D" }), /does not belong/);
+});
+
 test("CLI error classifier separates bounded operational failure classes", () => {
   const cases: ReadonlyArray<readonly [Error, Parameters<typeof _test.classifyCliError>[1], string]> = [
     [new Error("request parser rejected private C:\\secret\\request.json"), "REQUEST_INVALID", "REQUEST_INVALID"],

@@ -510,6 +510,8 @@ export class StageEngine {
       ) throw new Error("Stored successful operation result is invalid");
       return stored as StageResult;
     }
+    if (operation.status === "FAILED_OUTPUT") operation = this.store.beginFailedOutputRecovery(runId, operationId, operation.revision);
+    const failedOutputRecovery = this.store.hasFailedOutputRecovery(runId, operationId);
     if (!["DISPATCHING", "ACTIVE", "UNCERTAIN", "RECONCILING"].includes(operation.status)) throw new Error("Operation is not reconcilable");
     if (!this.snapshots) throw new Error("Snapshot reconciliation capability is unavailable");
     if (operation.status !== "RECONCILING") operation = this.store.updateOperation(runId, operationId, operation.revision, { status: "RECONCILING" });
@@ -532,6 +534,7 @@ export class StageEngine {
     let rawCommandRootCandidates: SnapshotCandidate[] = [];
     let commandRootCandidates: SnapshotCandidate[] = [];
     let recoveredCandidate: SnapshotCandidate | undefined;
+    let recoveredFromCommandRoot = false;
     do {
       try {
         candidates = await this.snapshots.collect(runId, operationId);
@@ -549,15 +552,16 @@ export class StageEngine {
           try { parseOutputShape(operation.invocation.requested_stage, text); return true; } catch { return false; }
         },
       });
-      rawCommandRootCandidates = transportReceipt ? [] : candidates.filter((candidate) =>
+      rawCommandRootCandidates = transportReceipt && !failedOutputRecovery ? [] : candidates.filter((candidate) =>
         candidate.command_root_correlated === true && sha256(candidate.session_id) === operation.invocation.recipient_session_sha256,
       );
       commandRootCandidates = rawCommandRootCandidates.filter((candidate) => {
         try { parseOutputShape(operation.invocation.requested_stage, candidate.text); return true; } catch { return false; }
       });
       const receiptCandidate = exactCorrelation && resolution.status === "TRANSCRIPT_RECONCILED" ? resolution.candidate : undefined;
-      const commandRootCandidate = !transportReceipt && commandRootCandidates.length === 1 ? commandRootCandidates[0] : undefined;
+      const commandRootCandidate = (!transportReceipt || failedOutputRecovery) && commandRootCandidates.length === 1 ? commandRootCandidates[0] : undefined;
       recoveredCandidate = receiptCandidate ?? commandRootCandidate;
+      recoveredFromCommandRoot = recoveredCandidate !== undefined && recoveredCandidate === commandRootCandidate && recoveredCandidate !== receiptCandidate;
       if (recoveredCandidate || now() >= deadline) break;
       await sleep(Math.min(pollIntervalMs, Math.max(1, deadline - now())));
     } while (now() <= deadline);
@@ -584,15 +588,26 @@ export class StageEngine {
           : undefined;
         const artifact = `${recoveredCandidate.text.replace(/\r\n/g, "\n").trim()}\n`;
         this.store.writeArtifact(runId, operationId, "terminal", artifact);
-        const responseEvidenceSha256 = transportReceipt?.response_sha256 ?? sha256(canonicalize({
+        const responseEvidenceSha256 = transportReceipt && !recoveredFromCommandRoot ? transportReceipt.response_sha256 : sha256(canonicalize({
           domain: "fal-router-command-root-transcript-recovery/v1",
           command_body_sha256: operation.invocation.command_body_sha256,
           message_id_sha256: sha256(recoveredCandidate.id),
           parent_id_sha256: sha256(recoveredCandidate.parent_id),
           terminal_sha256: sha256(recoveredCandidate.text),
         }));
-        const succeeded = makeResult(operation.invocation, operationId, "SUCCEEDED", "TRANSCRIPT_RECONCILED", "VALID", "BOUND", "VALID", allowedNext(operation.invocation.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), successReason(operation.invocation.requested_stage, parsed.terminal, transportReceipt ? "exact installed response correlation validated" : "exact installed command-root transcript correlation validated"), sha256(recoveredCandidate.id), responseEvidenceSha256, candidateScope?.sha256);
+        const succeeded = makeResult(operation.invocation, operationId, "SUCCEEDED", "TRANSCRIPT_RECONCILED", "VALID", "BOUND", "VALID", allowedNext(operation.invocation.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), successReason(operation.invocation.requested_stage, parsed.terminal, recoveredFromCommandRoot ? "exact installed command-root transcript correlation validated" : "exact installed response correlation validated"), sha256(recoveredCandidate.id), responseEvidenceSha256, candidateScope?.sha256);
         this.store.updateResult(runId, operationId, succeeded);
+        if (failedOutputRecovery) this.store.writeFailedOutputRecoveryReceipt(runId, operationId, {
+          schema_version: "failed-output-recovery-receipt.v1",
+          run_id: runId,
+          operation_id: operationId,
+          result: "RECOVERED",
+          command_root_candidate_count: rawCommandRootCandidates.length,
+          valid_command_root_candidate_count: commandRootCandidates.length,
+          recovered_terminal_sha256: sha256(recoveredCandidate.text),
+          transport_resent: false,
+          raw_output_persisted: false,
+        });
         this.store.updateOperation(runId, operationId, operation.revision, { status: "SUCCEEDED" });
         return succeeded;
       } catch {
@@ -605,6 +620,21 @@ export class StageEngine {
       : rawCommandRootCandidates.length === 1
         ? "exact command-root response failed the stage terminal contract"
         : "snapshot evidence is diagnostic without one exact installed response or command-root correlation";
+    if (failedOutputRecovery) {
+      this.store.writeFailedOutputRecoveryReceipt(runId, operationId, {
+        schema_version: "failed-output-recovery-receipt.v1",
+        run_id: runId,
+        operation_id: operationId,
+        result: "NOT_RECOVERED",
+        command_root_candidate_count: rawCommandRootCandidates.length,
+        valid_command_root_candidate_count: commandRootCandidates.length,
+        diagnostic_reason_sha256: sha256(reason),
+        transport_resent: false,
+        raw_output_persisted: false,
+      });
+      this.store.updateOperation(runId, operationId, operation.revision, { status: "FAILED_OUTPUT" });
+      return this.store.loadResult(runId, operationId) as StageResult;
+    }
     const result = makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "AMBIGUOUS", "UNVALIDATED", "UNVALIDATED", [], "", reason);
     this.store.updateResult(runId, operationId, result);
     this.store.updateOperation(runId, operationId, operation.revision, { status: "UNCERTAIN" });

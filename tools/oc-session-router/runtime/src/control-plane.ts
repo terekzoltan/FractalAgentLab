@@ -489,7 +489,8 @@ export async function resolveCompactProtectedAuthority(options: {
   const target = options.registry.targets[options.target_id];
   if (!target) throw new Error("Compact target is absent from protected authority");
   if (!target.capability_receipt_path || !target.isolation_class) throw new Error("Compact target lacks protected capability authority");
-  const logicalMatches = Object.keys(target.sessions).filter((role) => role.toLocaleLowerCase("en-US") === options.recipient_role.toLocaleLowerCase("en-US"));
+  const requestedLogicalSession = normalizeLogicalSessionReference(options.recipient_role);
+  const logicalMatches = Object.keys(target.sessions).filter((role) => normalizeLogicalSessionReference(role) === requestedLogicalSession);
   if (logicalMatches.length !== 1) throw new Error("Compact logical session reference is unknown or ambiguous");
   const logicalSessionRef = logicalMatches[0]!;
   const sessionId = target.sessions[logicalSessionRef]!.id;
@@ -542,6 +543,10 @@ export async function resolveCompactProtectedAuthority(options: {
     authorization_use_sha256: receipt.mode === "P0B_ISOLATED" ? capabilityAuthorizationUseSha256(receipt) : "0".repeat(64),
     command_timeout_ms: receipt.command_timeout_ms,
   };
+}
+
+function normalizeLogicalSessionReference(value: string): string {
+  return value.trim().toLocaleLowerCase("en-US").replace(/[ _-]+/g, "-");
 }
 
 function installedCapabilityMatchesReceipt(live: CapabilityProbeProjection, receipt: CapabilityReceipt): boolean {
@@ -880,4 +885,4 @@ function samePath(left: string, right: string): boolean {
   return process.platform === "win32" ? path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase() : path.resolve(left) === path.resolve(right);
 }
 
-export const _test = { parseTargets, readContainedJson, exactKeys, ordinaryDirectory, ordinaryDirectoryTree };
+export const _test = { parseTargets, readContainedJson, exactKeys, ordinaryDirectory, ordinaryDirectoryTree, normalizeLogicalSessionReference };

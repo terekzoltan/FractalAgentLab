@@ -285,6 +285,63 @@ export class StateStore {
     });
   }
 
+  beginFailedOutputRecovery(runId: string, operationId: string, expectedRevision: number): OperationDocument {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    return this.withExclusiveLock(this.resolve("runs", runId, "operations", operationId, "update.lock"), () => {
+      const current = this.loadOperation(runId, operationId);
+      if (current.revision !== expectedRevision) throw new Error("Stale operation revision");
+      if (current.status !== "FAILED_OUTPUT") throw new Error("Only FAILED_OUTPUT operations admit failed-output recovery");
+      const result = this.loadResult(runId, operationId) as Record<string, unknown>;
+      if (
+        result.schema_version !== "stage-result.v1" ||
+        result.run_id !== runId ||
+        result.operation_id !== operationId ||
+        result.operation_status !== "FAILED_OUTPUT" ||
+        result.transport_status !== "RESPONSE_ACCEPTED" ||
+        result.output_status !== "INVALID" ||
+        result.binding_status !== "UNVALIDATED" ||
+        result.terminal_status !== "UNVALIDATED" ||
+        result.reason !== "OUTPUT_VALIDATION_FAILED"
+      ) throw new Error("FAILED_OUTPUT recovery origin is not eligible");
+      const receiptPath = this.resolve("runs", runId, "operations", operationId, "transport-receipt.json");
+      const terminalPath = this.resolve("runs", runId, "operations", operationId, "terminal.md");
+      if (!existsSync(receiptPath) || existsSync(terminalPath)) throw new Error("FAILED_OUTPUT recovery evidence is incomplete or already finalized");
+      const originPath = this.resolve("runs", runId, "operations", operationId, "failed-output-recovery-origin.json");
+      const origin = {
+        schema_version: "failed-output-recovery-origin.v1",
+        run_id: runId,
+        operation_id: operationId,
+        original_status: "FAILED_OUTPUT",
+        original_result_sha256: sha256(canonicalize(result)),
+        original_result: result,
+        raw_output_persisted: false,
+      };
+      if (existsSync(originPath)) {
+        if (canonicalize(JSON.parse(readFileSync(originPath, "utf8"))) !== canonicalize(origin)) throw new Error("FAILED_OUTPUT recovery origin drifted");
+      } else {
+        this.writeJsonExclusive(originPath, origin);
+      }
+      const next: OperationDocument = { ...current, status: "RECONCILING", revision: current.revision + 1, updated_at: new Date().toISOString() };
+      this.writeJsonAtomic(this.resolve("runs", runId, "operations", operationId, "operation.json"), next);
+      return next;
+    });
+  }
+
+  hasFailedOutputRecovery(runId: string, operationId: string): boolean {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    return existsSync(this.resolve("runs", runId, "operations", operationId, "failed-output-recovery-origin.json"));
+  }
+
+  writeFailedOutputRecoveryReceipt(runId: string, operationId: string, receipt: unknown): void {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    const receiptPath = this.resolve("runs", runId, "operations", operationId, "failed-output-recovery-receipt.json");
+    if (existsSync(receiptPath)) this.writeJsonAtomic(receiptPath, receipt);
+    else this.writeJsonExclusive(receiptPath, receipt);
+  }
+
   writeResult(runId: string, operationId: string, result: unknown): void {
     assertFilesystemId(runId, "run_id");
     assertFilesystemId(operationId, "operation_id");
