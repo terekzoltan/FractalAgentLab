@@ -10,6 +10,10 @@ interface PersistedIntent {
   capability_receipt_sha256?: string;
 }
 
+function needsCommandRootCorrelation(hasTransportReceipt: boolean, failedOutputRecovery: boolean): boolean {
+  return !hasTransportReceipt || failedOutputRecovery;
+}
+
 export class InstalledSnapshotReader implements SnapshotReader {
   constructor(
     private readonly store: StateStore,
@@ -34,10 +38,12 @@ export class InstalledSnapshotReader implements SnapshotReader {
       if (sha256(resolved.transport.session_id) !== operation.invocation.recipient_session_sha256) throw new Error("Snapshot authority drifted");
       const stageRequest = stageRequestFromInvocation(operation.invocation);
       const transportReceipt = this.store.loadTransportReceipt<TransportReceipt>(runId, operationId);
-      const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000, {
+      const commandRootRequired = needsCommandRootCorrelation(Boolean(transportReceipt), this.store.hasFailedOutputRecovery(runId, operationId));
+      const expectedCommand = commandRootRequired ? {
         name: operation.invocation.command_name,
         argument: renderCommandArgument(stageRequest, resolved.sources),
-      });
+      } : undefined;
+      const snapshot = await this.client.collect(resolved.transport, intent.baseline, mode, 15_000, expectedCommand);
       const correlated = transportReceipt && isValidTransportIdentity(transportReceipt.parent_id)
         ? snapshot.candidates.filter((candidate) =>
           isValidTransportIdentity(candidate.parent_id)
@@ -87,3 +93,5 @@ export class InstalledSnapshotReader implements SnapshotReader {
     }
   }
 }
+
+export const _test = { needsCommandRootCorrelation };

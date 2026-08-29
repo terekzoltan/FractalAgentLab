@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { sha256 } from "../src/contracts.js";
+import { _test as snapshotReaderTest } from "../src/snapshot-reader.js";
 import { CommandClient, InstalledCapabilityProbe, InstalledSnapshotClient, _test, reconcileSnapshot, type FetchLike } from "../src/transport.js";
 
 const session = "session-fixture";
@@ -11,6 +12,12 @@ const responseBody = {
   info: { id: "assistant-1", role: "assistant", sessionID: session, parentID: "user-send-1" },
   parts: [{ id: "part-1", type: "text", text: "META PLAN REVIEW\nOverall verdict: GREEN", messageID: "assistant-1", sessionID: session }],
 };
+
+test("snapshot command-root lookup is limited to receipt-free or FAILED_OUTPUT recovery", () => {
+  assert.equal(snapshotReaderTest.needsCommandRootCorrelation(true, false), false);
+  assert.equal(snapshotReaderTest.needsCommandRootCorrelation(false, false), true);
+  assert.equal(snapshotReaderTest.needsCommandRootCorrelation(true, true), true);
+});
 
 test("command client is response-first and disables redirects", async () => {
   let calls = 0;
