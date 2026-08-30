@@ -1,6 +1,7 @@
 import { lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import {
   assertSafeRelativePath,
@@ -70,6 +71,24 @@ class ClassifiedCliError extends Error {
   constructor(readonly errorCode: CliErrorCode) {
     super(errorCode);
     this.name = "ClassifiedCliError";
+  }
+}
+
+interface CompactPreflightDiagnostic {
+  schema_version: "compact-preflight-diagnostic.v1";
+  disposition: string;
+  reason: string;
+  pressure_state: string;
+  session_state: string;
+  wait_attempts: number;
+  wait_elapsed_ms: number;
+  lifecycle_send: false;
+}
+
+class CompactPreflightBlockedError extends ClassifiedCliError {
+  constructor(readonly diagnostic: CompactPreflightDiagnostic) {
+    super("COMPACT_PREFLIGHT_BLOCKED");
+    this.name = "CompactPreflightBlockedError";
   }
 }
 
@@ -691,6 +710,7 @@ function classifyCliError(error: unknown, fallback: CliErrorCode = "BLOCKED"): C
 }
 
 function rethrowClassified(error: unknown, fallback: CliErrorCode): never {
+  if (error instanceof ClassifiedCliError) throw error;
   throw new ClassifiedCliError(classifyCliError(error, fallback));
 }
 
@@ -704,7 +724,8 @@ async function classifiedAsync<T>(fallback: CliErrorCode, action: () => Promise<
   catch (error) { return rethrowClassified(error, fallback); }
 }
 
-function cliErrorReceipt(error: unknown, fallback: CliErrorCode = "BLOCKED"): { error_code: CliErrorCode } {
+function cliErrorReceipt(error: unknown, fallback: CliErrorCode = "BLOCKED"): { error_code: CliErrorCode; compact_preflight?: CompactPreflightDiagnostic } {
+  if (error instanceof CompactPreflightBlockedError) return { error_code: error.errorCode, compact_preflight: error.diagnostic };
   return { error_code: classifyCliError(error, fallback) };
 }
 
@@ -735,6 +756,66 @@ function writeCliRowToFd(fd: 1 | 2, row: string): void {
 }
 
 type CompactHookEvent = "before_dispatch" | "after_stage_output";
+type CompactHookResult = Record<string, unknown>;
+
+const COMPACT_BUSY_WAIT_MS = 3_600_000;
+const COMPACT_BUSY_POLL_MS = 15_000;
+const READY_COMPACT_DISPOSITIONS = new Set(["CONTINUE", "COMPACTED_RESTORED", "COMPACTED_DEGRADED", "ALREADY_COMPACTED"]);
+
+function safeCompactToken(value: unknown, fallback: string): string {
+  const token = String(value ?? "");
+  return /^[A-Z0-9_]{1,96}$/.test(token) ? token : fallback;
+}
+
+function compactPreflightDiagnostic(result: CompactHookResult, waitAttempts: number, waitElapsedMs: number): CompactPreflightDiagnostic {
+  return {
+    schema_version: "compact-preflight-diagnostic.v1",
+    disposition: safeCompactToken(result.disposition, "INVALID"),
+    reason: safeCompactToken(result.reason, "UNCLASSIFIED"),
+    pressure_state: safeCompactToken(String(result.pressure_state ?? "unknown").toUpperCase(), "UNKNOWN"),
+    session_state: safeCompactToken(String(result.session_state ?? "unknown").toUpperCase(), "UNKNOWN"),
+    wait_attempts: Math.max(0, Math.min(10_000, Math.trunc(waitAttempts))),
+    wait_elapsed_ms: Math.max(0, Math.min(COMPACT_BUSY_WAIT_MS, Math.trunc(waitElapsedMs))),
+    lifecycle_send: false,
+  };
+}
+
+function compactPreflightReady(result: CompactHookResult): boolean {
+  const disposition = String(result.disposition);
+  if (READY_COMPACT_DISPOSITIONS.has(disposition)) return true;
+  return disposition === "WAIT_SAFE_BOUNDARY" && String(result.pressure_state).toLowerCase() === "warn";
+}
+
+interface CompactPreflightOptions {
+  max_wait_ms?: number;
+  poll_interval_ms?: number;
+  now?: () => number;
+  sleep?: (milliseconds: number) => Promise<void>;
+}
+
+async function resolveCompactPreflight(probe: () => CompactHookResult, options: CompactPreflightOptions = {}): Promise<{ result: CompactHookResult; wait_attempts: number; wait_elapsed_ms: number }> {
+  const maxWaitMs = options.max_wait_ms ?? COMPACT_BUSY_WAIT_MS;
+  const pollIntervalMs = options.poll_interval_ms ?? COMPACT_BUSY_POLL_MS;
+  const now = options.now ?? Date.now;
+  const wait = options.sleep ?? (async (milliseconds: number) => { await sleep(milliseconds); });
+  if (!Number.isInteger(maxWaitMs) || maxWaitMs < 0 || maxWaitMs > COMPACT_BUSY_WAIT_MS || !Number.isInteger(pollIntervalMs) || pollIntervalMs <= 0 || pollIntervalMs > 60_000) throw new Error("Compact preflight wait options are invalid");
+  const startedAt = now();
+  let waitAttempts = 0;
+  while (true) {
+    const elapsed = Math.max(0, now() - startedAt);
+    let result: CompactHookResult;
+    try { result = probe(); }
+    catch {
+      throw new CompactPreflightBlockedError(compactPreflightDiagnostic({ disposition: "HOOK_FAILED", reason: "HOOK_EXECUTION_FAILED", pressure_state: "unknown", session_state: "unknown" }, waitAttempts, elapsed));
+    }
+    if (compactPreflightReady(result)) return { result, wait_attempts: waitAttempts, wait_elapsed_ms: elapsed };
+    const busy = String(result.disposition) === "WAIT_SAFE_BOUNDARY" && String(result.reason) === "SESSION_NOT_IDLE";
+    if (!busy || elapsed >= maxWaitMs) throw new CompactPreflightBlockedError(compactPreflightDiagnostic(result, waitAttempts, elapsed));
+    const remaining = maxWaitMs - elapsed;
+    await wait(Math.min(pollIntervalMs, remaining));
+    waitAttempts += 1;
+  }
+}
 
 function compactProfileForStage(request: StageRequest): { profileId: string; logicalSessionRef: string; roleHint: string } {
   const metaStage = new Set(["PLAN_REVIEW", "STEP_REVIEW", "CLOSEOUT"]).has(request.requested_stage);
@@ -748,9 +829,9 @@ function compactProfileForStage(request: StageRequest): { profileId: string; log
   return { profileId, logicalSessionRef, roleHint: request.recipient_role };
 }
 
-function runCompactLiteHook(request: StageRequest, eventType: CompactHookEvent, registryPath: string): unknown {
+function runCompactLiteHook(request: StageRequest, eventType: CompactHookEvent, registryPath: string): CompactHookResult {
   const registry = parseControlRegistry(parseStrictJson(readFileSync(registryPath, "utf8")));
-  if (registry.schema_version !== "router-control-registry.v2" || registry.mode !== "PRODUCTION_RESPONSE_FIRST") return { disposition: "NOT_APPLICABLE" };
+  if (registry.schema_version !== "router-control-registry.v2" || registry.mode !== "PRODUCTION_RESPONSE_FIRST") return { disposition: "CONTINUE", reason: "NOT_APPLICABLE", pressure_state: "unknown", session_state: "unknown" };
   const target = registry.targets[request.target_id];
   if (!target) throw new Error("Compact target is absent from protected authority");
   const targetRoot = resolveProtectedTargetDirectory(registry, target.root, "Compact target directory");
@@ -802,8 +883,7 @@ function runCompactLiteHook(request: StageRequest, eventType: CompactHookEvent, 
   const privacy = result.privacy;
   const privacyKeys = ["absolute_roots_emitted", "credentials_emitted", "endpoints_emitted", "ports_emitted", "raw_session_ids_emitted", "transcripts_emitted"];
   if (!privacy || typeof privacy !== "object" || Array.isArray(privacy) || canonicalize(Object.keys(privacy).sort()) !== canonicalize(privacyKeys) || Object.values(privacy).some((value) => value !== false)) throw new Error("Compact Lite hook privacy result is invalid");
-  if (eventType === "before_dispatch" && !["CONTINUE", "COMPACTED_RESTORED", "COMPACTED_DEGRADED", "ALREADY_COMPACTED"].includes(String(result.disposition))) throw new Error("Compact Lite pre-dispatch boundary is not ready");
-  return output;
+  return result;
 }
 
 async function main(): Promise<void> {
@@ -839,10 +919,27 @@ async function main(): Promise<void> {
   } else if (operation === "invoke-stage") {
     const request = classified("REQUEST_INVALID", () => parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     if (!registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
-    classified("COMPACT_PREFLIGHT_BLOCKED", () => runCompactLiteHook(request, "before_dispatch", registryPath));
+    const compactPreflight = await classifiedAsync("COMPACT_PREFLIGHT_BLOCKED", () => resolveCompactPreflight(() => runCompactLiteHook(request, "before_dispatch", registryPath)));
     result = await classifiedAsync("BLOCKED", () => engine.invokeStage(request));
-    try { runCompactLiteHook(request, "after_stage_output", registryPath); }
-    catch { /* A completed lifecycle result stays authoritative; the next mandatory preflight re-evaluates pressure. */ }
+    let compactAfterStage: CompactHookResult | undefined;
+    let compactAfterStageStatus: "RECORDED" | "HOOK_FAILED" = "RECORDED";
+    try { compactAfterStage = runCompactLiteHook(request, "after_stage_output", registryPath); }
+    catch { compactAfterStageStatus = "HOOK_FAILED"; }
+    try {
+      const operationId = (result as { operation_id?: unknown }).operation_id;
+      if (typeof operationId !== "string") throw new Error("Stage result operation identity is missing");
+      store.writeCompactHookReceipt(request.run_id, operationId, {
+        schema_version: "router-compact-hook-receipt.v1",
+        run_id: request.run_id,
+        operation_id: operationId,
+        before_dispatch: compactPreflight.result,
+        before_dispatch_wait_attempts: compactPreflight.wait_attempts,
+        before_dispatch_wait_elapsed_ms: compactPreflight.wait_elapsed_ms,
+        after_stage_output_status: compactAfterStageStatus,
+        after_stage_output: compactAfterStage ?? null,
+        workflow_command_sent: false,
+      });
+    } catch { /* A completed lifecycle result stays authoritative; the next mandatory preflight re-evaluates pressure. */ }
   } else if (operation === "install-closeout-authority") {
     const request = classified("REQUEST_INVALID", () => parseCloseoutAuthorityInstallRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     result = await classifiedAsync("RUN_AUTHORITY_BLOCKED", () => engine.installCloseoutAuthority(request));
@@ -941,4 +1038,4 @@ if (isEntry) {
   });
 }
 
-export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, compactProfileForStage, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };
+export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, compactProfileForStage, compactPreflightDiagnostic, compactPreflightReady, resolveCompactPreflight, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };

@@ -69,6 +69,14 @@ It is not project truth and does not grant workflow authority.
   argument hash, so later envelope improvements cannot invalidate an older send
   or authorize an unrecognized historical shape. SSE is probed and recorded but
   remains disabled.
+- Compact preflight is observable rather than opaque. WARN-level maintenance
+  cannot block lifecycle dispatch; a higher-pressure `SESSION_NOT_IDLE` result
+  is rechecked without a lifecycle POST for a bounded 60-minute window; if it
+  becomes idle, normal Compact Lite policy resumes. A terminal block emits
+  a privacy-safe `compact_preflight` diagnostic and no lifecycle send. After a
+  stage settles, the operation stores `compact-hooks.json` with the validated
+  before/after projections; this receipt never changes the stage result and
+  does not introduce automatic Compact recovery.
 - `Prepare-OCRouterStage.ps1` is the bounded no-send source-hash helper. It hashes
   only sources explicitly named by the operator and emits candidate manifest and
   state packet files; invocation remains a separate explicit transaction.

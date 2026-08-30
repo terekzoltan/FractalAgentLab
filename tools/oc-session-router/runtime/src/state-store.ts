@@ -403,6 +403,12 @@ export class StateStore {
     else this.writeJsonExclusive(diagnosticPath, diagnostic);
   }
 
+  writeCompactHookReceipt(runId: string, operationId: string, receipt: unknown): void {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    this.writeJsonExclusive(this.resolve("runs", runId, "operations", operationId, "compact-hooks.json"), receipt);
+  }
+
   writeArtifact(runId: string, operationId: string, name: string, content: string): void {
     assertFilesystemId(runId, "run_id");
     assertFilesystemId(operationId, "operation_id");

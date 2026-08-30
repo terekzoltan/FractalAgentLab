@@ -40,6 +40,75 @@ test("production compact hooks select Meta or the exact accountable delivery pro
   assert.throws(() => _test.compactProfileForStage({ ...base, requested_stage: "PLAN_REVISION", accountable_profile: "worldsim.track-d", recipient_role: "Track D" }), /does not belong/);
 });
 
+test("Compact preflight keeps WARN nonblocking and waits only for a bounded busy critical session", async () => {
+  const warn = { disposition: "WAIT_SAFE_BOUNDARY", reason: "SESSION_NOT_IDLE", pressure_state: "warn", session_state: "busy" };
+  const warnResult = await _test.resolveCompactPreflight(() => warn, { max_wait_ms: 0, poll_interval_ms: 1 });
+  assert.equal(warnResult.result, warn);
+  assert.equal(warnResult.wait_attempts, 0);
+
+  let clock = 0;
+  let probes = 0;
+  const criticalResult = await _test.resolveCompactPreflight(
+    () => ++probes === 1
+      ? { disposition: "WAIT_SAFE_BOUNDARY", reason: "SESSION_NOT_IDLE", pressure_state: "critical", session_state: "busy" }
+      : { disposition: "CONTINUE", reason: "PRESSURE_NORMAL", pressure_state: "normal", session_state: "idle" },
+    { max_wait_ms: 30, poll_interval_ms: 10, now: () => clock, sleep: async (milliseconds) => { clock += milliseconds; } },
+  );
+  assert.equal(criticalResult.wait_attempts, 1);
+  assert.equal(criticalResult.wait_elapsed_ms, 10);
+  assert.equal(probes, 2);
+});
+
+test("Compact preflight timeout emits a privacy-safe actionable receipt without a lifecycle send", async () => {
+  let clock = 0;
+  let caught: unknown;
+  try {
+    await _test.resolveCompactPreflight(
+      () => ({ disposition: "WAIT_SAFE_BOUNDARY", reason: "SESSION_NOT_IDLE", pressure_state: "critical", session_state: "busy" }),
+      { max_wait_ms: 30, poll_interval_ms: 10, now: () => clock, sleep: async (milliseconds) => { clock += milliseconds; } },
+    );
+  } catch (error) { caught = error; }
+  assert.deepEqual(_test.cliErrorReceipt(caught), {
+    error_code: "COMPACT_PREFLIGHT_BLOCKED",
+    compact_preflight: {
+      schema_version: "compact-preflight-diagnostic.v1",
+      disposition: "WAIT_SAFE_BOUNDARY",
+      reason: "SESSION_NOT_IDLE",
+      pressure_state: "CRITICAL",
+      session_state: "BUSY",
+      wait_attempts: 3,
+      wait_elapsed_ms: 30,
+      lifecycle_send: false,
+    },
+  });
+});
+
+test("Compact uncertainty still blocks immediately and sanitizes unreviewed diagnostic tokens", async () => {
+  let caught: unknown;
+  try {
+    await _test.resolveCompactPreflight(
+      () => ({ disposition: "COMPACT_UNCERTAIN", reason: "private C:\\secret", pressure_state: "critical", session_state: "idle" }),
+      { max_wait_ms: 0, poll_interval_ms: 1 },
+    );
+  } catch (error) { caught = error; }
+  const receipt = _test.cliErrorReceipt(caught);
+  assert.equal(receipt.error_code, "COMPACT_PREFLIGHT_BLOCKED");
+  assert.equal(receipt.compact_preflight?.reason, "UNCLASSIFIED");
+  assert.equal(JSON.stringify(receipt).includes("secret"), false);
+});
+
+test("Compact hook execution failure is observable without exposing the native error", async () => {
+  let caught: unknown;
+  try {
+    await _test.resolveCompactPreflight(() => { throw new Error("private C:\\secret\\hook.log"); }, { max_wait_ms: 0, poll_interval_ms: 1 });
+  } catch (error) { caught = error; }
+  const receipt = _test.cliErrorReceipt(caught);
+  assert.equal(receipt.error_code, "COMPACT_PREFLIGHT_BLOCKED");
+  assert.equal(receipt.compact_preflight?.disposition, "HOOK_FAILED");
+  assert.equal(receipt.compact_preflight?.reason, "HOOK_EXECUTION_FAILED");
+  assert.equal(JSON.stringify(receipt).includes("secret"), false);
+});
+
 test("CLI error classifier separates bounded operational failure classes", () => {
   const cases: ReadonlyArray<readonly [Error, Parameters<typeof _test.classifyCliError>[1], string]> = [
     [new Error("request parser rejected private C:\\secret\\request.json"), "REQUEST_INVALID", "REQUEST_INVALID"],

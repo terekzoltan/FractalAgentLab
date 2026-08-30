@@ -273,8 +273,22 @@ summarize availability, and no participant-scoped pending or uncertain lifecycle
 or compact intent. Production participant lifecycle intent is derived only from
 the owner-protected router runtime for the exact target and session; historical
 target-local ledgers remain legacy/dry-run diagnostics and cannot permanently
-block a production preflight. It persists one minimal intent, requires one attributable
-marker, consumes any P0B grant after intent while the private-session fence is
+block a production preflight. Warning pressure is maintenance-only at the
+pre-dispatch boundary: a `WAIT_SAFE_BOUNDARY` result at WARN does not block the
+lifecycle send. A busy session at higher pressure is re-observed without a
+lifecycle POST for at most 60 minutes at 15-second intervals; if it becomes idle,
+the existing Compact Lite policy may perform its separately fenced maintenance
+transaction before dispatch. Exhaustion returns a closed
+`compact_preflight` diagnostic containing only disposition, reason, pressure,
+session state, wait count, elapsed time, and `lifecycle_send: false`. Every
+completed stage persists the validated before/after Compact projections in the
+operation-local `compact-hooks.json`; a failed after-stage hook is recorded as
+`HOOK_FAILED` but cannot invalidate the already-authoritative lifecycle result.
+This is bounded observation and receipt persistence, not a Compact recovery
+state machine or an automatic lifecycle retry.
+
+Compact Lite persists one minimal intent, requires one attributable marker,
+consumes any P0B grant after intent while the private-session fence is
 held, revalidates the measured authority immediately before both POSTs, invokes
 `/after-compact <project-id> <role>` once, accepts `RESTORED` or `DEGRADED`, and
 stops with `workflow_command_sent: false`. Timeout or ambiguous marker state is

@@ -118,6 +118,31 @@ test("CAS, one nonterminal operation, and terminal immutability", () => {
   }
 });
 
+test("after-stage Compact receipt is durable, private, and immutable", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-compact-hook-"));
+  try {
+    const store = new StateStore(root);
+    const authority = makeAuthority();
+    store.createRun(authority, authoritySha256(authority));
+    store.createOperation("run-1", makeInvocation("op-1"), { operation_id: "op-1" }, "1".repeat(64));
+    const receipt = {
+      schema_version: "router-compact-hook-receipt.v1",
+      run_id: "run-1",
+      operation_id: "op-1",
+      before_dispatch: { disposition: "CONTINUE", workflow_command_sent: false },
+      after_stage_output_status: "RECORDED",
+      after_stage_output: { disposition: "CONTINUE", workflow_command_sent: false },
+      workflow_command_sent: false,
+    };
+    store.writeCompactHookReceipt("run-1", "op-1", receipt);
+    const persisted = JSON.parse(readFileSync(path.join(root, "runs", "run-1", "operations", "op-1", "compact-hooks.json"), "utf8"));
+    assert.deepEqual(persisted, receipt);
+    assert.throws(() => store.writeCompactHookReceipt("run-1", "op-1", receipt));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("protected participant lifecycle state ignores legacy ledgers and follows exact runtime operations", () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-participant-state-"));
   try {
