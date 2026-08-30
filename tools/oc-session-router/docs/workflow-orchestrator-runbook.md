@@ -87,6 +87,68 @@ Delivery /seq-next
 
 `/terv-review` is one direct Meta pass and its canonical envelope includes `Plan class`. `/terv-review-utan` normally ends `PLAN_REVISION_COMPLETE` and `IMPLEMENT_READY`; `IMPLEMENT_BLOCKED` is exceptional. The corrected plan and summary repeat Target, Epic, lane, and one opaque final plan identity byte-identically, then route directly to `/implement`. Every final step-review color routes through `/step-review-utan`. Only exact `ACK_ONLY` is closeout-eligible. `FIX_PLAN_REQUIRED ... FIX_PLAN_READY_FOR_IMPLEMENT` declares fix-plan completeness and establishes `REVIEW_FIX_PLAN` lineage, but it ends the current immutable review-cycle run. Start a follow-on run with an incremented `Review cycle`, the exact accepted finding IDs, and that fix plan; then route once through Meta `/terv-review` plus Delivery `/terv-review-utan`. Only the resulting ready revision routes to `/implement`. `UNCLEAR` routes upward. Meta color never substitutes for the Delivery response class.
 
+## Router semantic policy
+
+Do not confuse protected transport mode with semantic policy:
+
+| Surface | Values | Owner |
+|---|---|---|
+| Protected control-plane mode | `DISABLED`, `P0B_ISOLATED`, `PRODUCTION_RESPONSE_FIRST` | Owner-protected registry/capability |
+| Bound router policy mode | `STANDARD`, `STRICT` | hashed target state and immutable run authority |
+| Effective stage policy | bound mode, except forced `STRICT` | runtime; `CLOSEOUT` and P0B are always strict |
+
+The `Router mode:` state label with value `STANDARD` or `STRICT` is optional only
+for migration: its absence resolves to
+`STRICT`. Adopt `STANDARD` only at a stable target-governance boundary before a
+new run. Never edit the label under an active immutable run. A caller may ask for
+stricter run creation but cannot lower target authority.
+
+The router has no automatic risk classifier, and chat wording, environment, or
+model judgment cannot choose the mode. Before run creation, the accountable
+target state MUST bind `STRICT` for release, migration, destructive, or
+explicitly high-consequence ordinary lifecycle work. When consequence is not
+safely classifiable, choose `STRICT`.
+
+```text
+Router mode: `STANDARD`
+```
+
+Live rollout is staged even though the policy implementation covers every
+ordinary stage. The first separately authorized STANDARD canary may execute only
+one named read-only stage: SEQ_NEXT, PLAN_REVIEW, or STEP_REVIEW, and must stop
+before any successor delivery dispatch. Review that canary evidence first.
+PLAN_REVISION, IMPLEMENT, and REVIEW_RESPONSE may use STANDARD only after a
+later authorization opens delivery stages. CLOSEOUT and P0B remain STRICT.
+
+| Disposition | Meaning | Successor |
+|---|---|---|
+| `ACCEPTED_EXACT` | canonical output passed unchanged | normal canonical rule |
+| `ACCEPTED_NORMALIZED` | one finite STANDARD rule produced a canonical artifact | only from that validated artifact |
+| `ACCEPTED_NO_SUCCESSOR` | under STANDARD, recipient/terminal binding is proven but a required semantic fact is absent | none; operation settles as `EVIDENCE_GAP` |
+| `BLOCKED_AUTHORITY` | output binding or protected authority disagrees | none |
+| `BLOCKED_AMBIGUOUS` | zero/multiple interpretations or an unallowlisted difference | none |
+
+The first STANDARD allowlist is deliberately small: a unique full canonical
+envelope may be surrounded only by the exact inert lines `Here is the requested
+canonical output:`, `End of canonical output.`, `Progress note: review
+completed.`, or `Explanation: retained outside the canonical artifact.`.
+Arbitrary outside prose is ambiguous even when it contains no colon. The
+following absent non-authority fields may receive the exact value `NONE`: PLAN_REVIEW
+`Non-blocking improvements`; PLAN_REVISION `Rejected/unclear items`; IMPLEMENT
+`Explicit non-changes` and `Unresolved risks/findings`; STEP_REVIEW
+`Rejected/downgraded findings`. No field alias, authority value, finding,
+acceptance fact, candidate, plan identity, terminal, or closeout fact is guessed.
+The reviewed v25-v32 header/terminal alias list is currently empty: all durable
+examples were canonical. Exact reconstruction from one persisted, hash-bound
+predecessor artifact remains a shared projection rule, not a semantic
+normalization, and therefore emits no warning receipt.
+
+Every applied rule writes a sanitized append-only warning receipt with input and
+normalized hashes. Warning receipts never contain the raw response, session,
+endpoint, credential, or path. They do not grant retry or acceptance authority.
+STRICT never defaults or evidence-gap-normalizes a missing field; it returns an
+invalid output and keeps the exact recovery/incident path.
+
 ## Transport law
 
 - Use `scripts/Invoke-OCRouter.ps1` as the sole lifecycle command entrypoint.

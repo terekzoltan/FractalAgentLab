@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   authoritySha256,
   assertSafeRelativePath,
+  boundRouterPolicyMode,
   canonicalFindingIds,
   canonicalize,
   commandForStage,
@@ -16,12 +17,17 @@ import {
   type FollowOnRunRequest,
   type RunAuthority,
   type RunRequest,
+  type RouterPolicyDisposition,
+  type RouterPolicyMode,
+  type RouterWarningReceipt,
+  type RouterWarningRule,
   type SourceBinding,
   type SourceClass,
   type StageInvocation,
   type StageRequest,
 } from "./contracts.js";
-import { ROUTER_PROTOCOL_IDENTITY, SharedSessionFence, type ResolvedCapability, type SharedFenceBinding, type SharedFenceLease } from "./control-plane.js";
+import { ROUTER_PROTOCOL_IDENTITY, SharedSessionFence, effectiveRouterPolicyMode, type ResolvedCapability, type SharedFenceBinding, type SharedFenceLease } from "./control-plane.js";
+import { evaluateOutputPolicy, type OutputBindingExpectation, type OutputPolicyDecision } from "./policy-validator.js";
 import { StateStore, type OperationDocument } from "./state-store.js";
 import { CommandClient, assertPrivateTransportBinding, reconcileSnapshot, type SnapshotBaseline, type SnapshotCandidate, type TransportBinding } from "./transport.js";
 import { worktreeProofSha256, type WorktreeProof } from "./worktree-reader.js";
@@ -67,8 +73,18 @@ export interface StageResult {
   message_id_sha256: string;
   response_sha256: string;
   candidate_scope_sha256?: string;
+  router_policy?: StagePolicySummary;
   reason: string;
   auto_advance: false;
+}
+
+export interface StagePolicySummary {
+  bound_mode: RouterPolicyMode;
+  effective_mode: RouterPolicyMode;
+  disposition: RouterPolicyDisposition;
+  warning_rules: RouterWarningRule[];
+  input_sha256: string;
+  normalized_output_sha256: string;
 }
 
 export interface ResolveStageOptions {
@@ -132,7 +148,7 @@ export class StageEngine {
     const runId = `run-${randomUUID()}`;
     const createdAt = new Date().toISOString();
     const current = await this.resolver.deriveRunAuthority(
-      { schema_version: "run-request.v1", target_id: predecessor.authority.target_id, expected_worktree_identity: predecessor.authority.worktree_identity },
+      { schema_version: "run-request.v1", target_id: predecessor.authority.target_id, expected_worktree_identity: predecessor.authority.worktree_identity, ...(boundRouterPolicyMode(predecessor.authority) === "STRICT" ? { requested_router_policy_mode: "STRICT" as const } : {}) },
       { runId, createdAt },
     );
     const predecessorCurrentIdentity: RunAuthority = { ...current, run_id: predecessor.authority.run_id, created_at: predecessor.authority.created_at };
@@ -212,6 +228,11 @@ export class StageEngine {
   getRun(runId: string): unknown {
     const loaded = this.store.loadRun(runId);
     const operations = this.store.listOperations(runId);
+    const warningReceipts = this.store.listRouterWarningReceipts(runId);
+    const policyWarnings = {
+      warning_count: warningReceipts.length,
+      warning_rules: [...new Set(warningReceipts.map((receipt) => receipt.rule))].sort(),
+    };
     const previous = operations.at(-1);
     let next_stage_sources: Array<{ requested_stage: StageRequest["requested_stage"]; expected_sources: SourceBinding[] }> = [];
     let available_stage_sources: Array<{ requested_stage: StageRequest["requested_stage"]; expected_sources: SourceBinding[] }> = [];
@@ -246,7 +267,7 @@ export class StageEngine {
         continuation_requirements.push({ requested_stage: "CLOSEOUT", requirement: "OWNER_SOURCE_REQUIRED", source_classes: ["CLOSEOUT_AUTHORITY"], reason: "Install one fresh Owner closeout authority in the protected runtime before explicit same-run closeout dispatch" });
       }
     }
-    return { schema_version: "run-projection.v1", run_id: loaded.run.run_id, target_id: loaded.run.target_id, worktree_identity: loaded.run.worktree_identity, run_authority_sha256: loaded.run.run_authority_sha256, review_cycle: loaded.authority.review_cycle, next_stage_sources, available_stage_sources, continuation_requirements, auto_advance: false };
+    return { schema_version: "run-projection.v1", run_id: loaded.run.run_id, target_id: loaded.run.target_id, worktree_identity: loaded.run.worktree_identity, run_authority_sha256: loaded.run.run_authority_sha256, ...(loaded.authority.router_policy_mode !== undefined || policyWarnings.warning_count > 0 ? { router_policy: { bound_mode: boundRouterPolicyMode(loaded.authority), ...policyWarnings } } : {}), review_cycle: loaded.authority.review_cycle, next_stage_sources, available_stage_sources, continuation_requirements, auto_advance: false };
   }
 
   async invokeStage(input: StageRequest): Promise<StageResult> {
@@ -261,8 +282,10 @@ export class StageEngine {
     if (!["FIXTURE_ONLY", "P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(capability.mode)) throw new Error("Production command dispatch is disabled until a reviewed P0B capability transaction");
     if (capability.mode !== "FIXTURE_ONLY" && (capability.router_protocol_identity !== ROUTER_PROTOCOL_IDENTITY || capability.sse_enabled !== false || !capability.snapshot_correlation || !capability.server_instance_identity_sha256 || !capability.target_directory_sha256 || capability.command_timeout_ms === undefined)) throw new Error("Production capability contract is incomplete");
     if (capability.mode === "P0B_ISOLATED" && !capability.authorization_use_sha256) throw new Error("P0B capability lacks a stable authorization-use identity");
+    const boundPolicyMode = boundRouterPolicyMode(loaded.authority);
+    const effectivePolicyMode = effectiveRouterPolicyMode(loaded.authority.router_policy_mode, request.requested_stage, capability.mode);
     const resolved = await this.resolver.resolveStageAuthority(loaded.authority, request);
-    if (authoritySha256(resolved.run_authority) !== request.run_authority_sha256) throw new Error("Current target authority drifted");
+    if (!runAuthorityMatchesAcrossOperationalRefresh(resolved.run_authority, loaded.authority)) throw new Error("Current target authority drifted");
     if (canonicalize(resolved.capability) !== canonicalize(capability)) throw new Error("Dispatch capability drifted before authority resolution");
     assertPrivateTransportBinding(resolved.transport);
     assertArtifactSafe(canonicalize(request), resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
@@ -300,6 +323,8 @@ export class StageEngine {
     let sharedLease: SharedFenceLease | undefined;
     let oneUseClaimed = false;
     let oneUseConsumed = false;
+    let policySummary: StagePolicySummary | undefined;
+    let finalizationStarted = false;
     try {
       if (resolved.shared_fence) sharedLease = await this.sharedFence.acquire(resolved.shared_fence);
       else if (capability.mode !== "FIXTURE_ONLY") throw new Error("Production dispatch requires the shared Compact/lifecycle session fence");
@@ -332,7 +357,7 @@ export class StageEngine {
         operation = this.store.createOperation(request.run_id, invocation, intent, intentHash);
         operation = this.store.updateOperation(request.run_id, operationId, operation.revision, { status: "DISPATCHING" });
         const preSend = await this.resolver.resolveStageAuthority(loaded.authority, request);
-        assertResolvedStageStable(preSend, resolved, request.run_authority_sha256);
+        assertResolvedStageStable(preSend, resolved, request.run_authority_sha256, loaded.authority);
         sharedLease?.assertHeld();
         if (capability.mode === "P0B_ISOLATED") {
           this.store.settleOneUseCapability(authorizationUseSha256!, request.run_id, operationId, "CONSUMED");
@@ -353,27 +378,45 @@ export class StageEngine {
           raw_response_persisted: false,
         });
         assertArtifactSafe(receipt.terminal_markdown, preSend.transport, preSend.privacy.absolute_paths, preSend.privacy.private_values);
-        const parsed = parseOutputShape(request.requested_stage, receipt.terminal_markdown);
+        const policy = evaluateOutputPolicy({ mode: effectivePolicyMode, stage: request.requested_stage, raw: receipt.terminal_markdown, expected: outputBindingExpectation(loaded.authority, request) });
+        policySummary = summarizePolicy(boundPolicyMode, effectivePolicyMode, policy);
+        if (policy.disposition === "BLOCKED_AUTHORITY" || policy.disposition === "BLOCKED_AMBIGUOUS") {
+          const blocked = makeResult(request, operationId, "FAILED_OUTPUT", "RESPONSE_ACCEPTED", "INVALID", "UNVALIDATED", "UNVALIDATED", [], "", "OUTPUT_VALIDATION_FAILED", sha256(receipt.message_id), receipt.response_sha256, undefined, policySummary);
+          this.store.writeResult(request.run_id, operationId, blocked);
+          this.store.updateOperation(request.run_id, operationId, operation.revision, { status: "FAILED_OUTPUT" });
+          this.store.settleSemanticAction(semanticKey, request.run_id, operationId, "CONSUMED");
+          return blocked;
+        }
         const postResponse = await this.resolver.resolveStageAuthority(loaded.authority, request);
-        assertResolvedStagePostResponse(postResponse, preSend, request, parsed.fields, request.run_authority_sha256);
+        if (policy.disposition === "ACCEPTED_NO_SUCCESSOR") {
+          assertResolvedStageStable(postResponse, preSend, request.run_authority_sha256, loaded.authority);
+          const artifact = `${policy.normalized_output!.replace(/\r\n/g, "\n").trim()}\n`;
+          assertArtifactSafe(artifact, preSend.transport, preSend.privacy.absolute_paths, preSend.privacy.private_values);
+          finalizationStarted = true;
+          writePolicyWarnings(this.store, request, operationId, policy, []);
+          this.store.writeArtifact(request.run_id, operationId, "terminal", artifact);
+          const evidenceGap = makeResult(request, operationId, "EVIDENCE_GAP", "RESPONSE_ACCEPTED", "ACCEPTED_NO_SUCCESSOR", "BOUND", "EVIDENCE_GAP", [], sha256(Buffer.from(artifact, "utf8")), "REQUIRED_SEMANTIC_FACT_MISSING", sha256(receipt.message_id), receipt.response_sha256, undefined, policySummary);
+          this.store.writeFinalResult(request.run_id, operationId, evidenceGap);
+          this.store.updateOperation(request.run_id, operationId, operation.revision, { status: "EVIDENCE_GAP" });
+          this.store.settleSemanticAction(semanticKey, request.run_id, operationId, "CONSUMED");
+          return evidenceGap;
+        }
+        const parsed = policy.parsed_output!;
+        assertResolvedStagePostResponse(postResponse, preSend, request, parsed.fields, request.run_authority_sha256, loaded.authority);
         assertOutputSourceLineage(request, preSend.sources, parsed.terminal, parsed.fields, preSend.worktree);
-        validateOutputBinding(parsed, {
-          target: loaded.authority.target_identity,
-          epic: loaded.authority.epic,
-          lane: `${loaded.authority.accountable_lane} / ${loaded.authority.accountable_class} / ${loaded.authority.accountable_profile}`,
-          ...(request.candidate_identity === "UNDECLARED" || !["IMPLEMENT", "STEP_REVIEW", "CLOSEOUT"].includes(request.requested_stage) ? {} : { candidate: request.candidate_identity }),
-          plan: request.plan_identity,
-          plan_class: request.plan_class,
-        });
         const candidateScope = request.requested_stage === "IMPLEMENT"
           ? await this.captureCandidateScope(loaded.authority, request, operationId)
           : undefined;
         const artifact = request.requested_stage === "CLOSEOUT" && parsed.fields.Commit?.startsWith("sha=")
-          ? closeoutDurableProjection(receipt.terminal_markdown, parsed.fields.Commit)
-          : `${receipt.terminal_markdown.replace(/\r\n/g, "\n").trim()}\n`;
+          ? closeoutDurableProjection(policy.normalized_output!, parsed.fields.Commit)
+          : `${policy.normalized_output!.replace(/\r\n/g, "\n").trim()}\n`;
+        assertArtifactSafe(artifact, preSend.transport, preSend.privacy.absolute_paths, preSend.privacy.private_values);
+        const successor = allowedNext(request.requested_stage, parsed.terminal);
+        finalizationStarted = true;
+        writePolicyWarnings(this.store, request, operationId, policy, successor);
         this.store.writeArtifact(request.run_id, operationId, "terminal", artifact);
-        const result = makeResult(request, operationId, "SUCCEEDED", "RESPONSE_ACCEPTED", "VALID", "BOUND", "VALID", allowedNext(request.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), successReason(request.requested_stage, parsed.terminal, "synchronous response validated"), sha256(receipt.message_id), receipt.response_sha256, candidateScope?.sha256);
-        this.store.writeResult(request.run_id, operationId, result);
+        const result = makeResult(request, operationId, "SUCCEEDED", "RESPONSE_ACCEPTED", "VALID", "BOUND", "VALID", successor, sha256(Buffer.from(artifact, "utf8")), successReason(request.requested_stage, parsed.terminal, "synchronous response validated"), sha256(receipt.message_id), receipt.response_sha256, candidateScope?.sha256, policySummary);
+        this.store.writeFinalResult(request.run_id, operationId, result);
         this.store.updateOperation(request.run_id, operationId, operation.revision, { status: "SUCCEEDED" });
         this.store.settleSemanticAction(semanticKey, request.run_id, operationId, "CONSUMED");
         return result;
@@ -382,6 +425,7 @@ export class StageEngine {
           this.store.settleOneUseCapability(authorizationUseSha256!, request.run_id, operationId, "RELEASED");
           oneUseClaimed = false;
         }
+        if (finalizationStarted) throw error;
         if (!operation) {
           this.store.settleSemanticAction(semanticKey, request.run_id, operationId, "RELEASED");
           throw error;
@@ -400,6 +444,10 @@ export class StageEngine {
           [],
           "",
           safeFailureReason(error, resolved.transport),
+          "",
+          "",
+          undefined,
+          policySummary,
         );
         this.store.writeResult(request.run_id, operationId, result);
         this.store.settleSemanticAction(semanticKey, request.run_id, operationId, sendAttempted || responseReceived ? "CONSUMED" : "RELEASED");
@@ -494,21 +542,21 @@ export class StageEngine {
   }
 
   async resolveStage(runId: string, operationId: string, options: ResolveStageOptions = {}): Promise<StageResult> {
+    const loadedForPolicy = this.store.loadRun(runId);
     let operation = this.store.loadOperation(runId, operationId);
-    if (operation.status === "SUCCEEDED") {
-      const stored = this.store.loadResult(runId, operationId) as Partial<StageResult>;
-      if (
-        stored.schema_version !== "stage-result.v1" ||
-        stored.run_id !== runId ||
-        stored.operation_id !== operationId ||
-        stored.operation_status !== "SUCCEEDED" ||
-        stored.output_status !== "VALID" ||
-        stored.binding_status !== "BOUND" ||
-        stored.terminal_status !== "VALID" ||
-        !Array.isArray(stored.allowed_next) ||
-        stored.auto_advance !== false
-      ) throw new Error("Stored successful operation result is invalid");
-      return stored as StageResult;
+    const stageRequest = stageRequestFromInvocation(operation.invocation);
+    this.assertStoredResolveIdentity(runId, operationId, loadedForPolicy, operation, stageRequest);
+    if (operation.status === "SUCCEEDED" || operation.status === "EVIDENCE_GAP") {
+      const stored = this.validateStoredTerminalResult(runId, operationId, operation.status);
+      this.store.settleSemanticAction(operation.semantic_key, runId, operationId, "CONSUMED");
+      return stored;
+    }
+    const preparedResult = this.store.loadResultIfExists(runId, operationId) as Partial<StageResult> | undefined;
+    if (["DISPATCHING", "ACTIVE", "UNCERTAIN", "RECONCILING"].includes(operation.status) && (preparedResult?.operation_status === "SUCCEEDED" || preparedResult?.operation_status === "EVIDENCE_GAP")) {
+      const stored = this.validateStoredTerminalResult(runId, operationId, preparedResult.operation_status);
+      operation = this.store.updateOperation(runId, operationId, operation.revision, { status: preparedResult.operation_status });
+      this.store.settleSemanticAction(operation.semantic_key, runId, operationId, "CONSUMED");
+      return stored;
     }
     if (operation.status === "FAILED_OUTPUT") operation = this.store.beginFailedOutputRecovery(runId, operationId, operation.revision);
     const failedOutputRecovery = this.store.hasFailedOutputRecovery(runId, operationId);
@@ -524,7 +572,27 @@ export class StageEngine {
       terminal_sha256: string;
     }>(runId, operationId);
     const exactCorrelation = operation.invocation.snapshot_correlation === "EXACT_PARENT_LINK" && transportReceipt !== undefined;
-    const stageRequest = stageRequestFromInvocation(operation.invocation);
+    const expectedPolicyBinding = outputBindingExpectation(loadedForPolicy.authority, stageRequest);
+    let candidatePolicyMode = boundRouterPolicyMode(loadedForPolicy.authority);
+    let candidateTargetDirectory: string | undefined;
+    if (this.resolver) {
+      try {
+        const candidateAuthority = await this.resolver.resolveStageAuthority(loadedForPolicy.authority, stageRequest);
+        candidatePolicyMode = effectiveRouterPolicyMode(loadedForPolicy.authority.router_policy_mode, stageRequest.requested_stage, candidateAuthority.capability.mode);
+        candidateTargetDirectory = candidateAuthority.transport.directory;
+      } catch {
+        // Final acceptance still performs full protected authority resolution.
+        // A provisional bound mode here can only widen read-only evidence
+        // consideration; it cannot authorize persistence or a successor.
+      }
+    }
+    const policyAcceptsCandidate = (text: string): boolean => {
+      const policyText = candidateTargetDirectory
+        ? normalizeRecoveredTerminalTarget(text, loadedForPolicy.authority.target_identity, candidateTargetDirectory).text
+        : text;
+      const decision = evaluateOutputPolicy({ mode: candidatePolicyMode, stage: stageRequest.requested_stage, raw: policyText, expected: expectedPolicyBinding });
+      return decision.disposition !== "BLOCKED_AMBIGUOUS";
+    };
     const waitMs = boundedResolveWait(options.wait_ms ?? 0);
     const pollIntervalMs = boundedResolvePoll(options.poll_interval_ms ?? 5_000);
     const now = options.now ?? Date.now;
@@ -536,6 +604,8 @@ export class StageEngine {
     let recoveredCandidate: SnapshotCandidate | undefined;
     let recoveredFromCommandRoot = false;
     let recoveryValidationReason = "";
+    let recoveryPolicySummary: StagePolicySummary | undefined;
+    let recoveryFinalizationStarted = false;
     do {
       try {
         candidates = await this.snapshots.collect(runId, operationId);
@@ -549,16 +619,12 @@ export class StageEngine {
         sessionSha256: operation.invocation.recipient_session_sha256,
         parentId: transportReceipt?.parent_id ?? "NO_RESPONSE_PARENT_AVAILABLE",
         ...(transportReceipt ? { messageId: transportReceipt.message_id, terminalSha256: transportReceipt.terminal_sha256 } : {}),
-        terminal: (text) => {
-          try { parseOutputShape(operation.invocation.requested_stage, text); return true; } catch { return false; }
-        },
+        terminal: policyAcceptsCandidate,
       });
       rawCommandRootCandidates = transportReceipt && !failedOutputRecovery ? [] : candidates.filter((candidate) =>
         candidate.command_root_correlated === true && sha256(candidate.session_id) === operation.invocation.recipient_session_sha256,
       );
-      commandRootCandidates = rawCommandRootCandidates.filter((candidate) => {
-        try { parseOutputShape(operation.invocation.requested_stage, candidate.text); return true; } catch { return false; }
-      });
+      commandRootCandidates = rawCommandRootCandidates.filter((candidate) => policyAcceptsCandidate(candidate.text));
       const receiptCandidate = exactCorrelation && resolution.status === "TRANSCRIPT_RECONCILED" ? resolution.candidate : undefined;
       const commandRootCandidate = (!transportReceipt || failedOutputRecovery) && commandRootCandidates.length === 1 ? commandRootCandidates[0] : undefined;
       recoveredCandidate = receiptCandidate ?? commandRootCandidate;
@@ -568,29 +634,31 @@ export class StageEngine {
     } while (now() <= deadline);
     if (recoveredCandidate && this.resolver) {
       try {
-        const loaded = this.store.loadRun(runId);
-        const resolved = await this.resolver.resolveStageAuthority(loaded.authority, stageRequest);
-        if (!runAuthorityMatchesAcrossOperationalRefresh(resolved.run_authority, loaded.authority) || !["P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(resolved.capability.mode) || resolved.capability.snapshot_correlation !== "EXACT_PARENT_LINK") throw new Error("Snapshot production authority drifted");
+        const resolved = await this.resolver.resolveStageAuthority(loadedForPolicy.authority, stageRequest);
+        if (!runAuthorityMatchesAcrossOperationalRefresh(resolved.run_authority, loadedForPolicy.authority) || !["P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(resolved.capability.mode) || resolved.capability.snapshot_correlation !== "EXACT_PARENT_LINK") throw new Error("Snapshot production authority drifted");
         assertPrivateTransportBinding(resolved.transport);
         if (!resolved.transport.directory) throw new Error("Snapshot production target directory missing");
-        const normalized = normalizeRecoveredTerminalTarget(recoveredCandidate.text, loaded.authority.target_identity, resolved.transport.directory);
+        const normalized = normalizeRecoveredTerminalTarget(recoveredCandidate.text, loadedForPolicy.authority.target_identity, resolved.transport.directory);
         assertArtifactSafe(normalized.privacyProbeText, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
         assertArtifactSafe(normalized.text, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
-        const parsed = parseOutputShape(operation.invocation.requested_stage, normalized.text);
-        assertSourceLineage(stageRequest, resolved.sources, loaded.authority, resolved.worktree);
-        assertOutputSourceLineage(stageRequest, resolved.sources, parsed.terminal, parsed.fields, resolved.worktree);
-        validateOutputBinding(parsed, {
-          target: loaded.authority.target_identity,
-          epic: loaded.authority.epic,
-          lane: `${loaded.authority.accountable_lane} / ${loaded.authority.accountable_class} / ${loaded.authority.accountable_profile}`,
-          ...(operation.invocation.candidate_identity === "UNDECLARED" || !["IMPLEMENT", "STEP_REVIEW", "CLOSEOUT"].includes(operation.invocation.requested_stage) ? {} : { candidate: operation.invocation.candidate_identity }),
-          plan: operation.invocation.plan_identity,
-          plan_class: operation.invocation.plan_class,
-        });
-        const candidateScope = operation.invocation.requested_stage === "IMPLEMENT"
-          ? await this.captureCandidateScope(loaded.authority, stageRequest, operationId)
+        const effectivePolicyMode = effectiveRouterPolicyMode(loadedForPolicy.authority.router_policy_mode, stageRequest.requested_stage, resolved.capability.mode);
+        const policy = evaluateOutputPolicy({ mode: effectivePolicyMode, stage: stageRequest.requested_stage, raw: normalized.text, expected: expectedPolicyBinding });
+        recoveryPolicySummary = summarizePolicy(boundRouterPolicyMode(loadedForPolicy.authority), effectivePolicyMode, policy);
+        if (policy.disposition === "BLOCKED_AUTHORITY" || policy.disposition === "BLOCKED_AMBIGUOUS") {
+          recoveryValidationReason = policy.disposition;
+          throw new Error("Output policy validation failed");
+        }
+        assertSourceLineage(stageRequest, resolved.sources, loadedForPolicy.authority, resolved.worktree);
+        const parsed = policy.parsed_output;
+        if (parsed) assertOutputSourceLineage(stageRequest, resolved.sources, parsed.terminal, parsed.fields, resolved.worktree);
+        const candidateScope = parsed && operation.invocation.requested_stage === "IMPLEMENT"
+          ? await this.captureCandidateScope(loadedForPolicy.authority, stageRequest, operationId)
           : undefined;
-        const artifact = `${normalized.text.replace(/\r\n/g, "\n").trim()}\n`;
+        const successor = parsed ? allowedNext(operation.invocation.requested_stage, parsed.terminal) : [];
+        const artifact = `${policy.normalized_output!.replace(/\r\n/g, "\n").trim()}\n`;
+        assertArtifactSafe(artifact, resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
+        recoveryFinalizationStarted = true;
+        writePolicyWarnings(this.store, operation.invocation, operationId, policy, successor);
         this.store.writeArtifact(runId, operationId, "terminal", artifact);
         if (normalized.targetProvenanceSanitized) {
           this.store.writeArtifact(runId, operationId, "recovery-sanitization", `${canonicalize({
@@ -608,8 +676,9 @@ export class StageEngine {
           parent_id_sha256: sha256(recoveredCandidate.parent_id),
           terminal_sha256: sha256(recoveredCandidate.text),
         }));
-        const succeeded = makeResult(operation.invocation, operationId, "SUCCEEDED", "TRANSCRIPT_RECONCILED", "VALID", "BOUND", "VALID", allowedNext(operation.invocation.requested_stage, parsed.terminal), sha256(Buffer.from(artifact, "utf8")), successReason(operation.invocation.requested_stage, parsed.terminal, recoveredFromCommandRoot ? "exact installed command-root transcript correlation validated" : "exact installed response correlation validated"), sha256(recoveredCandidate.id), responseEvidenceSha256, candidateScope?.sha256);
-        this.store.updateResult(runId, operationId, succeeded);
+        const finalResult = parsed
+          ? makeResult(operation.invocation, operationId, "SUCCEEDED", "TRANSCRIPT_RECONCILED", "VALID", "BOUND", "VALID", successor, sha256(Buffer.from(artifact, "utf8")), successReason(operation.invocation.requested_stage, parsed.terminal, recoveredFromCommandRoot ? "exact installed command-root transcript correlation validated" : "exact installed response correlation validated"), sha256(recoveredCandidate.id), responseEvidenceSha256, candidateScope?.sha256, recoveryPolicySummary)
+          : makeResult(operation.invocation, operationId, "EVIDENCE_GAP", "TRANSCRIPT_RECONCILED", "ACCEPTED_NO_SUCCESSOR", "BOUND", "EVIDENCE_GAP", [], sha256(Buffer.from(artifact, "utf8")), "REQUIRED_SEMANTIC_FACT_MISSING", sha256(recoveredCandidate.id), responseEvidenceSha256, undefined, recoveryPolicySummary);
         if (failedOutputRecovery) this.store.writeFailedOutputRecoveryReceipt(runId, operationId, {
           schema_version: "failed-output-recovery-receipt.v1",
           run_id: runId,
@@ -621,12 +690,15 @@ export class StageEngine {
           transport_resent: false,
           raw_output_persisted: false,
         });
-        this.store.updateOperation(runId, operationId, operation.revision, { status: "SUCCEEDED" });
-        return succeeded;
+        this.store.writeFinalResult(runId, operationId, finalResult, ["UNCERTAIN", "FAILED_OUTPUT"]);
+        this.store.updateOperation(runId, operationId, operation.revision, { status: parsed ? "SUCCEEDED" : "EVIDENCE_GAP" });
+        this.store.settleSemanticAction(operation.semantic_key, runId, operationId, "CONSUMED");
+        return finalResult;
       } catch (error) {
+        if (recoveryFinalizationStarted) throw error;
         // Exact correlation is necessary but not sufficient; any authority,
         // privacy, shape, binding, or finalization failure remains non-success.
-        recoveryValidationReason = safeRecoveryValidationReason(error);
+        recoveryValidationReason ||= safeRecoveryValidationReason(error);
       }
     }
     const reason = exactCorrelation || commandRootCandidates.length === 1
@@ -647,12 +719,72 @@ export class StageEngine {
         raw_output_persisted: false,
       });
       this.store.updateOperation(runId, operationId, operation.revision, { status: "FAILED_OUTPUT" });
-      return this.store.loadResult(runId, operationId) as StageResult;
+      const failed = this.store.loadResult(runId, operationId) as StageResult;
+      if (recoveryPolicySummary) {
+        const summarized = { ...failed, router_policy: recoveryPolicySummary };
+        this.store.updateResult(runId, operationId, summarized);
+        return summarized;
+      }
+      return failed;
     }
-    const result = makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "AMBIGUOUS", "UNVALIDATED", "UNVALIDATED", [], "", reason);
+    const result = makeResult(operation.invocation, operationId, "UNCERTAIN", "NO_SEND", "AMBIGUOUS", "UNVALIDATED", "UNVALIDATED", [], "", reason, "", "", undefined, recoveryPolicySummary);
     this.store.updateResult(runId, operationId, result);
     this.store.updateOperation(runId, operationId, operation.revision, { status: "UNCERTAIN" });
     return result;
+  }
+
+  private assertStoredResolveIdentity(
+    runId: string,
+    operationId: string,
+    loaded: ReturnType<StateStore["loadRun"]>,
+    operation: OperationDocument,
+    request: StageRequest,
+  ): void {
+    if (
+      loaded.run.schema_version !== "run.v1" ||
+      loaded.run.run_id !== runId ||
+      loaded.authority.run_id !== runId ||
+      loaded.run.target_id !== loaded.authority.target_id ||
+      loaded.run.worktree_identity !== loaded.authority.worktree_identity ||
+      authoritySha256(loaded.authority) !== loaded.run.run_authority_sha256
+    ) throw new Error("Run authority hash mismatch");
+    const storedInvocation = this.store.loadStageInvocation(runId, operationId);
+    if (
+      operation.schema_version !== "operation.v1" ||
+      operation.run_id !== runId ||
+      operation.operation_id !== operationId ||
+      operation.semantic_key !== operation.invocation.semantic_key ||
+      operation.invocation.run_id !== runId ||
+      operation.invocation.operation_id !== operationId ||
+      operation.invocation.run_authority_sha256 !== loaded.run.run_authority_sha256 ||
+      operation.invocation.target_id !== loaded.authority.target_id ||
+      operation.invocation.worktree_identity !== loaded.authority.worktree_identity ||
+      canonicalize(storedInvocation) !== canonicalize(operation.invocation) ||
+      sha256(canonicalize(this.store.loadIntent(runId, operationId))) !== operation.intent_sha256
+    ) throw new Error("Stored operation invocation binding mismatch");
+    this.assertRequestAuthority(request, loaded.authority);
+  }
+
+  private validateStoredTerminalResult(runId: string, operationId: string, expectedStatus: "SUCCEEDED" | "EVIDENCE_GAP"): StageResult {
+    const stored = this.store.loadResultIfExists(runId, operationId) as Partial<StageResult> | undefined;
+    const successful = expectedStatus === "SUCCEEDED";
+    if (
+      stored?.schema_version !== "stage-result.v1" ||
+      stored.run_id !== runId ||
+      stored.operation_id !== operationId ||
+      stored.operation_status !== expectedStatus ||
+      stored.output_status !== (successful ? "VALID" : "ACCEPTED_NO_SUCCESSOR") ||
+      stored.binding_status !== "BOUND" ||
+      stored.terminal_status !== (successful ? "VALID" : "EVIDENCE_GAP") ||
+      !Array.isArray(stored.allowed_next) ||
+      stored.allowed_next.some((stage) => typeof stage !== "string") ||
+      (!successful && stored.allowed_next.length !== 0) ||
+      typeof stored.artifact_sha256 !== "string" ||
+      stored.auto_advance !== false
+    ) throw new Error(successful ? "Stored successful operation result is invalid" : "Stored evidence-gap operation result is invalid");
+    const artifact = this.store.readArtifact(runId, operationId, "terminal");
+    if (sha256(Buffer.from(artifact, "utf8")) !== stored.artifact_sha256) throw new Error("Stored terminal artifact hash mismatch");
+    return stored as StageResult;
   }
 }
 
@@ -667,8 +799,8 @@ function boundedResolvePoll(value: number): number {
 }
 
 export function runAuthorityMatchesAcrossOperationalRefresh(current: RunAuthority, original: RunAuthority): boolean {
-  const { target_profile_sha256: _currentProfileSha, ...currentStable } = current;
-  const { target_profile_sha256: _originalProfileSha, ...originalStable } = original;
+  const { target_profile_sha256: _currentProfileSha, ...currentStable } = { ...current, router_policy_mode: boundRouterPolicyMode(current) };
+  const { target_profile_sha256: _originalProfileSha, ...originalStable } = { ...original, router_policy_mode: boundRouterPolicyMode(original) };
   return canonicalize(currentStable) === canonicalize(originalStable);
 }
 
@@ -775,6 +907,56 @@ function sourceField(text: string, name: string): string {
 
 function authorityBinding(authority: RunAuthority): { target: string; epic: string; lane: string } {
   return { target: authority.target_identity, epic: authority.epic, lane: `${authority.accountable_lane} / ${authority.accountable_class} / ${authority.accountable_profile}` };
+}
+
+function outputBindingExpectation(authority: RunAuthority, request: Pick<StageRequest, "requested_stage" | "candidate_identity" | "plan_identity" | "plan_class">): OutputBindingExpectation {
+  return {
+    ...authorityBinding(authority),
+    ...(request.candidate_identity === "UNDECLARED" || !["IMPLEMENT", "STEP_REVIEW", "CLOSEOUT"].includes(request.requested_stage) ? {} : { candidate: request.candidate_identity }),
+    plan: request.plan_identity,
+    plan_class: request.plan_class,
+  };
+}
+
+function summarizePolicy(boundMode: RouterPolicyMode, effectiveMode: RouterPolicyMode, policy: OutputPolicyDecision): StagePolicySummary {
+  return {
+    bound_mode: boundMode,
+    effective_mode: effectiveMode,
+    disposition: policy.disposition,
+    warning_rules: [...policy.warning_rules],
+    input_sha256: policy.input_sha256,
+    normalized_output_sha256: policy.normalized_output_sha256,
+  };
+}
+
+function writePolicyWarnings(
+  store: StateStore,
+  request: Pick<StageRequest, "run_id" | "issued_at" | "requested_stage">,
+  operationId: string,
+  policy: OutputPolicyDecision,
+  allowed: readonly string[],
+): void {
+  if (policy.router_policy_mode !== "STANDARD") return;
+  for (const rule of [...new Set(policy.warning_rules)]) {
+    const consequenceClass = rule === "REQUIRED_SEMANTIC_FACT_MISSING" || policy.disposition === "ACCEPTED_NO_SUCCESSOR" ? "NO_SUCCESSOR" : "FORMAT_ONLY";
+    const identity = sha256(canonicalize({ domain: "fal-router-warning/v1", run_id: request.run_id, operation_id: operationId, stage: request.requested_stage, rule, input_sha256: policy.input_sha256, normalized_output_sha256: policy.normalized_output_sha256 }));
+    const receipt: RouterWarningReceipt = {
+      schema_version: "router-warning-receipt.v1",
+      warning_id: `warning-${identity.slice(0, 32)}`,
+      run_id: request.run_id,
+      operation_id: operationId,
+      router_policy_mode: "STANDARD",
+      stage: request.requested_stage,
+      rule,
+      input_sha256: policy.input_sha256,
+      normalized_output_sha256: policy.normalized_output_sha256,
+      consequence_class: consequenceClass,
+      successor_projected: consequenceClass === "FORMAT_ONLY" && allowed.length > 0,
+      raw_output_persisted: false,
+      created_at: new Date(request.issued_at).toISOString(),
+    };
+    store.writeRouterWarningReceipt(request.run_id, operationId, receipt);
+  }
 }
 
 function planReceipt(plan: string, request: StageRequest, authority: RunAuthority): { planClass: StageRequest["plan_class"]; planIdentity: string } {
@@ -1009,8 +1191,8 @@ function assertOutputSourceLineage(request: StageRequest, sources: readonly Reso
   }
 }
 
-function assertResolvedStageStable(current: ResolvedStageAuthority, baseline: ResolvedStageAuthority, expectedAuthoritySha256: string): void {
-  if (authoritySha256(current.run_authority) !== expectedAuthoritySha256) throw new Error("Current target authority drifted during immediate transport revalidation");
+function assertResolvedStageStable(current: ResolvedStageAuthority, baseline: ResolvedStageAuthority, expectedAuthoritySha256: string, originalAuthority: RunAuthority = baseline.run_authority): void {
+  if (authoritySha256(originalAuthority) !== expectedAuthoritySha256 || !runAuthorityMatchesAcrossOperationalRefresh(baseline.run_authority, originalAuthority) || !runAuthorityMatchesAcrossOperationalRefresh(current.run_authority, originalAuthority)) throw new Error("Current target authority drifted during immediate transport revalidation");
   if (!sameSources(current.sources.map((source) => source.binding), baseline.sources.map((source) => source.binding))) throw new Error("Current stage sources drifted during immediate transport revalidation");
   for (const source of current.sources) if (sha256(Buffer.from(source.content, "utf8")) !== source.binding.sha256) throw new Error("Current stage source content drifted during immediate transport revalidation");
   if (canonicalize(current.transport) !== canonicalize(baseline.transport)) throw new Error("Protected transport binding drifted during immediate transport revalidation");
@@ -1020,12 +1202,13 @@ function assertResolvedStageStable(current: ResolvedStageAuthority, baseline: Re
   if (canonicalize(current.worktree ?? null) !== canonicalize(baseline.worktree ?? null)) throw new Error("Worktree authority drifted during immediate transport revalidation");
 }
 
-function assertResolvedStagePostResponse(current: ResolvedStageAuthority, baseline: ResolvedStageAuthority, request: StageRequest, fields: Readonly<Record<string, string>>, expectedAuthoritySha256: string): void {
+function assertResolvedStagePostResponse(current: ResolvedStageAuthority, baseline: ResolvedStageAuthority, request: StageRequest, fields: Readonly<Record<string, string>>, expectedAuthoritySha256: string, originalAuthority: RunAuthority = baseline.run_authority): void {
   const commit = request.requested_stage === "CLOSEOUT" ? /^sha=([a-f0-9]{40}|[a-f0-9]{64});\s*tree=([a-f0-9]{40}|[a-f0-9]{64});/.exec(fields.Commit ?? "") : null;
   if (!commit) {
-    assertResolvedStageStable(current, baseline, expectedAuthoritySha256);
+    assertResolvedStageStable(current, baseline, expectedAuthoritySha256, originalAuthority);
     return;
   }
+  if (authoritySha256(originalAuthority) !== expectedAuthoritySha256 || !runAuthorityMatchesAcrossOperationalRefresh(baseline.run_authority, originalAuthority)) throw new Error("Closeout baseline authority drifted");
   const mutableAuthority = new Set<keyof RunAuthority>(["state_revision", "state_sha256", "combined_span_sha256", "pinned_artifact_path", "pinned_artifact_identity", "pinned_artifact_sha256", "stage_source_manifest_path", "stage_source_manifest_sha256", "next_command"]);
   for (const key of Object.keys(baseline.run_authority) as Array<keyof RunAuthority>) {
     if (!mutableAuthority.has(key) && canonicalize(current.run_authority[key]) !== canonicalize(baseline.run_authority[key])) throw new Error(`Closeout immutable authority drifted: ${key}`);
@@ -1161,8 +1344,8 @@ function successReason(stage: StageRequest["requested_stage"], terminal: string,
   return fallback;
 }
 
-function makeResult(request: Pick<StageRequest, "run_id">, operationId: string, operationStatus: string, transportStatus: string, outputStatus: string, bindingStatus: string, terminalStatus: string, allowed: string[], artifactSha: string, reason: string, messageIdSha = "", responseSha = "", candidateScopeSha?: string): StageResult {
-  return { schema_version: "stage-result.v1", run_id: request.run_id, operation_id: operationId, operation_status: operationStatus, transport_status: transportStatus, output_status: outputStatus, binding_status: bindingStatus, terminal_status: terminalStatus, allowed_next: allowed, artifact_sha256: artifactSha, message_id_sha256: messageIdSha, response_sha256: responseSha, ...(candidateScopeSha ? { candidate_scope_sha256: candidateScopeSha } : {}), reason, auto_advance: false };
+function makeResult(request: Pick<StageRequest, "run_id">, operationId: string, operationStatus: string, transportStatus: string, outputStatus: string, bindingStatus: string, terminalStatus: string, allowed: string[], artifactSha: string, reason: string, messageIdSha = "", responseSha = "", candidateScopeSha?: string, routerPolicy?: StagePolicySummary): StageResult {
+  return { schema_version: "stage-result.v1", run_id: request.run_id, operation_id: operationId, operation_status: operationStatus, transport_status: transportStatus, output_status: outputStatus, binding_status: bindingStatus, terminal_status: terminalStatus, allowed_next: allowed, artifact_sha256: artifactSha, message_id_sha256: messageIdSha, response_sha256: responseSha, ...(candidateScopeSha ? { candidate_scope_sha256: candidateScopeSha } : {}), ...(routerPolicy ? { router_policy: routerPolicy } : {}), reason, auto_advance: false };
 }
 
 export const _test = { assertSourceLineage, assertOutputSourceLineage, assertResolvedStagePostResponse, closeoutAuthorityReceipt, parseProposedDelta, normalizeRecoveredTerminalTarget, safeRecoveryValidationReason, SOURCE_CLASSES };

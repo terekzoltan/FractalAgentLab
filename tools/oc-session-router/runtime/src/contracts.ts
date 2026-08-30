@@ -12,6 +12,9 @@ export const STAGES = [
 
 export type StageName = (typeof STAGES)[number];
 export type PlanClass = "EPIC_PLAN" | "REVIEW_FIX_PLAN";
+export type RouterPolicyMode = "STANDARD" | "STRICT";
+export type RouterPolicyDisposition = "ACCEPTED_EXACT" | "ACCEPTED_NORMALIZED" | "ACCEPTED_NO_SUCCESSOR" | "BLOCKED_AUTHORITY" | "BLOCKED_AMBIGUOUS";
+export type RouterWarningRule = "UNIQUE_CANONICAL_ENVELOPE" | "DETERMINISTIC_OPTIONAL_DEFAULT" | "REQUIRED_SEMANTIC_FACT_MISSING";
 export type SourceClass = "PLANNING_CONTEXT" | "PLAN" | "META_PLAN_REVIEW" | "REVISED_PLAN" | "IMPLEMENTATION_RESULT" | "ACCEPTANCE_EVIDENCE" | "FINAL_SYNTHESIS" | "DELIVERY_RESPONSE" | "PROPOSED_DELTA" | "CLOSEOUT_AUTHORITY";
 export type CanonPhase =
   | "SEQ_NEXT"
@@ -52,6 +55,7 @@ export interface RunRequest {
   schema_version: "run-request.v1";
   target_id: string;
   expected_worktree_identity: string;
+  requested_router_policy_mode?: "STRICT";
 }
 
 export interface FollowOnRunRequest {
@@ -94,6 +98,8 @@ export interface RunAuthority {
   accountable_role_identity: string;
   configuration_identity: string;
   active_route_generation: string;
+  /** Missing only on pre-policy runs, where it resolves compatibly to STRICT. */
+  router_policy_mode?: RouterPolicyMode;
   review_cycle: string;
   stage_source_manifest_path: string;
   stage_source_manifest_sha256: string;
@@ -157,6 +163,22 @@ export interface ParsedOutput {
   plan_class?: PlanClass;
 }
 
+export interface RouterWarningReceipt {
+  schema_version: "router-warning-receipt.v1";
+  warning_id: string;
+  run_id: string;
+  operation_id: string;
+  router_policy_mode: "STANDARD";
+  stage: StageName;
+  rule: RouterWarningRule;
+  input_sha256: string;
+  normalized_output_sha256: string;
+  consequence_class: "FORMAT_ONLY" | "NO_SUCCESSOR";
+  successor_projected: boolean;
+  raw_output_persisted: false;
+  created_at: string;
+}
+
 const OPAQUE_ID = /^[A-Za-z0-9][A-Za-z0-9._@:+~-]{0,199}$/;
 const OPAQUE_ID_CHAR = /^[A-Za-z0-9._@:+~-]$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -208,6 +230,10 @@ export function sha256(value: string | Uint8Array): string {
 
 export function authoritySha256(authority: RunAuthority): string {
   return sha256(Buffer.from(canonicalize(authority), "utf8"));
+}
+
+export function boundRouterPolicyMode(authority: Pick<RunAuthority, "router_policy_mode">): RouterPolicyMode {
+  return authority.router_policy_mode ?? "STRICT";
 }
 
 export function resolveCanonPhase(stage: StageName, planClass: PlanClass): CanonPhase {
@@ -529,12 +555,14 @@ export function parseStageSourceManifest(value: unknown): StageSourceManifest {
 
 export function parseRunRequest(value: unknown): RunRequest {
   const record = requireRecord(value, "run request");
-  requireExactKeys(record, ["schema_version", "target_id", "expected_worktree_identity"], "run request");
+  const requestedMode = record.requested_router_policy_mode;
+  requireExactKeys(record, ["schema_version", "target_id", "expected_worktree_identity", ...(requestedMode === undefined ? [] : ["requested_router_policy_mode"])], "run request");
   if (record.schema_version !== "run-request.v1") throw new Error("run request schema mismatch");
+  if (requestedMode !== undefined && requestedMode !== "STRICT") throw new Error("run request may only request stricter router policy");
   const targetId = requireString(record, "target_id");
   const worktree = requireString(record, "expected_worktree_identity");
   assertOpaqueId(targetId, "target_id");
-  return { schema_version: "run-request.v1", target_id: targetId, expected_worktree_identity: worktree };
+  return { schema_version: "run-request.v1", target_id: targetId, expected_worktree_identity: worktree, ...(requestedMode === "STRICT" ? { requested_router_policy_mode: "STRICT" as const } : {}) };
 }
 
 export function parseFollowOnRunRequest(value: unknown): FollowOnRunRequest {

@@ -10,6 +10,8 @@ import {
   commandForStage,
   parseStrictJson,
   sha256,
+  type RouterPolicyMode,
+  type StageName,
   type StageRequest,
 } from "./contracts.js";
 import { validateOrigin } from "./transport.js";
@@ -24,6 +26,18 @@ export const FENCE_BROKER_EXECUTABLE_SHA256 = "7600ffe12da441fe89d035b13801e8e91
 export type ProductionMode = "DISABLED" | "P0B_ISOLATED" | "PRODUCTION_RESPONSE_FIRST";
 export type ActiveProductionMode = Exclude<ProductionMode, "DISABLED">;
 export type SnapshotCorrelationMode = "DIAGNOSTIC_ONLY" | "EXACT_PARENT_LINK";
+
+export function effectiveRouterPolicyMode(
+  boundMode: RouterPolicyMode | undefined,
+  stage: StageName,
+  capabilityMode: ProductionMode | "FIXTURE_ONLY",
+  requestedMode?: RouterPolicyMode,
+): RouterPolicyMode {
+  const authorityMode = boundMode ?? "STRICT";
+  if (requestedMode === "STANDARD" && authorityMode === "STRICT") throw new Error("Caller cannot downgrade STRICT router policy authority");
+  if (stage === "CLOSEOUT" || capabilityMode === "P0B_ISOLATED") return "STRICT";
+  return requestedMode === "STRICT" ? "STRICT" : authorityMode;
+}
 
 export interface RegistryTarget {
   profile_identity: string;
@@ -751,7 +765,7 @@ export function purgeExpiredPrivateEvidence(runtimeRoot: string, policy: Retenti
         const status = stringValue(operation.status, "retention operation status");
         const updatedAt = timestamp(operation.updated_at, "retention operation updated_at");
         if (["CREATED", "DISPATCHING", "ACTIVE", "RECONCILING", "WAITING_ACTION", "STALLED_SUSPECTED", "UNCERTAIN"].includes(status)) preserveRun = true;
-        else if (!["SUCCEEDED", "FAILED_OUTPUT", "FAILED_TRANSPORT", "BLOCKED", "CANCELLED"].includes(status)) throw new Error("Operation retention status is unsupported");
+        else if (!["SUCCEEDED", "EVIDENCE_GAP", "FAILED_OUTPUT", "FAILED_TRANSPORT", "BLOCKED", "CANCELLED"].includes(status)) throw new Error("Operation retention status is unsupported");
         latestTerminal = Math.max(latestTerminal, Date.parse(updatedAt));
       }
       if (preserveRun) { preserved.active_or_uncertain_runs += 1; continue; }

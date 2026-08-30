@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { RunAuthority, SourceBinding, StageInvocation } from "./contracts.js";
-import { assertFilesystemId, assertOpaqueId, assertSafeRelativePath, assertSha256, canonicalize, sha256 } from "./contracts.js";
+import type { RouterWarningReceipt, RunAuthority, SourceBinding, StageInvocation } from "./contracts.js";
+import { STAGES, assertFilesystemId, assertOpaqueId, assertSafeRelativePath, assertSha256, canonicalize, sha256 } from "./contracts.js";
 
-export type OperationStatus = "CREATED" | "DISPATCHING" | "ACTIVE" | "RECONCILING" | "WAITING_ACTION" | "STALLED_SUSPECTED" | "SUCCEEDED" | "FAILED_OUTPUT" | "FAILED_TRANSPORT" | "UNCERTAIN" | "BLOCKED" | "CANCELLED";
+export type OperationStatus = "CREATED" | "DISPATCHING" | "ACTIVE" | "RECONCILING" | "WAITING_ACTION" | "STALLED_SUSPECTED" | "SUCCEEDED" | "EVIDENCE_GAP" | "FAILED_OUTPUT" | "FAILED_TRANSPORT" | "UNCERTAIN" | "BLOCKED" | "CANCELLED";
 export type ParticipantLifecycleState = "SETTLED" | "PENDING" | "UNCERTAIN";
 
 export interface RunDocument {
@@ -256,6 +256,12 @@ export class StateStore {
     return JSON.parse(readFileSync(this.resolve("runs", runId, "operations", operationId, "operation.json"), "utf8")) as OperationDocument;
   }
 
+  loadStageInvocation(runId: string, operationId: string): StageInvocation {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    return JSON.parse(readFileSync(this.resolve("runs", runId, "operations", operationId, "stage-invocation.json"), "utf8")) as StageInvocation;
+  }
+
   loadIntent<T = unknown>(runId: string, operationId: string): T {
     assertFilesystemId(runId, "run_id");
     assertFilesystemId(operationId, "operation_id");
@@ -298,6 +304,13 @@ export class StateStore {
     assertFilesystemId(runId, "run_id");
     assertFilesystemId(operationId, "operation_id");
     return JSON.parse(readFileSync(this.resolve("runs", runId, "operations", operationId, "result.json"), "utf8")) as unknown;
+  }
+
+  loadResultIfExists(runId: string, operationId: string): unknown | undefined {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    const resultPath = this.resolve("runs", runId, "operations", operationId, "result.json");
+    return existsSync(resultPath) ? JSON.parse(readFileSync(resultPath, "utf8")) as unknown : undefined;
   }
 
   updateOperation(runId: string, operationId: string, expectedRevision: number, patch: Partial<Pick<OperationDocument, "status" | "intent_sha256">>): OperationDocument {
@@ -376,6 +389,22 @@ export class StateStore {
     this.writeJsonExclusive(this.resolve("runs", runId, "operations", operationId, "result.json"), result);
   }
 
+  writeFinalResult(runId: string, operationId: string, result: unknown, replaceableStatuses: readonly string[] = []): void {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    const resultPath = this.resolve("runs", runId, "operations", operationId, "result.json");
+    if (!existsSync(resultPath)) {
+      this.writeJsonExclusive(resultPath, result);
+      return;
+    }
+    const current = JSON.parse(readFileSync(resultPath, "utf8")) as Record<string, unknown>;
+    if (canonicalize(current) === canonicalize(result)) return;
+    if (current.run_id !== runId || current.operation_id !== operationId || typeof current.operation_status !== "string" || !replaceableStatuses.includes(current.operation_status)) {
+      throw new Error("Final result identity collision");
+    }
+    this.writeJsonAtomic(resultPath, result);
+  }
+
   updateResult(runId: string, operationId: string, result: unknown): void {
     assertFilesystemId(runId, "run_id");
     assertFilesystemId(operationId, "operation_id");
@@ -409,11 +438,89 @@ export class StateStore {
     this.writeJsonExclusive(this.resolve("runs", runId, "operations", operationId, "compact-hooks.json"), receipt);
   }
 
+  writeRouterWarningReceipt(runId: string, operationId: string, receipt: RouterWarningReceipt): void {
+    assertFilesystemId(runId, "run_id");
+    assertFilesystemId(operationId, "operation_id");
+    validateRouterWarningReceipt(receipt, runId, operationId);
+    const directory = this.resolve("runs", runId, "operations", operationId, "warnings");
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const receiptPath = this.resolve("runs", runId, "operations", operationId, "warnings", `${receipt.warning_id}.json`);
+    if (existsSync(receiptPath)) {
+      const current = JSON.parse(readFileSync(receiptPath, "utf8")) as RouterWarningReceipt;
+      validateRouterWarningReceipt(current, runId, operationId);
+      if (canonicalize(current) !== canonicalize(receipt)) throw new Error("Router warning receipt identity collision");
+      return;
+    }
+    this.writeJsonExclusive(receiptPath, receipt);
+  }
+
+  listRouterWarningReceipts(runId: string, operationId?: string): RouterWarningReceipt[] {
+    assertFilesystemId(runId, "run_id");
+    const operationIds = operationId ? [operationId] : this.listOperationIds(runId);
+    const receipts: RouterWarningReceipt[] = [];
+    for (const currentOperationId of operationIds) {
+      assertFilesystemId(currentOperationId, "operation_id");
+      const operation = this.loadOperation(runId, currentOperationId);
+      if (operation.status !== "SUCCEEDED" && operation.status !== "EVIDENCE_GAP") continue;
+      const result = this.loadResult(runId, currentOperationId) as Record<string, unknown>;
+      const expectedStatus = operation.status;
+      if (
+        result.schema_version !== "stage-result.v1" ||
+        result.run_id !== runId ||
+        result.operation_id !== currentOperationId ||
+        result.operation_status !== expectedStatus ||
+        !Array.isArray(result.allowed_next) ||
+        result.auto_advance !== false ||
+        typeof result.artifact_sha256 !== "string"
+      ) throw new Error("Settled warning result binding is invalid");
+      const terminalPath = this.resolve("runs", runId, "operations", currentOperationId, "terminal.md");
+      if (!existsSync(terminalPath)) throw new Error("Settled warning terminal artifact is missing");
+      const terminal = readFileSync(terminalPath, "utf8");
+      if (sha256(Buffer.from(terminal, "utf8")) !== result.artifact_sha256) throw new Error("Settled warning terminal artifact hash mismatch");
+      const policy = result.router_policy as Record<string, unknown> | undefined;
+      if (!policy || policy.effective_mode !== "STANDARD" || !Array.isArray(policy.warning_rules) || typeof policy.input_sha256 !== "string" || typeof policy.normalized_output_sha256 !== "string") {
+        const directory = this.resolve("runs", runId, "operations", currentOperationId, "warnings");
+        if (existsSync(directory)) throw new Error("Settled warning receipt lacks an authoritative STANDARD result");
+        continue;
+      }
+      assertSha256(policy.input_sha256, "settled warning input sha256");
+      assertSha256(policy.normalized_output_sha256, "settled warning normalized output sha256");
+      if (policy.normalized_output_sha256 !== sha256(terminal.replace(/\r\n/g, "\n").trim())) throw new Error("Settled warning normalized artifact hash mismatch");
+      const directory = this.resolve("runs", runId, "operations", currentOperationId, "warnings");
+      if (!existsSync(directory)) {
+        if (policy.warning_rules.length > 0) throw new Error("Settled warning receipt set is missing");
+        continue;
+      }
+      const entries = readdirSync(directory, { withFileTypes: true });
+      if (entries.length > 1_000) throw new Error("Router warning receipt count exceeds the bounded limit");
+      const operationReceipts: RouterWarningReceipt[] = [];
+      for (const entry of entries) {
+        if (!entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith(".json")) throw new Error("Router warning receipt directory contains an unsafe entry");
+        const receipt = JSON.parse(readFileSync(path.join(directory, entry.name), "utf8")) as RouterWarningReceipt;
+        validateRouterWarningReceipt(receipt, runId, currentOperationId);
+        if (entry.name !== `${receipt.warning_id}.json`) throw new Error("Router warning receipt filename mismatch");
+        if (receipt.input_sha256 !== policy.input_sha256 || receipt.normalized_output_sha256 !== policy.normalized_output_sha256) throw new Error("Settled warning receipt hash binding mismatch");
+        const successorProjected = receipt.consequence_class === "FORMAT_ONLY" && result.allowed_next.length > 0;
+        if (receipt.successor_projected !== successorProjected) throw new Error("Settled warning successor projection mismatch");
+        operationReceipts.push(receipt);
+      }
+      const receiptRules = [...new Set(operationReceipts.map((receipt) => receipt.rule))].sort();
+      const policyRules = [...new Set(policy.warning_rules)].sort();
+      if (canonicalize(receiptRules) !== canonicalize(policyRules)) throw new Error("Settled warning rule set mismatch");
+      receipts.push(...operationReceipts);
+    }
+    return receipts.sort((left, right) => left.created_at.localeCompare(right.created_at) || left.warning_id.localeCompare(right.warning_id));
+  }
+
   writeArtifact(runId: string, operationId: string, name: string, content: string): void {
     assertFilesystemId(runId, "run_id");
     assertFilesystemId(operationId, "operation_id");
     assertFilesystemId(name, "artifact name");
     const filePath = this.resolve("runs", runId, "operations", operationId, `${name}.md`);
+    if (existsSync(filePath)) {
+      if (readFileSync(filePath, "utf8") !== content) throw new Error("Artifact identity collision");
+      return;
+    }
     const descriptor = openSync(filePath, "wx", 0o600);
     try {
       writeFileSync(descriptor, content, { encoding: "utf8" });
@@ -498,7 +605,9 @@ export class StateStore {
     this.withExclusiveLock(this.resolve("semantic-actions", `${semanticKey}.lock`), () => {
       const documentPath = this.resolve("semantic-actions", `${semanticKey}.json`);
       const current = JSON.parse(readFileSync(documentPath, "utf8")) as SemanticActionDocument;
-      if (current.run_id !== runId || current.operation_id !== operationId || current.status !== "CLAIMED") throw new Error("Semantic action claim identity mismatch");
+      if (current.run_id !== runId || current.operation_id !== operationId) throw new Error("Semantic action claim identity mismatch");
+      if (current.status === status) return;
+      if (current.status !== "CLAIMED") throw new Error("Semantic action claim identity mismatch");
       this.writeJsonAtomic(documentPath, { ...current, status, updated_at: new Date().toISOString() });
     });
   }
@@ -577,4 +686,20 @@ export class StateStore {
       if (existsSync(lockPath)) unlinkSync(lockPath);
     }
   }
+}
+
+function validateRouterWarningReceipt(receipt: RouterWarningReceipt, runId: string, operationId: string): void {
+  const keys = ["consequence_class", "created_at", "input_sha256", "normalized_output_sha256", "operation_id", "raw_output_persisted", "router_policy_mode", "rule", "run_id", "schema_version", "stage", "successor_projected", "warning_id"];
+  if (!receipt || typeof receipt !== "object" || canonicalize(Object.keys(receipt).sort()) !== canonicalize(keys)) throw new Error("Router warning receipt schema mismatch");
+  if (receipt.schema_version !== "router-warning-receipt.v1" || receipt.run_id !== runId || receipt.operation_id !== operationId || receipt.router_policy_mode !== "STANDARD" || receipt.raw_output_persisted !== false) throw new Error("Router warning receipt binding mismatch");
+  assertFilesystemId(receipt.warning_id, "warning_id");
+  assertFilesystemId(receipt.run_id, "warning run_id");
+  assertFilesystemId(receipt.operation_id, "warning operation_id");
+  assertSha256(receipt.input_sha256, "warning input sha256");
+  assertSha256(receipt.normalized_output_sha256, "warning normalized output sha256");
+  if (!(STAGES as readonly string[]).includes(receipt.stage)) throw new Error("Router warning receipt stage is invalid");
+  if (!["UNIQUE_CANONICAL_ENVELOPE", "DETERMINISTIC_OPTIONAL_DEFAULT", "REQUIRED_SEMANTIC_FACT_MISSING"].includes(receipt.rule)) throw new Error("Router warning receipt rule is invalid");
+  if (receipt.consequence_class !== "FORMAT_ONLY" && receipt.consequence_class !== "NO_SUCCESSOR") throw new Error("Router warning receipt consequence is invalid");
+  if (receipt.consequence_class === "NO_SUCCESSOR" && receipt.successor_projected) throw new Error("No-successor warning cannot project a successor");
+  if (typeof receipt.successor_projected !== "boolean" || typeof receipt.created_at !== "string" || !receipt.created_at.endsWith("Z") || !Number.isFinite(Date.parse(receipt.created_at))) throw new Error("Router warning receipt metadata is invalid");
 }

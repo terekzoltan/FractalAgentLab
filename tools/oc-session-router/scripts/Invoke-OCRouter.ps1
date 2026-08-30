@@ -52,7 +52,7 @@ function Invoke-WithRouterEnvironment {
 $ErrorActionPreference = 'Stop'
 $RuntimeRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'runtime'
 $AttestationPath = Join-Path $RuntimeRoot 'executable-attestation.json'
-$ExpectedAttestationSha256 = '2fcaea06e96d567d8bba9c740d9c9b924f8ec1f1505d32aeee56175d9737ae3b'
+$ExpectedAttestationSha256 = 'f66913b3979473a791af7a66df69967305db538aef3ea01748030628e5ad1017'
 
 function Get-Sha256Text {
   param([string]$Text)
@@ -107,14 +107,14 @@ $FenceBroker = Assert-OrdinaryContainedFile -Path $Attestation.fence_broker_exec
 if ((Get-FileHash -Algorithm SHA256 -LiteralPath $FenceBroker).Hash.ToLowerInvariant() -ne $Attestation.fence_broker_executable_sha256) { throw 'Fence broker executable hash mismatch.' }
 $Entry = Assert-OrdinaryContainedFile -Path (Join-Path $RuntimeRoot $Attestation.compiled_entry_path) -ContainmentRoot $RuntimeRoot -Label 'Compiled router entry'
 if ((Get-FileHash -Algorithm SHA256 -LiteralPath $Entry).Hash.ToLowerInvariant() -ne $Attestation.compiled_entry_sha256) { throw 'Compiled router entry hash mismatch.' }
-$CompiledRows = @('cli.js','contracts.js','control-plane.js','p0b-proof.js','snapshot-reader.js','stage-engine.js','state-store.js','transport.js','worktree-reader.js') | ForEach-Object {
+$CompiledRows = @('cli.js','contracts.js','control-plane.js','p0b-proof.js','policy-validator.js','snapshot-reader.js','stage-engine.js','state-store.js','transport.js','worktree-reader.js') | ForEach-Object {
   $Compiled = Assert-OrdinaryContainedFile -Path (Join-Path $RuntimeRoot (Join-Path 'dist/src' $_)) -ContainmentRoot $RuntimeRoot -Label 'Compiled router module'
   "$_|$((Get-FileHash -Algorithm SHA256 -LiteralPath $Compiled).Hash.ToLowerInvariant())"
 }
 $CompiledManifestBytes = [System.Text.Encoding]::UTF8.GetBytes(($CompiledRows -join "`n") + "`n")
 $CompiledManifestSha256 = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash($CompiledManifestBytes)).Replace('-','').ToLowerInvariant()
 if ($CompiledManifestSha256 -ne $Attestation.compiled_manifest_sha256) { throw 'Compiled router manifest hash mismatch.' }
-$SourceRows = @('cli.ts','contracts.ts','control-plane.ts','p0b-proof.ts','snapshot-reader.ts','stage-engine.ts','state-store.ts','transport.ts','worktree-reader.ts') | ForEach-Object {
+$SourceRows = @('cli.ts','contracts.ts','control-plane.ts','p0b-proof.ts','policy-validator.ts','snapshot-reader.ts','stage-engine.ts','state-store.ts','transport.ts','worktree-reader.ts') | ForEach-Object {
   $Source = Assert-OrdinaryContainedFile -Path (Join-Path $RuntimeRoot (Join-Path 'src' $_)) -ContainmentRoot $RuntimeRoot -Label 'Reviewed router source'
   "$_|$((Get-FileHash -Algorithm SHA256 -LiteralPath $Source).Hash.ToLowerInvariant())"
 }

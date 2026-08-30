@@ -39,6 +39,38 @@ It is not project truth and does not grant workflow authority.
   P0B proof-bound install receipt). The protected receipt path is registry-owned,
   never request- or environment-selectable. No real-project P0B send is part of
   the offline suite.
+- Those are protected **control-plane modes**, not semantic output policy. New
+  immutable runs also bind one target-authoritative `router_policy_mode` from
+  `Router mode: STANDARD|STRICT` in target state. A missing label, including every
+  pre-policy saved run, means `STRICT`; a caller may request `STRICT` but cannot
+  request or inject `STANDARD`. `CLOSEOUT` and `P0B_ISOLATED` always execute with
+  effective `STRICT` policy without changing the run's bound mode.
+- There is no automatic risk classifier. Release, migration, destructive, and
+  explicitly high-consequence ordinary lifecycle runs must bind `STRICT` in
+  accountable target state before run creation; uncertainty also selects
+  `STRICT`. The first live STANDARD canary is limited to one named SEQ_NEXT,
+  PLAN_REVIEW, or STEP_REVIEW stage with no successor delivery dispatch.
+  PLAN_REVISION, IMPLEMENT, and REVIEW_RESPONSE open only after successful
+  canary evidence and later authorization; CLOSEOUT and P0B remain strict.
+- `STANDARD` changes only post-recipient output policy. Exact canonical output is
+  unchanged. The first finite allowlist accepts one uniquely delimited canonical
+  envelope surrounded only by an exact reviewed, semantically inert wrapper line
+  (`Here is the requested canonical output:`, `End of canonical output.`,
+  `Progress note: review completed.`, or `Explanation: retained outside the
+  canonical artifact.`), plus deterministic `NONE` defaults for a small
+  documented set of non-authority fields. Arbitrary outside prose is ambiguous,
+  even without a colon. The policy has no fuzzy parser, model
+  repair, alias guessing, retry, auto-advance, or second sender. Ambiguous output,
+  binding drift, missing authority, and every transport invariant remain closed.
+- A normalized success persists only the canonical terminal plus one or more
+  digest-only, append-only `router-warning-receipt.v1` records. A well-bound
+  STANDARD terminal with a required semantic evidence gap becomes terminal
+  `EVIDENCE_GAP`: transport evidence is retained, no successor is projected, and
+  the command is never retried automatically. STRICT keeps treating that same
+  omission as invalid output. For v34 runs, `get-run` exposes only the bound mode
+  and a bounded `warning_count`/`warning_rules` summary, never raw private output.
+  A pre-v34 run with no warning receipts may omit `router_policy`; that omission
+  is the backward-compatible representation of effective `STRICT`.
 - An accepted P0B transport proof survives an ordinary server restart and
   forward OpenCode patch updates on the same strict `major.minor` line.
   Production admission binds stable server semantics; each dispatch separately

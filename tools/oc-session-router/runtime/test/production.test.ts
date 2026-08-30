@@ -11,6 +11,7 @@ import {
   SharedSessionFence,
   buildSharedFenceBinding,
   capabilityAuthorizationUseSha256,
+  effectiveRouterPolicyMode,
   isP0bProofCompatibleWithInstalledServer,
   parseCapabilityReceipt,
   parseControlRegistry,
@@ -29,6 +30,16 @@ import { parseP0bProofReceipt, p0bProofSha256, readP0bProofReceipt, writeP0bProo
 import { StateStore } from "../src/state-store.js";
 
 const fixedNow = new Date("2026-08-21T12:00:00.000Z");
+
+test("router policy cannot be downgraded and CLOSEOUT/P0B are always STRICT", () => {
+  assert.equal(effectiveRouterPolicyMode(undefined, "PLAN_REVIEW", "PRODUCTION_RESPONSE_FIRST"), "STRICT");
+  assert.equal(effectiveRouterPolicyMode("STANDARD", "PLAN_REVIEW", "PRODUCTION_RESPONSE_FIRST"), "STANDARD");
+  assert.equal(effectiveRouterPolicyMode("STANDARD", "PLAN_REVIEW", "PRODUCTION_RESPONSE_FIRST", "STRICT"), "STRICT");
+  assert.throws(() => effectiveRouterPolicyMode("STRICT", "PLAN_REVIEW", "PRODUCTION_RESPONSE_FIRST", "STANDARD"), /cannot downgrade/);
+  assert.equal(effectiveRouterPolicyMode("STANDARD", "CLOSEOUT", "PRODUCTION_RESPONSE_FIRST"), "STRICT");
+  assert.equal(effectiveRouterPolicyMode("STANDARD", "PLAN_REVIEW", "P0B_ISOLATED"), "STRICT");
+});
+
 const policy: RetentionPolicy = {
   schema_version: "router-retention-policy.v2",
   compact_handoff_minutes: 15,

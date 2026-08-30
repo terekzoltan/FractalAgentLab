@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { _test } from "../src/cli.js";
-import { parseFollowOnRunRequest, parseRunRequest, parseStageRequest, parseStrictJson } from "../src/contracts.js";
+import { assertSafeRelativePath, parseFollowOnRunRequest, parseRunRequest, parseStageRequest, parseStrictJson } from "../src/contracts.js";
 import { StateStore } from "../src/state-store.js";
 
 test("closed request schemas reject authority injection", () => {
@@ -97,5 +97,12 @@ test("runtime root must be pre-created and contained", () => {
     assert.throws(() => store.resolve("safe", "..", "..", "escape"), /escapes/);
   } finally {
     rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test("unsafe paths are rejected by the shared pre-policy kernel in both semantic modes", () => {
+  for (const mode of ["STANDARD", "STRICT"] as const) {
+    assert.throws(() => assertSafeRelativePath("../escape", `${mode} source path`), /safe relative path/);
+    assert.throws(() => assertSafeRelativePath("C:\\private\\escape", `${mode} source path`), /safe relative path/);
   }
 });

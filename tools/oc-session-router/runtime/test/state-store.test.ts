@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import type { RunAuthority, StageInvocation } from "../src/contracts.js";
+import type { RouterWarningReceipt, RunAuthority, StageInvocation } from "../src/contracts.js";
 import { authoritySha256, sha256 } from "../src/contracts.js";
 import { promotedSourcesForStage } from "../src/stage-engine.js";
 import { StateStore } from "../src/state-store.js";
@@ -97,6 +97,68 @@ test("run and authority are immutable BOM-free files", () => {
     const bytes = readFileSync(path.join(root, "runs", "run-1", "run.json"));
     assert.notDeepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
     assert.throws(() => store.createRun(authority, authoritySha256(authority)));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("STANDARD warning receipts are sanitized, append-only, and idempotent by exact identity", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-warning-"));
+  try {
+    const store = new StateStore(root);
+    const authority = { ...makeAuthority(), router_policy_mode: "STANDARD" as const };
+    store.createRun(authority, authoritySha256(authority));
+    const invocation = { ...makeInvocation("op-warning"), run_authority_sha256: authoritySha256(authority) };
+    const operation = store.createOperation("run-1", invocation, { schema_version: "dispatch-intent.v1" }, sha256("intent"));
+    const receipt: RouterWarningReceipt = {
+      schema_version: "router-warning-receipt.v1",
+      warning_id: "warning-1",
+      run_id: "run-1",
+      operation_id: "op-warning",
+      router_policy_mode: "STANDARD",
+      stage: "PLAN_REVIEW",
+      rule: "UNIQUE_CANONICAL_ENVELOPE",
+      input_sha256: sha256("private-input"),
+      normalized_output_sha256: sha256("canonical-output"),
+      consequence_class: "FORMAT_ONLY",
+      successor_projected: true,
+      raw_output_persisted: false,
+      created_at: "2026-08-30T00:00:00.000Z",
+    };
+    store.writeRouterWarningReceipt("run-1", "op-warning", receipt);
+    store.writeRouterWarningReceipt("run-1", "op-warning", receipt);
+    assert.deepEqual(store.listRouterWarningReceipts("run-1", "op-warning"), []);
+    const artifact = "canonical-output\n";
+    store.writeArtifact("run-1", "op-warning", "terminal", artifact);
+    store.writeFinalResult("run-1", "op-warning", {
+      schema_version: "stage-result.v1",
+      run_id: "run-1",
+      operation_id: "op-warning",
+      operation_status: "SUCCEEDED",
+      transport_status: "RESPONSE_ACCEPTED",
+      output_status: "VALID",
+      binding_status: "BOUND",
+      terminal_status: "VALID",
+      allowed_next: ["PLAN_REVISION"],
+      artifact_sha256: sha256(Buffer.from(artifact, "utf8")),
+      message_id_sha256: sha256("message"),
+      response_sha256: sha256("response"),
+      router_policy: {
+        bound_mode: "STANDARD",
+        effective_mode: "STANDARD",
+        disposition: "ACCEPTED_NORMALIZED",
+        warning_rules: ["UNIQUE_CANONICAL_ENVELOPE"],
+        input_sha256: receipt.input_sha256,
+        normalized_output_sha256: receipt.normalized_output_sha256,
+      },
+      reason: "fixture",
+      auto_advance: false,
+    });
+    store.updateOperation("run-1", "op-warning", operation.revision, { status: "SUCCEEDED" });
+    assert.deepEqual(store.listRouterWarningReceipts("run-1", "op-warning"), [receipt]);
+    const persisted = readFileSync(path.join(root, "runs", "run-1", "operations", "op-warning", "warnings", "warning-1.json"), "utf8");
+    assert.equal(persisted.includes("private-input"), false);
+    assert.throws(() => store.writeRouterWarningReceipt("run-1", "op-warning", { ...receipt, normalized_output_sha256: sha256("different") }), /identity collision/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

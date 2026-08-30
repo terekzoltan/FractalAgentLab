@@ -6,7 +6,7 @@ import test from "node:test";
 import { authoritySha256, canonicalize, parseOutputShape, sha256, validateOutputBinding, type RunAuthority, type RunRequest, type StageRequest } from "../src/contracts.js";
 import { StageEngine, _test as stageTest, promotedSourcesForStage, renderCommandArgument, renderPersistedCommandArgument, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "../src/stage-engine.js";
 import { ROUTER_PROTOCOL_IDENTITY, buildSharedFenceBinding } from "../src/control-plane.js";
-import { StateStore } from "../src/state-store.js";
+import { StateStore, type OperationDocument } from "../src/state-store.js";
 import { CommandClient, type FetchLike } from "../src/transport.js";
 import { worktreeProofSha256, type WorktreeProof } from "../src/worktree-reader.js";
 
@@ -32,6 +32,7 @@ class FakeResolver implements AuthorityResolver {
   capabilityMode: "DISABLED" | "FIXTURE_ONLY" | "P0B_ISOLATED" | "PRODUCTION_RESPONSE_FIRST" = "FIXTURE_ONLY";
   capabilityIdentityGeneration = "";
   capabilityDriftOnCall = 0;
+  routerPolicyMode: "STANDARD" | "STRICT" = "STRICT";
   worktreeAfterResponse?: WorktreeProof;
   nextCommand = "/terv-review";
   reviewCycle = "0";
@@ -70,6 +71,7 @@ class FakeResolver implements AuthorityResolver {
       accountable_role_identity: "track-d-v1",
       configuration_identity: "config-v1",
       active_route_generation: this.activeRouteGeneration,
+      router_policy_mode: request.requested_router_policy_mode === "STRICT" ? "STRICT" : this.routerPolicyMode,
       review_cycle: this.reviewCycle,
       stage_source_manifest_path: "plans/stage-sources.json",
       stage_source_manifest_sha256: "e".repeat(64),
@@ -221,6 +223,13 @@ function request(runId: string, authorityHash: string, sourceSha: string): Stage
   };
 }
 
+function assistantResponse(text: string, id: string): Response {
+  return new Response(JSON.stringify({
+    info: { id, role: "assistant", sessionID: "session-meta", parentID: `user-${id}` },
+    parts: [{ id: `part-${id}`, type: "text", text, messageID: id, sessionID: "session-meta" }],
+  }), { status: 200 });
+}
+
 test("SEQ_NEXT command envelope requires the exact canonical target field", () => {
   const base = request("run-1", "a".repeat(64), "b".repeat(64));
   const argument = renderCommandArgument({ ...base, requested_stage: "SEQ_NEXT", target_id: "worldsim" }, []);
@@ -267,6 +276,161 @@ test("one explicit stage uses one response and never auto-advances", async () =>
   }
 });
 
+test("STANDARD normalizes only finite harmless output drift and writes a sanitized warning receipt", async () => {
+  const canonical = planReviewSource();
+  const scenarios = [
+    {
+      name: "unique-envelope",
+      raw: `Here is the requested canonical output:\n${canonical}\nEnd of canonical output.`,
+      normalized: canonical,
+      rule: "UNIQUE_CANONICAL_ENVELOPE",
+    },
+    {
+      name: "optional-default",
+      raw: canonical.split("\n").filter((line) => !line.startsWith("Non-blocking improvements:")).join("\n"),
+      normalized: canonical.replace("Non-blocking improvements: none", "Non-blocking improvements: NONE"),
+      rule: "DETERMINISTIC_OPTIONAL_DEFAULT",
+    },
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const root = mkdtempSync(path.join(tmpdir(), `fal-router-standard-${scenario.name}-`));
+    try {
+      let calls = 0;
+      const resolver = new FakeResolver();
+      resolver.routerPolicyMode = "STANDARD";
+      const store = new StateStore(root);
+      const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+        calls += 1;
+        return assistantResponse(scenario.raw, `assistant-standard-${scenario.name}`);
+      }));
+      const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+      assert.equal(store.loadRun(created.run_id).authority.router_policy_mode, "STANDARD");
+
+      const result = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+      assert.equal(result.operation_status, "SUCCEEDED", `${scenario.name}: ${JSON.stringify(result)}`);
+      assert.deepEqual(result.allowed_next, ["PLAN_REVISION"]);
+      assert.equal(calls, 1);
+      const artifact = readFileSync(path.join(root, "runs", created.run_id, "operations", result.operation_id, "terminal.md"), "utf8");
+      assert.equal(artifact, `${scenario.normalized}\n`);
+
+      const warnings = store.listRouterWarningReceipts(created.run_id, result.operation_id);
+      assert.equal(warnings.length, 1);
+      assert.equal(warnings[0]!.router_policy_mode, "STANDARD");
+      assert.equal(warnings[0]!.rule, scenario.rule);
+      assert.equal(warnings[0]!.input_sha256, sha256(scenario.raw));
+      assert.equal(warnings[0]!.normalized_output_sha256, sha256(scenario.normalized));
+      assert.equal(warnings[0]!.consequence_class, "FORMAT_ONLY");
+      assert.equal(warnings[0]!.successor_projected, true);
+      assert.equal(warnings[0]!.raw_output_persisted, false);
+      assert.deepEqual((engine.getRun(created.run_id) as { router_policy: unknown }).router_policy, {
+        bound_mode: "STANDARD",
+        warning_count: 1,
+        warning_rules: [scenario.rule],
+      });
+      if (scenario.name === "unique-envelope") {
+        assert.doesNotMatch(allPersistentText(root), /Here is the requested canonical output|End of canonical output/);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("STRICT rejects the same harmless wrapper that STANDARD normalizes", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-strict-wrapper-"));
+  try {
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.routerPolicyMode = "STRICT";
+    const store = new StateStore(root);
+    const wrapped = `Here is the requested canonical output:\n${planReviewSource()}\nEnd of canonical output.`;
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      calls += 1;
+      return assistantResponse(wrapped, "assistant-strict-wrapper");
+    }));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const result = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+    assert.equal(result.operation_status, "FAILED_OUTPUT");
+    assert.equal(result.transport_status, "RESPONSE_ACCEPTED");
+    assert.deepEqual(result.allowed_next, []);
+    assert.equal(calls, 1);
+    assert.deepEqual(store.listRouterWarningReceipts(created.run_id, result.operation_id), []);
+    assert.equal(existsSync(path.join(root, "runs", created.run_id, "operations", result.operation_id, "terminal.md")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("missing required semantic fact is a terminal EVIDENCE_GAP with no successor or resend", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-standard-evidence-gap-"));
+  try {
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.routerPolicyMode = "STANDARD";
+    const store = new StateStore(root);
+    const incomplete = planReviewSource().split("\n").filter((line) => !line.startsWith("Acceptance/evidence decision:")).join("\n");
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      calls += 1;
+      return assistantResponse(incomplete, "assistant-evidence-gap");
+    }));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const stage = request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent));
+    const result = await engine.invokeStage(stage);
+    assert.equal(result.operation_status, "EVIDENCE_GAP", JSON.stringify(result));
+    assert.equal(result.transport_status, "RESPONSE_ACCEPTED");
+    assert.deepEqual(result.allowed_next, []);
+    assert.equal(result.auto_advance, false);
+    assert.equal(store.loadOperation(created.run_id, result.operation_id).status, "EVIDENCE_GAP");
+    assert.deepEqual(promotedSourcesForStage(store, created.run_id, "PLAN_REVISION"), []);
+    const warnings = store.listRouterWarningReceipts(created.run_id, result.operation_id);
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0]!.rule, "REQUIRED_SEMANTIC_FACT_MISSING");
+    assert.equal(warnings[0]!.consequence_class, "NO_SUCCESSOR");
+    assert.equal(warnings[0]!.successor_projected, false);
+
+    await assert.rejects(() => engine.invokeStage({ ...stage, request_id: "request-evidence-gap-retry" }), /semantic action/i);
+    assert.equal(calls, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("STANDARD never relaxes caller, recipient, source, or duplicate-send authority", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-standard-hard-invariants-"));
+  try {
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.routerPolicyMode = "STANDARD";
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      calls += 1;
+      return assistantResponse(planReviewSource(), "assistant-standard-authority");
+    }));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const base = request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent));
+    await assert.rejects(() => engine.invokeStage({ ...base, request_id: "request-standard-binding", state_revision: "forged" }), /state_revision binding mismatch/);
+    await assert.rejects(() => engine.invokeStage({ ...base, request_id: "request-standard-recipient", recipient_role: "Track D" }), /recipient role/);
+    const sourceDrift: StageRequest = {
+      ...base,
+      request_id: "request-standard-source-drift",
+      expected_sources: [{ ...base.expected_sources[0]!, path: "plans/other.md", sha256: "f".repeat(64) }],
+    };
+    await assert.rejects(() => engine.invokeStage(sourceDrift), /SOURCE_SUBSTITUTION/);
+    assert.equal(calls, 0);
+    assert.equal(store.listOperations(created.run_id).length, 0);
+
+    assert.equal((await engine.invokeStage({ ...base, request_id: "request-standard-exact" })).operation_status, "SUCCEEDED");
+    const duplicateRun = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const duplicate = request(duplicateRun.run_id, duplicateRun.run_authority_sha256, sha256(resolver.sourceContent));
+    await assert.rejects(() => engine.invokeStage({ ...duplicate, request_id: "request-standard-duplicate" }), /semantic action/i);
+    assert.equal(calls, 1);
+    assert.equal(store.listOperations(duplicateRun.run_id).length, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("immediate pre-send authority drift fails closed before POST", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-presend-drift-"));
   try {
@@ -294,23 +458,47 @@ test("immediate pre-send authority drift fails closed before POST", async () => 
 });
 
 test("credential or raw session sentinel is rejected before artifact persistence", async () => {
-  const root = mkdtempSync(path.join(tmpdir(), "fal-router-private-sink-"));
+  for (const mode of ["STANDARD", "STRICT"] as const) {
+    const root = mkdtempSync(path.join(tmpdir(), `fal-router-private-sink-${mode.toLowerCase()}-`));
+    try {
+      const resolver = new FakeResolver();
+      resolver.routerPolicyMode = mode;
+      const engine = new StageEngine(new StateStore(root), resolver, new CommandClient(async () => new Response(JSON.stringify({
+        info: { id: "assistant-private", role: "assistant", sessionID: "session-meta", parentID: "user-private" },
+        parts: [{ id: "part-private", type: "text", text: "META PLAN REVIEW\nTarget: fal\nEpic: E\nPlan class: EPIC_PLAN\nPlan artifact: plan-1\nAccountable Lane / class / profile: Track D / TRACK / track-d\nOverall verdict: GREEN\nBlocking corrections: none\nNon-blocking improvements: process-only\nOwnership/dependency decision: accepted\nAcceptance/evidence decision: accepted\nExact Delivery Lane action: invoke /terv-review-utan with this review", messageID: "assistant-private", sessionID: "session-meta" }],
+      }))));
+      const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+      const result = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+      assert.equal(result.operation_status, "FAILED_OUTPUT", mode);
+      assert.equal(result.reason, "PRIVATE_OUTPUT_REJECTED", mode);
+      const operationDir = path.join(root, "runs", created.run_id, "operations", result.operation_id);
+      assert.equal(existsSync(path.join(operationDir, "terminal.md")), false);
+      for (const name of readdirSync(operationDir)) {
+        const file = path.join(operationDir, name);
+        if (!name.endsWith(".lock")) assert.doesNotMatch(readFileSync(file, "utf8"), /process-only|session-meta/);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("STANDARD keeps immediate pre-send authority drift fail-closed", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-standard-presend-drift-"));
   try {
+    let calls = 0;
     const resolver = new FakeResolver();
-    const engine = new StageEngine(new StateStore(root), resolver, new CommandClient(async () => new Response(JSON.stringify({
-      info: { id: "assistant-private", role: "assistant", sessionID: "session-meta", parentID: "user-private" },
-      parts: [{ id: "part-private", type: "text", text: "META PLAN REVIEW\nTarget: fal\nEpic: E\nPlan class: EPIC_PLAN\nPlan artifact: plan-1\nAccountable Lane / class / profile: Track D / TRACK / track-d\nOverall verdict: GREEN\nBlocking corrections: none\nNon-blocking improvements: process-only\nOwnership/dependency decision: accepted\nAcceptance/evidence decision: accepted\nExact Delivery Lane action: invoke /terv-review-utan with this review", messageID: "assistant-private", sessionID: "session-meta" }],
-    }))));
+    resolver.routerPolicyMode = "STANDARD";
+    resolver.driftOnResolutionCall = 2;
+    const engine = new StageEngine(new StateStore(root), resolver, new CommandClient(async () => {
+      calls += 1;
+      return assistantResponse(planReviewSource(), "assistant-standard-presend-drift");
+    }));
     const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
     const result = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
-    assert.equal(result.operation_status, "FAILED_OUTPUT");
-    assert.equal(result.reason, "PRIVATE_OUTPUT_REJECTED");
-    const operationDir = path.join(root, "runs", created.run_id, "operations", result.operation_id);
-    assert.equal(existsSync(path.join(operationDir, "terminal.md")), false);
-    for (const name of readdirSync(operationDir)) {
-      const file = path.join(operationDir, name);
-      if (!name.endsWith(".lock")) assert.doesNotMatch(readFileSync(file, "utf8"), /process-only|session-meta/);
-    }
+    assert.equal(result.operation_status, "FAILED_TRANSPORT");
+    assert.equal(result.reason, "AUTHORITY_REVALIDATION_FAILED");
+    assert.equal(calls, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -638,6 +826,7 @@ test("v29 green lifecycle projects complete router sources and declares the Owne
   try {
     let calls = 0;
     const resolver = new FakeResolver();
+    resolver.routerPolicyMode = "STANDARD";
     resolver.nextCommand = "/seq-next";
     const closeoutCommitSha = "a".repeat(40);
     const closeoutTree = "b".repeat(40);
@@ -666,6 +855,7 @@ test("v29 green lifecycle projects complete router sources and declares the Owne
       }));
     }));
     const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    assert.equal(store.loadRun(created.run_id).authority.router_policy_mode, "STANDARD");
     const base = request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent));
     const planningSource = resolvedSource("PLANNING_CONTEXT", resolver.sourceContent, 0);
     resolver.resolvedSources = [planningSource];
@@ -1632,6 +1822,7 @@ test("FSR-030: COMMIT CLOSEOUT accepts only the authorized changed postcondition
   try {
     let calls = 0;
     const resolver = new FakeResolver();
+    resolver.routerPolicyMode = "STANDARD";
     resolver.nextCommand = "/closeout-commit";
     const commitSha = "a".repeat(40);
     const before: WorktreeProof = { ...resolver.worktree, changed_paths: ["src/candidate.ts"], status_clean: false, has_unstaged_or_untracked: true };
@@ -1667,6 +1858,9 @@ test("FSR-030: COMMIT CLOSEOUT accepts only the authorized changed postcondition
     resolver.resolutionCalls = 0;
     const result = await engine.invokeStage(stage);
     assert.equal(result.operation_status, "SUCCEEDED", JSON.stringify(result));
+    assert.equal(result.router_policy?.bound_mode, "STANDARD");
+    assert.equal(result.router_policy?.effective_mode, "STRICT");
+    assert.equal(result.router_policy?.disposition, "ACCEPTED_EXACT");
     assert.equal(calls, 1);
     const terminal = readFileSync(path.join(root, "runs", created.run_id, "operations", result.operation_id, "terminal.md"), "utf8");
     assert.match(terminal, /CLOSEOUT DURABLE PROJECTION/);
@@ -1674,6 +1868,7 @@ test("FSR-030: COMMIT CLOSEOUT accepts only the authorized changed postcondition
     assert.doesNotMatch(terminal, new RegExp("b".repeat(40)));
     assert.deepEqual(engine.getRun(created.run_id), {
       schema_version: "run-projection.v1", run_id: created.run_id, target_id: "fal", worktree_identity: "git:abc", run_authority_sha256: created.run_authority_sha256,
+      router_policy: { bound_mode: "STANDARD", warning_count: 0, warning_rules: [] },
       review_cycle: "0", next_stage_sources: [], available_stage_sources: [], continuation_requirements: [], auto_advance: false,
     });
   } finally {
@@ -1748,6 +1943,99 @@ test("resolve-stage recovers one exact command-root terminal after an uncertain 
     assert.equal(calls, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("STANDARD preserves an uncertain send claim and blocks a duplicate POST", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-standard-uncertain-"));
+  try {
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.routerPolicyMode = "STANDARD";
+    const engine = new StageEngine(new StateStore(root), resolver, new CommandClient(async () => {
+      calls += 1;
+      throw new Error("timeout after acceptance unknown");
+    }));
+    const first = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const result = await engine.invokeStage(request(first.run_id, first.run_authority_sha256, sha256(resolver.sourceContent)));
+    assert.equal(result.operation_status, "UNCERTAIN");
+    const second = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    await assert.rejects(() => engine.invokeStage(request(second.run_id, second.run_authority_sha256, sha256(resolver.sourceContent))), /semantic action/i);
+    assert.equal(calls, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("STANDARD resolve-stage normalizes or evidence-gaps one correlated terminal without resending", async () => {
+  const canonical = planReviewSource();
+  const scenarios = [
+    {
+      name: "wrapped",
+      recoveredText: `Here is the requested canonical output:\n${canonical}\nEnd of canonical output.`,
+      status: "SUCCEEDED",
+      rule: "UNIQUE_CANONICAL_ENVELOPE",
+      artifact: `${canonical}\n`,
+      allowedNext: ["PLAN_REVISION"],
+    },
+    {
+      name: "missing-required",
+      recoveredText: canonical.split("\n").filter((line) => !line.startsWith("Acceptance/evidence decision:")).join("\n"),
+      status: "EVIDENCE_GAP",
+      rule: "REQUIRED_SEMANTIC_FACT_MISSING",
+      artifact: `${canonical.split("\n").filter((line) => !line.startsWith("Acceptance/evidence decision:")).join("\n")}\n`,
+      allowedNext: [],
+    },
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const root = mkdtempSync(path.join(tmpdir(), `fal-router-standard-reconcile-${scenario.name}-`));
+    try {
+      mkdirSync(path.join(root, ".opencode-router"));
+      let sends = 0;
+      const store = new StateStore(root);
+      const resolver = new FakeResolver();
+      resolver.routerPolicyMode = "STANDARD";
+      resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+      resolver.fenceTargetRoot = root;
+      const snapshot = {
+        captureBaseline: async () => ({ message_id: "assistant-baseline", identity_sha256: sha256("assistant-baseline"), captured_at: new Date().toISOString() }),
+        collect: async () => [{
+          id: `assistant-standard-${scenario.name}`,
+          parent_id: "user-command-root",
+          session_id: resolver.recipientSessionId,
+          text: scenario.recoveredText,
+          after_baseline: true,
+          command_root_correlated: true,
+        }],
+      };
+      const client = new CommandClient(async () => {
+        sends += 1;
+        throw new Error("delivery unknown");
+      });
+      const engine = new StageEngine(store, resolver, client, snapshot);
+      const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+      const uncertain = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+      assert.equal(uncertain.operation_status, "UNCERTAIN");
+
+      const recoveryEngine = new StageEngine(store, resolver, client, snapshot);
+      const reconciled = await recoveryEngine.resolveStage(created.run_id, uncertain.operation_id);
+      assert.equal(reconciled.operation_status, scenario.status, JSON.stringify(reconciled));
+      assert.equal(reconciled.transport_status, "TRANSCRIPT_RECONCILED");
+      assert.deepEqual(reconciled.allowed_next, scenario.allowedNext);
+      assert.equal(sends, 1);
+      const operationRoot = path.join(root, "runs", created.run_id, "operations", uncertain.operation_id);
+      assert.equal(readFileSync(path.join(operationRoot, "terminal.md"), "utf8"), scenario.artifact);
+      const warnings = store.listRouterWarningReceipts(created.run_id, uncertain.operation_id);
+      assert.equal(warnings.length, 1);
+      assert.equal(warnings[0]!.rule, scenario.rule);
+      assert.equal(warnings[0]!.raw_output_persisted, false);
+      const repeated = await recoveryEngine.resolveStage(created.run_id, uncertain.operation_id);
+      assert.deepEqual(repeated, reconciled);
+      assert.equal(sends, 1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 
@@ -1889,6 +2177,7 @@ test("P0B production mode reaches response-first stage engine and consumes its g
     mkdirSync(path.join(root, ".opencode-router"));
     let calls = 0;
     const resolver = new FakeResolver();
+    resolver.routerPolicyMode = "STANDARD";
     resolver.capabilityMode = "P0B_ISOLATED";
     resolver.fenceTargetRoot = root;
     const terminal = planReviewSource();
@@ -1910,6 +2199,14 @@ test("P0B production mode reaches response-first stage engine and consumes its g
     const current = { ...request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)), expected_contract_version: "awc-4.1.1" as const };
     const result = await engine.invokeStage(current);
     assert.equal(result.operation_status, "SUCCEEDED", JSON.stringify(result));
+    assert.deepEqual(result.router_policy, {
+      bound_mode: "STANDARD",
+      effective_mode: "STRICT",
+      disposition: "ACCEPTED_EXACT",
+      warning_rules: [],
+      input_sha256: sha256(terminal),
+      normalized_output_sha256: sha256(terminal),
+    });
     assert.equal(calls, 1);
     const capabilitySha = sha256("P0B_ISOLATED");
     assert.match(readFileSync(path.join(root, "capability-uses", `${capabilitySha}.json`), "utf8"), /"status":"CONSUMED"/);
@@ -1966,6 +2263,115 @@ test("P0B pre-POST capability drift sends nothing and releases an unconsumed gra
     assert.equal(result.transport_status, "NOT_SENT");
     assert.equal(calls, 0);
     assert.match(readFileSync(path.join(root, "capability-uses", `${sha256("P0B_ISOLATED")}.json`), "utf8"), /"status":"RELEASED"/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+class FailOnceTerminalSettlementStore extends StateStore {
+  private failTerminalSettlement = true;
+  override updateOperation(runId: string, operationId: string, expectedRevision: number, patch: Partial<Pick<OperationDocument, "status" | "intent_sha256">>): OperationDocument {
+    if (this.failTerminalSettlement && (patch.status === "SUCCEEDED" || patch.status === "EVIDENCE_GAP")) {
+      this.failTerminalSettlement = false;
+      throw new Error("fixture crash after final result persistence");
+    }
+    return super.updateOperation(runId, operationId, expectedRevision, patch);
+  }
+}
+
+test("resolve-stage validates exact authority and invocation bytes before snapshot recovery", async () => {
+  for (const kind of ["authority", "invocation"] as const) {
+    const root = mkdtempSync(path.join(tmpdir(), `fal-router-resolve-binding-${kind}-`));
+    try {
+      mkdirSync(path.join(root, ".opencode-router"));
+      let sends = 0;
+      let snapshotReads = 0;
+      const store = new StateStore(root);
+      const resolver = new FakeResolver();
+      resolver.routerPolicyMode = "STANDARD";
+      resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+      resolver.fenceTargetRoot = root;
+      const engine = new StageEngine(store, resolver, new CommandClient(async () => { sends += 1; throw new Error("delivery unknown"); }), {
+        captureBaseline: async () => ({ message_id: "binding-baseline", identity_sha256: sha256("binding-baseline"), captured_at: new Date().toISOString() }),
+        collect: async () => { snapshotReads += 1; return []; },
+      });
+      const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+      const uncertain = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+      const file = kind === "authority"
+        ? path.join(root, "runs", created.run_id, "run-authority.json")
+        : path.join(root, "runs", created.run_id, "operations", uncertain.operation_id, "stage-invocation.json");
+      const document = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+      writeFileSync(file, `${JSON.stringify(kind === "authority" ? { ...document, router_policy_mode: "STRICT" } : { ...document, recipient_session_sha256: "f".repeat(64) })}\n`, "utf8");
+      await assert.rejects(() => engine.resolveStage(created.run_id, uncertain.operation_id), kind === "authority" ? /Run authority hash mismatch/ : /invocation binding mismatch/);
+      assert.equal(snapshotReads, 0);
+      assert.equal(sends, 1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("prepared result rolls forward after restart without resend or premature warning visibility", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-result-roll-forward-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let sends = 0;
+    const store = new StateStore(root);
+    const resolver = new FakeResolver();
+    resolver.routerPolicyMode = "STANDARD";
+    resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+    resolver.fenceTargetRoot = root;
+    const wrapped = `Here is the requested canonical output:\n${planReviewSource()}\nEnd of canonical output.`;
+    const snapshots = {
+      captureBaseline: async () => ({ message_id: "roll-forward-baseline", identity_sha256: sha256("roll-forward-baseline"), captured_at: new Date().toISOString() }),
+      collect: async () => [{ id: "roll-forward-output", parent_id: "user-command-root", session_id: resolver.recipientSessionId, text: wrapped, after_baseline: true, command_root_correlated: true }],
+    };
+    const client = new CommandClient(async () => { sends += 1; throw new Error("delivery unknown"); });
+    const invokeEngine = new StageEngine(store, resolver, client, snapshots);
+    const created = await invokeEngine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const uncertain = await invokeEngine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+    const faultStore = new FailOnceTerminalSettlementStore(root);
+    await assert.rejects(() => new StageEngine(faultStore, resolver, client, snapshots).resolveStage(created.run_id, uncertain.operation_id), /fixture crash/);
+    assert.equal(faultStore.loadOperation(created.run_id, uncertain.operation_id).status, "RECONCILING");
+    assert.equal((faultStore.loadResult(created.run_id, uncertain.operation_id) as { operation_status: string }).operation_status, "SUCCEEDED");
+    assert.deepEqual(faultStore.listRouterWarningReceipts(created.run_id, uncertain.operation_id), []);
+
+    let restartReads = 0;
+    const restartStore = new StateStore(root);
+    const restartEngine = new StageEngine(restartStore, resolver, client, { collect: async () => { restartReads += 1; return []; } });
+    const recovered = await restartEngine.resolveStage(created.run_id, uncertain.operation_id);
+    assert.equal(recovered.operation_status, "SUCCEEDED");
+    assert.equal(restartStore.listRouterWarningReceipts(created.run_id, uncertain.operation_id).length, 1);
+    assert.equal(restartReads, 0);
+    assert.equal(sends, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("mismatching crash-window terminal stays fail-closed without resend", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-artifact-mismatch-"));
+  try {
+    mkdirSync(path.join(root, ".opencode-router"));
+    let sends = 0;
+    const store = new StateStore(root);
+    const resolver = new FakeResolver();
+    resolver.routerPolicyMode = "STANDARD";
+    resolver.capabilityMode = "PRODUCTION_RESPONSE_FIRST";
+    resolver.fenceTargetRoot = root;
+    const snapshots = {
+      captureBaseline: async () => ({ message_id: "artifact-baseline", identity_sha256: sha256("artifact-baseline"), captured_at: new Date().toISOString() }),
+      collect: async () => [{ id: "artifact-output", parent_id: "user-command-root", session_id: resolver.recipientSessionId, text: planReviewSource(), after_baseline: true, command_root_correlated: true }],
+    };
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => { sends += 1; throw new Error("delivery unknown"); }), snapshots);
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const uncertain = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+    store.writeArtifact(created.run_id, uncertain.operation_id, "terminal", "mismatching terminal\n");
+    await assert.rejects(() => engine.resolveStage(created.run_id, uncertain.operation_id), /Artifact identity collision/);
+    assert.equal(store.loadOperation(created.run_id, uncertain.operation_id).status, "RECONCILING");
+    assert.equal((store.loadResult(created.run_id, uncertain.operation_id) as { operation_status: string }).operation_status, "UNCERTAIN");
+    assert.deepEqual(store.listRouterWarningReceipts(created.run_id, uncertain.operation_id), []);
+    assert.equal(sends, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

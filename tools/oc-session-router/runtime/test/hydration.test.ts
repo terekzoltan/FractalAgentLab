@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { _test } from "../src/cli.js";
-import { authoritySha256, parseRunRequest, sha256, type RunAuthority, type StageInvocation, type StageRequest } from "../src/contracts.js";
+import { authoritySha256, boundRouterPolicyMode, canonicalize, parseRunRequest, sha256, type RunAuthority, type StageInvocation, type StageRequest } from "../src/contracts.js";
 import { StageEngine, promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh } from "../src/stage-engine.js";
 import { StateStore } from "../src/state-store.js";
 import { GitWorktreeReader, worktreeProofSha256 } from "../src/worktree-reader.js";
@@ -20,6 +20,8 @@ test("target state and exact Combined heading remain authority", () => {
 
 test("compact summary cannot become run authority", () => {
   assert.throws(() => parseRunRequest({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a", compact_summary: "continue" }), /unknown fields/);
+  assert.throws(() => parseRunRequest({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a", requested_router_policy_mode: "STANDARD" }), /only request stricter/);
+  assert.equal(parseRunRequest({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a", requested_router_policy_mode: "STRICT" }).requested_router_policy_mode, "STRICT");
 });
 
 test("duplicate target-state labels fail closed", () => {
@@ -74,11 +76,23 @@ test("CLI and PowerShell launcher derive authority from target state and fail on
     const resolver = new _test.FileAuthorityResolver(registryPath);
     const firstAuthority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-registry-1", createdAt: "2026-08-10T00:00:00.000Z" });
     assert.equal(firstAuthority.active_route_generation, "UNDECLARED");
+    assert.equal(firstAuthority.router_policy_mode, "STRICT", "missing Router mode must migrate compatibly to STRICT");
+    const statePath = path.join(target, "ops", "PROJECT_STATE.md");
+    const standardState = readFileSync(statePath, "utf8").replace("Review cycle: `0`", "Review cycle: `0`\nRouter mode: `STANDARD`");
+    writeFileSync(statePath, standardState);
+    const standardAuthority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-registry-standard", createdAt: "2026-08-10T00:00:00.100Z" });
+    assert.equal(standardAuthority.router_policy_mode, "STANDARD");
+    const callerStrictAuthority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a", requested_router_policy_mode: "STRICT" }, { runId: "run-registry-caller-strict", createdAt: "2026-08-10T00:00:00.200Z" });
+    assert.equal(callerStrictAuthority.router_policy_mode, "STRICT", "caller may tighten but never lower the target mode");
+    writeFileSync(statePath, standardState.replace("Router mode: `STANDARD`", "Router mode: `LOOSE`"));
+    await assert.rejects(() => resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-registry-invalid-mode", createdAt: "2026-08-10T00:00:00.300Z" }), /Router mode must be STANDARD or STRICT/);
+    writeFileSync(statePath, standardState);
     const optionalChanged = { ...activeBase, created_utc: "2026-08-12T00:00:01.000Z", route_input: { ...activeBase.route_input, path: "plans/other.md" }, generation_id: "" };
     optionalChanged.generation_id = _test.activeRouteGeneration(optionalChanged as never);
     writeFileSync(path.join(target, ".fal", "ACTIVE_ROUTE.json"), JSON.stringify(optionalChanged));
     const optionalChangedAuthority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-registry-optional", createdAt: "2026-08-10T00:00:00.500Z" });
     assert.equal(optionalChangedAuthority.active_route_generation, "UNDECLARED");
+    assert.equal(optionalChangedAuthority.router_policy_mode, "STANDARD");
     registry.targets.fal.profile_identity = "profile-2";
     writeFileSync(registryPath, JSON.stringify(registry));
     const secondAuthority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:a" }, { runId: "run-registry-2", createdAt: "2026-08-10T00:00:01.000Z" });
@@ -156,15 +170,50 @@ test("CLI resolve-stage preserves UNCERTAIN while production launcher rejects al
     };
     const store = new StateStore(runtime);
     store.createRun(authority, authoritySha256(authority));
-    const invocation = {
+    const runAuthorityHash = authoritySha256(authority);
+    const invocation: StageInvocation = {
       schema_version: "stage-invocation.v1",
       operation_id: "op-resolve-fixture",
+      request_id: "request-resolve-fixture",
       run_id: authority.run_id,
+      issued_at: "2026-08-10T00:01:00.000Z",
+      issued_by: "orchestrator",
+      run_authority_sha256: runAuthorityHash,
       requested_stage: "PLAN_REVIEW",
+      plan_class: "EPIC_PLAN",
+      target_id: authority.target_id,
+      worktree_identity: authority.worktree_identity,
+      state_revision: authority.state_revision,
+      state_sha256: authority.state_sha256,
+      combined_selector: authority.combined_selector,
+      combined_span_sha256: authority.combined_span_sha256,
+      expected_sources: [],
+      wave: authority.wave,
+      epic: authority.epic,
+      accountable_lane: authority.accountable_lane,
+      accountable_class: authority.accountable_class,
+      accountable_profile: authority.accountable_profile,
+      sender_role: authority.accountable_lane,
+      recipient_role: "Meta",
+      plan_identity: authority.pinned_artifact_identity,
+      candidate_identity: "UNDECLARED",
+      review_cycle: authority.review_cycle,
+      finding_ids: [],
+      review_risk: "low_risk",
+      project_review_context: authority.target_id,
+      expected_contract_version: "awc-4.1.1",
+      allowed_side_effect_class: "ADDRESSED_SESSION_COMMAND",
+      configuration_identity: authority.configuration_identity,
+      active_route_generation: authority.active_route_generation,
+      canon_phase: "PLAN_REVIEW",
+      command_name: "terv-review",
+      command_argument_sha256: sha256("resolve-fixture-argument"),
+      command_body_sha256: sha256("resolve-fixture-body"),
       recipient_session_sha256: sha256("private-session"),
       semantic_key: sha256("resolve-fixture"),
-    } as StageInvocation;
-    const operation = store.createOperation(authority.run_id, invocation, { schema_version: "dispatch-intent.v1" }, sha256("intent"));
+    };
+    const intent = { schema_version: "dispatch-intent.v1" };
+    const operation = store.createOperation(authority.run_id, invocation, intent, sha256(canonicalize(intent)));
     store.updateOperation(authority.run_id, operation.operation_id, operation.revision, { status: "DISPATCHING" });
 
     const cli = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/cli.js");
@@ -271,7 +320,7 @@ test("FSR-012/017: real resolver reloads protected manifest and stage sources", 
   }
 });
 
-test("operational registry refresh preserves an immutable run and its promoted next-stage source", async () => {
+test("operational registry refresh preserves a pre-v34 immutable STRICT run and its promoted next-stage source", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "fal-router-operational-refresh-"));
   const previousUsername = process.env.OPENCODE_SERVER_USERNAME;
   const previousPassword = process.env.OPENCODE_SERVER_PASSWORD;
@@ -305,7 +354,10 @@ test("operational registry refresh preserves an immutable run and its promoted n
     process.env.OPENCODE_SERVER_PASSWORD = "fixture-password";
     const store = new StateStore(runtime);
     const resolver = new _test.FileAuthorityResolver(registryPath, undefined, undefined, undefined, undefined, store);
-    const authority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "ringfall", expected_worktree_identity: "git:ringfall" }, { runId: "run-refresh-1", createdAt: "2026-08-26T00:00:00.000Z" });
+    const derivedAuthority = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "ringfall", expected_worktree_identity: "git:ringfall" }, { runId: "run-refresh-1", createdAt: "2026-08-26T00:00:00.000Z" });
+    const { router_policy_mode: _preV34MissingPolicy, ...authority } = derivedAuthority;
+    assert.equal(Object.hasOwn(authority, "router_policy_mode"), false);
+    assert.equal(boundRouterPolicyMode(authority as RunAuthority), "STRICT");
     store.createRun(authority, authoritySha256(authority));
     const invocation = { schema_version: "stage-invocation.v1", operation_id: "op-seq-next", run_id: authority.run_id, requested_stage: "SEQ_NEXT" } as StageInvocation;
     const operation = store.createOperation(authority.run_id, invocation, { schema_version: "dispatch-intent.v1" }, sha256("intent"));
@@ -332,6 +384,7 @@ test("operational registry refresh preserves an immutable run and its promoted n
     registry.targets.ringfall.server.fingerprint = "fixture-after";
     writeFileSync(registryPath, JSON.stringify(registry));
     const refreshed = await resolver.resolveStageAuthority(authority, stage);
+    assert.equal(Object.hasOwn(refreshed.run_authority, "router_policy_mode"), false, "refresh must preserve the legacy authority bytes");
     assert.equal(authoritySha256(refreshed.run_authority), authoritySha256(authority));
     assert.equal(refreshed.sources[0]!.binding.producer, "FAL_ROUTER_OUTPUT");
     const current = await resolver.deriveRunAuthority({ schema_version: "run-request.v1", target_id: "ringfall", expected_worktree_identity: "git:ringfall" }, { runId: authority.run_id, createdAt: authority.created_at });

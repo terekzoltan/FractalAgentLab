@@ -7,6 +7,23 @@ review-fix, polling, and resume examples in this document are historical unless
 they explicitly call `scripts/Invoke-OCRouter.ps1`. Historical run artifacts are
 readable and non-resumable.
 
+## STANDARD / STRICT output-policy reference
+
+The router has two independent mode families. Protected control-plane mode owns
+whether any POST is admissible; immutable `router_policy_mode` owns only how a
+correctly addressed response is validated. Missing policy on legacy runs means
+`STRICT`. `CLOSEOUT` and P0B remain effectively strict even in a STANDARD run.
+
+`ACCEPTED_NORMALIZED` is a canonical artifact with digest-only warning receipts,
+not a raw-output exception. STANDARD `EVIDENCE_GAP` is terminal, preserves accepted
+transport evidence, projects no successor, and never authorizes resend. Inspect
+the bounded `router_policy.bound_mode`, `router_policy.warning_count`, and
+`router_policy.warning_rules` projection. A pre-v34 run with no warning receipt
+may omit that object; interpret the omission as effective `STRICT` rather than
+as missing authority;
+load private operation evidence only for a named incident. The exact finite rule
+list and adoption procedure are in the hot runbook.
+
 ## Status and purpose
 
 This is the selective cold reference for FAL's current AWC router adapter. The hot

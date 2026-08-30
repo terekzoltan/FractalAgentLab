@@ -135,6 +135,9 @@ class FileAuthorityResolver implements AuthorityResolver {
     const candidateIdentity = label(stateText, "Candidate identity");
     const reviewCycle = label(stateText, "Review cycle");
     if (!/^(?:0|[1-9]\d*)$/.test(reviewCycle)) throw new Error("Target state review cycle is invalid");
+    const declaredRouterPolicyMode = optionalLabel(stateText, "Router mode") ?? "STRICT";
+    if (declaredRouterPolicyMode !== "STANDARD" && declaredRouterPolicyMode !== "STRICT") throw new Error("Target state Router mode must be STANDARD or STRICT");
+    const routerPolicyMode = request.requested_router_policy_mode === "STRICT" ? "STRICT" : declaredRouterPolicyMode;
     const stageSourceManifestPath = label(stateText, "Stage source manifest");
     const stageSourceManifestSha256 = label(stateText, "Stage source manifest SHA-256");
     const nextCommand = label(stateText, "Next command");
@@ -190,6 +193,7 @@ class FileAuthorityResolver implements AuthorityResolver {
       accountable_role_identity: sha256(role.text),
       configuration_identity: configurationIdentity,
       active_route_generation: activeRouteGeneration,
+      router_policy_mode: routerPolicyMode,
       review_cycle: reviewCycle,
       stage_source_manifest_path: stageSourceManifestPath,
       stage_source_manifest_sha256: stageSourceManifestSha256,
@@ -206,10 +210,13 @@ class FileAuthorityResolver implements AuthorityResolver {
   async resolveStageAuthority(runAuthority: RunAuthority, request: StageRequest): Promise<ResolvedStageAuthority> {
     const loaded = this.loadRegistry();
     const current = this.deriveRunAuthorityFromRegistry(
-      { schema_version: "run-request.v1", target_id: runAuthority.target_id, expected_worktree_identity: runAuthority.worktree_identity },
+      { schema_version: "run-request.v1", target_id: runAuthority.target_id, expected_worktree_identity: runAuthority.worktree_identity, ...(runAuthority.router_policy_mode === "STANDARD" ? {} : { requested_router_policy_mode: "STRICT" as const }) },
       { runId: runAuthority.run_id, createdAt: runAuthority.created_at },
       loaded,
     );
+    // Preserve the exact bytes of a pre-policy immutable run during operational
+    // refresh. Its missing field already resolves semantically to STRICT.
+    if (runAuthority.router_policy_mode === undefined) delete current.router_policy_mode;
     const target = this.target(runAuthority.target_id, loaded.registry);
     const root = this.targetRoot(loaded.registry, target);
     const authorityMatches = this.stateStore ? targetAuthorityMatchesRun(this.stateStore, current, runAuthority) : runAuthorityMatchesAcrossOperationalRefresh(current, runAuthority);
@@ -236,10 +243,11 @@ class FileAuthorityResolver implements AuthorityResolver {
     if (!this.worktreeReader) throw new Error("Protected Git worktree reader is unavailable");
     const loaded = this.loadRegistry();
     const current = this.deriveRunAuthorityFromRegistry(
-      { schema_version: "run-request.v1", target_id: runAuthority.target_id, expected_worktree_identity: runAuthority.worktree_identity },
+      { schema_version: "run-request.v1", target_id: runAuthority.target_id, expected_worktree_identity: runAuthority.worktree_identity, ...(runAuthority.router_policy_mode === "STANDARD" ? {} : { requested_router_policy_mode: "STRICT" as const }) },
       { runId: runAuthority.run_id, createdAt: runAuthority.created_at },
       loaded,
     );
+    if (runAuthority.router_policy_mode === undefined) delete current.router_policy_mode;
     const authorityMatches = this.stateStore ? targetAuthorityMatchesRun(this.stateStore, current, runAuthority) : runAuthorityMatchesAcrossOperationalRefresh(current, runAuthority);
     if (!authorityMatches) throw new Error("Current target semantic authority drifted");
     const root = this.targetRoot(loaded.registry, this.target(runAuthority.target_id, loaded.registry));

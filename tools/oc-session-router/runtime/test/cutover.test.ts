@@ -88,6 +88,8 @@ test("new entrypoint never installs or embeds a transport endpoint", () => {
   assert.doesNotMatch(launcher, /npm\s+(install|ci)|Invoke-RestMethod|https?:\/\//i);
   assert.match(launcher, /OC_ROUTER_CONTROL_REGISTRY/);
   assert.match(launcher, /ExpectedAttestationSha256/);
+  assert.match(launcher, /policy-validator\.js/);
+  assert.match(launcher, /policy-validator\.ts/);
   assert.doesNotMatch(launcher, /&\s+node\.exe/i);
 });
 
@@ -106,6 +108,7 @@ test("FSR-021: launcher pins attestation, Node, and compiled entry before execut
     const copiedRuntime = path.join(root, "runtime");
     mkdirSync(copiedScripts);
     mkdirSync(path.join(copiedRuntime, "dist", "src"), { recursive: true });
+    mkdirSync(path.join(copiedRuntime, "src"), { recursive: true });
     copyFileSync(path.join(scripts, "Invoke-OCRouter.ps1"), path.join(copiedScripts, "Invoke-OCRouter.ps1"));
     copyFileSync(path.resolve(scripts, "../runtime/executable-attestation.json"), path.join(copiedRuntime, "executable-attestation.json"));
     copyFileSync(path.resolve(scripts, "../runtime/dist/src/cli.js"), path.join(copiedRuntime, "dist", "src", "cli.js"));
@@ -117,7 +120,22 @@ test("FSR-021: launcher pins attestation, Node, and compiled entry before execut
     assert.notEqual(distTamper.status, 0);
     assert.match(distTamper.stderr, /Compiled router entry hash mismatch/);
 
-    copyFileSync(path.resolve(scripts, "../runtime/dist/src/cli.js"), path.join(copiedRuntime, "dist", "src", "cli.js"));
+    const compiledModules = ["cli.js", "contracts.js", "control-plane.js", "p0b-proof.js", "policy-validator.js", "snapshot-reader.js", "stage-engine.js", "state-store.js", "transport.js", "worktree-reader.js"];
+    for (const module of compiledModules) copyFileSync(path.resolve(scripts, "../runtime/dist/src", module), path.join(copiedRuntime, "dist", "src", module));
+    writeFileSync(path.join(copiedRuntime, "dist", "src", "policy-validator.js"), "tampered policy\n");
+    const policyDistTamper = run();
+    assert.notEqual(policyDistTamper.status, 0);
+    assert.match(policyDistTamper.stderr, /Compiled router manifest hash mismatch/);
+
+    copyFileSync(path.resolve(scripts, "../runtime/dist/src/policy-validator.js"), path.join(copiedRuntime, "dist", "src", "policy-validator.js"));
+    const sourceModules = ["cli.ts", "contracts.ts", "control-plane.ts", "p0b-proof.ts", "policy-validator.ts", "snapshot-reader.ts", "stage-engine.ts", "state-store.ts", "transport.ts", "worktree-reader.ts"];
+    for (const module of sourceModules) copyFileSync(path.resolve(scripts, "../runtime/src", module), path.join(copiedRuntime, "src", module));
+    writeFileSync(path.join(copiedRuntime, "src", "policy-validator.ts"), "tampered policy source\n");
+    const policySourceTamper = run();
+    assert.notEqual(policySourceTamper.status, 0);
+    assert.match(policySourceTamper.stderr, /Reviewed source manifest hash mismatch/);
+
+    copyFileSync(path.resolve(scripts, "../runtime/src/policy-validator.ts"), path.join(copiedRuntime, "src", "policy-validator.ts"));
     const manifest = JSON.parse(readFileSync(path.join(copiedRuntime, "executable-attestation.json"), "utf8"));
     manifest.compiled_entry_sha256 = "0".repeat(64);
     writeFileSync(path.join(copiedRuntime, "executable-attestation.json"), `${JSON.stringify(manifest, null, 2)}\n`);
