@@ -71,6 +71,12 @@ It is not project truth and does not grant workflow authority.
   and a bounded `warning_count`/`warning_rules` summary, never raw private output.
   A pre-v34 run with no warning receipts may omit `router_policy`; that omission
   is the backward-compatible representation of effective `STRICT`.
+- Compatibility closure in v34.1: an unexpected technical failure while
+  executing the `before_dispatch` Compact Lite hook is maintenance evidence,
+  not transport authority. For every ordinary non-`CLOSEOUT` stage the router
+  continues with a privacy-safe `HOOK_EXECUTION_FAILED_NONBLOCKING` Compact
+  receipt. A valid critical-pressure/busy result still waits or blocks exactly
+  as before, and `CLOSEOUT` keeps technical hook failure fail-closed.
 - An accepted P0B transport proof survives an ordinary server restart and
   forward OpenCode patch updates on the same strict `major.minor` line.
   Production admission binds stable server semantics; each dispatch separately

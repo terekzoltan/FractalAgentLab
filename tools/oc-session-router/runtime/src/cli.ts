@@ -894,6 +894,43 @@ function runCompactLiteHook(request: StageRequest, eventType: CompactHookEvent, 
   return result;
 }
 
+function compactHookFailureWarning(request: StageRequest, eventType: CompactHookEvent): CompactHookResult {
+  const { logicalSessionRef, roleHint } = compactProfileForStage(request);
+  return {
+    schema_version: "compact-lite-result/v1",
+    contract: "opencode-compact-lite/v1",
+    logical_session_ref: logicalSessionRef,
+    role_hint: roleHint,
+    event_type: eventType,
+    disposition: "CONTINUE",
+    reason: "HOOK_EXECUTION_FAILED_NONBLOCKING",
+    pressure_state: "unknown",
+    session_state: "unknown",
+    workflow_command_sent: false,
+    terminal: true,
+    privacy: {
+      absolute_roots_emitted: false,
+      credentials_emitted: false,
+      endpoints_emitted: false,
+      ports_emitted: false,
+      raw_session_ids_emitted: false,
+      transcripts_emitted: false,
+    },
+  };
+}
+
+function runCompactLitePreflightHook(
+  request: StageRequest,
+  registryPath: string,
+  hook: typeof runCompactLiteHook = runCompactLiteHook,
+): CompactHookResult {
+  try { return hook(request, "before_dispatch", registryPath); }
+  catch (error) {
+    if (request.requested_stage === "CLOSEOUT") throw error;
+    return compactHookFailureWarning(request, "before_dispatch");
+  }
+}
+
 async function main(): Promise<void> {
   const operation = process.argv[2];
   if (!operation || !["new-run", "new-follow-on-run", "invoke-stage", "install-closeout-authority", "resolve-stage", "get-run", "purge-retention", "write-p0b-proof", "resolve-compact-authority", "consume-compact-authority"].includes(operation)) throw new ClassifiedCliError("REQUEST_INVALID");
@@ -927,7 +964,7 @@ async function main(): Promise<void> {
   } else if (operation === "invoke-stage") {
     const request = classified("REQUEST_INVALID", () => parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     if (!registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
-    const compactPreflight = await classifiedAsync("COMPACT_PREFLIGHT_BLOCKED", () => resolveCompactPreflight(() => runCompactLiteHook(request, "before_dispatch", registryPath)));
+    const compactPreflight = await classifiedAsync("COMPACT_PREFLIGHT_BLOCKED", () => resolveCompactPreflight(() => runCompactLitePreflightHook(request, registryPath)));
     result = await classifiedAsync("BLOCKED", () => engine.invokeStage(request));
     let compactAfterStage: CompactHookResult | undefined;
     let compactAfterStageStatus: "RECORDED" | "HOOK_FAILED" = "RECORDED";
@@ -1046,4 +1083,4 @@ if (isEntry) {
   });
 }
 
-export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, compactProfileForStage, compactPreflightDiagnostic, compactPreflightReady, resolveCompactPreflight, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };
+export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, compactProfileForStage, compactPreflightDiagnostic, compactPreflightReady, resolveCompactPreflight, compactHookFailureWarning, runCompactLitePreflightHook, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };

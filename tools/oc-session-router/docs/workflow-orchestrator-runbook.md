@@ -324,7 +324,12 @@ Compact Lite is the sole active automatic compact path. The production
 `Invoke-OCRouter.ps1 -Operation invoke-stage` launcher now performs the
 `before_dispatch` Compact Lite hook before operation creation and the
 `after_stage_output` hook after the settled stage result. The Orchestrator must
-not skip, duplicate, or separately emulate those two checks. Invoke
+not skip, duplicate, or separately emulate those two checks. A technical hook
+execution failure before an ordinary non-`CLOSEOUT` stage is recorded as the
+privacy-safe `HOOK_EXECUTION_FAILED_NONBLOCKING` maintenance warning and does
+not consume or block lifecycle send authority. A valid critical-pressure/busy
+result still waits or blocks, and `CLOSEOUT` keeps technical hook failure
+fail-closed. Invoke
 `invoke-session-compact-lite.ps1` directly only for `epic_closeout`, an explicitly
 named operator diagnostic, or a test/dry-run. Non-dry operation resolves the target root, server instance,
 private session, timeout, and capability grant only through the attested fixed

@@ -109,6 +109,55 @@ test("Compact hook execution failure is observable without exposing the native e
   assert.equal(JSON.stringify(receipt).includes("secret"), false);
 });
 
+test("ordinary pre-dispatch hook execution failure becomes a privacy-safe nonblocking warning", async () => {
+  const request = {
+    target_id: "ringfall",
+    requested_stage: "IMPLEMENT",
+    accountable_profile: "ringfall.track-d",
+    recipient_role: "Track D",
+  } as Parameters<typeof _test.runCompactLitePreflightHook>[0];
+  const warning = _test.runCompactLitePreflightHook(request, "C:\\protected\\registry.json", () => {
+    throw new Error("private C:\\secret\\hook.log");
+  });
+  assert.deepEqual(warning, {
+    schema_version: "compact-lite-result/v1",
+    contract: "opencode-compact-lite/v1",
+    logical_session_ref: "track-d",
+    role_hint: "Track D",
+    event_type: "before_dispatch",
+    disposition: "CONTINUE",
+    reason: "HOOK_EXECUTION_FAILED_NONBLOCKING",
+    pressure_state: "unknown",
+    session_state: "unknown",
+    workflow_command_sent: false,
+    terminal: true,
+    privacy: {
+      absolute_roots_emitted: false,
+      credentials_emitted: false,
+      endpoints_emitted: false,
+      ports_emitted: false,
+      raw_session_ids_emitted: false,
+      transcripts_emitted: false,
+    },
+  });
+  const resolved = await _test.resolveCompactPreflight(() => warning, { max_wait_ms: 0, poll_interval_ms: 1 });
+  assert.equal(resolved.result, warning);
+  assert.equal(JSON.stringify(warning).includes("secret"), false);
+});
+
+test("CLOSEOUT keeps pre-dispatch Compact hook execution failure fail-closed", () => {
+  const request = {
+    target_id: "ringfall",
+    requested_stage: "CLOSEOUT",
+    accountable_profile: "ringfall.track-d",
+    recipient_role: "Meta",
+  } as Parameters<typeof _test.runCompactLitePreflightHook>[0];
+  assert.throws(
+    () => _test.runCompactLitePreflightHook(request, "C:\\protected\\registry.json", () => { throw new Error("hook failed"); }),
+    /hook failed/,
+  );
+});
+
 test("CLI error classifier separates bounded operational failure classes", () => {
   const cases: ReadonlyArray<readonly [Error, Parameters<typeof _test.classifyCliError>[1], string]> = [
     [new Error("request parser rejected private C:\\secret\\request.json"), "REQUEST_INVALID", "REQUEST_INVALID"],
