@@ -127,6 +127,116 @@ test("installed capability probe binds target directory and records SSE without 
   }
 });
 
+test("installed capability probe retries one transient GET-only round and never sends a lifecycle POST", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "fal-router-probe-retry-"));
+  const calls: Array<{ path: string; method: string }> = [];
+  let healthAttempts = 0;
+  const fake: FetchLike = async (input, init) => {
+    const endpoint = new URL(String(input));
+    calls.push({ path: endpoint.pathname, method: init?.method ?? "" });
+    if (endpoint.pathname === "/global/health" && ++healthAttempts === 1) return new Response("busy", { status: 503 });
+    if (endpoint.pathname === "/global/health") return new Response('{"healthy":true,"version":"1.18.19"}');
+    if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
+    if (endpoint.pathname === "/command") return new Response('[{"name":"implement"}]');
+    if (endpoint.pathname === "/event") return new Response('event: message\ndata: {"type":"server.connected"}\n\n', { headers: { "content-type": "text/event-stream" } });
+    throw new Error("unexpected endpoint");
+  };
+  try {
+    const probe = new InstalledCapabilityProbe(fake, 4 * 1024 * 1024, () => ({ server_binary_sha256: "9".repeat(64), server_instance_identity_sha256: "8".repeat(64) }), async () => {});
+    const result = await probe.probe({ origin: "http://127.0.0.1:4096", username: "owner", password: "process-only", directory, expected_binary_sha256: "9".repeat(64), required_commands: ["implement"], timeout_ms: 1000 });
+    assert.equal(result.server_version, "1.18.19");
+    assert.equal(healthAttempts, 2);
+    assert.equal(calls.filter((call) => call.path === "/event").length, 1);
+    assert.equal(calls.every((call) => call.method === "GET"), true);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("transient capability recovery leaves the subsequent explicit lifecycle transport at exactly one POST", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "fal-router-probe-then-send-"));
+  let healthAttempts = 0;
+  let lifecyclePosts = 0;
+  const fake: FetchLike = async (input, init) => {
+    const endpoint = new URL(String(input));
+    if (init?.method === "POST") { lifecyclePosts += 1; return new Response(JSON.stringify(responseBody)); }
+    if (endpoint.pathname === "/global/health" && ++healthAttempts === 1) return new Response("busy", { status: 503 });
+    if (endpoint.pathname === "/global/health") return new Response('{"healthy":true,"version":"1.18.19"}');
+    if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
+    if (endpoint.pathname === "/command") return new Response('[{"name":"implement"}]');
+    if (endpoint.pathname === "/event") return new Response('event: message\ndata: {"type":"server.connected"}\n\n', { headers: { "content-type": "text/event-stream" } });
+    throw new Error("unexpected endpoint");
+  };
+  try {
+    const probe = new InstalledCapabilityProbe(fake, 4 * 1024 * 1024, () => ({ server_binary_sha256: "9".repeat(64), server_instance_identity_sha256: "8".repeat(64) }), async () => {});
+    await probe.probe({ origin: "http://127.0.0.1:4096", username: "owner", password: "process-only", directory, expected_binary_sha256: "9".repeat(64), required_commands: ["implement"], timeout_ms: 1000 });
+    await new CommandClient(fake).send({ origin: "http://127.0.0.1:4096", server_fingerprint: "fingerprint", session_id: session, username: "owner", password: "process-only" }, "implement", "plan", 1000);
+    assert.equal(healthAttempts, 2);
+    assert.equal(lifecyclePosts, 1);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("installed capability probe exhausts one transient retry without reaching SSE or a lifecycle send", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "fal-router-probe-exhaust-"));
+  let healthAttempts = 0;
+  let eventAttempts = 0;
+  const fake: FetchLike = async (input, init) => {
+    assert.equal(init?.method, "GET");
+    const endpoint = new URL(String(input));
+    if (endpoint.pathname === "/global/health") { healthAttempts += 1; return new Response("busy", { status: 503 }); }
+    if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
+    if (endpoint.pathname === "/command") return new Response('[{"name":"implement"}]');
+    if (endpoint.pathname === "/event") { eventAttempts += 1; return new Response(); }
+    throw new Error("unexpected endpoint");
+  };
+  try {
+    const probe = new InstalledCapabilityProbe(fake, 4 * 1024 * 1024, () => ({ server_binary_sha256: "9".repeat(64), server_instance_identity_sha256: "8".repeat(64) }), async () => {});
+    await assert.rejects(
+      () => probe.probe({ origin: "http://127.0.0.1:4096", username: "owner", password: "process-only", directory, expected_binary_sha256: "9".repeat(64), required_commands: ["implement"], timeout_ms: 1000 }),
+      /transient retry exhausted/,
+    );
+    assert.equal(healthAttempts, 2);
+    assert.equal(eventAttempts, 0);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("installed capability probe never retries authentication or semantic command mismatch", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "fal-router-probe-nonretry-"));
+  try {
+    let authenticationAttempts = 0;
+    const authenticationProbe = new InstalledCapabilityProbe(async (input) => {
+      const endpoint = new URL(String(input));
+      if (endpoint.pathname === "/global/health") { authenticationAttempts += 1; return new Response("busy", { status: 503 }); }
+      return new Response("denied", { status: 401 });
+    }, 4 * 1024 * 1024, () => ({ server_binary_sha256: "9".repeat(64), server_instance_identity_sha256: "8".repeat(64) }), async () => {});
+    await assert.rejects(
+      () => authenticationProbe.probe({ origin: "http://127.0.0.1:4096", username: "owner", password: "process-only", directory, expected_binary_sha256: "9".repeat(64), required_commands: ["implement"], timeout_ms: 1000 }),
+      /capability probe failed/i,
+    );
+    assert.equal(authenticationAttempts, 1);
+
+    let commandAttempts = 0;
+    const semanticProbe = new InstalledCapabilityProbe(async (input) => {
+      const endpoint = new URL(String(input));
+      if (endpoint.pathname === "/global/health") return new Response('{"healthy":true,"version":"1.18.19"}');
+      if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
+      if (endpoint.pathname === "/command") { commandAttempts += 1; return new Response('[{"name":"terv-review"}]'); }
+      return new Response('event: message\ndata: {"type":"server.connected"}\n\n', { headers: { "content-type": "text/event-stream" } });
+    }, 4 * 1024 * 1024, () => ({ server_binary_sha256: "9".repeat(64), server_instance_identity_sha256: "8".repeat(64) }), async () => {});
+    await assert.rejects(
+      () => semanticProbe.probe({ origin: "http://127.0.0.1:4096", username: "owner", password: "process-only", directory, expected_binary_sha256: "9".repeat(64), required_commands: ["implement"], timeout_ms: 1000 }),
+      /lacks the requested command/,
+    );
+    assert.equal(commandAttempts, 1);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("installed capability probe hashes complete command semantics independent of response ordering", () => {
   const first = [
     { name: "terv-review", description: "review", template: "exact review body" },

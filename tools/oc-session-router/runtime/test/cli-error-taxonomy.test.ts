@@ -15,6 +15,7 @@ const EXPECTED_CODES = [
   "TOOL_ATTESTATION_BLOCKED",
   "UNSAFE_PATH",
   "P0B_REQUIRED",
+  "CAPABILITY_PROBE_BLOCKED",
   "SOURCE_IDENTITY_CHANGED",
   "PARTICIPANT_FENCE_BLOCKED",
   "DISPATCH_LEASE_BLOCKED",
@@ -167,6 +168,7 @@ test("CLI error classifier separates bounded operational failure classes", () =>
     [new Error("KnownFolder authority broker is unavailable at C:\\Windows"), "BLOCKED", "TOOL_ATTESTATION_BLOCKED"],
     [new Error("target path traverses a link or junction at C:\\private"), "BLOCKED", "UNSAFE_PATH"],
     [new Error("Production command dispatch is disabled until a reviewed P0B capability transaction"), "BLOCKED", "P0B_REQUIRED"],
+    [new Error("Installed capability probe transient retry exhausted"), "BLOCKED", "CAPABILITY_PROBE_BLOCKED"],
     [new Error("SOURCE_IDENTITY_CHANGED: stage source manifest hash differs at C:\\private"), "BLOCKED", "SOURCE_IDENTITY_CHANGED"],
     [new Error("Participant transport is locked by Compact or lifecycle dispatch"), "BLOCKED", "PARTICIPANT_FENCE_BLOCKED"],
     [new Error("EEXIST at private dispatch-leases path"), "BLOCKED", "DISPATCH_LEASE_BLOCKED"],
@@ -174,6 +176,41 @@ test("CLI error classifier separates bounded operational failure classes", () =>
     [new Error("unclassified internal failure at C:\\private"), "BLOCKED", "BLOCKED"],
   ];
   for (const [error, fallback, expected] of cases) assert.equal(_test.classifyCliError(error, fallback), expected);
+});
+
+test("pre-operation capability exhaustion is the only diagnostic that permits the exact same request", () => {
+  const safe = new _test.StageDispatchBlockedError(
+    "CAPABILITY_PROBE_BLOCKED",
+    _test.stageDispatchDiagnostic("CAPABILITY_PROBE_BLOCKED", false, false),
+  );
+  assert.deepEqual(_test.cliErrorReceipt(safe), {
+    error_code: "CAPABILITY_PROBE_BLOCKED",
+    stage_dispatch: {
+      schema_version: "stage-dispatch-diagnostic.v1",
+      phase: "LIVE_CAPABILITY",
+      operation_created: false,
+      lifecycle_send: false,
+      retry_disposition: "SAFE_SAME_REQUEST",
+    },
+  });
+
+  const semantic = new _test.StageDispatchBlockedError(
+    "SOURCE_IDENTITY_CHANGED",
+    _test.stageDispatchDiagnostic("SOURCE_IDENTITY_CHANGED", false, false),
+  );
+  assert.equal(_test.cliErrorReceipt(semantic).stage_dispatch?.retry_disposition, "NO_AUTOMATIC_RETRY");
+
+  const postOperation = new _test.StageDispatchBlockedError(
+    "CAPABILITY_PROBE_BLOCKED",
+    _test.stageDispatchDiagnostic("CAPABILITY_PROBE_BLOCKED", true, false),
+  );
+  assert.deepEqual(_test.cliErrorReceipt(postOperation).stage_dispatch, {
+    schema_version: "stage-dispatch-diagnostic.v1",
+    phase: "LIVE_CAPABILITY",
+    operation_created: true,
+    lifecycle_send: false,
+    retry_disposition: "NO_AUTOMATIC_RETRY",
+  });
 });
 
 test("request boundary remains authoritative when private paths contain taxonomy keywords", () => {

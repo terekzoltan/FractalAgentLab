@@ -271,9 +271,20 @@ invalid output and keeps the exact recovery/incident path.
   capability drift requires a new isolated P0B proof.
 - Lifecycle dispatch and Compact share the same persistent participant fence.
 - A pre-operation failure reports a bounded privacy-safe class:
-  `PARTICIPANT_FENCE_BLOCKED`, `DISPATCH_LEASE_BLOCKED`, or
+  `CAPABILITY_PROBE_BLOCKED`, `PARTICIPANT_FENCE_BLOCKED`,
+  `DISPATCH_LEASE_BLOCKED`, or
   `SNAPSHOT_BASELINE_BLOCKED`; generic `BLOCKED` is reserved for failures that
-  cannot be classified without exposing private material.
+  cannot be classified without exposing private material. The attached
+  `stage_dispatch` receipt records the finite phase, whether an operation or
+  lifecycle send exists, and the retry disposition without paths, endpoints,
+  credentials, session IDs, or native errors. The exact same request is safe to
+  repeat only when the class is `CAPABILITY_PROBE_BLOCKED`, no operation and no
+  send exist, and the receipt explicitly says `SAFE_SAME_REQUEST`.
+- The installed-capability preflight itself may rerun one complete GET-only probe
+  after a transport timeout/connection error or reviewed retryable status. It
+  never retries a lifecycle POST and never converts authentication, protected
+  authority, identity, command-roster, source, privacy, or semantic mismatch
+  into a retryable condition.
 - Snapshot baselines may hash completed historical `tool` and `patch` parts from
   a mature session. They never execute or persist their payloads, never treat
   them as terminal text, and still reject active tools, identity drift, unknown

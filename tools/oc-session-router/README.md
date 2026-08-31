@@ -115,6 +115,15 @@ It is not project truth and does not grant workflow authority.
   stage settles, the operation stores `compact-hooks.json` with the validated
   before/after projections; this receipt never changes the stage result and
   does not introduce automatic Compact recovery.
+- Live installed-capability measurement is GET-only and may repeat its complete
+  probe exactly once after a transport timeout/connection failure or a finite
+  retryable server status. Authentication, authority, identity, command-roster,
+  source, privacy, and semantic mismatches are never retried. This bounded probe
+  retry cannot repeat the lifecycle command POST.
+- A thrown `invoke-stage` pre-operation failure emits a privacy-safe
+  `stage_dispatch` diagnostic. Only `CAPABILITY_PROBE_BLOCKED` with both
+  `operation_created: false` and `lifecycle_send: false` declares
+  `SAFE_SAME_REQUEST`; every other class declares `NO_AUTOMATIC_RETRY`.
 - `Prepare-OCRouterStage.ps1` is the bounded no-send source-hash helper. It hashes
   only sources explicitly named by the operator and emits candidate manifest and
   state packet files; invocation remains a separate explicit transaction.

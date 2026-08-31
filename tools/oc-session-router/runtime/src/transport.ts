@@ -122,17 +122,38 @@ export class InstalledCapabilityProbe implements CapabilityProbe {
     private readonly fetchImpl: FetchLike = fetch,
     private readonly maximumBytes = 4 * 1024 * 1024,
     private readonly measureServerInstance: ServerInstanceMeasurer = measureWindowsServerInstance,
+    private readonly wait: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
   ) {}
 
   async probe(input: { origin: string; username: string; password: string; directory: string; expected_binary_sha256: string; required_commands: readonly string[]; timeout_ms: number }): Promise<CapabilityProbeProjection> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try { return await this.probeOnce(input); }
+      catch (error) {
+        if (!(error instanceof CapabilityProbeTransportError) || !error.retryable) throw error;
+        if (attempt === 1) throw new Error("Installed capability probe transient retry exhausted");
+        await this.wait(250);
+      }
+    }
+    throw new Error("Installed capability probe transient retry exhausted");
+  }
+
+  private async probeOnce(input: { origin: string; username: string; password: string; directory: string; expected_binary_sha256: string; required_commands: readonly string[]; timeout_ms: number }): Promise<CapabilityProbeProjection> {
     const origin = validateOrigin(input.origin);
     if (!input.username || !input.password) throw new Error("Capability probe authentication is unavailable");
     const authorization = basicAuthorization(input.username, input.password);
-    const [healthBytes, docBytes, commandBytes] = await Promise.all([
+    const measurements = await Promise.allSettled([
       this.get(new URL("/global/health", origin), authorization, input.timeout_ms),
       this.get(new URL("/doc", origin), authorization, input.timeout_ms),
       this.get(commandRegistryUrl(origin, input.directory), authorization, input.timeout_ms),
     ]);
+    const failures = measurements.filter((measurement): measurement is PromiseRejectedResult => measurement.status === "rejected");
+    const stableFailure = failures.find((failure) => !(failure.reason instanceof CapabilityProbeTransportError && failure.reason.retryable));
+    if (stableFailure) throw stableFailure.reason;
+    if (failures.length > 0) throw failures[0]!.reason;
+    const values = measurements.map((measurement) => (measurement as PromiseFulfilledResult<Uint8Array>).value);
+    const healthBytes = values[0]!;
+    const docBytes = values[1]!;
+    const commandBytes = values[2]!;
     const sse = await this.probeSse(origin, authorization, input.directory, Math.min(input.timeout_ms, 5_000));
     const health = parseHealth(parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(healthBytes)));
     const commandRegistry = parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(commandBytes));
@@ -156,10 +177,20 @@ export class InstalledCapabilityProbe implements CapabilityProbe {
   }
 
   private async get(endpoint: URL, authorization: string, timeoutMs: number): Promise<Uint8Array> {
-    const response = await this.fetchImpl(endpoint, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(timeoutMs), headers: { authorization, accept: "application/json" } });
+    let response: Response;
+    try {
+      response = await this.fetchImpl(endpoint, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(timeoutMs), headers: { authorization, accept: "application/json" } });
+    } catch {
+      throw new CapabilityProbeTransportError(true);
+    }
     if (response.status >= 300 && response.status < 400) throw new Error("Capability probe redirect is forbidden");
+    if ([408, 425, 429, 500, 502, 503, 504].includes(response.status)) throw new CapabilityProbeTransportError(true);
     if (!response.ok) throw new Error("Installed server capability probe failed");
-    return readBoundedBody(response, this.maximumBytes);
+    try { return await readBoundedBody(response, this.maximumBytes); }
+    catch (error) {
+      if (error instanceof Error && /byte limit/i.test(error.message)) throw error;
+      throw new CapabilityProbeTransportError(true);
+    }
   }
 
   private async probeSse(origin: URL, authorization: string, directory: string, timeoutMs: number): Promise<CapabilityProbeProjection["sse"]> {
@@ -195,6 +226,13 @@ export class InstalledCapabilityProbe implements CapabilityProbe {
       clearTimeout(timer);
       try { await reader?.cancel(); } catch { /* bounded diagnostic probe */ }
     }
+  }
+}
+
+class CapabilityProbeTransportError extends Error {
+  constructor(readonly retryable: boolean) {
+    super("Installed capability probe transport failure");
+    this.name = "CapabilityProbeTransportError";
   }
 }
 

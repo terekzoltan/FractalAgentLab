@@ -56,6 +56,7 @@ const CLI_ERROR_CODES = [
   "TOOL_ATTESTATION_BLOCKED",
   "UNSAFE_PATH",
   "P0B_REQUIRED",
+  "CAPABILITY_PROBE_BLOCKED",
   "SOURCE_IDENTITY_CHANGED",
   "PARTICIPANT_FENCE_BLOCKED",
   "DISPATCH_LEASE_BLOCKED",
@@ -89,6 +90,21 @@ class CompactPreflightBlockedError extends ClassifiedCliError {
   constructor(readonly diagnostic: CompactPreflightDiagnostic) {
     super("COMPACT_PREFLIGHT_BLOCKED");
     this.name = "CompactPreflightBlockedError";
+  }
+}
+
+interface StageDispatchDiagnostic {
+  schema_version: "stage-dispatch-diagnostic.v1";
+  phase: "LIVE_CAPABILITY" | "SOURCE_AUTHORITY" | "SESSION_FENCE" | "DISPATCH_LEASE" | "SNAPSHOT_BASELINE" | "PRE_OPERATION_VALIDATION" | "POST_OPERATION_FINALIZATION";
+  operation_created: boolean;
+  lifecycle_send: boolean;
+  retry_disposition: "SAFE_SAME_REQUEST" | "NO_AUTOMATIC_RETRY";
+}
+
+class StageDispatchBlockedError extends ClassifiedCliError {
+  constructor(errorCode: CliErrorCode, readonly diagnostic: StageDispatchDiagnostic) {
+    super(errorCode);
+    this.name = "StageDispatchBlockedError";
   }
 }
 
@@ -710,6 +726,7 @@ function classifyCliError(error: unknown, fallback: CliErrorCode = "BLOCKED"): C
   if (/link|junction|reparse|escapes (?:root|KnownFolder authority|protected control root|router root)|unsafe path|must (?:be|remain) an ordinary (?:absolute )?file|cannot be a link/i.test(message)) return "UNSAFE_PATH";
   if (/KnownFolder|LocalAppData|fixed (?:router|control) root|control registry differs from the KnownFolder authority/i.test(message)) return "ROOT_AUTHORITY_BLOCKED";
   if (/P0B|dispatch is disabled/i.test(message)) return "P0B_REQUIRED";
+  if (/Installed capability probe (?:transport failure|transient retry exhausted)/i.test(message)) return "CAPABILITY_PROBE_BLOCKED";
   if (/Participant transport|Shared session fence/i.test(message)) return "PARTICIPANT_FENCE_BLOCKED";
   if (/dispatch lease|dispatch-leases/i.test(message)) return "DISPATCH_LEASE_BLOCKED";
   if (/Snapshot|message collection shape/i.test(message)) return "SNAPSHOT_BASELINE_BLOCKED";
@@ -732,8 +749,26 @@ async function classifiedAsync<T>(fallback: CliErrorCode, action: () => Promise<
   catch (error) { return rethrowClassified(error, fallback); }
 }
 
-function cliErrorReceipt(error: unknown, fallback: CliErrorCode = "BLOCKED"): { error_code: CliErrorCode; compact_preflight?: CompactPreflightDiagnostic } {
+function stageDispatchDiagnostic(errorCode: CliErrorCode, operationCreated: boolean, lifecycleSend: boolean): StageDispatchDiagnostic {
+  const phase: StageDispatchDiagnostic["phase"] = errorCode === "CAPABILITY_PROBE_BLOCKED" ? "LIVE_CAPABILITY"
+    : errorCode === "SOURCE_IDENTITY_CHANGED" ? "SOURCE_AUTHORITY"
+      : errorCode === "PARTICIPANT_FENCE_BLOCKED" ? "SESSION_FENCE"
+        : errorCode === "DISPATCH_LEASE_BLOCKED" ? "DISPATCH_LEASE"
+          : errorCode === "SNAPSHOT_BASELINE_BLOCKED" ? "SNAPSHOT_BASELINE"
+            : operationCreated ? "POST_OPERATION_FINALIZATION"
+              : "PRE_OPERATION_VALIDATION";
+  return {
+    schema_version: "stage-dispatch-diagnostic.v1",
+    phase,
+    operation_created: operationCreated,
+    lifecycle_send: lifecycleSend,
+    retry_disposition: errorCode === "CAPABILITY_PROBE_BLOCKED" && !operationCreated && !lifecycleSend ? "SAFE_SAME_REQUEST" : "NO_AUTOMATIC_RETRY",
+  };
+}
+
+function cliErrorReceipt(error: unknown, fallback: CliErrorCode = "BLOCKED"): { error_code: CliErrorCode; compact_preflight?: CompactPreflightDiagnostic; stage_dispatch?: StageDispatchDiagnostic } {
   if (error instanceof CompactPreflightBlockedError) return { error_code: error.errorCode, compact_preflight: error.diagnostic };
+  if (error instanceof StageDispatchBlockedError) return { error_code: error.errorCode, stage_dispatch: error.diagnostic };
   return { error_code: classifyCliError(error, fallback) };
 }
 
@@ -965,7 +1000,22 @@ async function main(): Promise<void> {
     const request = classified("REQUEST_INVALID", () => parseStageRequest(parseStrictJson(readFileSync(required(args, "--request"), "utf8"))));
     if (!registryPath) throw new ClassifiedCliError("ROOT_AUTHORITY_BLOCKED");
     const compactPreflight = await classifiedAsync("COMPACT_PREFLIGHT_BLOCKED", () => resolveCompactPreflight(() => runCompactLitePreflightHook(request, registryPath)));
-    result = await classifiedAsync("BLOCKED", () => engine.invokeStage(request));
+    const operationsBefore = classified("STATE_STORE_BLOCKED", () => new Set(store.listOperations(request.run_id).map((entry) => entry.operation_id)));
+    try { result = await engine.invokeStage(request); }
+    catch (error) {
+      const errorCode = classifyCliError(error, "BLOCKED");
+      try {
+        const created = store.listOperations(request.run_id).filter((entry) => !operationsBefore.has(entry.operation_id));
+        let lifecycleSend = false;
+        for (const entry of created) {
+          if (store.loadTransportReceipt(request.run_id, entry.operation_id) !== undefined) lifecycleSend = true;
+        }
+        throw new StageDispatchBlockedError(errorCode, stageDispatchDiagnostic(errorCode, created.length > 0, lifecycleSend));
+      } catch (diagnosticError) {
+        if (diagnosticError instanceof StageDispatchBlockedError) throw diagnosticError;
+        throw new ClassifiedCliError(errorCode);
+      }
+    }
     let compactAfterStage: CompactHookResult | undefined;
     let compactAfterStageStatus: "RECORDED" | "HOOK_FAILED" = "RECORDED";
     try { compactAfterStage = runCompactLiteHook(request, "after_stage_output", registryPath); }
@@ -1083,4 +1133,4 @@ if (isEntry) {
   });
 }
 
-export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, compactProfileForStage, compactPreflightDiagnostic, compactPreflightReady, resolveCompactPreflight, compactHookFailureWarning, runCompactLitePreflightHook, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };
+export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, compactProfileForStage, compactPreflightDiagnostic, compactPreflightReady, resolveCompactPreflight, compactHookFailureWarning, runCompactLitePreflightHook, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, stageDispatchDiagnostic, StageDispatchBlockedError, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };

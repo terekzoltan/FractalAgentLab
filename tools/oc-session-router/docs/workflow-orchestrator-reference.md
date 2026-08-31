@@ -478,6 +478,15 @@ most one proven-idempotent retry. Do not try arbitrary console variants, restart
 or kill Owner-managed processes, guess credentials, rewrite state, or continue
 merely to avoid stopping.
 
+The sole automatic transport recovery is narrower: an installed-capability
+preflight may repeat its complete GET-only measurement once for a transient
+connection/timeout or reviewed retryable status. Lifecycle POST is never retried.
+When that measurement still fails before operation creation, the CLI emits
+`CAPABILITY_PROBE_BLOCKED` plus a sanitized `stage_dispatch` receipt. Only an
+explicit `SAFE_SAME_REQUEST` receipt with `operation_created: false` and
+`lifecycle_send: false` authorizes the orchestrator to repeat the identical
+stage request; all other dispositions require diagnosis or Owner action.
+
 ## Separation from compact, checkpoint, and closeout
 
 Compact Lite is the sole active compact mechanism and always ends with
