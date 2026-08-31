@@ -32,6 +32,7 @@ class FakeResolver implements AuthorityResolver {
   capabilityMode: "DISABLED" | "FIXTURE_ONLY" | "P0B_ISOLATED" | "PRODUCTION_RESPONSE_FIRST" = "FIXTURE_ONLY";
   capabilityIdentityGeneration = "";
   capabilityDriftOnCall = 0;
+  capabilityDriftEveryResolution = false;
   routerPolicyMode: "STANDARD" | "STRICT" = "STRICT";
   worktreeAfterResponse?: WorktreeProof;
   nextCommand = "/terv-review";
@@ -105,7 +106,7 @@ class FakeResolver implements AuthorityResolver {
       run_authority: runAuthority,
       sources,
       transport: { origin: "http://127.0.0.1:4321", server_fingerprint: "server-fingerprint-private", session_id: this.recipientSessionId, username: "router-user-private", password: "process-only", ...(this.fenceTargetRoot ? { directory: this.fenceTargetRoot } : {}) },
-      capability: this.capability(this.resolutionCalls === this.capabilityDriftOnCall ? "DISABLED" : this.capabilityMode),
+      capability: this.capability(this.capabilityDriftEveryResolution || this.resolutionCalls === this.capabilityDriftOnCall ? "DISABLED" : this.capabilityMode),
       privacy: { absolute_paths: ["C:\\fixture-target", "C:\\fixture-control"], private_values: this.privateValues },
       ...(this.capabilityMode === "P0B_ISOLATED" || this.capabilityMode === "PRODUCTION_RESPONSE_FIRST" ? { shared_fence: buildSharedFenceBinding(this.fenceTargetRoot ?? (() => { throw new Error("production fence root missing"); })(), this.recipientSessionId) } : {}),
       ...(request.requested_stage === "CLOSEOUT" ? { worktree: this.worktreeAfterResponse && this.resolutionCalls >= 3 ? this.worktreeAfterResponse : this.worktree } : {}),
@@ -452,6 +453,49 @@ test("immediate pre-send authority drift fails closed before POST", async () => 
     resolver.driftOnResolutionCall = 0;
     assert.equal((await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)))).operation_status, "SUCCEEDED");
     assert.equal(calls, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("initial live capability disagreement gets one GET-only stabilization before operation creation", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-initial-capability-stability-"));
+  try {
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.capabilityDriftOnCall = 1;
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => {
+      calls += 1;
+      return assistantResponse(planReviewSource(), "assistant-initial-capability-stability");
+    }));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    const result = await engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent)));
+    assert.equal(result.operation_status, "SUCCEEDED");
+    assert.equal(calls, 1);
+    assert.equal(resolver.resolutionCalls, 4);
+    assert.equal(store.listOperations(created.run_id).length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("persistent initial capability disagreement remains pre-operation and sends nothing", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "fal-router-persistent-capability-stability-"));
+  try {
+    let calls = 0;
+    const resolver = new FakeResolver();
+    resolver.capabilityDriftEveryResolution = true;
+    const store = new StateStore(root);
+    const engine = new StageEngine(store, resolver, new CommandClient(async () => { calls += 1; return new Response(); }));
+    const created = await engine.newRun({ schema_version: "run-request.v1", target_id: "fal", expected_worktree_identity: "git:abc" });
+    await assert.rejects(
+      () => engine.invokeStage(request(created.run_id, created.run_authority_sha256, sha256(resolver.sourceContent))),
+      (error: unknown) => error instanceof Error && error.name === "PreOperationStabilityError" && error.message === "Dispatch capability drifted before authority resolution",
+    );
+    assert.equal(resolver.resolutionCalls, 2);
+    assert.equal(calls, 0);
+    assert.equal(store.listOperations(created.run_id).length, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

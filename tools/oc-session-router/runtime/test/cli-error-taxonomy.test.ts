@@ -178,7 +178,7 @@ test("CLI error classifier separates bounded operational failure classes", () =>
   for (const [error, fallback, expected] of cases) assert.equal(_test.classifyCliError(error, fallback), expected);
 });
 
-test("pre-operation capability exhaustion is the only diagnostic that permits the exact same request", () => {
+test("only transient pre-operation live capability failures permit the exact same request", () => {
   const safe = new _test.StageDispatchBlockedError(
     "CAPABILITY_PROBE_BLOCKED",
     _test.stageDispatchDiagnostic("CAPABILITY_PROBE_BLOCKED", false, false),
@@ -186,8 +186,10 @@ test("pre-operation capability exhaustion is the only diagnostic that permits th
   assert.deepEqual(_test.cliErrorReceipt(safe), {
     error_code: "CAPABILITY_PROBE_BLOCKED",
     stage_dispatch: {
-      schema_version: "stage-dispatch-diagnostic.v1",
+      schema_version: "stage-dispatch-diagnostic.v2",
       phase: "LIVE_CAPABILITY",
+      reason_class: "LIVE_CAPABILITY_UNAVAILABLE",
+      stability_attempts: 0,
       operation_created: false,
       lifecycle_send: false,
       retry_disposition: "SAFE_SAME_REQUEST",
@@ -200,17 +202,48 @@ test("pre-operation capability exhaustion is the only diagnostic that permits th
   );
   assert.equal(_test.cliErrorReceipt(semantic).stage_dispatch?.retry_disposition, "NO_AUTOMATIC_RETRY");
 
+  const unstable = new _test.PreOperationStabilityError(new Error("Dispatch capability drifted before authority resolution"), 1);
+  assert.deepEqual(_test.stageDispatchDiagnostic("BLOCKED", false, false, unstable), {
+    schema_version: "stage-dispatch-diagnostic.v2",
+    phase: "LIVE_CAPABILITY",
+    reason_class: "LIVE_CAPABILITY_UNSTABLE",
+    stability_attempts: 1,
+    operation_created: false,
+    lifecycle_send: false,
+    retry_disposition: "SAFE_SAME_REQUEST",
+  });
+
   const postOperation = new _test.StageDispatchBlockedError(
     "CAPABILITY_PROBE_BLOCKED",
     _test.stageDispatchDiagnostic("CAPABILITY_PROBE_BLOCKED", true, false),
   );
   assert.deepEqual(_test.cliErrorReceipt(postOperation).stage_dispatch, {
-    schema_version: "stage-dispatch-diagnostic.v1",
-    phase: "LIVE_CAPABILITY",
+    schema_version: "stage-dispatch-diagnostic.v2",
+    phase: "POST_OPERATION_FINALIZATION",
+    reason_class: "POST_OPERATION_FAILURE",
+    stability_attempts: 0,
     operation_created: true,
     lifecycle_send: false,
     retry_disposition: "NO_AUTOMATIC_RETRY",
   });
+});
+
+test("pre-operation diagnostics classify semantic guards without leaking native messages", () => {
+  const cases = [
+    [new Error("state_revision binding mismatch at C:\\private"), "REQUEST_AUTHORITY", "REQUEST_AUTHORITY_MISMATCH"],
+    [new Error("Requested stage is not an allowed transition"), "STAGE_TRANSITION", "STAGE_TRANSITION_BLOCKED"],
+    [new Error("Current target semantic authority drifted"), "CURRENT_AUTHORITY", "CURRENT_AUTHORITY_DRIFT"],
+    [new Error("Protected source finding lineage mismatch"), "SOURCE_AUTHORITY", "SOURCE_AUTHORITY_MISMATCH"],
+    [new Error("Semantic action is already consumed or unresolved"), "DUPLICATE_ACTION", "DUPLICATE_ACTION_BLOCKED"],
+    [new Error("Run authority contains a private transport sentinel"), "PRIVACY_BOUNDARY", "PRIVACY_BOUNDARY_REJECTED"],
+  ] as const;
+  for (const [error, phase, reasonClass] of cases) {
+    const diagnostic = _test.stageDispatchDiagnostic("BLOCKED", false, false, error);
+    assert.equal(diagnostic.phase, phase);
+    assert.equal(diagnostic.reason_class, reasonClass);
+    assert.equal(diagnostic.retry_disposition, "NO_AUTOMATIC_RETRY");
+    assert.equal(JSON.stringify(diagnostic).includes("private"), false);
+  }
 });
 
 test("request boundary remains authoritative when private paths contain taxonomy keywords", () => {

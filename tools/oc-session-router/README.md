@@ -121,9 +121,13 @@ It is not project truth and does not grant workflow authority.
   source, privacy, and semantic mismatches are never retried. This bounded probe
   retry cannot repeat the lifecycle command POST.
 - A thrown `invoke-stage` pre-operation failure emits a privacy-safe
-  `stage_dispatch` diagnostic. Only `CAPABILITY_PROBE_BLOCKED` with both
+  `stage_dispatch.v2` diagnostic with a finite guard phase, reason class,
+  stability-attempt count, and send evidence. The initial capability/authority
+  pair may be re-read once when its two GET-only measurements disagree; no
+  operation exists yet. Only transient live-capability failure with both
   `operation_created: false` and `lifecycle_send: false` declares
-  `SAFE_SAME_REQUEST`; every other class declares `NO_AUTOMATIC_RETRY`.
+  `SAFE_SAME_REQUEST`; every semantic guard and every later failure declares
+  `NO_AUTOMATIC_RETRY`.
 - `Prepare-OCRouterStage.ps1` is the bounded no-send source-hash helper. It hashes
   only sources explicitly named by the operator and emits candidate manifest and
   state packet files; invocation remains a separate explicit transaction.

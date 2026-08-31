@@ -37,7 +37,7 @@ import {
   type ControlRegistry,
   type RegistryTarget,
 } from "./control-plane.js";
-import { StageEngine, promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh, targetAuthorityMatchesRun, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "./stage-engine.js";
+import { PreOperationStabilityError, StageEngine, promotedSourcesForStage, runAuthorityMatchesAcrossOperationalRefresh, targetAuthorityMatchesRun, type AuthorityResolver, type ResolvedSource, type ResolvedStageAuthority } from "./stage-engine.js";
 import { StateStore } from "./state-store.js";
 import { InstalledSnapshotReader } from "./snapshot-reader.js";
 import { CommandClient, InstalledCapabilityProbe, InstalledSnapshotClient } from "./transport.js";
@@ -94,8 +94,10 @@ class CompactPreflightBlockedError extends ClassifiedCliError {
 }
 
 interface StageDispatchDiagnostic {
-  schema_version: "stage-dispatch-diagnostic.v1";
-  phase: "LIVE_CAPABILITY" | "SOURCE_AUTHORITY" | "SESSION_FENCE" | "DISPATCH_LEASE" | "SNAPSHOT_BASELINE" | "PRE_OPERATION_VALIDATION" | "POST_OPERATION_FINALIZATION";
+  schema_version: "stage-dispatch-diagnostic.v2";
+  phase: "REQUEST_AUTHORITY" | "STAGE_TRANSITION" | "LIVE_CAPABILITY" | "CURRENT_AUTHORITY" | "SOURCE_AUTHORITY" | "PRIVACY_BOUNDARY" | "DUPLICATE_ACTION" | "SESSION_FENCE" | "DISPATCH_LEASE" | "SNAPSHOT_BASELINE" | "PRE_OPERATION_VALIDATION" | "POST_OPERATION_FINALIZATION";
+  reason_class: "REQUEST_AUTHORITY_MISMATCH" | "STAGE_TRANSITION_BLOCKED" | "LIVE_CAPABILITY_UNAVAILABLE" | "LIVE_CAPABILITY_UNSTABLE" | "CURRENT_AUTHORITY_DRIFT" | "SOURCE_AUTHORITY_MISMATCH" | "PRIVACY_BOUNDARY_REJECTED" | "DUPLICATE_ACTION_BLOCKED" | "SESSION_FENCE_BLOCKED" | "DISPATCH_LEASE_BLOCKED" | "SNAPSHOT_BASELINE_BLOCKED" | "POST_OPERATION_FAILURE" | "UNCLASSIFIED_PRE_OPERATION";
+  stability_attempts: number;
   operation_created: boolean;
   lifecycle_send: boolean;
   retry_disposition: "SAFE_SAME_REQUEST" | "NO_AUTOMATIC_RETRY";
@@ -749,20 +751,43 @@ async function classifiedAsync<T>(fallback: CliErrorCode, action: () => Promise<
   catch (error) { return rethrowClassified(error, fallback); }
 }
 
-function stageDispatchDiagnostic(errorCode: CliErrorCode, operationCreated: boolean, lifecycleSend: boolean): StageDispatchDiagnostic {
-  const phase: StageDispatchDiagnostic["phase"] = errorCode === "CAPABILITY_PROBE_BLOCKED" ? "LIVE_CAPABILITY"
-    : errorCode === "SOURCE_IDENTITY_CHANGED" ? "SOURCE_AUTHORITY"
-      : errorCode === "PARTICIPANT_FENCE_BLOCKED" ? "SESSION_FENCE"
-        : errorCode === "DISPATCH_LEASE_BLOCKED" ? "DISPATCH_LEASE"
-          : errorCode === "SNAPSHOT_BASELINE_BLOCKED" ? "SNAPSHOT_BASELINE"
-            : operationCreated ? "POST_OPERATION_FINALIZATION"
-              : "PRE_OPERATION_VALIDATION";
+function stageDispatchDiagnostic(errorCode: CliErrorCode, operationCreated: boolean, lifecycleSend: boolean, error?: unknown): StageDispatchDiagnostic {
+  const diagnosticError = error instanceof PreOperationStabilityError ? error.originalError : error;
+  const message = diagnosticError instanceof Error ? diagnosticError.message : "";
+  const reasonClass: StageDispatchDiagnostic["reason_class"] = operationCreated ? "POST_OPERATION_FAILURE"
+    : /(?:run authority hash mismatch|stage request run binding mismatch|(?:state_revision|state_sha256|combined_selector|combined_span_sha256|configuration_identity|active_route_generation|review_cycle|wave|epic|accountable_lane|accountable_class|accountable_profile) binding mismatch|issued_by|contract version mismatch|side-effect class|recipient role|sender role)/i.test(message) ? "REQUEST_AUTHORITY_MISMATCH"
+      : /(?:Requested first stage|Requested stage is not an allowed transition|Failed stage may only be retried|plan class changed)/i.test(message) ? "STAGE_TRANSITION_BLOCKED"
+        : /Dispatch capability drifted before authority resolution/i.test(message) ? "LIVE_CAPABILITY_UNSTABLE"
+          : errorCode === "CAPABILITY_PROBE_BLOCKED" || /(?:Production command dispatch is disabled|Production capability contract is incomplete|capability receipt|P0B capability)/i.test(message) ? "LIVE_CAPABILITY_UNAVAILABLE"
+            : /(?:Current target.*authority drifted|current target semantic authority drifted)/i.test(message) ? "CURRENT_AUTHORITY_DRIFT"
+              : errorCode === "SOURCE_IDENTITY_CHANGED" || /(?:source classes|source lineage|source content hash|SOURCE_SUBSTITUTION|stage source manifest|plan class or identity|plan review lineage|Revised plan lineage|finding lineage)/i.test(message) ? "SOURCE_AUTHORITY_MISMATCH"
+                : /private transport sentinel|private registry sentinel/i.test(message) ? "PRIVACY_BOUNDARY_REJECTED"
+                  : /Semantic action|semantic-actions/i.test(message) ? "DUPLICATE_ACTION_BLOCKED"
+                    : errorCode === "PARTICIPANT_FENCE_BLOCKED" ? "SESSION_FENCE_BLOCKED"
+                      : errorCode === "DISPATCH_LEASE_BLOCKED" ? "DISPATCH_LEASE_BLOCKED"
+                        : errorCode === "SNAPSHOT_BASELINE_BLOCKED" ? "SNAPSHOT_BASELINE_BLOCKED"
+                          : "UNCLASSIFIED_PRE_OPERATION";
+  const phase: StageDispatchDiagnostic["phase"] = reasonClass === "REQUEST_AUTHORITY_MISMATCH" ? "REQUEST_AUTHORITY"
+    : reasonClass === "STAGE_TRANSITION_BLOCKED" ? "STAGE_TRANSITION"
+      : reasonClass === "LIVE_CAPABILITY_UNAVAILABLE" || reasonClass === "LIVE_CAPABILITY_UNSTABLE" ? "LIVE_CAPABILITY"
+        : reasonClass === "CURRENT_AUTHORITY_DRIFT" ? "CURRENT_AUTHORITY"
+          : reasonClass === "SOURCE_AUTHORITY_MISMATCH" ? "SOURCE_AUTHORITY"
+            : reasonClass === "PRIVACY_BOUNDARY_REJECTED" ? "PRIVACY_BOUNDARY"
+              : reasonClass === "DUPLICATE_ACTION_BLOCKED" ? "DUPLICATE_ACTION"
+                : reasonClass === "SESSION_FENCE_BLOCKED" ? "SESSION_FENCE"
+                  : reasonClass === "DISPATCH_LEASE_BLOCKED" ? "DISPATCH_LEASE"
+                    : reasonClass === "SNAPSHOT_BASELINE_BLOCKED" ? "SNAPSHOT_BASELINE"
+                      : operationCreated ? "POST_OPERATION_FINALIZATION"
+                        : "PRE_OPERATION_VALIDATION";
+  const safeSameRequest = !operationCreated && !lifecycleSend && (errorCode === "CAPABILITY_PROBE_BLOCKED" || reasonClass === "LIVE_CAPABILITY_UNSTABLE");
   return {
-    schema_version: "stage-dispatch-diagnostic.v1",
+    schema_version: "stage-dispatch-diagnostic.v2",
     phase,
+    reason_class: reasonClass,
+    stability_attempts: error instanceof PreOperationStabilityError ? error.stabilityAttempts : 0,
     operation_created: operationCreated,
     lifecycle_send: lifecycleSend,
-    retry_disposition: errorCode === "CAPABILITY_PROBE_BLOCKED" && !operationCreated && !lifecycleSend ? "SAFE_SAME_REQUEST" : "NO_AUTOMATIC_RETRY",
+    retry_disposition: safeSameRequest ? "SAFE_SAME_REQUEST" : "NO_AUTOMATIC_RETRY",
   };
 }
 
@@ -1010,7 +1035,7 @@ async function main(): Promise<void> {
         for (const entry of created) {
           if (store.loadTransportReceipt(request.run_id, entry.operation_id) !== undefined) lifecycleSend = true;
         }
-        throw new StageDispatchBlockedError(errorCode, stageDispatchDiagnostic(errorCode, created.length > 0, lifecycleSend));
+        throw new StageDispatchBlockedError(errorCode, stageDispatchDiagnostic(errorCode, created.length > 0, lifecycleSend, error));
       } catch (diagnosticError) {
         if (diagnosticError instanceof StageDispatchBlockedError) throw diagnosticError;
         throw new ClassifiedCliError(errorCode);
@@ -1133,4 +1158,4 @@ if (isEntry) {
   });
 }
 
-export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, compactProfileForStage, compactPreflightDiagnostic, compactPreflightReady, resolveCompactPreflight, compactHookFailureWarning, runCompactLitePreflightHook, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, stageDispatchDiagnostic, StageDispatchBlockedError, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };
+export const _test = { headingSpan, label, optionalLabel, argumentsMap, validateOperationArguments, FileAuthorityResolver, dispatchAuthorityResolver, productionAuthorityResolver, productionAuthorityContext, resolveOsKnownFolderRoot, resolveCompactAuthorityOperation, compactAuthorityStatus, writeCompactAuthorityHandoff, compactProfileForStage, compactPreflightDiagnostic, compactPreflightReady, resolveCompactPreflight, compactHookFailureWarning, runCompactLitePreflightHook, requiredSourceClasses, parseActiveRoute, activeRouteGeneration, assertActiveRouteBinding, assertArtifactPrivate, CLI_ERROR_CODES, classifyCliError, stateStoreErrorCode, stageDispatchDiagnostic, StageDispatchBlockedError, PreOperationStabilityError, cliErrorReceipt, cliErrorJson, serializeCliJsonRow, writeCliJsonRow };

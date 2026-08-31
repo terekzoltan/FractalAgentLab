@@ -275,16 +275,22 @@ invalid output and keeps the exact recovery/incident path.
   `DISPATCH_LEASE_BLOCKED`, or
   `SNAPSHOT_BASELINE_BLOCKED`; generic `BLOCKED` is reserved for failures that
   cannot be classified without exposing private material. The attached
-  `stage_dispatch` receipt records the finite phase, whether an operation or
-  lifecycle send exists, and the retry disposition without paths, endpoints,
-  credentials, session IDs, or native errors. The exact same request is safe to
-  repeat only when the class is `CAPABILITY_PROBE_BLOCKED`, no operation and no
-  send exist, and the receipt explicitly says `SAFE_SAME_REQUEST`.
+  `stage_dispatch.v2` receipt records the finite guard phase, reason class,
+  stability-attempt count, whether an operation or lifecycle send exists, and
+  the retry disposition without paths, endpoints, credentials, session IDs, or
+  native errors. The exact same request is safe to repeat only for a transient
+  live-capability class when no operation and no send exist and the receipt
+  explicitly says `SAFE_SAME_REQUEST`.
 - The installed-capability preflight itself may rerun one complete GET-only probe
   after a transport timeout/connection error or reviewed retryable status. It
   never retries a lifecycle POST and never converts authentication, protected
   authority, identity, command-roster, source, privacy, or semantic mismatch
   into a retryable condition.
+- Before operation creation, the initial capability/authority pair may be read
+  once more when the two live measurements disagree. A stable second pair may
+  proceed; persistent disagreement remains a no-send block. This stabilization
+  never repeats request, transition, source, privacy, duplicate-action, fence,
+  lease, baseline, or lifecycle POST work.
 - Snapshot baselines may hash completed historical `tool` and `patch` parts from
   a mature session. They never execute or persist their payloads, never treat
   them as terminal text, and still reject active tools, identity drift, unknown

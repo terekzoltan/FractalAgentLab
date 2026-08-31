@@ -480,12 +480,14 @@ merely to avoid stopping.
 
 The sole automatic transport recovery is narrower: an installed-capability
 preflight may repeat its complete GET-only measurement once for a transient
-connection/timeout or reviewed retryable status. Lifecycle POST is never retried.
-When that measurement still fails before operation creation, the CLI emits
-`CAPABILITY_PROBE_BLOCKED` plus a sanitized `stage_dispatch` receipt. Only an
-explicit `SAFE_SAME_REQUEST` receipt with `operation_created: false` and
-`lifecycle_send: false` authorizes the orchestrator to repeat the identical
-stage request; all other dispositions require diagnosis or Owner action.
+connection/timeout or reviewed retryable status. The initial capability and
+authority pair may also be re-read once when those two pre-operation GET-only
+measurements disagree. Lifecycle POST is never retried. A remaining failure
+emits a sanitized `stage_dispatch.v2` receipt with finite phase, reason class,
+stability count, and send evidence. Only an explicit `SAFE_SAME_REQUEST` receipt
+with `operation_created: false` and `lifecycle_send: false` authorizes the
+orchestrator to repeat the identical stage request; semantic guard failures and
+all later dispositions require diagnosis or Owner action.
 
 ## Separation from compact, checkpoint, and closeout
 

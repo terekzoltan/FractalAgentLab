@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
 import {
   authoritySha256,
   assertSafeRelativePath,
@@ -52,6 +53,18 @@ export interface AuthorityResolver {
   resolveStageCapability(runAuthority: RunAuthority, request: StageRequest): Promise<ResolvedStageAuthority["capability"]>;
   resolveStageAuthority(runAuthority: RunAuthority, request: StageRequest): Promise<ResolvedStageAuthority>;
   resolveCloseoutPreflight(runAuthority: RunAuthority): Promise<{ run_authority: RunAuthority; worktree: WorktreeProof }>;
+}
+
+export class PreOperationStabilityError extends Error {
+  constructor(readonly originalError: unknown, readonly stabilityAttempts: number) {
+    super(originalError instanceof Error ? originalError.message : "Pre-operation live authority remained unstable");
+    this.name = "PreOperationStabilityError";
+  }
+}
+
+function isStabilizablePreOperationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return /^(?:Dispatch capability drifted before authority resolution|Installed capability probe transient retry exhausted)$/.test(message);
 }
 
 export interface SnapshotReader {
@@ -278,15 +291,9 @@ export class StageEngine {
     if (request.target_id !== loaded.authority.target_id || request.worktree_identity !== loaded.authority.worktree_identity) throw new Error("Stage request run binding mismatch");
     this.assertRequestAuthority(request, loaded.authority);
     this.assertTransition(request);
-    const capability = await this.resolver.resolveStageCapability(loaded.authority, request);
-    if (!["FIXTURE_ONLY", "P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(capability.mode)) throw new Error("Production command dispatch is disabled until a reviewed P0B capability transaction");
-    if (capability.mode !== "FIXTURE_ONLY" && (capability.router_protocol_identity !== ROUTER_PROTOCOL_IDENTITY || capability.sse_enabled !== false || !capability.snapshot_correlation || !capability.server_instance_identity_sha256 || !capability.target_directory_sha256 || capability.command_timeout_ms === undefined)) throw new Error("Production capability contract is incomplete");
-    if (capability.mode === "P0B_ISOLATED" && !capability.authorization_use_sha256) throw new Error("P0B capability lacks a stable authorization-use identity");
+    const { capability, resolved } = await this.resolveStablePreOperationAuthority(loaded.authority, request);
     const boundPolicyMode = boundRouterPolicyMode(loaded.authority);
     const effectivePolicyMode = effectiveRouterPolicyMode(loaded.authority.router_policy_mode, request.requested_stage, capability.mode);
-    const resolved = await this.resolver.resolveStageAuthority(loaded.authority, request);
-    if (!runAuthorityMatchesAcrossOperationalRefresh(resolved.run_authority, loaded.authority)) throw new Error("Current target authority drifted");
-    if (canonicalize(resolved.capability) !== canonicalize(capability)) throw new Error("Dispatch capability drifted before authority resolution");
     assertPrivateTransportBinding(resolved.transport);
     assertArtifactSafe(canonicalize(request), resolved.transport, resolved.privacy.absolute_paths, resolved.privacy.private_values);
     const resolvedBindings = resolved.sources.map((source) => source.binding);
@@ -459,6 +466,30 @@ export class StageEngine {
     } finally {
       release?.();
       await sharedLease?.release();
+    }
+  }
+
+  private async resolveStablePreOperationAuthority(authority: RunAuthority, request: StageRequest): Promise<{ capability: ResolvedStageAuthority["capability"]; resolved: ResolvedStageAuthority }> {
+    let stabilityAttempts = 0;
+    for (;;) {
+      try {
+        const capability = await this.resolver!.resolveStageCapability(authority, request);
+        if (!["FIXTURE_ONLY", "P0B_ISOLATED", "PRODUCTION_RESPONSE_FIRST"].includes(capability.mode)) throw new Error("Production command dispatch is disabled until a reviewed P0B capability transaction");
+        if (capability.mode !== "FIXTURE_ONLY" && (capability.router_protocol_identity !== ROUTER_PROTOCOL_IDENTITY || capability.sse_enabled !== false || !capability.snapshot_correlation || !capability.server_instance_identity_sha256 || !capability.target_directory_sha256 || capability.command_timeout_ms === undefined)) throw new Error("Production capability contract is incomplete");
+        if (capability.mode === "P0B_ISOLATED" && !capability.authorization_use_sha256) throw new Error("P0B capability lacks a stable authorization-use identity");
+        const resolved = await this.resolver!.resolveStageAuthority(authority, request);
+        if (!runAuthorityMatchesAcrossOperationalRefresh(resolved.run_authority, authority)) throw new Error("Current target authority drifted");
+        if (canonicalize(resolved.capability) !== canonicalize(capability)) throw new Error("Dispatch capability drifted before authority resolution");
+        return { capability, resolved };
+      } catch (error) {
+        if (stabilityAttempts === 0 && isStabilizablePreOperationError(error)) {
+          stabilityAttempts = 1;
+          await sleep(50);
+          continue;
+        }
+        if (stabilityAttempts > 0) throw new PreOperationStabilityError(error, stabilityAttempts);
+        throw error;
+      }
     }
   }
 
