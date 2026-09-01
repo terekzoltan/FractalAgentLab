@@ -84,7 +84,11 @@ It is not project truth and does not grant workflow authority.
   and post-response revalidation. Exact-version reuse still requires the exact
   proven binary. Downgrade, minor/major change, prerelease/nonstandard version,
   router-attestation change, or a stable capability mismatch requires a new
-  isolated P0B proof.
+  isolated P0B proof. Command-registry identity binds execution semantics
+  (`name`, `template`, and effective `agent`/`model`/`subtask`) while ignoring
+  presentation/provenance metadata (`description`, `hints`, `source`) that may
+  be regenerated across an otherwise identical restart. Unknown command fields
+  remain fail-closed.
 - Installed `/command` is response-first. Audited `step-start`, `step-finish`,
   reasoning, and synthetic/ignored text are hashed but not treated as output;
   tool/subtask/file/patch/unknown parts fail closed. Snapshot history is ordered

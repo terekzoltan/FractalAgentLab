@@ -96,7 +96,7 @@ class CompactPreflightBlockedError extends ClassifiedCliError {
 interface StageDispatchDiagnostic {
   schema_version: "stage-dispatch-diagnostic.v2";
   phase: "REQUEST_AUTHORITY" | "STAGE_TRANSITION" | "LIVE_CAPABILITY" | "CURRENT_AUTHORITY" | "SOURCE_AUTHORITY" | "PRIVACY_BOUNDARY" | "DUPLICATE_ACTION" | "SESSION_FENCE" | "DISPATCH_LEASE" | "SNAPSHOT_BASELINE" | "PRE_OPERATION_VALIDATION" | "POST_OPERATION_FINALIZATION";
-  reason_class: "REQUEST_AUTHORITY_MISMATCH" | "STAGE_TRANSITION_BLOCKED" | "LIVE_CAPABILITY_UNAVAILABLE" | "LIVE_CAPABILITY_UNSTABLE" | "CURRENT_AUTHORITY_DRIFT" | "SOURCE_AUTHORITY_MISMATCH" | "PRIVACY_BOUNDARY_REJECTED" | "DUPLICATE_ACTION_BLOCKED" | "SESSION_FENCE_BLOCKED" | "DISPATCH_LEASE_BLOCKED" | "SNAPSHOT_BASELINE_BLOCKED" | "POST_OPERATION_FAILURE" | "UNCLASSIFIED_PRE_OPERATION";
+  reason_class: "REQUEST_AUTHORITY_MISMATCH" | "STAGE_TRANSITION_BLOCKED" | "LIVE_CAPABILITY_UNAVAILABLE" | "LIVE_CAPABILITY_UNSTABLE" | "COMMAND_REGISTRY_DRIFT" | "CURRENT_AUTHORITY_DRIFT" | "SOURCE_AUTHORITY_MISMATCH" | "PRIVACY_BOUNDARY_REJECTED" | "DUPLICATE_ACTION_BLOCKED" | "SESSION_FENCE_BLOCKED" | "DISPATCH_LEASE_BLOCKED" | "SNAPSHOT_BASELINE_BLOCKED" | "POST_OPERATION_FAILURE" | "UNCLASSIFIED_PRE_OPERATION";
   stability_attempts: number;
   operation_created: boolean;
   lifecycle_send: boolean;
@@ -758,6 +758,7 @@ function stageDispatchDiagnostic(errorCode: CliErrorCode, operationCreated: bool
     : /(?:run authority hash mismatch|stage request run binding mismatch|(?:state_revision|state_sha256|combined_selector|combined_span_sha256|configuration_identity|active_route_generation|review_cycle|wave|epic|accountable_lane|accountable_class|accountable_profile) binding mismatch|issued_by|contract version mismatch|side-effect class|recipient role|sender role)/i.test(message) ? "REQUEST_AUTHORITY_MISMATCH"
       : /(?:Requested first stage|Requested stage is not an allowed transition|Failed stage may only be retried|plan class changed)/i.test(message) ? "STAGE_TRANSITION_BLOCKED"
         : /Dispatch capability drifted before authority resolution/i.test(message) ? "LIVE_CAPABILITY_UNSTABLE"
+          : /Installed (?:Compact server |server )?command registry drifted from protected receipt/i.test(message) ? "COMMAND_REGISTRY_DRIFT"
           : errorCode === "CAPABILITY_PROBE_BLOCKED" || /(?:Production command dispatch is disabled|Production capability contract is incomplete|capability receipt|P0B capability)/i.test(message) ? "LIVE_CAPABILITY_UNAVAILABLE"
             : /(?:Current target.*authority drifted|current target semantic authority drifted)/i.test(message) ? "CURRENT_AUTHORITY_DRIFT"
               : errorCode === "SOURCE_IDENTITY_CHANGED" || /(?:source classes|source lineage|source content hash|SOURCE_SUBSTITUTION|stage source manifest|plan class or identity|plan review lineage|Revised plan lineage|finding lineage)/i.test(message) ? "SOURCE_AUTHORITY_MISMATCH"
@@ -769,7 +770,7 @@ function stageDispatchDiagnostic(errorCode: CliErrorCode, operationCreated: bool
                           : "UNCLASSIFIED_PRE_OPERATION";
   const phase: StageDispatchDiagnostic["phase"] = reasonClass === "REQUEST_AUTHORITY_MISMATCH" ? "REQUEST_AUTHORITY"
     : reasonClass === "STAGE_TRANSITION_BLOCKED" ? "STAGE_TRANSITION"
-      : reasonClass === "LIVE_CAPABILITY_UNAVAILABLE" || reasonClass === "LIVE_CAPABILITY_UNSTABLE" ? "LIVE_CAPABILITY"
+      : reasonClass === "LIVE_CAPABILITY_UNAVAILABLE" || reasonClass === "LIVE_CAPABILITY_UNSTABLE" || reasonClass === "COMMAND_REGISTRY_DRIFT" ? "LIVE_CAPABILITY"
         : reasonClass === "CURRENT_AUTHORITY_DRIFT" ? "CURRENT_AUTHORITY"
           : reasonClass === "SOURCE_AUTHORITY_MISMATCH" ? "SOURCE_AUTHORITY"
             : reasonClass === "PRIVACY_BOUNDARY_REJECTED" ? "PRIVACY_BOUNDARY"

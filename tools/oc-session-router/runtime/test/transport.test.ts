@@ -95,7 +95,7 @@ test("installed capability probe binds target directory and records SSE without 
     if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
     if (endpoint.pathname === "/command") {
       assert.equal(endpoint.searchParams.get("directory"), directory);
-      return new Response('[{"name":"implement"},{"name":"terv-review"}]');
+      return new Response('[{"name":"implement","template":"implement $ARGUMENTS"},{"name":"terv-review","template":"review $ARGUMENTS"}]');
     }
     if (endpoint.pathname === "/event") {
       assert.equal(endpoint.searchParams.get("directory"), directory);
@@ -137,7 +137,7 @@ test("installed capability probe retries one transient GET-only round and never 
     if (endpoint.pathname === "/global/health" && ++healthAttempts === 1) return new Response("busy", { status: 503 });
     if (endpoint.pathname === "/global/health") return new Response('{"healthy":true,"version":"1.18.19"}');
     if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
-    if (endpoint.pathname === "/command") return new Response('[{"name":"implement"}]');
+    if (endpoint.pathname === "/command") return new Response('[{"name":"implement","template":"implement $ARGUMENTS"}]');
     if (endpoint.pathname === "/event") return new Response('event: message\ndata: {"type":"server.connected"}\n\n', { headers: { "content-type": "text/event-stream" } });
     throw new Error("unexpected endpoint");
   };
@@ -163,7 +163,7 @@ test("transient capability recovery leaves the subsequent explicit lifecycle tra
     if (endpoint.pathname === "/global/health" && ++healthAttempts === 1) return new Response("busy", { status: 503 });
     if (endpoint.pathname === "/global/health") return new Response('{"healthy":true,"version":"1.18.19"}');
     if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
-    if (endpoint.pathname === "/command") return new Response('[{"name":"implement"}]');
+    if (endpoint.pathname === "/command") return new Response('[{"name":"implement","template":"implement $ARGUMENTS"}]');
     if (endpoint.pathname === "/event") return new Response('event: message\ndata: {"type":"server.connected"}\n\n', { headers: { "content-type": "text/event-stream" } });
     throw new Error("unexpected endpoint");
   };
@@ -187,7 +187,7 @@ test("installed capability probe exhausts one transient retry without reaching S
     const endpoint = new URL(String(input));
     if (endpoint.pathname === "/global/health") { healthAttempts += 1; return new Response("busy", { status: 503 }); }
     if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
-    if (endpoint.pathname === "/command") return new Response('[{"name":"implement"}]');
+    if (endpoint.pathname === "/command") return new Response('[{"name":"implement","template":"implement $ARGUMENTS"}]');
     if (endpoint.pathname === "/event") { eventAttempts += 1; return new Response(); }
     throw new Error("unexpected endpoint");
   };
@@ -224,7 +224,7 @@ test("installed capability probe never retries authentication or semantic comman
       const endpoint = new URL(String(input));
       if (endpoint.pathname === "/global/health") return new Response('{"healthy":true,"version":"1.18.19"}');
       if (endpoint.pathname === "/doc") return new Response('{"openapi":"3.1.0"}');
-      if (endpoint.pathname === "/command") { commandAttempts += 1; return new Response('[{"name":"terv-review"}]'); }
+      if (endpoint.pathname === "/command") { commandAttempts += 1; return new Response('[{"name":"terv-review","template":"review $ARGUMENTS"}]'); }
       return new Response('event: message\ndata: {"type":"server.connected"}\n\n', { headers: { "content-type": "text/event-stream" } });
     }, 4 * 1024 * 1024, () => ({ server_binary_sha256: "9".repeat(64), server_instance_identity_sha256: "8".repeat(64) }), async () => {});
     await assert.rejects(
@@ -237,18 +237,22 @@ test("installed capability probe never retries authentication or semantic comman
   }
 });
 
-test("installed capability probe hashes complete command semantics independent of response ordering", () => {
+test("installed capability probe hashes execution semantics independent of restart-only metadata", () => {
   const first = [
-    { name: "terv-review", description: "review", template: "exact review body" },
-    { name: "implement", description: "implement", template: "exact implementation body" },
+    { name: "terv-review", description: "review", hints: ["old hint"], source: "startup-a", agent: "build-xhigh", model: null, subtask: null, template: "exact review body" },
+    { name: "implement", description: "implement", hints: [], source: "startup-a", agent: "build-xhigh", model: "openai/gpt-5.6-sol", subtask: false, template: "exact implementation body" },
   ];
   const restarted = [
-    { template: "exact implementation body", name: "implement", description: "implement" },
-    { template: "exact review body", description: "review", name: "terv-review" },
+    { template: "exact implementation body", name: "implement", description: "changed UI copy", hints: ["new hint"], source: "startup-b", agent: "build-xhigh", model: "openai/gpt-5.6-sol", subtask: false },
+    { template: "exact review body", description: "changed review copy", hints: [], source: "startup-b", name: "terv-review", agent: "build-xhigh" },
   ];
   assert.deepEqual(_test.parseCommandRegistry(first), _test.parseCommandRegistry(restarted));
   assert.equal(_test.commandRegistryIdentity(first), _test.commandRegistryIdentity(restarted));
   assert.notEqual(_test.commandRegistryIdentity(first), _test.commandRegistryIdentity([{ ...first[0], template: "changed body" }, first[1]]));
+  assert.notEqual(_test.commandRegistryIdentity(first), _test.commandRegistryIdentity([{ ...first[0], agent: "other-agent" }, first[1]]));
+  assert.notEqual(_test.commandRegistryIdentity(first), _test.commandRegistryIdentity([{ ...first[0], model: "openai/other-model" }, first[1]]));
+  assert.notEqual(_test.commandRegistryIdentity(first), _test.commandRegistryIdentity([{ ...first[0], subtask: true }, first[1]]));
+  assert.throws(() => _test.commandRegistryIdentity([{ ...first[0], futureExecutionField: true }, first[1]]), /unsupported semantic fields/);
 });
 
 test("installed response lifecycle parts are audited while only authoritative text is extracted", async () => {

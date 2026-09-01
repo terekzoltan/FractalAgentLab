@@ -631,8 +631,28 @@ function parseCommandRegistry(value: unknown): string[] {
 }
 
 function commandRegistryIdentity(value: unknown): string {
-  const entries = commandRegistryEntries(value);
-  return sha256(canonicalize({ domain: "fal-router-command-registry/v2", entries }));
+  const entries = commandRegistryEntries(value).map(commandExecutionSemantics);
+  return sha256(canonicalize({ domain: "fal-router-command-registry/v3", entries }));
+}
+
+function commandExecutionSemantics(entry: Record<string, unknown>): Record<string, unknown> {
+  const allowed = new Set(["name", "template", "agent", "model", "subtask", "description", "hints", "source"]);
+  const unknown = Object.keys(entry).filter((key) => !allowed.has(key));
+  if (unknown.length > 0) throw new Error("Installed command registry contains unsupported semantic fields");
+  if (typeof entry.template !== "string" || !entry.template) throw new Error("Installed command registry template is invalid");
+  if (entry.agent !== undefined && entry.agent !== null && typeof entry.agent !== "string") throw new Error("Installed command registry agent is invalid");
+  if (entry.model !== undefined && entry.model !== null && typeof entry.model !== "string") throw new Error("Installed command registry model is invalid");
+  if (entry.subtask !== undefined && entry.subtask !== null && typeof entry.subtask !== "boolean") throw new Error("Installed command registry subtask mode is invalid");
+  if (entry.description !== undefined && typeof entry.description !== "string") throw new Error("Installed command registry description is invalid");
+  if (entry.hints !== undefined && !Array.isArray(entry.hints)) throw new Error("Installed command registry hints are invalid");
+  if (entry.source !== undefined && typeof entry.source !== "string") throw new Error("Installed command registry source is invalid");
+  return {
+    name: entry.name,
+    template: entry.template,
+    ...(typeof entry.agent === "string" ? { agent: entry.agent } : {}),
+    ...(typeof entry.model === "string" ? { model: entry.model } : {}),
+    ...(typeof entry.subtask === "boolean" ? { subtask: entry.subtask } : {}),
+  };
 }
 
 function commandTemplate(value: unknown, commandName: string): string {

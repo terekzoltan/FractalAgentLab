@@ -232,6 +232,7 @@ test("pre-operation diagnostics classify semantic guards without leaking native 
   const cases = [
     [new Error("state_revision binding mismatch at C:\\private"), "REQUEST_AUTHORITY", "REQUEST_AUTHORITY_MISMATCH"],
     [new Error("Requested stage is not an allowed transition"), "STAGE_TRANSITION", "STAGE_TRANSITION_BLOCKED"],
+    [new Error("Installed server command registry drifted from protected receipt"), "LIVE_CAPABILITY", "COMMAND_REGISTRY_DRIFT"],
     [new Error("Current target semantic authority drifted"), "CURRENT_AUTHORITY", "CURRENT_AUTHORITY_DRIFT"],
     [new Error("Protected source finding lineage mismatch"), "SOURCE_AUTHORITY", "SOURCE_AUTHORITY_MISMATCH"],
     [new Error("Semantic action is already consumed or unresolved"), "DUPLICATE_ACTION", "DUPLICATE_ACTION_BLOCKED"],

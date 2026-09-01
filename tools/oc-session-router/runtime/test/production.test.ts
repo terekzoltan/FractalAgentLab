@@ -207,6 +207,12 @@ test("P0B protected capability is closed, short-lived, AWC 4.1.1-only, and direc
     assert.equal(restartedResolved.mode, "PRODUCTION_RESPONSE_FIRST");
     assert.equal(restartedResolved.server_instance_identity_sha256, restartedLive.server_instance_identity_sha256);
 
+    const commandDrift = { ...restartedLive, command_registry_sha256: "a".repeat(64) };
+    await assert.rejects(
+      () => resolveProtectedCapability({ registry: productionRegistry, registry_path: registryPath, protected_control_root: control, target_id: "synthetic-p0b", target: productionTarget, request: stageRequest(), now: fixedNow, credentials: () => ({ username: "owner-process", password: "process-secret" }), executable_attestation_sha256: productionProof.executable_attestation_sha256, probe: { probe: async () => commandDrift } }),
+      /command registry drifted/,
+    );
+
     writeFileSync(path.join(control, target.capability_receipt_path!), JSON.stringify(grant));
     await assert.rejects(() => resolveProtectedCapability({ registry, registry_path: registryPath, protected_control_root: control, target_id: "synthetic-p0b", target, request: stageRequest(), now: fixedNow, credentials: () => ({ username: "owner-process", password: "process-secret" }), probe: { probe: async () => restartedLive } }), /capability drifted/);
     writeFileSync(path.join(control, target.capability_receipt_path!), JSON.stringify(productionGrant));

@@ -262,7 +262,11 @@ invalid output and keeps the exact recovery/incident path.
 - An ordinary OpenCode server restart reuses the installed production authority
   after live revalidation of the same binary, version, health, OpenAPI, semantic
   command roster, target directory, session set, and authorized commands. The
-  new process identity is pinned for the individual dispatch and must remain
+  semantic command identity binds command name, template, and effective
+  agent/model/subtask behavior; regenerated description, hint, and source
+  metadata are excluded, while unknown fields fail closed. A stable semantic
+  mismatch reports `COMMAND_REGISTRY_DRIFT` without operation creation or send.
+  The new process identity is pinned for the individual dispatch and must remain
   unchanged through immediate pre-POST and post-response checks. A restart
   during that window fails closed without resend. Routine forward patch updates
   on the same strict `major.minor` line need a fresh installed receipt but may
@@ -271,7 +275,8 @@ invalid output and keeps the exact recovery/incident path.
   capability drift requires a new isolated P0B proof.
 - Lifecycle dispatch and Compact share the same persistent participant fence.
 - A pre-operation failure reports a bounded privacy-safe class:
-  `CAPABILITY_PROBE_BLOCKED`, `PARTICIPANT_FENCE_BLOCKED`,
+  `CAPABILITY_PROBE_BLOCKED`, `COMMAND_REGISTRY_DRIFT`,
+  `PARTICIPANT_FENCE_BLOCKED`,
   `DISPATCH_LEASE_BLOCKED`, or
   `SNAPSHOT_BASELINE_BLOCKED`; generic `BLOCKED` is reserved for failures that
   cannot be classified without exposing private material. The attached
