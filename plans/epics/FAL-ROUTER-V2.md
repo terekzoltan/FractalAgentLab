@@ -1,5 +1,12 @@
 # FAL-ROUTER-V2: small router and AWC5 adoption
 
+Qualification update2026-09-06: local source and the one useful isolated live
+pilot are complete. See FAL-ROUTER-V2-QUALIFICATION.md for exact evidence and
+remaining rollout boundaries. Earlier planning-only envelope below is historical;
+current Owner authority allowed LOCAL_COMMIT and isolated pilot, not production
+installation, main merge, push, release or project resumption. Do not rerun the
+completed pilot as a new prerequisite.
+
 Status: `IMPLEMENTATION_IN_PROGRESS / CANDIDATE_UNRELEASED`.
 Owner: Project Owner. Coordinator: Workflow Systems Steward maintenance.
 Source-only publication intent: `NONE`.

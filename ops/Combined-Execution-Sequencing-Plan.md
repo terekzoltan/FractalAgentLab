@@ -1,6 +1,8 @@
 # FractalAgentLab Combined Execution Sequencing Plan
 
 Status: AWC5 / Router V2 source adoption candidate, unreleased.
+Local qualification: complete; one useful isolated pilot closed at be764a3.
+Evidence: plans/epics/FAL-ROUTER-V2-QUALIFICATION.md. Do not repeat that pilot.
 Owner: Project Owner; current maintenance coordinated by Workflow Systems Steward.
 This is the sole current Combined. Project state owns one exact next action.
 Historical accepted baselines remain valid as historical facts; unfinished work
@@ -23,7 +25,7 @@ See `ops/migration/AWC5-V2-SUPERSESSION.md` for scope and provenance.
 
 | Position | Assignment | Owner | Dependencies | Deliverable and acceptance gate | Readiness | Status / phase | Next unlock |
 |---|---|---|---|---|---|---|---|
-| 10 | FAL-ROUTER-V2 | Owner-authorized Workflow Systems Steward | Accepted V2 decisions; explicit isolated FAL/AWC/WOps sources | One active source engine, no-send import, continuity, managed installer, aligned governance and proportionate offline evidence; plans/epics/FAL-ROUTER-V2.md | READY for source work | ACTIVE / IMPLEMENTATION_IN_PROGRESS; maintenance, not project lane lifecycle | Integrated candidate review; central qualification remains pending |
+| 10 | FAL-ROUTER-V2 | Owner-authorized Workflow Systems Steward | Accepted V2 decisions; isolated FAL/AWC/WOps sources | Tested source plus completed isolated full-lifecycle pilot; plans/epics/FAL-ROUTER-V2-QUALIFICATION.md | LOCAL_QUALIFIED | ACTIVE / ROLLOUT_PENDING | Separate Owner rollout/release envelope; product pauses remain |
 
 The assignment contains six dependent implementation packets, not six new Epics
 or approval ceremonies. Source work does not prove installation, live compatibility,

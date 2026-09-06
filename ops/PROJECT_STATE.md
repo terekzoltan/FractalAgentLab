@@ -14,7 +14,7 @@ Accountable role: `Workflow Systems Steward / fal.workflow-maintainer`
 Epic readiness: `READY for authorized source work`
 Epic status: `ACTIVE`
 Workflow phase: `none - not a normal project lane lifecycle`
-Maintenance status: `IMPLEMENTATION_IN_PROGRESS`
+Maintenance status: `LOCAL_QUALIFICATION_COMPLETE / ROLLOUT_PENDING`
 Candidate identity: `awc5-v2-router / mutable source, not frozen or accepted`
 Configuration identity: `AWC5 / Router V2 source candidate`
 Combined row identity: `Maintenance/FAL-ROUTER-V2/position-10`
@@ -25,32 +25,32 @@ Role runbook: external Canon `runbooks/WORKFLOW-MAINTAINER-RUNBOOK.md`
 
 Last accepted decision: Owner replaced the pending W8 program with one small
 Router V2 and approved isolated cross-repository source implementation.
-Last completed action: scoped source ownership and combined AWC/WOps integration
-inputs established; this checkout now contains the bounded FAL adoption candidate.
-Operation facts: no live operation observation performed by this source adoption;
-offline checks belong to the coordinator's candidate evidence.
-Semantic acceptance: pending integrated review and qualification.
+Last completed action: local candidate commits, isolated compatibility probe and
+one Orchestrator-led full documentation lifecycle through local closeout.
+Operation facts: all seven pilot stages delivered/completed without resend or
+manual stage intervention; exact evidence is in the qualification record.
+Semantic acceptance: isolated documentation pilot GREEN/ALLOWED, Delivery ACK,
+Meta local closeout; system production promotion remains pending.
 Owner pause: existing parked project pauses preserved; source maintenance may
 continue. A late result or successful import never resumes product work.
 Installed/loaded status: not established by this source candidate.
-Publication: `NONE`.
+Publication: `LOCAL_COMMIT`; no main merge, push or production installation.
 
 ## Exact next action
 
 Expected role: current Workflow Systems Steward maintenance coordinator.
-Action: integrate and verify the FAL router, installer and governance candidate
-against the explicitly selected combined AWC and Workflow Operations sources.
+Action: obtain the separate production rollout/release envelope, then complete
+only authorized adoption, installation and publication. Do not repeat the pilot.
 Input: `plans/epics/FAL-ROUTER-V2.md`, current source diff and offline evidence.
-Result: coherent reviewable source with actual checks, remaining qualification
-and one resume point recorded by the coordinator. No project lifecycle send.
+Evidence: `plans/epics/FAL-ROUTER-V2-QUALIFICATION.md` and pilot commit be764a3.
+No current product lifecycle send or unfreeze is authorized.
 Active source blocker: none recorded; report a concrete integration failure if found.
 
 ## Boundaries and pending closure
 
-AWC5 remains unreleased. Legacy no-send reconciliation, isolated live compatibility,
-one useful full-lifecycle pilot, authorized installation/loaded verification,
-release and target adoption remain pending central qualification. They are not
-proved or authorized by this state update.
+AWC5 remains unreleased. Isolated live compatibility and the one useful pilot are
+complete. Actual parked-project legacy import/adoption, production installation,
+loaded verification, release and publication remain outside the current envelope.
 
 W8-A and W8-W10 are `SUPERSEDED`, never `COMPLETE`; do not resume the old
 Meta review, stage-manifest route, W8-v3 planning program or temporary W8 role.

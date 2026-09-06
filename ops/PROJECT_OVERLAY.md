@@ -35,12 +35,13 @@ and E tests/evidence. Models, labels and topology grant no additional authority.
 
 The accepted successor is `plans/epics/FAL-ROUTER-V2.md`. Isolated source changes,
 offline fixtures, consumer alignment and candidate handoff are authorized.
-Publication intent is `NONE`. The source candidate is `LIVE_SAFE` because
+The latest envelope allowed local candidate/pilot commits and isolated testing.
+Production publication remains excluded. The source candidate is `LIVE_SAFE` because
 active consumers do not load it. Incompatible runtime deployment requires a
 coordinated affected boundary with one sender per participant.
 
-This assignment does not authorize global install, live OpenCode actions,
-pilot execution, server restart, commit/push/merge/deploy, public export or
+The isolated pilot has completed. This assignment does not authorize global
+install, unrelated live actions, server restart, main merge, push/deploy, public export or
 unfreezing parked product workflows. Existing project pauses and accepted scope
 survive migration and late results. Unrelated projects are outside this work;
 no new global hold is created. Follow later explicit Owner authority when given

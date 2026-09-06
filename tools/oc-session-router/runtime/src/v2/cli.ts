@@ -39,8 +39,10 @@ export function operationView(operation: Operation) {
     outputAvailable: Boolean(operation.outcome?.response?.text ?? operation.outcome?.artifact?.text), resultDigest: operation.resultDigest,
     interpretation: operation.interpretation ? { responsibleRole: operation.interpretation.responsibleRole, decision: operation.interpretation.decision } : null,
     observedAt: operation.observation?.observedAt ?? null,
-    activity: operation.observation?.activity ?? "UNKNOWN",
-    reason: operation.outcome?.reason ?? operation.observation?.context?.reason ?? null,
+    // Finished operation facts outrank stale pending diagnostics. Current session
+    // activity remains separately available in the work's session observations.
+    activity: operation.completedAt ? operation.outcome?.execution ?? "UNKNOWN" : operation.observation?.activity ?? "UNKNOWN",
+    reason: operation.completedAt ? operation.outcome?.reason ?? null : operation.observation?.context?.reason ?? null,
     autoAdvance: false,
   };
 }
