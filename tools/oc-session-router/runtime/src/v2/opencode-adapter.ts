@@ -206,10 +206,11 @@ export class OpenCodeAdapter {
         names.add(raw.name);
         const result: OpenCodeCommand = { name: raw.name, template: raw.template };
         for (const key of ["agent", "model", "description"] as const) {
-          const found = optionalString(raw, key);
+          // The live 1.18 API serializes unset optional command fields as null.
+          const found = raw[key] === null ? undefined : optionalString(raw, key);
           if (found !== undefined) result[key] = found;
         }
-        if (raw.subtask !== undefined) {
+        if (raw.subtask !== undefined && raw.subtask !== null) {
           if (typeof raw.subtask !== "boolean") throw new ShapeError("INVALID_RESPONSE");
           result.subtask = raw.subtask;
         }

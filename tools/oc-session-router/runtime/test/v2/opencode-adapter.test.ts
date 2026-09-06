@@ -243,6 +243,21 @@ test("bounded response rejects excessive bytes and preserves received status", a
   await assert.rejects(adapter.getSession(), error => error instanceof AdapterError && error.code === "RESPONSE_TOO_LARGE" && error.status === 200);
 });
 
+test("live nullable optional command metadata is absence, not a registry failure", async t => {
+  const { adapter } = await fixture(t, (_req, res) => json(res, [
+    { name: "pilot", template: "$ARGUMENTS", agent: null, model: null, description: null, subtask: null },
+    { name: "explicit", template: "work", subtask: false },
+  ]));
+  const result = await adapter.listCommands();
+  assert.equal(result.problem, undefined);
+  assert.deepEqual(result.value, [{ name: "pilot", template: "$ARGUMENTS" }, { name: "explicit", template: "work", subtask: false }]);
+});
+
+test("non-null malformed command metadata remains invalid", async t => {
+  const { adapter } = await fixture(t, (_req, res) => json(res, [{ name: "bad", template: "work", subtask: "false" }]));
+  assert.equal((await adapter.listCommands()).problem, "INVALID_RESPONSE");
+});
+
 test("read methods normalize session, current commands and status without strict unknown-field rejection", async t => {
   const { adapter } = await fixture(t, (req, res) => {
     const url = new URL(req.url!, "http://fixture");
