@@ -1,5 +1,25 @@
 # V2 interface and recovery reference
 
+## Continuity advice
+
+`observe-session` exposes `budget` (tokens/basis) and `continuity`. Ordinary
+operation inspect/wait/reconcile results include the same concise advice from the
+latest stored observation for that role, with age/freshness. Old records can show
+`OBSERVE_BEFORE_WORK`; reading completed results never requires a live server.
+`lastCallTokens` is the last successful completed provider call, not exact active
+context. Error/aborted placeholders are not usage observations. Successful calls
+without usage do not cause fallback to an older token-rich call; zero-only usage
+remains unconfirmed, not evidence of empty context. Summary-call usage is stale
+pre-compaction evidence, not a new compact trigger.
+The default compact threshold is 60% of usable input budget. The orchestrator
+checks advice before new work and runs existing compact -> restore when warranted.
+Advice does not grant maintenance authority or send a successor.
+
+`capabilityScope=OBSERVATION_ACTION_ONLY_NOT_MAINTENANCE_ELIGIBILITY` explicitly
+qualifies the legacy read-only `capabilities` fields. `mayCompact:false` there
+does NOT prohibit a separate compact request. Missing catalog diagnostics remain
+visible in observation `limitations`; no optional telemetry gap is an admission gate.
+
 Public entry: `../scripts/Invoke-OCRouter.ps1`. `-Action` is required. Shared
 options are `-StateRoot` and `-ConfigPath`; their CLI equivalents are
 `--state-root` and `--config`. The private state-root default is

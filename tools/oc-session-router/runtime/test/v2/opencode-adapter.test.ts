@@ -325,3 +325,15 @@ test("selected model lookup exposes only matched limits, never the provider cata
   assert.equal((await adapter.getModelInfo("provider", "missing")).value, null);
   assert.equal((await adapter.getModelInfo("provider", "wrong")).problem, "IDENTITY_MISMATCH");
 });
+
+test("provider-only 16 MiB allowance admits the real-size catalog without widening other responses", async t => {
+  let paddingBytes = 6 * 1024 * 1024;
+  const { adapter } = await fixture(t, (_req, res) => {
+    json(res, { padding: "x".repeat(paddingBytes), all: [{ id: "p", models: { m: { id: "m", providerID: "p", limit: { context: 400000, input: 272000, output: 128000 } } } }] });
+  });
+  assert.equal((await adapter.getModelInfo("p", "m")).value?.inputLimit, 272000);
+  await assert.rejects(adapter.listCommands(), { code: "RESPONSE_TOO_LARGE" });
+  await assert.rejects(adapter.submitCommand({ messageID: root, command: "implement", arguments: "fixture" }), { code: "RESPONSE_TOO_LARGE" });
+  paddingBytes = 17 * 1024 * 1024;
+  await assert.rejects(adapter.getModelInfo("p", "m"), { code: "RESPONSE_TOO_LARGE" });
+});

@@ -1,6 +1,12 @@
 # Private Router V2 configuration
 
 The runtime consumes one private `router-config.json` with `schemaVersion: 2`.
+Optional top-level `compactThresholdRatio` defaults to `0.60` (finite, from
+`0.02` through `0.99`). It controls advisory idle-lane maintenance, not send
+permission. The warning threshold is at most `0.50`, below the compact threshold.
+Omission needs no configuration migration. Pressure uses the matched model's input
+limit, or an explicitly labelled reserve-adjusted/context-only estimate. Never
+manually copy one model's capacity into every role.
 Default location: `%LOCALAPPDATA%\FractalAgentLab\oc-router\v2`, or the selected
 `-StateRoot`. `-ConfigPath` may name another private config file. Do not commit
 actual session IDs, endpoints, workstation paths, credentials or runtime state.

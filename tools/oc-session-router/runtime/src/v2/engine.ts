@@ -4,7 +4,7 @@ import { OpenCodeAdapter, type Acknowledgement, type AdapterOptions, type Adapte
 import { isTerminalMessage, outcomeForMessage, reconcileOperation } from "./reconcile.js";
 import { OperationStore } from "./state-store.js";
 import { commandRule, readContainedSource, resolveRole, RouterError, sameDirectory, type RouterConfiguration } from "./routing.js";
-import { observeSession, type SessionObservationOptions } from "./session-observation.js";
+import { observeSession, continuitySummary, type SessionObservationOptions } from "./session-observation.js";
 import { alreadyCompacted, captureCompactBaseline, observeCompactCompletion, type CompactBaseline } from "./session-maintenance.js";
 import { reconcileLegacyOperation } from "./legacy-import.js";
 
@@ -59,7 +59,7 @@ export class RouterEngine {
   async observe(workId: string, roleName: string, budgetMs?: number) {
     const work = this.store.getWork(workId);
     const { adapter, role, target } = this.binding(work.context, roleName, budgetMs);
-    const options: SessionObservationOptions = {};
+    const options: SessionObservationOptions = { criticalRatio: this.configuration.compactThresholdRatio ?? 0.60 };
     if (role.model) {
       const slash = role.model.indexOf("/");
       if (slash > 0 && slash < role.model.length - 1) {
@@ -69,7 +69,7 @@ export class RouterEngine {
     }
     const snapshot = await observeSession(adapter, { session: role.session, directory: target.directory }, options);
     const { nextCursor, ...coverage } = snapshot.history;
-    const visible = { ...snapshot, history: { ...coverage, hasMore: nextCursor !== undefined } };
+    const visible = { ...snapshot, history: { ...coverage, hasMore: nextCursor !== undefined }, continuity: continuitySummary(snapshot) };
     this.store.recordSessionObservation(workId, roleName, visible as unknown as Record<string, Json>);
     return visible;
   }

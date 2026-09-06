@@ -241,7 +241,7 @@ export class OpenCodeAdapter {
         }
       }
       return selected;
-    });
+    }, 16 * 1024 * 1024);
   }
 
   async getStatus(): Promise<AdapterReply<"BUSY" | "IDLE" | "UNKNOWN">> {
@@ -315,8 +315,8 @@ export class OpenCodeAdapter {
   }
 
   #sessionPath(): string { return `/session/${encodeURIComponent(this.#session)}`; }
-  async #read<T>(path: string, normalize: (value: unknown) => T): Promise<AdapterReply<T>> {
-    return this.#decode(await this.#request("GET", path), normalize);
+  async #read<T>(path: string, normalize: (value: unknown) => T, maxResponseBytes?: number): Promise<AdapterReply<T>> {
+    return this.#decode(await this.#request("GET", path, undefined, undefined, undefined, maxResponseBytes), normalize);
   }
   #decode<T>(response: RawResponse, normalize: (value: unknown) => T): AdapterReply<T> {
     const base = { status: response.status, bodySha256: createHash("sha256").update(response.body).digest("hex") };
@@ -329,7 +329,7 @@ export class OpenCodeAdapter {
   async #acknowledge(callback: Acknowledge | undefined, fact: Acknowledgement): Promise<void> {
     try { await callback?.(fact); } catch { throw new AdapterError("ACKNOWLEDGEMENT_FAILED", fact.status); }
   }
-  #request(method: "GET" | "POST", path: string, body?: unknown, query?: URLSearchParams, callback?: Acknowledge): Promise<RawResponse> {
+  #request(method: "GET" | "POST", path: string, body?: unknown, query?: URLSearchParams, callback?: Acknowledge, maxResponseBytes = this.#maxResponseBytes): Promise<RawResponse> {
     const getTimeout = Math.min(this.#getTimeoutMs, this.#getDeadline === undefined ? Infinity : Math.max(0, this.#getDeadline - performance.now()));
     if (method === "GET" && getTimeout <= 0) return Promise.reject(new AdapterError("GET_TIMEOUT"));
     const url = new URL(path, this.#origin);
@@ -358,7 +358,7 @@ export class OpenCodeAdapter {
         let bytes = 0;
         res.on("data", (chunk: Buffer) => {
           bytes += chunk.length;
-          if (bytes > this.#maxResponseBytes) {
+          if (bytes > maxResponseBytes) {
             res.destroy(new AdapterError("RESPONSE_TOO_LARGE", responseStatus));
             return;
           }

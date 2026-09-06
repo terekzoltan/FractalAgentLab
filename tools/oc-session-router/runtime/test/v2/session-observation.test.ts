@@ -3,8 +3,8 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { calculatePressure, observeSession, type ObservationReader } from "../../src/v2/session-observation.js";
-import type { AdapterReply, MessageHistory, MessageTokens, OpenCodeMessage, OpenCodeModelInfo, OpenCodeSession } from "../../src/v2/opencode-adapter.js";
+import { calculatePressure, observeSession, continuitySummary, inputBudget, type ObservationReader } from "../../src/v2/session-observation.js";
+import { AdapterError, type AdapterReply, type MessageHistory, type MessageTokens, type OpenCodeMessage, type OpenCodeModelInfo, type OpenCodeSession } from "../../src/v2/opencode-adapter.js";
 
 const expected = { session: "ses_private_fixture", directory: path.resolve("private-observation-fixture") };
 function ok<T>(value: T): AdapterReply<T> { return { status: 200, bodySha256: "fixture", value }; }
@@ -33,7 +33,7 @@ test("reported total wins and fallback counts cache exactly once without adding 
   assert.equal(reported.totalSource, "provider_reported_total");
   assert.equal(reported.state, "warn");
   assert.equal(reported.warnTokens, 250000);
-  assert.equal(reported.criticalTokens, 310000);
+  assert.equal(reported.criticalTokens, 300000);
   const fallback = calculatePressure({ total: 0, input: 330000, output: 10000, reasoning: 100000, cache: { read: 12000, write: 2000 } }, 500000);
   assert.equal(fallback.bestAvailableTokens, 354000);
   assert.equal(fallback.totalSource, "computed_opencode_overflow_formula");
@@ -44,7 +44,7 @@ test("reported total wins and fallback counts cache exactly once without adding 
 test("boundaries preserve recommendations and absent optional data is unknown", () => {
   for (const [total, state, recommendation] of [
     [249999, "normal", "none"], [250000, "warn", "monitor_and_prepare_boundary"],
-    [310000, "critical", "recommend_at_next_safe_boundary"], [500000, "over_limit", "urgent_recovery_required_no_automatic_compact"],
+    [300000, "critical", "recommend_at_next_safe_boundary"], [500000, "over_limit", "urgent_recovery_required_no_automatic_compact"],
   ] as const) {
     const pressure = calculatePressure({ total }, 500000);
     assert.equal(pressure.state, state);
@@ -107,7 +107,7 @@ test("verified session snapshot exposes last-call pressure without private IDs o
   assert.equal(snapshot.activity, "IDLE");
   assert.equal(snapshot.latestCompletedCall?.completedAt, "1970-01-01T00:00:02.000Z");
   assert.equal(snapshot.pressure.bestAvailableTokens, 280000);
-  assert.equal(snapshot.pressure.state, "warn");
+  assert.equal(snapshot.pressure.state, "critical");
   assert.equal(snapshot.model?.contextLimit, 500000);
   assert.equal(snapshot.model?.limitSource, "opencode_provider_catalog");
   assert.equal(snapshot.history.coverage, "COMPLETE");
@@ -139,7 +139,7 @@ test("bounded pages find last visible compaction and disclose stale last-call pr
   assert.equal(snapshot.history.pagesRead, 2);
   assert.equal(snapshot.lastCompaction?.createdAt, "1970-01-01T00:00:03.000Z");
   assert.equal(snapshot.lastCompaction?.source, "NATIVE_COMPACTION_PART");
-  assert.equal(snapshot.latestCompletedCall?.freshness, "COMPACTION_AFTER_CALL");
+  assert.equal(snapshot.latestCompletedCall?.freshness, "UNKNOWN", "A marker without completed summary does not prove compact completion");
   assert.ok(snapshot.limitations.includes("LAST_CALL_PRESSURE_MAY_BE_STALE"));
   assert.equal(snapshot.pressure.bestAvailableSource, "provider_observed_last_completion");
   assert.equal(snapshot.activeContext.status, "unavailable");
@@ -229,7 +229,7 @@ test("busy and later user activity make last completion freshness explicit", asy
   reader.pages.set("newest", ok({ messages: [assistant(), { id: "msg_new_user", session: expected.session, role: "user", timeCreated: 5000, text: "later request", hasCompactionPart: false }] }));
   const later = await observeSession(reader, expected);
   assert.equal(later.latestCompletedCall?.freshness, "NEWER_ACTIVITY_OBSERVED");
-  assert.equal(later.pressure.state, "warn");
+  assert.equal(later.pressure.state, "critical");
 });
 
 test("catalog identity mismatch and unknown status remain visibly unavailable", async () => {
@@ -241,4 +241,88 @@ test("catalog identity mismatch and unknown status remain visibly unavailable", 
   assert.equal(snapshot.pressure.state, "unknown");
   assert.ok(snapshot.limitations.includes("MODEL_CATALOG_IDENTITY_CONFLICT"));
   assert.ok(snapshot.limitations.includes("ACTIVITY_UNAVAILABLE"));
+});
+
+test("60 percent input budget, not whole context, drives explicit idle maintenance advice", async () => {
+  const reader = new FakeReader();
+  reader.model = ok({ providerID: "provider", modelID: "model", contextLimit: 400000, inputLimit: 272000, outputLimit: 128000 });
+  for (const [total, recommendation] of [[163199, "CONTINUE_AND_MONITOR"], [163200, "COMPACT_THEN_RESTORE_BEFORE_WORK"], [203397, "COMPACT_THEN_RESTORE_BEFORE_WORK"]] as const) {
+    reader.pages.set("newest", ok({ messages: [assistant("msg_usage", { tokens: { total } })] }));
+    const snapshot = await observeSession(reader, expected);
+    assert.deepEqual(snapshot.budget, { tokens: 272000, basis: "input_limit" });
+    assert.equal(snapshot.pressure.criticalTokens, 163200);
+    assert.equal(continuitySummary(snapshot).recommendation, recommendation);
+    assert.equal(snapshot.capabilityScope, "OBSERVATION_ACTION_ONLY_NOT_MAINTENANCE_ELIGIBILITY");
+    assert.equal(snapshot.capabilities.mayCompact, false, "legacy field describes this read, not compact permission");
+  }
+  const custom = await observeSession(reader, expected, { criticalRatio: 0.8 });
+  assert.equal(continuitySummary(custom).recommendation, "CONTINUE_AND_MONITOR");
+  await assert.rejects(observeSession(reader, expected, { criticalRatio: 1 }), { code: "INVALID_INPUT" });
+});
+
+test("input-budget provenance avoids double reserve and never guesses missing limits", () => {
+  const model = { providerID: "p", modelID: "m", contextLimit: 400000, outputLimit: 128000 };
+  assert.deepEqual(inputBudget({ ...model, inputLimit: 272000 }), { tokens: 272000, basis: "input_limit" });
+  assert.deepEqual(inputBudget(model), { tokens: 272000, basis: "context_minus_output_estimate" });
+  assert.deepEqual(inputBudget({ ...model, inputLimit: 500000 }), { tokens: 400000, basis: "input_limit" });
+  assert.deepEqual(inputBudget({ providerID: "p", modelID: "m", contextLimit: 400000 }), { tokens: 400000, basis: "context_only_estimate" });
+  assert.equal(inputBudget({ ...model, outputLimit: 500000 }).tokens, null);
+  assert.equal(inputBudget().basis, "unavailable");
+});
+
+test("compact advice respects age, activity and post-compaction evidence", async () => {
+  const reader = new FakeReader();
+  const snapshot = await observeSession(reader, expected);
+  assert.equal(continuitySummary(snapshot).recommendation, "COMPACT_THEN_RESTORE_BEFORE_WORK");
+  assert.equal(continuitySummary(snapshot, Date.parse(snapshot.observedAt) + 120001).recommendation, "OBSERVE_BEFORE_WORK");
+  assert.equal(continuitySummary({ ...snapshot, activity: "BUSY" }).recommendation, "WAIT_FOR_IDLE_NO_INTERRUPTION");
+  assert.equal(continuitySummary({ ...snapshot, activity: "UNKNOWN" }).recommendation, "OBSERVE_ACTIVITY_BEFORE_MAINTENANCE");
+  assert.equal(continuitySummary({ ...snapshot, latestCompletedCall: { ...snapshot.latestCompletedCall!, freshness: "COMPACTION_AFTER_CALL" },
+    lastCompaction: { messageReference: "synthetic", createdAt: null, source: "NATIVE_COMPACTION_PART", completed: true } }).recommendation,
+    "CHECK_RESTORE_NOT_ANOTHER_COMPACT");
+  assert.equal(continuitySummary(null).recommendation, "OBSERVE_BEFORE_WORK");
+});
+
+test("catalog diagnostics retain sanitized cause without turning absence into a compact ban", async () => {
+  const reader = new FakeReader();
+  reader.model = unavailable();
+  const snapshot = await observeSession(reader, expected);
+  assert.ok(snapshot.limitations.includes("MODEL_CATALOG_HTTP_ERROR"));
+  assert.equal(continuitySummary(snapshot).recommendation, "INSPECT_TELEMETRY_NOT_A_COMPACT_BAN");
+  reader.model = ok(null);
+  assert.ok((await observeSession(reader, expected)).limitations.includes("MODEL_CATALOG_MODEL_ABSENT"));
+  reader.model = { status: 200, bodySha256: "fixture", problem: "INVALID_RESPONSE" };
+  assert.ok((await observeSession(reader, expected)).limitations.includes("MODEL_CATALOG_INVALID_RESPONSE"));
+  for (const code of ["GET_TIMEOUT", "RESPONSE_TOO_LARGE"] as const) {
+    reader.getModelInfo = async () => { throw new AdapterError(code); };
+    assert.ok((await observeSession(reader, expected)).limitations.includes(`MODEL_CATALOG_${code}`));
+  }
+});
+
+test("an aborted zero-token placeholder does not replace successful provider usage", async () => {
+  const reader = new FakeReader();
+  reader.pages.set("newest", ok({ messages: [assistant(), assistant("msg_aborted", { timeCreated: 3000, timeCompleted: 4000, error: true, tokens: { input: 0, output: 0 } })] }));
+  const snapshot = await observeSession(reader, expected);
+  assert.equal(snapshot.latestCompletedCall?.completedAt, "1970-01-01T00:00:02.000Z");
+  assert.equal(snapshot.pressure.bestAvailableTokens, 280000);
+  assert.ok(snapshot.limitations.includes("NEWER_FAILED_OR_UNFINISHED_ASSISTANT_NOT_PROVIDER_USAGE"));
+  assert.equal(continuitySummary(snapshot).recommendation, "REFRESH_TELEMETRY");
+  reader.pages.set("newest", ok({ messages: [assistant("msg_zero", { tokens: { input: 0, output: 0 } })] }));
+  const zero = await observeSession(reader, expected);
+  assert.equal(zero.latestCompletedCall?.tokens?.input, 0);
+  assert.equal(zero.pressure.state, "unknown");
+  assert.equal(zero.pressure.bestAvailableTokens, null);
+});
+
+test("completed native summary survives a later abort without another compact trigger", async () => {
+  const reader = new FakeReader();
+  const marker: OpenCodeMessage = { id: "msg_marker", session: expected.session, role: "user", timeCreated: 3000, text: "", hasCompactionPart: true };
+  reader.pages.set("newest", ok({ messages: [assistant(), marker,
+    assistant("msg_summary", { parentId: marker.id, summary: true, timeCreated: 3100, timeCompleted: 4000, tokens: { total: 94370 } }),
+    assistant("msg_abort", { timeCreated: 5000, timeCompleted: 6000, error: true, tokens: { input: 0, output: 0 } }),
+  ] }));
+  const snapshot = await observeSession(reader, expected);
+  assert.equal(snapshot.latestCompletedCall?.fromCompactionSummary, true);
+  assert.equal(snapshot.pressure.bestAvailableTokens, 94370);
+  assert.equal(continuitySummary(snapshot).recommendation, "CHECK_RESTORE_NOT_ANOTHER_COMPACT");
 });

@@ -49,7 +49,7 @@ function writeJson(root: string, name: string, value: unknown): string {
 
 function localFixture(t: TestContext) {
   const root = mkdtempSync(path.join(process.cwd(), ".router-v2-cli-"));
-  const work: WorkContext = { workId: "cli-fixture-work", target: "cli-fixture", directory: root, instructionReference: "fixture/owner", scope: "Fixture scope", allowedEffects: ["WORKSPACE_WRITE", "READ_ONLY"], stoppingPoint: "Return fixture evidence" };
+  const work: WorkContext = { workId: "cli-fixture-work", target: "cli-fixture", directory: root, instructionReference: "fixture/owner", scope: "Fixture scope", allowedEffects: ["WORKSPACE_WRITE", "READ_ONLY", "SESSION_MAINTENANCE"], stoppingPoint: "Return fixture evidence" };
   const configuration: RouterConfiguration = { schemaVersion: 2, targets: { "cli-fixture": { namespace: "cli-fixture-server", project: "cli-fixture-project", directory: root, origin: "http://127.0.0.1:1", roles: { Delivery: { session: "ses_cli_fixture", profile: "delivery", capability: "DELIVERY" } } } } };
   const configPath = writeJson(root, "router-config.json", configuration);
   const workPath = writeJson(root, "work.json", work);
@@ -68,13 +68,13 @@ async function httpFixture(t: TestContext) {
   const fixture = localFixture(t);
   const session = "ses_cli_fixture";
   const state = {
-    busy: false, hold: true, postClosedEarly: false,
+    busy: false, hold: true, postClosedEarly: false, summaries: 0,
     posts: [] as Array<{ body: { messageID: string; command: string; arguments: string }; response: ServerResponse; operationId: string; released: boolean }>,
     calls: [] as Array<{ method: string; path: string; directory: string | null; authorized: boolean }>,
-    messages: [] as Array<{ info: Record<string, unknown>; parts: Array<{ type: string; text: string }> }>,
+    messages: [] as Array<{ info: Record<string, unknown>; parts: Array<{ type: string; text?: string }> }>,
     template: "implement: $ARGUMENTS",
   };
-  const rawResponse = (rootMessageId: string) => ({ info: { id: `msg_cli_response_${state.posts.length}`, sessionID: session, role: "assistant", parentID: rootMessageId, time: { created: 100, completed: 200 }, finish: "stop" }, parts: [{ type: "text", text: "Private fixture result without an acceptance envelope." }] });
+  const rawResponse = (rootMessageId: string) => ({ info: { id: `msg_cli_response_${state.posts.length}`, sessionID: session, role: "assistant", parentID: rootMessageId, time: { created: Date.now(), completed: Date.now() }, finish: "stop", providerID: "fixture", modelID: "model", tokens: { total: 10000 } }, parts: [{ type: "text", text: "Private fixture result without an acceptance envelope." }] });
   const release = () => {
     for (const post of state.posts) {
       if (post.released) continue;
@@ -91,11 +91,27 @@ async function httpFixture(t: TestContext) {
     const send = (status: number, value: unknown) => { response.writeHead(status, { "content-type": "application/json", connection: "close" }); response.end(JSON.stringify(value)); };
     if (request.method === "GET" && url.pathname === `/session/${session}`) return send(200, { id: session, directory: fixture.root, projectID: "cli-fixture-project" });
     if (request.method === "GET" && url.pathname === "/session/status") return send(200, { [session]: { type: state.busy ? "busy" : "idle" } });
-    if (request.method === "GET" && url.pathname === "/command") return send(200, [{ name: "implement", template: state.template }]);
-    if (request.method === "GET" && url.pathname === `/session/${session}/message`) return send(200, state.messages);
+    if (request.method === "GET" && url.pathname === "/command") return send(200, [{ name: "implement", template: state.template }, { name: "after-compact", template: "Restore $ARGUMENTS" }]);
+    if (request.method === "GET" && url.pathname === "/provider") return send(200, { all: [{ id: "fixture", models: { model: { id: "model", limit: { context: 400000, input: 272000, output: 128000 } } } }] });
+    if (request.method === "GET" && url.pathname === `/session/${session}/message`) return send(200, state.messages.slice(-Number(url.searchParams.get("limit") ?? 40)));
     if (request.method === "GET" && url.pathname.startsWith(`/session/${session}/message/`)) {
       const message = state.messages.find(item => item.info.id === url.pathname.split("/").at(-1));
       return send(message ? 200 : 404, message ?? {});
+    }
+    if (request.method === "POST" && url.pathname === `/session/${session}/summarize`) {
+      let body = ""; request.setEncoding("utf8");
+      request.on("data", (chunk: string) => { body += chunk; });
+      request.on("end", () => {
+        assert.deepEqual(JSON.parse(body), { providerID: "fixture", modelID: "model", auto: false });
+        state.summaries += 1;
+        state.messages.push(
+          { info: { id: "msg_compact_marker", sessionID: session, role: "user", time: { created: Date.now() } }, parts: [{ type: "compaction" }] },
+          { info: { id: "msg_compact_summary", sessionID: session, role: "assistant", parentID: "msg_compact_marker", summary: true,
+            time: { created: Date.now(), completed: Date.now() }, finish: "stop", providerID: "fixture", modelID: "model", tokens: { total: 203397 } }, parts: [{ type: "text", text: "Synthetic summary" }] },
+        );
+        send(200, true);
+      });
+      return;
     }
     if (request.method === "POST" && url.pathname === `/session/${session}/command`) {
       let body = ""; request.setEncoding("utf8");
@@ -138,6 +154,46 @@ function privacy(output: string, root: string, messageIds: string[] = []): void 
   for (const secret of [credentials.username, credentials.password, "ses_cli_fixture", root, ...messageIds]) assert.ok(!output.includes(secret), "Normal projection exposed a private fixture value");
   assert.doesNotMatch(output, /http:\/\/|Private fixture result|Apply the local fixture/);
 }
+
+test("public CLI continuity routine compacts, restores and continues the same work once", async t => {
+  const { root, work, store, state, request } = await httpFixture(t);
+  state.hold = false;
+  state.messages.push({ info: { id: "msg_existing_plan", sessionID: "ses_cli_fixture", role: "assistant", parentID: "msg_plan_root",
+    time: { created: 10, completed: 20 }, finish: "stop", providerID: "fixture", modelID: "model", tokens: { total: 203397 } }, parts: [{ type: "text", text: "Accepted fixture plan" }] });
+  const plan = store.prepareAction({ workId: work.workId, actionKey: "existing-plan", participant: { namespace: "cli-fixture-server", project: "cli-fixture-project", session: "ses_cli_fixture" },
+    recipientRole: "Delivery", kind: "LIFECYCLE", effect: "WORKSPACE_WRITE", command: "terv-review-utan", predecessor: null, input: {} }).operation;
+  store.startDispatch(plan.operationId);
+  store.finish(plan.operationId, { execution: "COMPLETED", evidenceReferences: ["fixture/plan"], response: { messageId: "msg_existing_plan", rootMessageId: plan.messageId, text: "Accepted fixture plan" } });
+  const observe = () => runCli(root, "observe-session", ["--work-id", work.workId, "--role", "Delivery"]);
+  const before = await observe();
+  assert.equal((before.value.continuity as Output).recommendation, "COMPACT_THEN_RESTORE_BEFORE_WORK");
+  const compactPath = writeJson(root, "compact.json", { workId: work.workId, actionKey: "compact/plan-head", recipientRole: "Delivery", predecessor: plan.operationId });
+  const submitted = await runCli(root, "compact", ["--request", compactPath]);
+  assert.equal(submitted.exitCode, 0);
+  const compactId = String(submitted.value.operationId);
+  const waited = await runCli(root, "wait", ["--operation-id", compactId, "--wait-ms", "10000"]);
+  assert.equal(waited.value.execution, "COMPLETED");
+  assert.equal((await runCli(root, "compact", ["--request", compactPath])).value.operationId, compactId);
+  assert.equal(state.summaries, 1);
+  const after = await observe();
+  assert.equal((after.value.continuity as Output).recommendation, "CHECK_RESTORE_NOT_ANOTHER_COMPACT");
+  const restorePath = writeJson(root, "restore.json", { workId: work.workId, actionKey: "restore/plan-head", recipientRole: "Delivery", predecessor: compactId });
+  const restored = await runCli(root, "restore", ["--request", restorePath]);
+  assert.equal(restored.exitCode, 0);
+  assert.equal((await runCli(root, "wait", ["--operation-id", String(restored.value.operationId), "--wait-ms", "10000"])).value.execution, "COMPLETED");
+  assert.equal((await observe()).value.activity, "IDLE");
+  const continuationPath = writeJson(root, "continue.json", { ...request, predecessor: plan.operationId, sources: [{ operationId: plan.operationId }] });
+  const continued = await runCli(root, "submit", ["--request", continuationPath]);
+  assert.equal(continued.exitCode, 0);
+  assert.equal((await runCli(root, "wait", ["--operation-id", String(continued.value.operationId), "--wait-ms", "10000"])).value.execution, "COMPLETED");
+  assert.equal((await runCli(root, "submit", ["--request", continuationPath])).value.operationId, continued.value.operationId);
+  assert.deepEqual(state.posts.map(post => post.body.command), ["after-compact", "implement"]);
+  assert.match(state.posts[1]!.body.arguments, /Accepted fixture plan/);
+  assert.equal(store.getOperation(String(continued.value.operationId)).action.predecessor, plan.operationId);
+  assert.equal(store.getWork(work.workId).operations.length, 4);
+  assert.equal(state.summaries, 1);
+  assert.ok(state.calls.every(call => call.method === "GET" || /\/(command|summarize)$/.test(call.path)));
+});
 
 test("CLI opens and reads local work/results without credentials or a server", async t => {
   const { root, work, workPath, store } = localFixture(t);
@@ -305,7 +361,9 @@ for (const failure of ["source", "configuration"] as const) {
     assert.equal(store.getOperation(prepared.operation.operationId).dispatchStartedAt, null);
     assert.equal(state.posts.length, 0);
     const original = store.getOperation(prepared.operation.operationId);
-    assert.deepEqual((await runCli(root, "execute-operation", ["--operation-id", original.operationId])).value, failed.value);
+    const repeated = (await runCli(root, "execute-operation", ["--operation-id", original.operationId])).value;
+    const withoutElapsedAge = (value: Output) => ({ ...value, continuity: { ...(value.continuity as Output), ageMs: null } });
+    assert.deepEqual(withoutElapsedAge(repeated), withoutElapsedAge(failed.value), "Only derived observation age changes; operation facts are immutable");
     writeFileSync(source, "Frozen fixture source");
     delete configuration.targets["cli-fixture"]!.roles.Delivery!.allowedCommands;
     writeJson(root, "router-config.json", configuration);

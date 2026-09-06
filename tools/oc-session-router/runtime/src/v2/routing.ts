@@ -24,7 +24,7 @@ export interface TargetBinding {
   commands?: Record<string, { capability: Capability; effect: Effect }>;
 }
 /** Private configuration, enrolled once; not a per-stage capability receipt. */
-export interface RouterConfiguration { schemaVersion: 2; targets: Record<string, TargetBinding> }
+export interface RouterConfiguration { schemaVersion: 2; targets: Record<string, TargetBinding>; compactThresholdRatio?: number }
 export class RouterError extends Error {
   constructor(readonly code: string) { super(code); this.name = "RouterError"; }
 }

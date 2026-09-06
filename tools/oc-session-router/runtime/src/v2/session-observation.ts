@@ -47,8 +47,46 @@ export interface SessionObservation {
   model: OpenCodeModelInfo & { limitSource: "opencode_provider_catalog" | "matching_configured_override" | "unavailable" } | null;
   activeContext: { status: "unavailable"; estimatedTokens: null; reason: "NORMALIZED_HISTORY_IS_NOT_ACTIVE_CONTEXT" };
   pressure: PressureObservation;
+  budget: { tokens: number | null; basis: "input_limit" | "context_minus_output_estimate" | "context_only_estimate" | "unavailable" };
+  /** Describes this GET action only. It never denies a separate compact action. */
+  capabilityScope: "OBSERVATION_ACTION_ONLY_NOT_MAINTENANCE_ELIGIBILITY";
   capabilities: { readOnly: true; maySend: false; mayCompact: false; mayMutate: false };
   limitations: string[];
+}
+
+export function inputBudget(model?: OpenCodeModelInfo | null): SessionObservation["budget"] {
+  if (positive(model?.inputLimit)) return { tokens: positive(model.contextLimit) ? Math.min(model.inputLimit, model.contextLimit) : model.inputLimit, basis: "input_limit" };
+  if (positive(model?.contextLimit)) {
+    if (positive(model.outputLimit)) return model.outputLimit < model.contextLimit
+      ? { tokens: model.contextLimit - model.outputLimit, basis: "context_minus_output_estimate" }
+      : { tokens: null, basis: "unavailable" };
+    return { tokens: model.contextLimit, basis: "context_only_estimate" };
+  }
+  return { tokens: null, basis: "unavailable" };
+}
+
+/** Concise decision support, never permission or an automatic sender. */
+export function continuitySummary(snapshot: SessionObservation | null | undefined, now = Date.now()) {
+  const age = snapshot ? now - Date.parse(snapshot.observedAt) : NaN;
+  const freshness = snapshot?.latestCompletedCall?.freshness ?? "UNKNOWN";
+  let recommendation = "OBSERVE_BEFORE_WORK";
+  if (snapshot?.schemaVersion === "session-observation/v2" && snapshot.budget && Number.isFinite(age) && age >= 0 && age <= 120_000 && snapshot.identity?.verified) {
+    if (snapshot.activity === "BUSY") recommendation = "WAIT_FOR_IDLE_NO_INTERRUPTION";
+    else if (snapshot.activity !== "IDLE") recommendation = "OBSERVE_ACTIVITY_BEFORE_MAINTENANCE";
+    else if (freshness === "COMPACTION_AFTER_CALL" && snapshot.lastCompaction?.completed) recommendation = "CHECK_RESTORE_NOT_ANOTHER_COMPACT";
+    else if (freshness !== "NO_NEWER_MESSAGES_OBSERVED") recommendation = "REFRESH_TELEMETRY";
+    else if (snapshot.pressure?.state === "unknown") recommendation = "INSPECT_TELEMETRY_NOT_A_COMPACT_BAN";
+    else if (["critical", "over_limit"].includes(snapshot.pressure?.state)) recommendation = "COMPACT_THEN_RESTORE_BEFORE_WORK";
+    else recommendation = "CONTINUE_AND_MONITOR";
+  }
+  return {
+    observedAt: snapshot?.observedAt ?? null, ageMs: Number.isFinite(age) && age >= 0 ? age : null,
+    activity: snapshot?.activity ?? "UNKNOWN", freshness,
+    lastCallTokens: snapshot?.pressure?.bestAvailableTokens ?? null,
+    budgetTokens: snapshot?.budget?.tokens ?? null, budgetBasis: snapshot?.budget?.basis ?? "unavailable",
+    usageRatio: snapshot?.pressure?.usageRatio ?? null, compactThresholdRatio: snapshot?.pressure?.criticalRatio ?? null,
+    recommendation, authority: "ADVISORY_RECHECK_WORK_EFFECTS_IDLE_AND_CLAIM",
+  };
 }
 
 function count(value: unknown): value is number { return typeof value === "number" && Number.isSafeInteger(value) && value >= 0; }
@@ -62,8 +100,8 @@ function roundEven(value: number, digits: number): number {
   return (scaled - floor === 0.5 ? floor + (floor % 2) : Math.round(scaled)) / multiplier;
 }
 function validateRatios(options: { warnRatio?: number; criticalRatio?: number }): { warnRatio: number; criticalRatio: number } {
-  const warnRatio = options.warnRatio ?? 0.5, criticalRatio = options.criticalRatio ?? 0.62;
-  if (!Number.isFinite(warnRatio) || !Number.isFinite(criticalRatio) || warnRatio < 0.01 || criticalRatio > 0.99 || criticalRatio <= warnRatio) throw new AdapterError("INVALID_INPUT");
+  const criticalRatio = options.criticalRatio ?? 0.60, warnRatio = options.warnRatio ?? Math.min(0.5, criticalRatio * 5 / 6);
+  if (!Number.isFinite(warnRatio) || !Number.isFinite(criticalRatio) || warnRatio < 0.01 || criticalRatio < 0.02 || criticalRatio > 0.99 || criticalRatio <= warnRatio) throw new AdapterError("INVALID_INPUT");
   return { warnRatio, criticalRatio };
 }
 
@@ -78,7 +116,8 @@ export function calculatePressure(tokens?: MessageTokens, contextLimit?: number,
   if (positive(tokens?.total)) { total = tokens.total; totalSource = "provider_reported_total"; }
   else if ([tokens?.input, tokens?.output, tokens?.cache?.read, tokens?.cache?.write].some(count)) {
     total = [tokens?.input, tokens?.output, tokens?.cache?.read, tokens?.cache?.write].reduce<number>((sum, item) => sum + (count(item) ? item : 0), 0);
-    // Reasoning is already included by provider output semantics; do not add it again.
+    // Preserve OpenCode's fallback accounting; providers differ on reasoning
+    // inclusion. Prefer their reported total rather than guessing an extra sum.
     if (Number.isSafeInteger(total)) totalSource = "computed_opencode_overflow_formula";
     else total = null;
   }
@@ -132,6 +171,7 @@ export async function observeSession(adapter: ObservationReader, expected: { ses
     history: { coverage: "UNAVAILABLE", pagesRead: 0, messagesRead: 0 }, model: null,
     activeContext: { status: "unavailable", estimatedTokens: null, reason: "NORMALIZED_HISTORY_IS_NOT_ACTIVE_CONTEXT" },
     pressure: calculatePressure(undefined, undefined, options), capabilities: { readOnly: true, maySend: false, mayCompact: false, mayMutate: false },
+    budget: inputBudget(), capabilityScope: "OBSERVATION_ACTION_ONLY_NOT_MAINTENANCE_ELIGIBILITY",
     limitations: ["LAST_COMPLETED_CALL_IS_NOT_EXACT_LIVE_CONTEXT", "NORMALIZED_HISTORY_EXCLUDES_PROVIDER_SYSTEM_AND_TOOL_OVERHEAD", "PRESSURE_NEVER_AUTHORIZES_COMPACTION"],
   };
   const limitation = (value: string) => { if (!snapshot.limitations.includes(value)) snapshot.limitations.push(value); };
@@ -168,9 +208,14 @@ export async function observeSession(adapter: ObservationReader, expected: { ses
   if (activity) snapshot.activity = activity;
   else limitation("ACTIVITY_UNAVAILABLE");
   const all = [...messages.values()];
-  const completions = all.filter(message => message.role === "assistant" && iso(message.timeCompleted) !== null)
+  // An aborted zero-token placeholder is not a completed provider call. Keep
+  // successful tool-call steps, but never replace a successful token-less call
+  // with an older token-rich one merely to get a reassuring number.
+  const completions = all.filter(message => message.role === "assistant" && message.error !== true && !!message.finish && message.finish !== "unknown" && iso(message.timeCompleted) !== null)
     .sort((left, right) => (left.timeCompleted! - right.timeCompleted!) || ((left.timeCreated ?? 0) - (right.timeCreated ?? 0)) || left.id.localeCompare(right.id));
   const latest = completions.at(-1);
+  if (all.some(message => message.role === "assistant" && iso(message.timeCompleted) !== null &&
+    (!latest || message.timeCompleted! > latest.timeCompleted!) && (message.error === true || !message.finish || message.finish === "unknown"))) limitation("NEWER_FAILED_OR_UNFINISHED_ASSISTANT_NOT_PROVIDER_USAGE");
   const markers = all.filter(message => message.hasCompactionPart).sort((left, right) => ((left.timeCreated ?? 0) - (right.timeCreated ?? 0)) || left.id.localeCompare(right.id));
   const marker = markers.at(-1);
   if (marker) {
@@ -183,7 +228,7 @@ export async function observeSession(adapter: ObservationReader, expected: { ses
     const now = Date.now();
     let freshness: NonNullable<SessionObservation["latestCompletedCall"]>["freshness"] = "NO_NEWER_MESSAGES_OBSERVED";
     if (all.some(message => (message.timeCreated ?? 0) > latest.timeCompleted!) || snapshot.activity === "BUSY") freshness = "NEWER_ACTIVITY_OBSERVED";
-    if (marker && (marker.timeCreated ?? 0) > latest.timeCompleted!) freshness = "COMPACTION_AFTER_CALL";
+    if (marker && (marker.timeCreated ?? 0) > latest.timeCompleted!) freshness = snapshot.lastCompaction?.completed ? "COMPACTION_AFTER_CALL" : "UNKNOWN";
     // Summarize's input usage measures the context it is replacing, even though
     // the summary assistant completes after the user compaction marker.
     if (latest.summary === true) {
@@ -209,14 +254,32 @@ export async function observeSession(adapter: ObservationReader, expected: { ses
       snapshot.model = { ...model, contextLimit: override.contextLimit, limitSource: "matching_configured_override", ...(positive(override.inputLimit) ? { inputLimit: override.inputLimit } : {}), ...(positive(override.outputLimit) ? { outputLimit: override.outputLimit } : {}) };
     } else {
       if (override) limitation("MODEL_LIMIT_OVERRIDE_MISMATCH");
-      const selected = adapter.getModelInfo ? await read(() => adapter.getModelInfo!(model.providerID, model.modelID)) : undefined;
+      let selected: OpenCodeModelInfo | null | undefined;
+      if (!adapter.getModelInfo) limitation("MODEL_CATALOG_READER_UNAVAILABLE");
+      else {
+        try {
+          const reply = await adapter.getModelInfo(model.providerID, model.modelID);
+          if (reply.status < 200 || reply.status >= 300) limitation("MODEL_CATALOG_HTTP_ERROR");
+          else if (reply.problem) limitation(`MODEL_CATALOG_${reply.problem}`);
+          else { selected = reply.value; if (!selected) limitation("MODEL_CATALOG_MODEL_ABSENT"); }
+        } catch (error) { limitation(`MODEL_CATALOG_${error instanceof AdapterError ? error.code : "READ_FAILED"}`); }
+      }
       if (selected && matching(model, selected)) {
         snapshot.model = { ...model, limitSource: "opencode_provider_catalog", ...(positive(selected.contextLimit) ? { contextLimit: selected.contextLimit } : {}), ...(positive(selected.inputLimit) ? { inputLimit: selected.inputLimit } : {}), ...(positive(selected.outputLimit) ? { outputLimit: selected.outputLimit } : {}) };
       } else if (selected) limitation("MODEL_CATALOG_IDENTITY_CONFLICT");
     }
   }
   if (!snapshot.model?.contextLimit) limitation("CONTEXT_LIMIT_UNAVAILABLE");
-  snapshot.pressure = calculatePressure(tokens, snapshot.model?.contextLimit, options);
+  snapshot.budget = inputBudget(snapshot.model);
+  snapshot.pressure = calculatePressure(tokens, snapshot.budget.tokens ?? undefined, options);
+  // Legacy arithmetic helper retains its historical labels for parity. V2's
+  // actionable advice must not contradict safe idle maintenance at high pressure.
+  if (snapshot.pressure.state === "over_limit") snapshot.pressure.recommendation = "recommend_at_next_safe_boundary";
+  if (snapshot.pressure.bestAvailableTokens === 0) {
+    // A zero-filled provider placeholder is not evidence of an empty context.
+    snapshot.pressure = calculatePressure(undefined, snapshot.budget.tokens ?? undefined, options);
+    limitation("ZERO_USAGE_IS_NOT_ACTIVE_CONTEXT_EVIDENCE");
+  }
   snapshot.observedAt = new Date().toISOString();
   return snapshot;
 }

@@ -77,11 +77,34 @@ after result handling and during waits with backoff. The orchestrator remains
 responsible for inspecting freshness and deciding whether maintenance is useful.
 `observe-session` and the context-status facade use the same work/role mapping.
 
-Token counts describe the last completed provider call, not exact current context.
-The default advisory warning/critical ratios are `0.5`/`0.62`. Missing optional
-catalog/tokens/history stays visibly unavailable; it is not a universal lifecycle
+Token counts describe the last successful completed provider call (including
+tool-call steps), not exact current context. Aborted/failed empty assistant
+records do not replace it; newer activity remains visible as stale/unknown.
+Even successful zero-only telemetry does not prove an empty context.
+The default advisory warning/compact ratios are `0.5`/`0.60` of the usable input
+budget, not blindly the whole context window. `compactThresholdRatio` is the one
+optional configuration override. Reports distinguish input-limit from estimated
+context-minus-output/context-only basis; they never claim exact active context.
+Missing optional catalog/tokens/history stays visibly unavailable; it is not a universal lifecycle
 blocker. A new send still needs verified addressing, permitted scope/effect and a
-safe idle participant.
+safe idle participant. Catalog reads have their own 16 MiB cap; other response
+caps are unchanged. A read failure carries its sanitized reason.
+
+Before new addressed work and after handling a result, inspect the concise
+`continuity` advice in observe/inspect/wait/reconcile output. Older than two minutes,
+wrong participant, changed head or intervening activity: refresh with
+`observe-session`. A recent stored observation is not proof of a currently idle
+session. The legacy `capabilities.mayCompact:false` describes the read-only GET
+action ONLY, never a prohibition on the separate compact action.
+
+At `COMPACT_THEN_RESTORE_BEFORE_WORK`, perform the following maintenance routine
+within the existing SESSION_MAINTENANCE envelope without a fresh Owner question.
+Use stable action keys, preserve completed product result/source references and
+the original intended action. BUSY means wait without interruption; already
+compacted means check/finish restoration rather than compact again. Unknown
+telemetry is neither a compact ban nor a green pressure result: inspect its cause,
+use matching known limits when available, and make a bounded evidence-based
+decision. No universal guessed token threshold or mandatory telemetry gate.
 
 At an idle boundary, preserve the continuation/result references, request one
 `compact` operation, and observe its actual completion. The shared SQL claim and
@@ -93,7 +116,10 @@ its summary is stale, not a reason to compact again.
 Then request `restore` for the same project/role, supplying only useful current
 artifact references. It invokes installed `/after-compact` with minimal work
 context, never a new plan or implementation. A blocked phase does not prevent
-reading role/project instructions. Continue the original authorized lifecycle only
+reading role/project instructions. Report performed/deferred maintenance and its
+reason. The active orchestrator owns this routine, without a daemon, hidden
+successor send or a model call per telemetry sample.
+Continue the original authorized lifecycle only
 when the actual Owner pause permits it.
 
 The Owner compacts orchestrator sessions manually. Agents never abort, kill or

@@ -9,6 +9,7 @@ import { RouterEngine, type CompactRequest, type SubmitRequest } from "./engine.
 import { OperationStore } from "./state-store.js";
 import { RouterError, type RouterConfiguration } from "./routing.js";
 import { importLegacyOperation, type LegacyImportRequest } from "./legacy-import.js";
+import { continuitySummary, type SessionObservation } from "./session-observation.js";
 
 const here = fileURLToPath(import.meta.url);
 function jsonFile<T>(file: string): T {
@@ -29,7 +30,12 @@ function required(values: Record<string, string>, key: string): string {
 }
 
 /** Normal status contains no origin, credential, session/root message IDs or transcript. */
-export function operationView(operation: Operation) {
+export function operationView(operation: Operation, store?: OperationStore) {
+  const snapshot = store?.getWork(operation.action.workId).observations[operation.action.recipientRole] as unknown as SessionObservation | undefined;
+  const continuity = continuitySummary(snapshot);
+  if (operation.completedAt && (!snapshot || Date.parse(snapshot.observedAt) < Date.parse(operation.completedAt))) {
+    continuity.recommendation = "OBSERVE_BEFORE_WORK"; // Stored pre-result pressure is not post-result advice.
+  }
   return {
     operationId: operation.operationId, workId: operation.action.workId,
     actionKey: operation.action.actionKey, recipientRole: operation.action.recipientRole,
@@ -43,6 +49,7 @@ export function operationView(operation: Operation) {
     // activity remains separately available in the work's session observations.
     activity: operation.completedAt ? operation.outcome?.execution ?? "UNKNOWN" : operation.observation?.activity ?? "UNKNOWN",
     reason: operation.completedAt ? operation.outcome?.reason ?? null : operation.observation?.context?.reason ?? null,
+    ...(store ? { continuity } : {}),
     autoAdvance: false,
   };
 }
@@ -104,10 +111,10 @@ export async function runCli(argv: string[]): Promise<unknown> {
       return { workId: work.context.workId, target: work.context.target, paused: work.paused, operationCount: work.operations.length, autoAdvance: false };
     }
     if (action === "inspect") {
-      if (values["--operation-id"]) return operationView(store.getOperation(values["--operation-id"]));
+      if (values["--operation-id"]) return operationView(store.getOperation(values["--operation-id"]), store);
       const work = store.getWork(required(values, "--work-id"));
       return { workId: work.context.workId, target: work.context.target, instructionReference: work.context.instructionReference, stoppingPoint: work.context.stoppingPoint,
-        paused: work.paused, pauseReference: work.pauseReference, observations: work.observations, operations: work.operations.map(operationView), autoAdvance: false };
+        paused: work.paused, pauseReference: work.pauseReference, observations: work.observations, operations: work.operations.map(operation => operationView(operation, store)), autoAdvance: false };
     }
     if (action === "read-result") {
       const operation = store.getOperation(required(values, "--operation-id"));
@@ -116,7 +123,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
     }
     if (action === "import-legacy") {
       const imported = importLegacyOperation(store, jsonFile<RouterConfiguration>(configurationPath), readRequest<LegacyImportRequest>());
-      return { ...operationView(imported.operation), created: imported.created, imported: true, workPaused: store.getWork(imported.operation.action.workId).paused, lifecycleSend: false };
+      return { ...operationView(imported.operation, store), created: imported.created, imported: true, workPaused: store.getWork(imported.operation.action.workId).paused, lifecycleSend: false };
     }
     if (action === "record-pause") {
       const request = readRequest<{ workId: string; paused: boolean; instructionReference: string }>();
@@ -131,19 +138,19 @@ export async function runCli(argv: string[]): Promise<unknown> {
       return operationView(store.interpret(request.operationId, {
         resultDigest: request.resultDigest ?? operation.resultDigest, responsibleRole: request.responsibleRole,
         decision: request.decision, evidenceReferences: request.evidenceReferences,
-      }));
+      }), store);
     }
     if (action === "submit" || action === "restore") {
       const request = readRequest<SubmitRequest>();
       const prepared = await engine().prepare(action === "restore" ? { ...request, kind: "RESTORE" } : request);
       if (!prepared.operation.dispatchStartedAt && !prepared.operation.completedAt) await retainExecutor(stateRoot, configurationPath, prepared.operation.operationId);
-      return { ...operationView(store.getOperation(prepared.operation.operationId)), created: prepared.created };
+      return { ...operationView(store.getOperation(prepared.operation.operationId), store), created: prepared.created };
     }
     if (action === "compact") {
       const prepared = await engine().prepareCompact(readRequest<CompactRequest>());
       if (!prepared.operation) return { disposition: prepared.disposition, created: false, delivery: "NOT_SENT", autoAdvance: false };
       if (!prepared.operation.dispatchStartedAt && !prepared.operation.completedAt) await retainExecutor(stateRoot, configurationPath, prepared.operation.operationId);
-      return { ...operationView(store.getOperation(prepared.operation.operationId)), created: prepared.created };
+      return { ...operationView(store.getOperation(prepared.operation.operationId), store), created: prepared.created };
     }
     if (action === "observe-session") return await engine().observe(required(values, "--work-id"), required(values, "--role"));
     const operationId = required(values, "--operation-id");
@@ -153,7 +160,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
       const idleDeadline = performance.now() + idleWaitMs;
       let cadence = 1000;
       while (true) {
-        try { return operationView(await engine().execute(operationId)); }
+        try { return operationView(await engine().execute(operationId), store); }
         catch (error) {
           const code = error instanceof RouterError || error instanceof StoreError ? error.code : "EXECUTOR_FAILED";
           const operation = store.getOperation(operationId);
@@ -169,11 +176,11 @@ export async function runCli(argv: string[]): Promise<unknown> {
           }
           const permanentPreparationFailure = ["SOURCE_CHANGED", "SOURCE_UNAVAILABLE", "COMMAND_CHANGED_BEFORE_SEND", "COMMAND_EFFECT_CHANGED", "PARTICIPANT_BINDING_CHANGED", "PARTICIPANT_IDENTITY_MISMATCH", "ROLE_COMMAND_NOT_ALLOWED", "MODEL_CONFIGURATION_INVALID", "MAINTENANCE_BASELINE_CHANGED", "ORCHESTRATOR_COMPACT_IS_MANUAL"].includes(code);
           if (!operation.dispatchStartedAt && !operation.completedAt && permanentPreparationFailure) store.abandonPrepared(operationId, code);
-          return operationView(store.getOperation(operationId));
+          return operationView(store.getOperation(operationId), store);
         }
       }
     }
-    if (action === "reconcile") return { ...operationView((await engine().reconcile(operationId)).operation) };
+    if (action === "reconcile") return { ...operationView((await engine().reconcile(operationId)).operation, store) };
     const waitMs = Number(values["--wait-ms"] ?? 3_600_000);
     if (!Number.isSafeInteger(waitMs) || waitMs < 0 || waitMs > 3_600_000) throw new RouterError("WAIT_RANGE_INVALID");
     const deadline = performance.now() + waitMs;
@@ -181,12 +188,12 @@ export async function runCli(argv: string[]): Promise<unknown> {
     while (true) {
       const stored = store.getOperation(operationId);
       if (stored.completedAt || performance.now() >= deadline || store.getWork(stored.action.workId).paused) return {
-        ...operationView(stored), disposition: stored.completedAt ? "STORED" : "PENDING", observationEnded: true, sessionInterrupted: false,
+        ...operationView(stored, store), disposition: stored.completedAt ? "STORED" : "PENDING", observationEnded: true, sessionInterrupted: false,
       };
       const currentEngine = engine();
       const result = await currentEngine.reconcile(operationId);
       if (result.operation.completedAt || performance.now() >= deadline || result.disposition === "AMBIGUOUS" || store.getWork(result.operation.action.workId).paused) return {
-        ...operationView(result.operation), disposition: result.disposition, observationEnded: true, sessionInterrupted: false,
+        ...operationView(result.operation, store), disposition: result.disposition, observationEnded: true, sessionInterrupted: false,
       };
       await currentEngine.observeOptional(result.operation.action.workId, result.operation.action.recipientRole, Math.min(15_000, Math.max(0, deadline - performance.now())));
       await delay(Math.min(cadence, Math.max(0, deadline - performance.now())));
