@@ -3,15 +3,33 @@
 Agent Workflow Canon root: `../Agent-Workflow-Canon`
 Adoption contract: `../Agent-Workflow-Canon/ADOPTION.md`
 
-Read these authority surfaces in order before meaningful work:
+This checkout prepares the AWC 5 / Router V2 source candidate. It is unreleased;
+installed and loaded tooling are separate facts. The current assignment is
+Owner-authorized cross-repository workflow maintenance, not a completed project
+Delivery/Meta lifecycle.
 
-1. `ops/PROJECT_OVERLAY.md` for FAL identity, ownership, safety, privacy, and explicit Canon exceptions.
-2. `ops/PROJECT_STATE.md` for the exact active Wave, Epic, phase, blocker, and next action.
-3. The active Epic row in `ops/Combined-Execution-Sequencing-Plan.md` plus its direct prerequisites.
-4. The current pinned plan, review, synthesis, acknowledgement, or fix-plan artifact named by state.
-5. One role profile from `ops/roles/` and at most one event runbook required for the immediate action.
-6. `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` only when router mechanics are involved.
+Read target `ops/PROJECT_OVERLAY.md`, `ops/PROJECT_STATE.md` and one applicable
+role profile/runbook first. For execution, also read the current row in
+`ops/Combined-Execution-Sequencing-Plan.md` and the artifact named by state.
+Load `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` only for
+router mechanics. Basic role/status reads remain available while work is paused
+or blocked; successful hydration grants no execution permission.
 
-`ops/AGENTS.md` remains a cold legacy/history source. Load only a section explicitly named by the overlay or current plan; it does not replace the compact overlay, state, or sole Combined.
+The relative Canon locator is portable for the saved repositories. In isolated
+worktrees, use the coordinator's explicitly supplied combined Canon candidate
+root for read-only hydration and validation. Verify the selected source root;
+do not silently fall back to an original or unrelated checkout. Temporary
+worktree paths are execution evidence, not shipped configuration.
 
-The FAL Meta Coordinator does not write production code. Explicit FAL safety, privacy, public/private, target-authority, workflow-kernel, and remote-side-effect rules remain mandatory. A local Canon exception must be explicit in `ops/PROJECT_OVERLAY.md`; accidental drift is not an exception.
+Project files own intent, scope and acceptance. Router operation facts preserve
+what was prepared, possibly sent, delivered and observed; they do not decide
+acceptance or the next lifecycle step. Owner pauses remain explicit.
+
+The Meta Coordinator does not write production code. Only the Owner interrupts
+sessions or compacts orchestrators. Preserve private data and unrelated work.
+The protected Python router sync source/tests remain outside this assignment.
+
+W8-A and the unopened W8-W10 program are SUPERSEDED, not completed. See
+`ops/migration/AWC5-V2-SUPERSESSION.md` for exact historical Git references and
+retained requirements. Old plans, stage manifests, `ops/AGENTS.md` and temporary
+W8 role instructions are cold evidence, never an alternate current frontier.

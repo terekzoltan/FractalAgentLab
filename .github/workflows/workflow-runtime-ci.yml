@@ -1,0 +1,36 @@
+name: Workflow runtime source checks
+on:
+  push:
+    paths: ['tools/oc-session-router/**', 'tools/workflow-tooling/**', '.github/workflows/workflow-runtime-ci.yml']
+  pull_request:
+    paths: ['tools/oc-session-router/**', 'tools/workflow-tooling/**', '.github/workflows/workflow-runtime-ci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-offline-fixtures:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.11.0'
+          cache: npm
+          cache-dependency-path: tools/oc-session-router/runtime/package-lock.json
+      - name: Install locked development dependencies without lifecycle scripts
+        working-directory: tools/oc-session-router/runtime
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build and test one active V2 runtime
+        working-directory: tools/oc-session-router/runtime
+        run: npm test
+      - name: Windows PowerShell 5.1 facade and pure telemetry checks
+        shell: powershell
+        run: |
+          & ./tools/oc-session-router/scripts/test-v2-launcher.ps1
+          & ./tools/oc-session-router/scripts/test-session-context-status.ps1
+      - name: Managed-tooling transaction fixtures only
+        shell: powershell
+        run: ./tools/workflow-tooling/tests/Test-WorkflowTooling.ps1
+
+# These are source/fixture checks, not installed OpenCode or live pilot proof.
+# No server credentials, runtime data, protected registry or live writer is used.

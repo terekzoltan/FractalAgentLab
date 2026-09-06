@@ -1,234 +1,85 @@
-# OpenCode Session Router
+# OpenCode Session Router V2
 
-This directory is the FAL transport and evidence adapter for Agent Workflow Canon.
-It is not project truth and does not grant workflow authority.
+V2 is the FAL adapter for addressed OpenCode work: one operation store, one
+transport implementation and an orchestrator-led lifecycle. Project instructions,
+plans and acceptance remain with the Owner and the responsible project roles.
 
-## Load order
+This is a source/release candidate. These docs do not claim global installation,
+loaded-process qualification, an AWC 5 release or permission to resume frozen
+projects. The useful real-work pilot and its quickstart remain separate
+qualification deliverables.
 
-1. Use `docs/workflow-orchestrator-runbook.md` as the small operational entry point.
-2. Open `docs/workflow-orchestrator-reference.md` only for a named transport,
-   recovery, schema, or wrapper question.
-3. Resolve current sessions only through the owner-protected control plane and
-   current project authority through the target project's `AGENTS.md`, state,
-   Combined Epic, role runbook, and pinned phase artifact.
+## Entry points
 
-## Safety boundary
+- [Operating runbook](docs/workflow-orchestrator-runbook.md): lifecycle, recovery,
+  clarification and lane continuity.
+- [Interface reference](docs/workflow-orchestrator-reference.md): actions,
+  request fields and result meanings.
+- [Command reference](docs/session-router-cheatsheet.md): compact invocation syntax.
+- [Private configuration](config/README.md): schema 2 and participant addressing.
+- [Versioned tooling installer](../workflow-tooling/README.md): managed command,
+  skill and agent deployment; installed and loaded status are separate facts.
 
-- `scripts/Invoke-OCRouter.ps1` is the sole lifecycle command entrypoint. It runs
-  exactly one `new-run`, `new-follow-on-run`, `invoke-stage`, `install-closeout-authority`,
-  `resolve-stage`, or `get-run` operation,
-  emits JSON with `auto_advance: false`, and never installs or builds at dispatch.
-- The TypeScript core under `runtime/` derives run and stage authority from the
-  protected registry plus current target state, Combined span, pinned artifact,
-  overlay, and role. Request files are untrusted instructions and cannot supply a
-  server endpoint, session ID, command body, or output path.
-- Runtime release `0.2.0` keeps protocol identity
-  `fal-explicit-stage-router/v1` independent from AWC. Active production modes
-  require AWC `4.1.1`; AWC `3.1` remains fixture/input compatibility only.
-- The fixed owner-protected layout is
-  `%LOCALAPPDATA%\FractalAgentLab\oc-router\{control,runtime,receipts}`.
-  `Initialize-OCRouterControlPlane.ps1 -Action Bootstrap` creates `DISABLED`
-  defaults and owner+SYSTEM-only ACLs; `-Action Verify` is read-only. The retired
-  `init-router-runtime.ps1` never creates an alternate registry.
-- The launcher and Node runtime independently resolve the OS LocalApplicationData
-  KnownFolder; caller environment values are comparison-only. The protected v2
-  registry binds an exact domain-hashed `p0b_isolation_root`, and every synthetic
-  target/server directory must be a reparse-free descendant before any probe.
-- Modes are `DISABLED` (default kill switch), `P0B_ISOLATED` (short-lived
-  synthetic one-use grant), and `PRODUCTION_RESPONSE_FIRST` (requires a nonzero
-  P0B proof-bound install receipt). The protected receipt path is registry-owned,
-  never request- or environment-selectable. No real-project P0B send is part of
-  the offline suite.
-- Those are protected **control-plane modes**, not semantic output policy. New
-  immutable runs also bind one target-authoritative `router_policy_mode` from
-  `Router mode: STANDARD|STRICT` in target state. A missing label, including every
-  pre-policy saved run, means `STRICT`; a caller may request `STRICT` but cannot
-  request or inject `STANDARD`. `CLOSEOUT` and `P0B_ISOLATED` always execute with
-  effective `STRICT` policy without changing the run's bound mode.
-- There is no automatic risk classifier. Release, migration, destructive, and
-  explicitly high-consequence ordinary lifecycle runs must bind `STRICT` in
-  accountable target state before run creation; uncertainty also selects
-  `STRICT`. The first live STANDARD canary is limited to one named SEQ_NEXT,
-  PLAN_REVIEW, or STEP_REVIEW stage with no successor delivery dispatch.
-  PLAN_REVISION, IMPLEMENT, and REVIEW_RESPONSE open only after successful
-  canary evidence and later authorization; CLOSEOUT and P0B remain strict.
-- `STANDARD` changes only post-recipient output policy. Exact canonical output is
-  unchanged. The first finite allowlist accepts one uniquely delimited canonical
-  envelope surrounded only by an exact reviewed, semantically inert wrapper line
-  (`Here is the requested canonical output:`, `End of canonical output.`,
-  `Progress note: review completed.`, or `Explanation: retained outside the
-  canonical artifact.`), plus deterministic `NONE` defaults for a small
-  documented set of non-authority fields. Arbitrary outside prose is ambiguous,
-  even without a colon. The policy has no fuzzy parser, model
-  repair, alias guessing, retry, auto-advance, or second sender. Ambiguous output,
-  binding drift, missing authority, and every transport invariant remain closed.
-- A normalized success persists only the canonical terminal plus one or more
-  digest-only, append-only `router-warning-receipt.v1` records. A well-bound
-  STANDARD terminal with a required semantic evidence gap becomes terminal
-  `EVIDENCE_GAP`: transport evidence is retained, no successor is projected, and
-  the command is never retried automatically. STRICT keeps treating that same
-  omission as invalid output. For v34 runs, `get-run` exposes only the bound mode
-  and a bounded `warning_count`/`warning_rules` summary, never raw private output.
-  A pre-v34 run with no warning receipts may omit `router_policy`; that omission
-  is the backward-compatible representation of effective `STRICT`.
-- Compatibility closure in v34.1: an unexpected technical failure while
-  executing the `before_dispatch` Compact Lite hook is maintenance evidence,
-  not transport authority. For every ordinary non-`CLOSEOUT` stage the router
-  continues with a privacy-safe `HOOK_EXECUTION_FAILED_NONBLOCKING` Compact
-  receipt. A valid critical-pressure/busy result still waits or blocks exactly
-  as before, and `CLOSEOUT` keeps technical hook failure fail-closed.
-- An accepted P0B transport proof survives an ordinary server restart and
-  forward OpenCode patch updates on the same strict `major.minor` line.
-  Production admission binds stable server semantics; each dispatch separately
-  pins the current server process from its baseline through immediate pre-POST
-  and post-response revalidation. Exact-version reuse still requires the exact
-  proven binary. Downgrade, minor/major change, prerelease/nonstandard version,
-  router-attestation change, or a stable capability mismatch requires a new
-  isolated P0B proof. Command-registry identity binds execution semantics
-  (`name`, `template`, and effective `agent`/`model`/`subtask`) while ignoring
-  presentation/provenance metadata (`description`, `hints`, `source`) that may
-  be regenerated across an otherwise identical restart. Unknown command fields
-  remain fail-closed.
-- Installed `/command` is response-first. Audited `step-start`, `step-finish`,
-  reasoning, and synthetic/ignored text are hashed but not treated as output;
-  tool/subtask/file/patch/unknown parts fail closed. Snapshot history is ordered
-  chronologically, follows only the server-provided opaque next cursor within a
-  finite page cap, and treats the latest pre-send message as the baseline. If the POST
-  response is lost after delivery, `resolve-stage` may accept exactly one strict
-  terminal bound to exactly one post-baseline root user message whose text equals
-  the installed command template expanded with the pinned argument. Any missing,
-  duplicate, or invalid binding remains `UNCERTAIN`; recovery never resends.
-  Production reconciliation waits, by default, for at most the protected
-  60-minute window and polls only GET history for that same operation. It exits
-  immediately on exact correlation and never creates a new run, operation, or
-  lifecycle send. A recovered terminal may normalize only the exact protected
-  target-root provenance from its single `Target:` field; the raw output is not
-  persisted, a digest-only sanitization receipt is written, and every other
-  private sentinel still fails closed. New `SEQ_NEXT` dispatches explicitly
-  require the canonical target name without path, branch, endpoint, or credential
-  provenance. Reconciliation reconstructs a persisted command root only through
-  a finite reviewed renderer set and selects it by the invocation's exact saved
-  argument hash, so later envelope improvements cannot invalidate an older send
-  or authorize an unrecognized historical shape. SSE is probed and recorded but
-  remains disabled.
-- Compact preflight is observable rather than opaque. WARN-level maintenance
-  cannot block lifecycle dispatch; a higher-pressure `SESSION_NOT_IDLE` result
-  is rechecked without a lifecycle POST for a bounded 60-minute window; if it
-  becomes idle, normal Compact Lite policy resumes. A terminal block emits
-  a privacy-safe `compact_preflight` diagnostic and no lifecycle send. After a
-  stage settles, the operation stores `compact-hooks.json` with the validated
-  before/after projections; this receipt never changes the stage result and
-  does not introduce automatic Compact recovery.
-- Live installed-capability measurement is GET-only and may repeat its complete
-  probe exactly once after a transport timeout/connection failure or a finite
-  retryable server status. Authentication, authority, identity, command-roster,
-  source, privacy, and semantic mismatches are never retried. This bounded probe
-  retry cannot repeat the lifecycle command POST.
-- A thrown `invoke-stage` pre-operation failure emits a privacy-safe
-  `stage_dispatch.v2` diagnostic with a finite guard phase, reason class,
-  stability-attempt count, and send evidence. The initial capability/authority
-  pair may be re-read once when its two GET-only measurements disagree; no
-  operation exists yet. Only transient live-capability failure with both
-  `operation_created: false` and `lifecycle_send: false` declares
-  `SAFE_SAME_REQUEST`; every semantic guard and every later failure declares
-  `NO_AUTOMATIC_RETRY`.
-- `Prepare-OCRouterStage.ps1` is the bounded no-send source-hash helper. It hashes
-  only sources explicitly named by the operator and emits candidate manifest and
-  state packet files; invocation remains a separate explicit transaction.
-- A successful, valid, bound stage terminal is also an append-only router-owned
-  source candidate for the next allowed stage. `get-run` exposes the exact
-  `next_stage_sources` bindings; dispatch re-derives their content and hash from
-  protected runtime evidence. This permits an in-run `SEQ_NEXT -> PLAN_REVIEW`
-  handoff without rewriting target state or the target manifest. It does not
-  auto-advance, accept arbitrary runtime content, or weaken run authority.
-  A validated `IMPLEMENT` terminal also freezes the protected Git
-  `changed_paths` set as hash-bound router evidence and yields a separate
-  `ACCEPTANCE_EVIDENCE` projection containing that exact candidate scope plus
-  its canonical acceptance/check fields and review lineage. Same-run
-  `STEP_REVIEW` therefore reviews both required sources without inventing
-  target evidence. Later worktree dirt cannot retroactively enlarge this set.
-  `get-run` exposes a separate `continuation_requirements` entry when an allowed
-  successor still needs target- or Owner-owned authority. It never advertises a
-  partial `next_stage_sources` set as dispatch-ready. After `ACK_ONLY`, the same
-  immutable run pauses with `OWNER_SOURCE_REQUIRED`: the router retains the
-  exact synthesis, delivery response, and delta under `available_stage_sources`.
-  The Owner installs one fresh `CLOSEOUT_AUTHORITY` v2 through the protected,
-  no-send `install-closeout-authority` operation. No target file, manifest, or
-  lifecycle state is changed by that install. Its `candidate_paths` is copied
-  from the frozen reviewed candidate scope and is distinct from ambient
-  worktree dirt. After validation, `get-run` exposes the complete four-source
-  CLOSEOUT packet under `next_stage_sources`. Commit authority names the exact union of the frozen
-  candidate paths and synthesis-enumerated governance-delta paths. The index must
-  be empty before POST; the candidate may remain unstaged. The Meta closeout
-  command alone applies the governance delta, stages that exact union, and
-  commits it. The protected worktree proof exposes the exact pre-POST changed
-  paths and requires them to equal `candidate_paths`, so an unrelated dirty path blocks before delivery rather than being
-  absorbed or discovered after commit.
-  A validated `FIX_PLAN_REQUIRED` response ends the current immutable review
-  cycle. It establishes `REVIEW_FIX_PLAN` lineage and requires a new follow-on
-  run with a monotonically incremented review cycle and exact finding lineage;
-  the router never mutates cycle authority in place. The no-send
-  `new-follow-on-run` operation accepts only the exact predecessor run and
-  Delivery operation identities. It derives the candidate, fix plan, findings,
-  and next cycle from protected terminal evidence, creates one idempotent
-  successor, and projects its first `PLAN_REVIEW` source without rewriting the
-  target repository or sending a lifecycle command.
-  Within that follow-on run, a successful stage may carry forward an exact
-  target source binding it already validated when the successor requires the
-  same source class. Content and hash are still re-resolved before the next POST;
-  this is binding reuse, not source trust or authority mutation.
-  Non-`NONE` `Proposed closeout delta` values use the Canon's exact minified
-  JSON array of `{path,field,value}` objects. Legacy path-only arrays are
-  rejected rather than silently losing field/value intent. Array order is not
-  semantic; the exact path/field/value set remains byte-value bound.
-  An Owner refresh of the operational registry/capability may change the coarse
-  registry projection hash without invalidating that run. The resolver still
-  requires every semantic run-authority field, target source, current capability,
-  recipient, transport, and immediate pre-POST measurement to remain valid.
-- All legacy serial, parallel, packet, latest-output routing, message, question,
-  review-fix, polling, and resume senders fail closed. Historical runs remain
-  readable but are not resumable.
-- Router wrappers transport and pin artifacts; they do not decide acceptance.
-- Step review is one Meta command stage. The wrapper supplies a frozen
-  candidate/risk/budget/domain envelope; Meta owns native Task reviewer routing
-  and chairing. No Swarm session, plugin-role registry, `GO`, or external review
-  result forwarding is active.
-- FAL checkpoint integration is proposal-only inside transport wrappers.
-- Only a separate `/fal-checkpoint-target` dispatch may apply an authorized FAL
-  checkpoint after validating the exact Target/Epic/Candidate/lane/receipt tuple.
-- `scripts/invoke-command-and-wait.ps1` and
-  `scripts/sync-fal-checkpoint.ps1` are retired fail-closed compatibility stubs.
-- `/closeout-commit` is the only normal lifecycle commit authority. No router
-  helper pushes.
-- `scripts/session-context-status.ps1` reads provider-observed last-completion
-  usage plus a labeled active-context estimate for one mapped, explicit, or all
-  mapped sessions. It never sends, compacts, or mutates.
-- `scripts/invoke-session-compact-lite.ps1` is the sole active automatic compact
-  adapter. Non-dry operation resolves the exact target root, literal loopback
-  origin, private session, timeout, and one-use authority only through the same
-  attested KnownFolder control plane as lifecycle dispatch; caller arguments and
-  target-local `sessions.json` are expectations/fixture input, never production
-  authority. It consumes telemetry at declared events, checks participant transport
-  state, persists a minimal intent, verifies one marker, invokes
-  `/after-compact <project-id> <role>`, and never routes workflow.
-- `scripts/invoke-session-compact-flow.ps1` is retained Compact V2 reference source
-  only. Active Orchestrator paths must not invoke it.
-- Compact authority stdout contains status and digests only. The active Lite adapter
-  reads the raw root/origin/session packet from the owner-only
-  `runtime\compact-authority-handoffs` handoff and deletes it immediately; stale
-  crash remnants expire after 15 minutes.
-- `scripts/resolve-compact-policy.ps1` applies the complete global policy and an
-  optional tighten-only target `.fal/compact-policy.json` override. Invalid or
-  loosening overrides disable automatic action for that event.
+`scripts/Invoke-OCRouter.ps1` is the public facade over
+`runtime/dist/src/v2/cli.js`. It accepts `-Action`, never builds or installs during
+dispatch, inherits process credentials, and returns CLI JSON/exit status.
+`scripts/session-context-status.ps1` delegates to the same `observe-session` action.
+There is no legacy operation alias or second mapping/controller.
 
-Run `scripts/test-session-compact-lite.ps1` after active compact changes. Keep
-`scripts/test-session-compact-flow.ps1` as retained V2 compatibility coverage.
-Both use mocked transport and do not call a live summarize endpoint.
+Default private state is `%LOCALAPPDATA%\FractalAgentLab\oc-router\v2`:
+`router-config.json` and `router.sqlite` with its SQLite WAL sidecars.
+An explicit `-StateRoot` selects another private absolute root. Keep configuration,
+state, raw IDs and task results outside Git.
 
-Run the explicit-stage offline suite from `runtime/` with:
+## What the router establishes
 
-```text
-npm ci --ignore-scripts --no-audit --no-fund
-npm run build --silent
+| Fact | Meaning |
+|---|---|
+| Delivery | `NOT_SENT`, `POSSIBLE` or attributable `DELIVERED` |
+| Execution | Prepared/pending or an observed completed/failed operation |
+| Interpretation | The responsible role's recorded decision with evidence references |
+
+A completed request is not product acceptance. Empty/missing output, missing test
+evidence or unresolved findings never become green merely because a model stopped.
+Use `read-result` and the responsible role's interpretation before dependent work.
+
+Stable action keys prevent duplicate participating-client attempts. The same key
+with changed input is a conflict. An uncertain send remains recoverable under its
+existing identity; reconnect, timeout and process exit do not authorize resend.
+A local wait ends observation without cancelling the retaining POST connection.
+
+These are personal, same-user coordination guarantees, not adversarial OS
+isolation or universal remote exactly-once delivery. Manual UI activity may bypass
+router claims. Agents never abort, kill or interrupt sessions; the Owner does so
+manually.
+
+## Build and offline checks
+
+Use the package's supported Node 22 range (`>=22.11.0 <23`) and lockfile.
+
+```powershell
+Set-Location tools/oc-session-router/runtime
+npm ci
+node build.mjs
 npm test
 ```
+
+`node build.mjs` cleans generated `dist` and then runs TypeScript compilation.
+`npm test` exercises the active V2 suite; it does not run retired V1 engines.
+The launcher supplies `--experimental-sqlite`. A missing build reports
+`ROUTER_V2_BUILD_MISSING` rather than building on a live action.
+The focused facade check is `scripts/test-v2-launcher.ps1`; it uses only disposable
+local fixtures.
+
+## Remaining release closure
+
+Record integrated offline/Windows checks, one bounded isolated OpenCode transport
+compatibility check, and the single useful full-lifecycle pilot. Qualify actual
+connection/disconnection behavior and required loaded command behavior rather than
+promoting synthetic HTTP tests to live proof.
+
+Finish the reviewed source, installer/reference, consumer/adoption and retirement
+changes under the actual Owner publication envelope. The Owner performs any
+necessary running-service reload; normal restart requires read-only compatibility
+checks, not another P0B ceremony. Preserve paused projects and coherent store
+backups. Rollback cannot erase sends or re-enable a V1 writer unaware of V2 work.

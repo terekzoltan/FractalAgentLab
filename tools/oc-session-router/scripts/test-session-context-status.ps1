@@ -221,8 +221,8 @@ Assert-True (-not $RedactedFailureJson.Contains("mapped-session")) "Failure repo
 Assert-True (-not $RedactedFailureJson.Contains("127.0.0.1")) "Failure reports must not disclose endpoints or ports"
 
 $TelemetrySource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'session-context-status.ps1'))
-$TelemetryRequest = [regex]::Match($TelemetrySource, '(?s)function Invoke-OCRouterTelemetryGet\s*\{.*?\n\}')
-Assert-True $TelemetryRequest.Success "Telemetry request helper must exist"
-Assert-True ($TelemetryRequest.Value.Contains('-MaximumRedirection 0')) "Every telemetry GET must reject redirects"
+Assert-True ($TelemetrySource.Contains('Invoke-OCRouter.ps1')) "Telemetry must use the one V2 facade"
+Assert-True ($TelemetrySource.Contains('observe-session')) "Telemetry must expose the V2 read-only observation action"
+Assert-True (-not $TelemetrySource.Contains('Invoke-WebRequest')) "The facade must not own a second HTTP transport"
 
 Write-Host "SESSION CONTEXT STATUS TEST PASSED"

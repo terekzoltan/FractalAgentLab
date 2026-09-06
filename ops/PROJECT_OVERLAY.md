@@ -1,69 +1,103 @@
 # FractalAgentLab Project Overlay
 
-## Identity And Outcome
+## Identity and adoption
 
-FractalAgentLab is the private canonical evidence, review, measurement, and context-continuity control plane around OpenCode-assisted delivery. OpenCode remains the execution/session motor. FAL owns workflow evidence, coordination policy, audit, replay, bounded continuity, and private learning, not target-project product truth.
+FAL provides a small private router, durable operation evidence, recovery,
+continuity and managed tooling installation around OpenCode. OpenCode owns
+session execution/history; target projects own their product intent and truth.
+Useful notes and lesson candidates remain; a learning/research platform is
+deferred.
 
-## Authority Order
+Canon source target: AWC `5.0.0 / CANDIDATE_UNRELEASED`.
+Router source target: `fal-router/v2`.
+This is isolated source adoption. It establishes no installed, loaded, pilot,
+release or product-resumption fact.
 
-1. Explicit current Project Owner instruction.
-2. This overlay and its hard FAL safety/privacy rules.
-3. `ops/PROJECT_STATE.md` and the sole `ops/Combined-Execution-Sequencing-Plan.md` for current frontier and ordering.
-4. The pinned current Epic artifact and accepted review/response lineage.
-5. The external Agent Workflow Canon for reusable lifecycle, hydration, and role law.
-6. One selected `ops/roles/*.md` profile and one triggered runbook for mechanics.
-7. Evidence for proof; history, mirrors, summaries, and compact output are advisory only.
+## Authority and ownership
 
-The target project's own authority always owns target feature truth. FAL state, checkpoints, router state, evidence, and compact summaries never replace target state or Combined.
+Current explicit Owner instruction precedes this overlay, current state/Combined,
+the accepted assignment and evidence, then external Canon role/lifecycle law.
+History and generated views are advisory. Only one state and Combined are active.
 
-## Ownership
+The current cross-repository Workflow Systems Steward assignment owns reusable
+maintenance and integration under the Owner envelope. It is not project Meta,
+a new production lane or permission to claim normal lifecycle stages completed.
+The candidate hydration profile is `fal.workflow-maintainer`.
 
-- Owner: product/domain decisions, strategic scope, exceptions, publication, and high-impact side effects.
-- Meta: sequencing, readiness, review synthesis, state/Combined maintenance, and closeout coordination; no production code.
-- W8 Governance Delivery: temporary Owner-authorized `GOVERNANCE` Delivery profile at `ops/roles/W8-GOVERNANCE-DELIVERY.md`; only W8-A review-response and governance repair, expiring at W8-A closeout or Owner revocation.
-- Track A: CLI, presentation, and operator UX.
-- Track B: runtime, state, lifecycle, contracts, and enforcement truth.
-- Track C: roles, prompts, memory, identity, and planning semantics.
-- Track D: providers, tools, adapters, router integration, and configuration boundaries.
-- Track E: tests, replay, evaluation, security evidence, and quality gates.
+For future ordinary work, Owner sets scope and effects; Meta owns sequencing,
+independent review/synthesis and scoped closeout; declared Delivery owns plans,
+implementation and finding responses. Orchestrator coordinates addressed lanes
+using the sole router and chooses the next authorized action. Track A owns
+operator UX, B runtime/contracts, C role/planning semantics, D adapters/config,
+and E tests/evidence. Models, labels and topology grant no additional authority.
 
-One assignment has one accountable lane. Session labels, model choice, topology, or transport access never grant authority.
+## Current scope and continuity
 
-## Hard Boundaries
+The accepted successor is `plans/epics/FAL-ROUTER-V2.md`. Isolated source changes,
+offline fixtures, consumer alignment and candidate handoff are authorized.
+Publication intent is `NONE`. The source candidate is `LIVE_SAFE` because
+active consumers do not load it. Incompatible runtime deployment requires a
+coordinated affected boundary with one sender per participant.
 
-- Meta may change governance, plans, state, evidence indexes, and reports but not production source or production tests.
-- No target implementation, target mutation, provider call, bridge/API/session delivery, automatic dispatch, commit, push, PR, merge, deploy, publication, or public export without an explicit named gate.
-- Never expose credentials, raw session IDs, ports, private endpoints, raw transcripts, customer/private evidence, or unresolved secret-bearing data in durable governance or public output.
-- Treat router state, generated output, imported packages, model output, and external logs as untrusted evidence until validated.
-- Never use broad staging or absorb unrelated dirty work. The protected router sync source/test hunks remain outside migration and workflow-maintenance candidates until their named lifecycle resolves them.
-- Only one Combined and one project-state bootloader may be active. Shadow candidates are ignored, labelled non-authoritative, and cannot be hot pointers.
-- Canon is referenced externally and is not vendored or forked into FAL.
+This assignment does not authorize global install, live OpenCode actions,
+pilot execution, server restart, commit/push/merge/deploy, public export or
+unfreezing parked product workflows. Existing project pauses and accepted scope
+survive migration and late results. Unrelated projects are outside this work;
+no new global hold is created. Follow later explicit Owner authority when given
+without asking again for previously authorized work.
 
-## Git And Visibility
+## Operation and lifecycle boundaries
 
-The private FAL repository is canonical. Public mirrors and public-safe artifacts require separate review. Commit permission does not imply push. Runtime data, raw evidence, generated traces, global OpenCode config, router runtime state, and migration baselines stay ignored unless a reviewed exact allowlist admits a sanitized artifact.
+Keep editable project intent/plans separate from immutable dispatch inputs,
+SQLite operation facts, responsible-role judgments and Owner pause. A readable
+current view derives progress with source/freshness; it cannot overwrite intent
+or supply a competing editable next action.
 
-## Hydration
+Retain every normal planning, review, revision, implementation, review response,
+fix-plan review/revision and acknowledged closeout step. Evaluate substantive
+candidate-bound evidence; English wrappers or terminal positions are not proof.
+Known delivery remains known when meaning needs bounded clarification.
+Possible delivery requires read-only reconciliation; never blindly resend or
+infer no-send from process age, timeout, busy status or manual interruption.
 
-Root locator: `Agent Workflow Canon root: ../Agent-Workflow-Canon`.
+Orchestrator observes lane status/context before dispatch, after results and
+during long waits with backoff. At safe idle it may request one compact and
+minimal project/role restore through the same participant coordination, within
+its envelope. Restore preserves results and pauses and sends no lifecycle work.
+Only the Owner compacts orchestrators or aborts, kills or interrupts sessions.
+Ordinary restart calls for read-only compatibility checks, not a new P0B gate.
 
-Hydration is read-only evidence. It must preserve distinct target and control roots, exact current state/Combined identities, the pinned stage input, privacy limits, and one route. Read only the compact hot packet; trigger cold references when they enable a named decision. `READY` or later confidence labels never authorize mutation, acceptance, dispatch, or remote side effects by themselves.
+## Safety and private evidence
 
-Explicit-stage enrollment is target-local and offline until a separately installed production capability admits the exact target. The state points to a hash-bound `stage-source-manifest.v1`; enrollment, rehearsal, or a valid manifest never authorizes an OpenCode POST. Live FAL dispatch remains closed until its own reviewed capability and Owner gate are both present.
+Never expose credentials, raw session IDs, ports, private endpoints, transcripts
+or unresolved secret-bearing evidence in versioned governance or normal output.
+Retain concise operation facts, useful final outputs and evidence pointers;
+preserve unresolved recovery and accepted project artifacts. Do not duplicate
+OpenCode's full history.
 
-## Canon Exceptions
+Preserve unrelated dirty work and use exact-path changes/staging when authorized.
+`src/fractal_agent_lab/integrations/router_fal_sync.py` and
+`tests/integrations/test_router_fal_sync.py` remain no-touch. Their future
+disposition requires its own bounded assignment; it does not depend on opening
+the superseded W8-E program.
 
-| Exception | Canon surface | FAL rule | Reason | Review trigger |
-|---|---|---|---|---|
-| `FAL-EX-001` | Default Combined filename | Retain `ops/Combined-Execution-Sequencing-Plan.md` | Existing sole authority and consumers use this stable path | Any destructive information-architecture Epic |
-| `FAL-EX-002` | Project overlay migration | Keep `ops/AGENTS.md` as cold legacy/history while this file owns hot FAL rules | Lossless staged adoption without deletion | Stage B migration review |
-| `FAL-EX-003` | FAL control plane | Control-root evidence is optional and never target authority | FAL may coordinate external targets without owning them | Any bridge/session-delivery proposal |
+## Hydration and local exceptions
 
-## Cold References
+Keep the portable Canon locator `../Agent-Workflow-Canon`. Isolated validation
+uses the coordinator's explicit candidate root. Basic project/role/status reads
+need no legacy stage manifest, compact enrollment, Active Route, pack hash or
+binary attestation. An optional current artifact must be contained and relevant.
+Unknown/ambiguous target or role blocks unsafe reads; missing optional context
+may degrade the read without inventing execution authority.
 
-- `ops/AGENTS.md`: historical status, detailed architecture, old wave chronology, and long-form project rationale.
-- `docs/private/**`: private planning and decision evidence named by the current Epic only.
-- `ops/Review-Findings-Registry.md`: a named finding or review/closeout decision only.
-- `tools/oc-session-router/docs/workflow-orchestrator-runbook.md`: router transport, recovery, compact, or session coordination only.
+FAL retains two structural exceptions: `FAL-EX-001` uses the existing sole
+`ops/Combined-Execution-Sequencing-Plan.md` name; `FAL-EX-003` keeps optional
+control-root evidence subordinate to target truth. These preserve existing Owner
+adoption, with review at a changed consumer/path or target-authority boundary;
+reversal requires migrating the affected consumers together. Historical
+`FAL-EX-002` migration detail is preserved in the baseline overlay; its old
+no-delete rollout does not block the accepted V2 source retirement.
 
-Stop reading when authority, scope, phase, candidate/input, acceptance/evidence, blockers, required output, and one exact next action are known.
+Load history only for a named decision via
+`ops/migration/AWC5-V2-SUPERSESSION.md`. Cold records cannot reopen W8-A or revive
+a retired sender, temporary W8 role, enrollment gate or duplicate policy engine.

@@ -1,65 +1,108 @@
-# Router Control Configuration
+# Private Router V2 configuration
 
-This directory contains schemas/examples, not live target authority.
+The runtime consumes one private `router-config.json` with `schemaVersion: 2`.
+Default location: `%LOCALAPPDATA%\FractalAgentLab\oc-router\v2`, or the selected
+`-StateRoot`. `-ConfigPath` may name another private config file. Do not commit
+actual session IDs, endpoints, workstation paths, credentials or runtime state.
 
-`session-context-status.schema.json` defines the read-only telemetry report shared
-by router queries and the global self-query tool. Provider-observed
-last-completion usage and derived active-context estimates remain separate; the
-schema grants no compact, send, or mutation authority.
+This example is entirely synthetic and must be replaced with verified bindings:
 
-`compact-policy.schema.json` mirrors the Canon `opencode-compact-policy/v1`
-global and tighten-only project branches. `compact-flow-event.schema.json` is a
-retained Compact V2 reference; active Compact Lite uses typed invocation and no
-event JSON. The retained schema
-defines the private target-local event consumed by the separate adapter. Event
-input contains logical participant labels and hashes, never raw session IDs,
-credentials, endpoints, transcripts, or workstation roots.
+```json
+{
+  "schemaVersion": 2,
+  "targets": {
+    "example-project": {
+      "namespace": "example-opencode-instance",
+      "project": "REPLACE_WITH_VERIFIED_OPENCODE_PROJECT_ID",
+      "directory": "C:/projects/example",
+      "origin": "http://127.0.0.1:4096",
+      "roles": {
+        "delivery": {
+          "session": "ses_REPLACE_DELIVERY",
+          "profile": "example-delivery",
+          "capability": "DELIVERY"
+        },
+        "meta": {
+          "session": "ses_REPLACE_META",
+          "profile": "example-meta",
+          "capability": "META"
+        },
+        "support": {
+          "session": "ses_REPLACE_SUPPORT",
+          "profile": "example-support",
+          "capability": "SUPPORT"
+        },
+        "orchestrator": {
+          "session": "ses_REPLACE_ORCHESTRATOR",
+          "profile": "example-orchestrator",
+          "capability": "ORCHESTRATOR"
+        }
+      }
+    }
+  }
+}
+```
 
-Project `checks` cannot remove a global evaluation point. `required_gates` and
-`satisfied_gates` remain Compact V2 reference fields only. Active Compact Lite
-rejects a policy with nonempty `required_gates`; its hard gates are the closed,
-adapter-computed transport set in the Canon contract. Nested retained event objects
-remain closed schemas and receive the same recursive privacy validation as
-top-level fields.
+## Meaning of the binding
 
-The portable global default is `auto_safe` with checks at `before_dispatch`,
-`after_stage_output`, and `epic_closeout`, warning ratio `0.5`, critical ratio
-`0.62`, safe-boundary enforcement, closeout participant compaction, and at most
-one explicitly proven pre-acceptance retry. A target `.fal/compact-policy.json`
-may only tighten these values or select `recommend`, `ask`, or `disabled`.
+The target key (`example-project`) is the logical `target` in a work envelope.
+`project` is the actual OpenCode project ID verified from the selected session,
+not a display name. `directory` is the exact absolute target/worktree scope.
+`origin` must be HTTP on supported loopback: `127.0.0.1`, `localhost` or `[::1]`.
+Redirects and URL credentials are forbidden.
 
-The router accepts the portable legacy shape aliases `quick`, `focused`,
-`standard`, `high_risk`, `deep`, `audit`, `wide`, and `custom`. They normalize to
-the current Canon native-review budget policy, assignment cap, and optional requested-domain set; they
-do not name native agents or select an external transport. A target registry is
-optional and may add project-declared review domains or named envelope mappings.
-It must not change Canon authority, silently widen scope, pin unavailable models,
-or make a project name select a domain by itself.
+`namespace` identifies the intended OpenCode instance consistently across ordinary
+restarts/port changes. The tuple `namespace + project + session` owns participant
+exclusion. Aliases for the same participant must use the same tuple. Do not create
+a new namespace merely to bypass an unresolved claim, or infer that unrelated
+servers are equivalent.
 
-Store a live registry in the target's private router configuration and reference
-it from target-local router settings or an explicit wrapper argument. When used,
-the run pins its canonical path, schema version, and SHA-256 hash. Resume fails
-closed if any value drifts. Do not put ports, passwords, session IDs, customer
-data, or workstation-specific roots in a shared registry.
+Each role maps to a verified session and the installed project/role `profile` used
+by `/after-compact`. `capability` is `DELIVERY`, `META`, `SUPPORT` or `ORCHESTRATOR`.
+Independent Delivery and Meta cannot share a session. Configure participants once,
+then reuse these bindings; fresh addressing/activity checks do not require a
+per-stage P0B receipt.
 
-`review-control-registry.example.json` demonstrates a target-specific custom
-profile only. It is not required for built-in profiles and is not a runtime
-default.
+Optional role fields are `allowedCommands` (a narrowing allowlist), `agent`,
+`model` (`provider/model`), `variant` and `contextLimit`. Agent/model/profile names
+must describe actual available configuration, not promises invented by this
+example. A configured context-limit override applies only when its model matches
+the observed/configured model. Missing optional telemetry is reported unavailable.
 
-Normal native review is capped at seven total assignments. `EXPANDED_AUDIT`
-(eight to ten including retries and replacements), or a target registry profile
-that explicitly requires Owner authority, needs a resolvable candidate-bound
-approval receipt. Approval examples are formats only. Until the receipt schema is
-revised, its historical `Swarm depth` field must be exactly `none`; it is a
-compatibility slot, not transport authority. `Target`, `Epic`, `Candidate`, shape
-alias, assignment count, cost envelope, and `Owner approval: APPROVED` must match
-exactly. The wrapper pins and revalidates path, hash, version, and bindings on
-resume. A boolean or free-text claim grants no authority.
+Installed slash-command definitions may supply their own agent/model/subtask
+behavior. The router freezes selected command semantics and rechecks them before
+a new send. In particular, a configured compaction agent may use a different
+summary model; requested and effective model metadata remain distinct.
 
-Active review transport is always `native`. `UseSwarmReview`, `ForceFullReview`,
-and non-`none` Swarm depth fail closed. The old plugin-role registry and
-`swarm-assistant` session are not dependencies of the canonical review path.
+## Commands, credentials and scope
 
-Modify schemas through the reviewed workflow/tooling migration. Keep target
-instances project-local so project-specific review capabilities can evolve
-without hard-coding them into the global workflow kernel.
+Core lifecycle role/effect rules are in V2: Meta handles `wave-start`,
+`terv-review`, `step-review` and approved `closeout-commit`; Delivery handles
+`seq-next`, `terv-review-utan`, `implement` and `step-review-utan`.
+A target may declare additional reviewed `commands` as
+`{"command-name":{"capability":"SUPPORT","effect":"READ_ONLY"}}`. These cannot
+override core lifecycle rules. Custom effects are `READ_ONLY`, `WORKSPACE_WRITE`
+or `LOCAL_COMMIT`; commits require Meta capability. Configuration does not grant
+the Owner authority missing from a work envelope.
+
+Network actions inherit `OPENCODE_SERVER_PASSWORD` and optional
+`OPENCODE_SERVER_USERNAME` from the process; username defaults to `opencode`.
+There are no password parameters or credential fields in this JSON. Avoid logging
+the environment. Local work registration/inspection needs no running server.
+
+Register a meaningful `WorkContext` separately: instruction reference, scope,
+allowed effects and stopping point, not merely an Epic label. Requests carry a
+work ID, action key, recipient and relevant sources/results. They do not copy
+session credentials or the whole authority snapshot.
+
+After an ordinary server restart, verify current session/project/worktree and
+supported command behavior read-only. Reuse the same durable action for recovery;
+do not demand fresh P0B or discard known results because a template changed.
+Actual identity conflicts prevent new sends. Owner pauses survive maintenance
+and NO_SEND legacy import.
+
+See [request shapes](../docs/workflow-orchestrator-reference.md),
+[operating guidance](../docs/workflow-orchestrator-runbook.md), and the
+[versioned installer](../../workflow-tooling/README.md) for managed definitions.
+This configuration is a candidate interface, not proof of installation, loaded
+state, live qualification or project-resumption authority.
