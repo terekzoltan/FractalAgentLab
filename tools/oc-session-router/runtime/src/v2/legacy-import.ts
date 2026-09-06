@@ -99,7 +99,9 @@ export function importLegacyOperation(store: OperationStore, configuration: Rout
 /** Exact retained V1 argument bytes, not today's command template or output prose. */
 function matchesLegacyRoot(message: OpenCodeMessage, command: string, legacy: ObjectValue): boolean {
   if (message.role !== "user" || message.parentId || message.hasCompactionPart) return false;
-  const starts = [...message.text.matchAll(/^--- FAL (?:SOURCE 0 |VERIFIED (?:OUTPUT FIELD BINDING|REVIEW ENVELOPE) ---)/gm)].map(match => match.index!);
+  // OpenCode can interpolate $ARGUMENTS inline. The exact two retained hashes,
+  // not a line-start formatting condition, establish the old command identity.
+  const starts = [...message.text.matchAll(/--- FAL (?:SOURCE 0 |VERIFIED (?:OUTPUT FIELD BINDING|REVIEW ENVELOPE) ---)/g)].map(match => match.index!);
   const ends = [...message.text.matchAll(/--- END FAL SOURCE \d+ ---/g)].map(match => match.index! + match[0].length);
   // Ordinary V1 packets have few source sections. An unusual input remains unresolved.
   if (starts.length > 32 || ends.length > 64) return false;

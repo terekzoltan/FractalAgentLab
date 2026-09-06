@@ -4,15 +4,15 @@ V2 is the FAL adapter for addressed OpenCode work: one operation store, one
 transport implementation and an orchestrator-led lifecycle. Project instructions,
 plans and acceptance remain with the Owner and the responsible project roles.
 
-This is a source/release candidate. These docs do not claim global installation,
-loaded-process qualification, an AWC 5 release or permission to resume frozen
-projects. The useful real-work pilot and its quickstart remain separate
-qualification deliverables.
+Release: 2.0.0 with AWC5. Actual installation/loaded checks and project recovery
+limits are in plans/epics/FAL-ROUTER-V2-RELEASE.md at the repository root.
+The accepted pilot quickstart is linked below; release does not accept product work.
 
 ## Entry points
 
 - [Operating runbook](docs/workflow-orchestrator-runbook.md): lifecycle, recovery,
   clarification and lane continuity.
+- [Accepted quickstart](docs/v2-quickstart.md): practical examples and troubleshooting.
 - [Interface reference](docs/workflow-orchestrator-reference.md): actions,
   request fields and result meanings.
 - [Command reference](docs/session-router-cheatsheet.md): compact invocation syntax.
@@ -71,7 +71,7 @@ The launcher supplies `--experimental-sqlite`. A missing build reports
 The focused facade check is `scripts/test-v2-launcher.ps1`; it uses only disposable
 local fixtures.
 
-## Remaining release closure
+## Qualification and future release closure
 
 Record integrated offline/Windows checks, one bounded isolated OpenCode transport
 compatibility check, and the single useful full-lifecycle pilot. Qualify actual

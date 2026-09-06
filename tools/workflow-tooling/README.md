@@ -1,9 +1,10 @@
-# Versioned workflow tooling installer candidate
+# Versioned workflow tooling installer
 
 `Invoke-WorkflowTooling.ps1` is the single installer entrypoint for Git-owned AWC
 OpenCode commands, skills and review agents, and Workflow Operations Codex skills.
-This directory is an offline candidate. No global installation, Toolbox writer
-retirement, loaded-process qualification or AWC 5 release has occurred.
+AWC5 release installation and Toolbox writer retirement are recorded in
+plans/epics/FAL-ROUTER-V2-RELEASE.md at the repository root. The interface below
+still distinguishes source, installed files and separately observed loaded state.
 
 ## Interface
 

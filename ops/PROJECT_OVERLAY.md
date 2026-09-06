@@ -8,10 +8,10 @@ session execution/history; target projects own their product intent and truth.
 Useful notes and lesson candidates remain; a learning/research platform is
 deferred.
 
-Canon source target: AWC `5.0.0 / CANDIDATE_UNRELEASED`.
-Router source target: `fal-router/v2`.
-This is isolated source adoption. It establishes no installed, loaded, pilot,
-release or product-resumption fact.
+Adopted Canon: AWC `5.0.0`; router: `fal-router/v2 / 2.0.0`.
+Qualification, installation, loaded commands and target continuation limits are
+recorded in plans/epics/FAL-ROUTER-V2-RELEASE.md. Release grants no new product
+scope or acceptance; current Owner instructions and target gates remain binding.
 
 ## Authority and ownership
 

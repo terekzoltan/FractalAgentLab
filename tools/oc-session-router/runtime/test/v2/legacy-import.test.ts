@@ -195,6 +195,21 @@ test("unique post-baseline root uses both exact old arguments hash and command b
   f.unchanged();
 });
 
+test("inline command argument expansion recovers by exact hashes without a line-start requirement", async t => {
+  const f = fixture(t);
+  const imported = importLegacyOperation(f.store, f.configuration, f.request).operation;
+  const history = f.messages();
+  history[1]!.text = `Command input: ${argument}\nFooter`;
+  const { adapter, calls } = reader(f.root, f.session, history);
+  const recovered = await reconcileLegacyOperation(f.store, imported.operationId, adapter);
+  assert.equal(recovered.disposition, "COMPLETED");
+  assert.equal(recovered.operation.messageId, "msg_legacy_root");
+  assert.equal(recovered.operation.dispatchStartedAt, null);
+  assert.equal(recovered.operation.interpretation, null);
+  assert.ok(calls.every(call => call.method.startsWith("GET")));
+  f.unchanged();
+});
+
 test("old response message hash identifies its actual parent rather than a newer matching-looking output", async t => {
   const f = fixture(t);
   f.write(`${f.base}/result.json`, { schema_version: "stage-result.v1", operation_id: f.request.operationId, run_id: f.request.runId, operation_status: "UNCERTAIN", message_id_sha256: sha("msg_legacy_response") });

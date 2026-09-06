@@ -3,10 +3,10 @@
 Agent Workflow Canon root: `../Agent-Workflow-Canon`
 Adoption contract: `../Agent-Workflow-Canon/ADOPTION.md`
 
-This checkout prepares the AWC 5 / Router V2 source candidate. It is unreleased;
-installed and loaded tooling are separate facts. The current assignment is
-Owner-authorized cross-repository workflow maintenance, not a completed project
-Delivery/Meta lifecycle.
+This checkout provides released AWC5 / Router V2. Installed and loaded tooling
+remain separate facts. See plans/epics/FAL-ROUTER-V2-RELEASE.md for distribution,
+project recovery/enrollment limits and rollback. Shared-system release is not
+product acceptance or a new project Delivery/Meta assignment.
 
 Read target `ops/PROJECT_OVERLAY.md`, `ops/PROJECT_STATE.md` and one applicable
 role profile/runbook first. For execution, also read the current row in
