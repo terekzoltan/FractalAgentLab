@@ -11,6 +11,8 @@ references for already authorized work, not a pilot sequence.
 | Work progress | `-Action inspect -WorkId <work-id>` |
 | Operation facts | `-Action inspect -OperationId <operation-id>` |
 | Private result | `-Action read-result -OperationId <operation-id>` |
+| Frozen source or exact excerpt | `-Action read-source -WorkId <work> -SourceId <handle>`; optional `-Heading` or `-StartLine/-EndLine`, using supplied StateRoot |
+| Enrolled observed-progress block | `-Action refresh-state -WorkId <work-id>` (local narrow write, no send) |
 | Observe until boundary | `-Action wait -OperationId <operation-id> -WaitMilliseconds <0..3600000>` |
 | One recovery pass | `-Action reconcile -OperationId <operation-id>` |
 | Record accountable meaning | `-Action interpret -RequestPath <interpretation.json>` |

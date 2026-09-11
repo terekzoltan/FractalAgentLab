@@ -7,6 +7,7 @@ import { OperationStore } from "../../src/v2/state-store.js";
 import { StoreError, type WorkContext } from "../../src/v2/contracts.js";
 import { RouterError, type RouterConfiguration } from "../../src/v2/routing.js";
 import type { AdapterReply, CommandSubmission, MessageSubmission, OpenCodeCommand, OpenCodeMessage, OpenCodeSession, OpenCodeTarget } from "../../src/v2/opencode-adapter.js";
+import { refreshState, PROGRESS_START, PROGRESS_END } from "../../src/v2/state-projection.js";
 
 function reply<T>(value: T): AdapterReply<T> { return { status: 200, bodySha256: "fixture-body-digest", value }; }
 function code(expected: string) { return (error: unknown) => (error instanceof RouterError || error instanceof StoreError) && error.code === expected; }
@@ -84,6 +85,21 @@ function fixture(t: TestContext) {
   const request: SubmitRequest = { workId: work.workId, actionKey: "implement-fixture", recipientRole: "Delivery", command: "/implement", arguments: "Apply the fixture plan" };
   return { root, store, configuration, state, engine, work, request };
 }
+
+test("enrolled progress refresh does not invalidate a prepared state source, but Owner edits do", { skip: process.platform !== "win32" }, async t => {
+  const { root, store, configuration, engine, work, request } = fixture(t);
+  const statePath = path.join(root, "PROJECT_STATE.md");
+  const text = `Owner scope: unchanged\n${PROGRESS_START}\nold\n${PROGRESS_END}\nOwner stop: before commit\n`;
+  writeFileSync(statePath, text);
+  configuration.targets.fixture!.stateProjection = { path: "PROJECT_STATE.md", instructionReference: "owner-only-block-enrollment" };
+  const prepared = await engine.prepare({ ...request, sources: [{ path: "PROJECT_STATE.md" }] });
+  assert.equal(refreshState(store, configuration, work.workId).status, "UPDATED");
+  assert.equal((await engine.execute(prepared.operation.operationId)).outcome?.execution, "COMPLETED");
+  const next = await engine.prepare({ ...request, actionKey: "next", sources: [{ path: "PROJECT_STATE.md" }] });
+  writeFileSync(statePath, text.replace("Owner scope: unchanged", "Owner scope: changed"));
+  await assert.rejects(engine.execute(next.operation.operationId), code("SOURCE_CHANGED"));
+  assert.equal(store.getOperation(next.operation.operationId).dispatchStartedAt, null);
+});
 
 test("engine freezes configured address and command effect; absent optional telemetry permits dispatch", async t => {
   const { engine, store, state, configuration, request } = fixture(t);

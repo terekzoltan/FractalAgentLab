@@ -1,7 +1,7 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('help','open-work','submit','compact','restore','inspect','read-result','wait','reconcile','interpret','observe-session','record-pause','import-legacy')]
+  [ValidateSet('help','open-work','submit','compact','restore','inspect','read-result','read-source','refresh-state','wait','reconcile','interpret','observe-session','record-pause','import-legacy')]
   [string]$Action,
   [ValidateNotNullOrEmpty()][string]$StateRoot,
   [ValidateNotNullOrEmpty()][string]$ConfigPath,
@@ -9,6 +9,10 @@ param(
   [ValidateNotNullOrEmpty()][string]$WorkId,
   [ValidateNotNullOrEmpty()][string]$OperationId,
   [ValidateNotNullOrEmpty()][string]$Role,
+  [ValidatePattern('^[a-f0-9]{64}$')][string]$SourceId,
+  [ValidateNotNullOrEmpty()][string]$Heading,
+  [ValidateRange(1,2147483647)][int]$StartLine,
+  [ValidateRange(1,2147483647)][int]$EndLine,
   [ValidateRange(0,3600000)][int]$WaitMilliseconds
 )
 
@@ -38,6 +42,7 @@ if (-not [string]::IsNullOrWhiteSpace($StateRoot)) {
 $OptionNames = [ordered]@{
   ConfigPath = '--config'; RequestPath = '--request'; WorkId = '--work-id'
   OperationId = '--operation-id'; Role = '--role'; WaitMilliseconds = '--wait-ms'
+  SourceId = '--source-id'; Heading = '--heading'; StartLine = '--start-line'; EndLine = '--end-line'
 }
 foreach ($Name in $OptionNames.Keys) {
   if ($PSBoundParameters.ContainsKey($Name)) {

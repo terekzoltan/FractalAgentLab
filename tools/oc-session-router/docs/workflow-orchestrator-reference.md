@@ -42,6 +42,8 @@ from parameters or select a legacy engine.
 | `restore` | `-RequestPath` | `--request` | Prepare installed `/after-compact` |
 | `inspect` | `-OperationId` or `-WorkId` | `--operation-id` or `--work-id` | Local status/result metadata |
 | `read-result` | `-OperationId` | `--operation-id` | Explicit private retained-output read |
+| `read-source` | `-WorkId -SourceId`, optional `-Heading` or `-StartLine -EndLine`; alternatively `-RequestPath` | matching kebab-case flags or `--request` | Offline frozen-source read; no JSON file or new operation required |
+| `refresh-state` | `-WorkId` | `--work-id` | Local write to an Owner-enrolled observed-progress block only; no server/send |
 | `wait` | `-OperationId`, optional `-WaitMilliseconds` | `--operation-id`, optional `--wait-ms` | GET reconciliation and advisory observation |
 | `reconcile` | `-OperationId` | `--operation-id` | One bounded GET recovery pass |
 | `interpret` | `-RequestPath` | `--request` | Record responsible result interpretation |
@@ -112,6 +114,54 @@ conflict. Project plans may evolve within that envelope.
 the target; the router freezes their contents/digests and rechecks them before
 sending. Result references carry the retained result without requiring a copied
 snapshot of all project authority.
+
+### Source presentation (not evidence removal)
+
+Each source accepts `mode`: `auto` (default), `inline`, `reference` or `excerpt`.
+Auto references sources above16KiB; restore auto references all sources. Explicit
+inline remains available. Excerpt requires exactly one selector:
+`{"path":"docs/Combined.md","mode":"excerpt","heading":"## Current Epic"}` or
+`{"operationId":"op-prior","mode":"excerpt","lines":{"start":1,"end":20}}`.
+Headings must be unique exact Markdown headings outside fenced examples; line
+ranges are1-based inclusive. Bad/ambiguous selections fail before preparation;
+they are never silently truncated. Duplicate identical presentations collapse.
+
+The full snapshot remains in the existing operation record, even for excerpts.
+Reference packets supply the exact facade path, StateRoot and JSON reader request:
+`{"workId":"example-E17","sourceId":"<64-hex frozen source ID>"}`.
+Pass its values directly as `read-source -WorkId ... -SourceId ...` against that
+StateRoot, with optional `-Heading` or `-StartLine/-EndLine`; no file creation is
+needed by a read-only reviewer. Alternatively an existing JSON request may supply
+the same data with `heading` or `lines`; do not mix the two forms.
+The reader validates the handle in that same work and
+does not read a newer filesystem revision or create a lifecycle operation.
+Retrieve essential plan/evidence before acting; a reference is not an approval.
+
+Normal operation views include `packet` byte counts, top sources and an advisory
+warning above32KiB. These are bytes, not tokens, and never a new admission gate.
+
+### Observed state projection
+
+Explicit target enrollment is documented in config/README.md. Without it no file
+is written. Existing mutation boundaries (open-work, submit/restore/compact,
+executor return, interpret and record-pause) refresh the marked block only.
+Inspect, read-result/read-source, wait/reconcile and observe-session do not write
+project files. After read-only reconciliation, use refresh-state when needed;
+no extra Meta turn. The response distinguishes UPDATED/UNCHANGED/NOT_ENROLLED,
+DEFERRED and DRIFT_RECOVERABLE without undoing successful operation facts.
+
+The writer serializes cooperating processes and compares the whole file before
+replacement. It preserves an unexpected displaced version as a `.replaced`
+recovery file; never delete it as generic cleanup. Resolve actual Owner-edit
+conflict before dependent mutation. A mere missing optional projection does not
+block unrelated work. Windows File.Replace is the supported writer; other hosts
+return DEFERRED rather than use an unsafe fallback.
+
+Only the validly enrolled generated block is excluded from new pre-send authority
+comparison; full original source/digest is retained. Old pending whole-file state
+sources defer projection refresh until they settle, without rewriting their inputs.
+The same tracked state file can become projection-only dirty after closeout. Report
+that fact; never amend, auto-commit or reopen product work to chase the view.
 
 The same action key and same request retrieve the existing operation. Different
 input under that key is `INPUT_CONFLICT`. Use a new key for a genuine subsequent

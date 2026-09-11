@@ -10,6 +10,8 @@ import { OperationStore } from "./state-store.js";
 import { RouterError, type RouterConfiguration } from "./routing.js";
 import { importLegacyOperation, type LegacyImportRequest } from "./legacy-import.js";
 import { continuitySummary, type SessionObservation } from "./session-observation.js";
+import { readFrozenSource, type Selection } from "./context-packet.js";
+import { refreshState } from "./state-projection.js";
 
 const here = fileURLToPath(import.meta.url);
 function jsonFile<T>(file: string): T {
@@ -50,6 +52,7 @@ export function operationView(operation: Operation, store?: OperationStore) {
     activity: operation.completedAt ? operation.outcome?.execution ?? "UNKNOWN" : operation.observation?.activity ?? "UNKNOWN",
     reason: operation.completedAt ? operation.outcome?.reason ?? null : operation.observation?.context?.reason ?? null,
     ...(store ? { continuity } : {}),
+    ...(operation.action.input.packet ? { packet: operation.action.input.packet } : {}),
     autoAdvance: false,
   };
 }
@@ -74,16 +77,18 @@ async function retainExecutor(stateRoot: string, configurationPath: string, oper
 export async function runCli(argv: string[]): Promise<unknown> {
   const [action, ...rest] = argv;
   if (!action || action === "help" || action === "--help") return {
-    interface: "fal-router/v2", actions: ["open-work", "submit", "compact", "restore", "inspect", "read-result", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy"],
+    interface: "fal-router/v2", actions: ["open-work", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy"],
     configuration: "Private router-config.json; credentials are process environment only.",
   };
-  if (!["open-work", "submit", "compact", "restore", "inspect", "read-result", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy", "execute-operation"].includes(action)) throw new RouterError("ACTION_UNSUPPORTED");
+  if (!["open-work", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy", "execute-operation"].includes(action)) throw new RouterError("ACTION_UNSUPPORTED");
   const values = options(rest);
   const actionOptions: Record<string, string[]> = {
     "open-work": ["--request"], submit: ["--request"], compact: ["--request"], restore: ["--request"],
     inspect: ["--operation-id", "--work-id"], "read-result": ["--operation-id"], wait: ["--operation-id", "--wait-ms"],
     reconcile: ["--operation-id"], interpret: ["--request"], "observe-session": ["--work-id", "--role"],
     "record-pause": ["--request"], "import-legacy": ["--request"], "execute-operation": ["--operation-id", "--idle-wait-ms"],
+    "read-source": ["--request", "--work-id", "--source-id", "--heading", "--start-line", "--end-line"],
+    "refresh-state": ["--work-id"],
   };
   const accepted = new Set(["--state-root", "--config", ...actionOptions[action]!]);
   if (Object.keys(values).some(key => !accepted.has(key))) throw new RouterError("INVALID_ARGUMENTS");
@@ -101,14 +106,30 @@ export async function runCli(argv: string[]): Promise<unknown> {
     });
   };
   const readRequest = <T>() => jsonFile<T>(required(values, "--request"));
+  const project = (workId: string) => {
+    try { return refreshState(store, jsonFile<RouterConfiguration>(configurationPath), workId); }
+    catch { return { status: "DEFERRED", reason: "PROJECTION_CONFIG_UNAVAILABLE" }; }
+  };
+  const mutationView = (operation: Operation) => ({ ...operationView(operation, store), stateProjection: project(operation.action.workId) });
   try {
+    if (action === "read-source") {
+      const direct = ["--work-id", "--source-id", "--heading", "--start-line", "--end-line"];
+      if (values["--request"] && direct.some(key => values[key] !== undefined)) throw new RouterError("INVALID_ARGUMENTS");
+      const request = values["--request"] ? readRequest<{ workId: string; sourceId: string } & Selection>() : {
+        workId: required(values, "--work-id"), sourceId: required(values, "--source-id"),
+        ...(values["--heading"] === undefined ? {} : { heading: values["--heading"] }),
+        ...(values["--start-line"] !== undefined || values["--end-line"] !== undefined ? { lines: { start: Number(required(values, "--start-line")), end: Number(required(values, "--end-line")) } } : {}),
+      };
+      return readFrozenSource(store, request);
+    }
+    if (action === "refresh-state") return { ...project(required(values, "--work-id")), lifecycleSend: false };
     if (action === "open-work") {
       const context = readRequest<WorkContext>();
       const configuration = jsonFile<RouterConfiguration>(configurationPath);
       // Opening local intent does not need a server or credentials.
       const localEngine = new RouterEngine(store, configuration, { username: "", password: "" });
       const work = localEngine.openWork(context);
-      return { workId: work.context.workId, target: work.context.target, paused: work.paused, operationCount: work.operations.length, autoAdvance: false };
+      return { workId: work.context.workId, target: work.context.target, paused: work.paused, operationCount: work.operations.length, autoAdvance: false, stateProjection: project(work.context.workId) };
     }
     if (action === "inspect") {
       if (values["--operation-id"]) return operationView(store.getOperation(values["--operation-id"]), store);
@@ -128,29 +149,29 @@ export async function runCli(argv: string[]): Promise<unknown> {
     if (action === "record-pause") {
       const request = readRequest<{ workId: string; paused: boolean; instructionReference: string }>();
       store.recordOwnerPause(request.workId, request.paused, request.instructionReference);
-      return { workId: request.workId, paused: request.paused, sessionInterrupted: false };
+      return { workId: request.workId, paused: request.paused, sessionInterrupted: false, stateProjection: project(request.workId) };
     }
     if (action === "interpret") {
       const request = readRequest<{ operationId: string; responsibleRole: string; decision: string; evidenceReferences: string[]; resultDigest?: string }>();
       const operation = store.getOperation(request.operationId);
       if (request.responsibleRole !== operation.action.recipientRole) throw new RouterError("INTERPRETATION_ROLE_MISMATCH");
       if (!operation.resultDigest) throw new RouterError("RESULT_UNAVAILABLE");
-      return operationView(store.interpret(request.operationId, {
+      return mutationView(store.interpret(request.operationId, {
         resultDigest: request.resultDigest ?? operation.resultDigest, responsibleRole: request.responsibleRole,
         decision: request.decision, evidenceReferences: request.evidenceReferences,
-      }), store);
+      }));
     }
     if (action === "submit" || action === "restore") {
       const request = readRequest<SubmitRequest>();
       const prepared = await engine().prepare(action === "restore" ? { ...request, kind: "RESTORE" } : request);
       if (!prepared.operation.dispatchStartedAt && !prepared.operation.completedAt) await retainExecutor(stateRoot, configurationPath, prepared.operation.operationId);
-      return { ...operationView(store.getOperation(prepared.operation.operationId), store), created: prepared.created };
+      return { ...mutationView(store.getOperation(prepared.operation.operationId)), created: prepared.created };
     }
     if (action === "compact") {
       const prepared = await engine().prepareCompact(readRequest<CompactRequest>());
       if (!prepared.operation) return { disposition: prepared.disposition, created: false, delivery: "NOT_SENT", autoAdvance: false };
       if (!prepared.operation.dispatchStartedAt && !prepared.operation.completedAt) await retainExecutor(stateRoot, configurationPath, prepared.operation.operationId);
-      return { ...operationView(store.getOperation(prepared.operation.operationId), store), created: prepared.created };
+      return { ...mutationView(store.getOperation(prepared.operation.operationId)), created: prepared.created };
     }
     if (action === "observe-session") return await engine().observe(required(values, "--work-id"), required(values, "--role"));
     const operationId = required(values, "--operation-id");
@@ -160,7 +181,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
       const idleDeadline = performance.now() + idleWaitMs;
       let cadence = 1000;
       while (true) {
-        try { return operationView(await engine().execute(operationId), store); }
+        try { return mutationView(await engine().execute(operationId)); }
         catch (error) {
           const code = error instanceof RouterError || error instanceof StoreError ? error.code : "EXECUTOR_FAILED";
           const operation = store.getOperation(operationId);
@@ -176,7 +197,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
           }
           const permanentPreparationFailure = ["SOURCE_CHANGED", "SOURCE_UNAVAILABLE", "COMMAND_CHANGED_BEFORE_SEND", "COMMAND_EFFECT_CHANGED", "PARTICIPANT_BINDING_CHANGED", "PARTICIPANT_IDENTITY_MISMATCH", "ROLE_COMMAND_NOT_ALLOWED", "MODEL_CONFIGURATION_INVALID", "MAINTENANCE_BASELINE_CHANGED", "ORCHESTRATOR_COMPACT_IS_MANUAL"].includes(code);
           if (!operation.dispatchStartedAt && !operation.completedAt && permanentPreparationFailure) store.abandonPrepared(operationId, code);
-          return operationView(store.getOperation(operationId), store);
+          return mutationView(store.getOperation(operationId));
         }
       }
     }

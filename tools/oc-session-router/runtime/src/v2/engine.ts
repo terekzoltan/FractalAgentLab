@@ -7,10 +7,12 @@ import { commandRule, readContainedSource, resolveRole, RouterError, sameDirecto
 import { observeSession, continuitySummary, type SessionObservationOptions } from "./session-observation.js";
 import { alreadyCompacted, captureCompactBaseline, observeCompactCompletion, type CompactBaseline } from "./session-maintenance.js";
 import { reconcileLegacyOperation } from "./legacy-import.js";
+import { freezeSources, renderSources, packetSummary, type SourceSnapshot, type SourceReference } from "./context-packet.js";
+import { stateAuthorityDigest } from "./state-projection.js";
+export type { SourceReference } from "./context-packet.js";
 
 export type Adapter = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "listCommands" | "getMessage" | "getHistory" | "submitCommand" | "submitMessage" | "summarize"> & Partial<Pick<OpenCodeAdapter, "getModelInfo">>;
 export type AdapterFactory = (target: OpenCodeTarget, credentials: OpenCodeCredentials, options?: AdapterOptions) => Adapter;
-export type SourceReference = { path: string; sha256?: string } | { operationId: string };
 export interface SubmitRequest {
   workId: string;
   actionKey: string;
@@ -30,12 +32,6 @@ export interface CompactRequest {
   model?: { providerID: string; modelID: string };
 }
 
-interface SourceSnapshot {
-  sourceClass: "FILE" | "RESULT";
-  reference: string;
-  sha256: string;
-  content: string;
-}
 
 /** The orchestrator chooses stages. This class never computes or sends a successor. */
 export class RouterEngine {
@@ -136,22 +132,6 @@ export class RouterEngine {
     // Optional context/token telemetry is not a dispatch admission condition.
   }
 
-  private sourceSnapshots(work: WorkContext, references: SourceReference[]): SourceSnapshot[] {
-    return references.map(reference => {
-      if ("path" in reference) {
-        const source = readContainedSource(work.directory, reference.path);
-        if (reference.sha256 !== undefined && reference.sha256 !== source.sha256) throw new RouterError("SOURCE_CHANGED");
-        return { sourceClass: "FILE", reference: source.path, sha256: source.sha256, content: source.content };
-      }
-      const operation = this.store.getOperation(reference.operationId);
-      const content = operation.outcome?.response?.text ?? operation.outcome?.artifact?.text;
-      if (operation.action.workId !== work.workId || !operation.completedAt || content === undefined || !operation.resultDigest) {
-        throw new RouterError("RESULT_SOURCE_UNAVAILABLE");
-      }
-      return { sourceClass: "RESULT", reference: reference.operationId, sha256: operation.resultDigest, content };
-    });
-  }
-
   async prepare(request: SubmitRequest): Promise<{ operation: Operation; created: boolean }> {
     text(request.workId); text(request.actionKey); text(request.recipientRole);
     const kind = request.kind ?? "LIFECYCLE";
@@ -175,7 +155,8 @@ export class RouterEngine {
     if (!["LIFECYCLE", "CLARIFICATION", "RESTORE"].includes(kind)) throw new RouterError("ACTION_KIND_UNSUPPORTED");
     await this.verifyParticipant(adapter, work.context.directory, target.project, role.session, true);
     await this.observeOptional(request.workId, request.recipientRole);
-    const sources = this.sourceSnapshots(work.context, normalized.sources);
+    const projectionPath = target.stateProjection?.instructionReference?.trim() && /(^|[\\/])PROJECT_STATE\.md$/.test(target.stateProjection.path) ? target.stateProjection.path : undefined;
+    const sources = freezeSources(this.store, work.context, normalized.sources, kind === "RESTORE", projectionPath);
     let argument = kind === "RESTORE" ? `${work.context.target} ${role.profile}` : normalized.arguments;
     if (kind === "RESTORE") {
       const recent = work.operations.slice(-3).map(operation => ({ operationId: operation.operationId, role: operation.action.recipientRole,
@@ -186,11 +167,11 @@ export class RouterEngine {
       text(argument);
       argument = `Clarify the existing work only. Do not implement again, change acceptance, commit, or expand scope.\nOwner scope: ${work.context.scope}\nQuestion: ${argument}`;
     }
-    if (sources.length) argument += sources.map(source => `\n\nReference data (${source.reference}):\n${source.content}`).join("");
+    argument += renderSources(request.workId, sources, this.store.databasePath);
     const input: ActionInput["input"] = {
       requestDigest, arguments: argument, sources: sources as unknown as Json,
       address: { origin: target.origin, directory: target.directory, session: role.session },
-      profile: role.profile,
+      profile: role.profile, packet: packetSummary(argument, sources) as unknown as Json,
     };
     for (const key of ["agent", "model", "variant"] as const) if (role[key]) input[key] = role[key]!;
     if (kind !== "CLARIFICATION") {
@@ -253,7 +234,15 @@ export class RouterEngine {
     const adapter = this.adapterForOperation(operation, true);
     await this.verifyParticipant(adapter, work.context.directory, operation.action.participant.project, operation.action.participant.session, true);
     for (const source of operation.action.input.sources as unknown as SourceSnapshot[]) {
-      if (source.sourceClass === "FILE" && readContainedSource(work.context.directory, source.reference).sha256 !== source.sha256) throw new RouterError("SOURCE_CHANGED");
+      if (source.sourceClass === "FILE") {
+        const current = readContainedSource(work.context.directory, source.reference);
+        let currentDigest = current.sha256;
+        if (source.authoritySha256) {
+          try { currentDigest = stateAuthorityDigest(current.content); }
+          catch { throw new RouterError("SOURCE_CHANGED"); }
+        }
+        if (currentDigest !== (source.authoritySha256 ?? source.sha256)) throw new RouterError("SOURCE_CHANGED");
+      }
     }
     if (operation.action.kind === "COMPACT") {
       const configured = this.binding(work.context, operation.action.recipientRole);

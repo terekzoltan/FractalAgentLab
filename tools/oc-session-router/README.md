@@ -26,6 +26,13 @@ dispatch, inherits process credentials, and returns CLI JSON/exit status.
 `scripts/session-context-status.ps1` delegates to the same `observe-session` action.
 There is no legacy operation alias or second mapping/controller.
 
+New source packets preserve exact snapshots but avoid eager large-file copies:
+auto/inline/excerpt/reference modes plus local `read-source`. `packet` reports
+advisory byte counts, not a token or acceptance gate. An explicitly Owner-enrolled
+`refresh-state` maintains only the marked observed-progress block; file scope,
+acceptance and next dispatch remain outside its authority. See the interface and
+configuration references for enrollment, preservation and recovery semantics.
+
 Default private state is `%LOCALAPPDATA%\FractalAgentLab\oc-router\v2`:
 `router-config.json` and `router.sqlite` with its SQLite WAL sidecars.
 An explicit `-StateRoot` selects another private absolute root. Keep configuration,

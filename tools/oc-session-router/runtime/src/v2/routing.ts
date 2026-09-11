@@ -20,6 +20,8 @@ export interface TargetBinding {
   directory: string;
   origin: string;
   roles: Record<string, RoleBinding>;
+  /** Explicit Owner enrollment, only the marked observed-progress block; never lane authority. */
+  stateProjection?: { path: string; instructionReference: string };
   /** Reviewed project commands; cannot override the core lifecycle role rules. */
   commands?: Record<string, { capability: Capability; effect: Effect }>;
 }

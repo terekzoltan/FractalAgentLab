@@ -24,6 +24,20 @@ A materially different work envelope requires the corresponding Owner decision.
 
 ## Preserve the lifecycle
 
+Use stage-sized source packets: active Combined section, required plan/result and
+targeted code reads, not whole roadmap/code/history copies. Auto sources above16KiB
+become retrievable frozen references; restore defaults to references. Explicit
+inline/excerpt choices remain available and the full source is retained. Read
+required referenced content via the supplied reader before dependent work. Packet
+size advice never licenses dropping acceptance requirements or creates a new stop.
+
+For an Owner-enrolled observed state block, existing mutation responses include
+stateProjection status. After a read-only result/reconciliation, refresh-state
+can synchronize recorded progress without a Meta call. Never edit the human
+baseline from router metadata. A stale phase line is not permission to replay a
+completed action. Resolve real authority conflicts, preserve pause and current
+scope; missing optional projection only leaves visible view debt.
+
 | Action | Accountable recipient |
 |---|---|
 | `/wave-start` when explicitly opening a Wave | Meta |

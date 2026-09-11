@@ -23,7 +23,7 @@ export class OperationStore {
   private readonly db: DatabaseSync;
   private readonly options: StoreOptions;
 
-  constructor(databasePath: string, options: StoreOptions = {}) {
+  constructor(readonly databasePath: string, options: StoreOptions = {}) {
     this.options = options;
     if (!path.isAbsolute(databasePath)) throw new StoreError("INVALID_INPUT");
     const resolved = path.resolve(databasePath);
@@ -82,6 +82,19 @@ export class OperationStore {
   }
 
   close(): void { this.db.close(); }
+  listRecentWorkIds(target: string): string[] {
+    text(target);
+    return this.db.prepare("SELECT work_id FROM work_items WHERE json_extract(context_json,'$.target')=? ORDER BY created_at DESC,rowid DESC LIMIT 12").all(target).map(row => String(row.work_id));
+  }
+  hasPendingFullStateSource(target: string, directory: string, reference: string): boolean {
+    const referenceExpression = process.platform === "win32" ? "lower(json_extract(s.value,'$.reference'))=lower(?)" : "json_extract(s.value,'$.reference')=?";
+    const rows = this.db.prepare(`SELECT w.context_json FROM operations o JOIN work_items w ON w.work_id=o.work_id
+      WHERE o.completed_at IS NULL AND json_extract(w.context_json,'$.target')=? AND EXISTS (
+        SELECT 1 FROM json_each(o.action_json,'$.input.sources') s WHERE json_extract(s.value,'$.sourceClass')='FILE'
+          AND ${referenceExpression} AND json_extract(s.value,'$.authoritySha256') IS NULL)`).all(target, reference);
+    const normalize = (value: string) => process.platform === "win32" ? path.resolve(value).toLowerCase() : path.resolve(value);
+    return rows.some(row => normalize((JSON.parse(String(row.context_json)) as WorkContext).directory) === normalize(directory));
+  }
   private now(): string { return this.options.now?.() ?? new Date().toISOString(); }
 
   private transaction<T>(action: () => T): T {

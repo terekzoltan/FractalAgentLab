@@ -81,6 +81,9 @@ __pycache__/
 !/tools/oc-session-router/runtime/package-lock.json
 !/tools/oc-session-router/runtime/tsconfig.json
 !/tools/oc-session-router/runtime/build.mjs
+!/tools/oc-session-router/runtime/scripts/
+/tools/oc-session-router/runtime/scripts/*
+!/tools/oc-session-router/runtime/scripts/write-observed-progress.ps1
 !/tools/oc-session-router/runtime/src/
 !/tools/oc-session-router/runtime/src/**
 !/tools/oc-session-router/runtime/test/

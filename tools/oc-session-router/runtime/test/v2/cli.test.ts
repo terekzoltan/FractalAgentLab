@@ -9,7 +9,10 @@ import { fileURLToPath } from "node:url";
 import { OperationStore } from "../../src/v2/state-store.js";
 import { RouterEngine, type SubmitRequest } from "../../src/v2/engine.js";
 import type { RouterConfiguration } from "../../src/v2/routing.js";
-import type { WorkContext } from "../../src/v2/contracts.js";
+import type { WorkContext, Json } from "../../src/v2/contracts.js";
+import { freezeSources } from "../../src/v2/context-packet.js";
+import { PROGRESS_START, PROGRESS_END } from "../../src/v2/state-projection.js";
+import { readFileSync } from "node:fs";
 
 const cliPath = fileURLToPath(new URL("../../src/v2/cli.js", import.meta.url));
 const credentials = { username: "fixture-cli-user", password: "fixture-cli-password" };
@@ -154,6 +157,35 @@ function privacy(output: string, root: string, messageIds: string[] = []): void 
   for (const secret of [credentials.username, credentials.password, "ses_cli_fixture", root, ...messageIds]) assert.ok(!output.includes(secret), "Normal projection exposed a private fixture value");
   assert.doesNotMatch(output, /http:\/\/|Private fixture result|Apply the local fixture/);
 }
+
+test("read-source is offline and refresh-state only writes the enrolled observed block", async t => {
+  const { root, work, workPath, store, configuration, configPath } = localFixture(t);
+  await runCli(root, "open-work", ["--request", workPath], false);
+  writeFileSync(path.join(root, "plan.md"), "# Plan\nExact retained plan\n");
+  const sources = freezeSources(store, work, [{ path: "plan.md", mode: "reference" }]);
+  store.prepareAction({ workId: work.workId, actionKey: "read-only-fixture", participant: { namespace: "fixture", project: "fixture", session: "ses_test" }, recipientRole: "Meta", kind: "LIFECYCLE", effect: "READ_ONLY", command: "step-review", predecessor: null, input: { sources: sources as unknown as Json } });
+  const readPath = writeJson(root, "read-source.json", { workId: work.workId, sourceId: sources[0]!.sourceId });
+  const read = await runCli(root, "read-source", ["--request", readPath], false);
+  assert.equal(read.exitCode, 0);
+  assert.equal(read.value.content, "# Plan\nExact retained plan\n");
+  assert.equal(read.value.lifecycleSend, false);
+  const directRead = await runCli(root, "read-source", ["--work-id", work.workId, "--source-id", sources[0]!.sourceId, "--start-line", "2", "--end-line", "2"], false);
+  assert.equal(directRead.exitCode, 0);
+  assert.equal(directRead.value.content, "Exact retained plan");
+  assert.equal((await runCli(root, "read-source", ["--request", readPath, "--work-id", work.workId], false)).exitCode, 1);
+  if (process.platform !== "win32") return;
+  const original = `Scope: fixed\n${PROGRESS_START}\nold\n${PROGRESS_END}\nStop: OWNER\n`;
+  const statePath = path.join(root, "PROJECT_STATE.md");
+  writeFileSync(statePath, original);
+  configuration.targets["cli-fixture"]!.stateProjection = { path: "PROJECT_STATE.md", instructionReference: "Owner enrollment" };
+  writeJson(root, "router-config.json", configuration);
+  await runCli(root, "inspect", ["--work-id", work.workId], false);
+  assert.equal(readFileSync(statePath, "utf8"), original, "read-only inspect must not refresh a file");
+  const refreshed = await runCli(root, "refresh-state", ["--work-id", work.workId, "--config", configPath], false);
+  assert.equal(refreshed.value.status, "UPDATED");
+  assert.ok(readFileSync(statePath, "utf8").includes("Scope: fixed"));
+  assert.equal(store.getWork(work.workId).operations.length, 1, "local projection/read creates no lifecycle operation");
+});
 
 test("public CLI continuity routine compacts, restores and continues the same work once", async t => {
   const { root, work, store, state, request } = await httpFixture(t);

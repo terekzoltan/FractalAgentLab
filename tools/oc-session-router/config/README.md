@@ -51,6 +51,28 @@ This example is entirely synthetic and must be replaced with verified bindings:
 
 ## Meaning of the binding
 
+### Optional observed-progress enrollment
+
+Only an actual Owner-approved operator enrollment may add this target field:
+`"stateProjection":{"path":"ops/PROJECT_STATE.md","instructionReference":"owner-approved-observed-block-only"}`.
+It is a narrow operator permission, not a new lane effect or editable work
+envelope. It does not authorize governance/acceptance/next-stage decisions.
+The existing state file must contain exactly one matching pair:
+
+```markdown
+<!-- FAL-OBSERVED-PROGRESS:BEGIN -->
+Observed progress awaiting refresh.
+<!-- FAL-OBSERVED-PROGRESS:END -->
+```
+
+Meta/Owner keep all authority outside that block. Label old phase/next-action
+prose as the last reconciled baseline during adoption; do not silently retain
+an old instruction as live progression. The helper cannot create markers, change
+human text, stage/commit or clear an Owner pause. Omitted enrollment writes nothing.
+Paths must be contained ordinary PROJECT_STATE.md files. No runtime data/credentials
+or live configuration belong in Git. Inspect migration/adoption at a safe boundary;
+preserve existing pending operations and unrelated product changes.
+
 The target key (`example-project`) is the logical `target` in a work envelope.
 `project` is the actual OpenCode project ID verified from the selected session,
 not a display name. `directory` is the exact absolute target/worktree scope.
