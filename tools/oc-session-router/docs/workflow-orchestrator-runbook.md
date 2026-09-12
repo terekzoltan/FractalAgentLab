@@ -84,6 +84,16 @@ abort the target. Preserve the operation and participant claim while uncertain.
 A missing transcript page, an idle session or a dead local process proves neither
 rollback nor permission to resend.
 
+Native automatic compaction may finish an existing action under a synthetic
+continuation user message. Recovery supports the native metadata-marked path
+through an automatic compaction marker, completed summary and uninterrupted
+continuation lineage. It retains the original operation root and actual response
+parent separately. No matching by prose, time proximity or candidate name.
+Missing native metadata, incomplete/changed history or conflicting response pins
+remain explicit recovery limitations; never mark completed or resend manually.
+Use the existing wait/reconcile/read-result interface; no new lifecycle stage,
+project enrollment, forced compact or restore is introduced by this recovery.
+
 ## Observe and maintain lane continuity
 
 The runtime attempts advisory status/context observation before new lane work,

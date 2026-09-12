@@ -2,6 +2,7 @@ import path from "node:path";
 import { digest, StoreError, type Json, type Observation, type Operation, type TerminalOutcome } from "./contracts.js";
 import type { AdapterReply, OpenCodeAdapter, OpenCodeMessage } from "./opencode-adapter.js";
 import type { OperationStore } from "./state-store.js";
+import { linkFacts, nativeContinuation, type ContinuationProof } from "./native-continuation.js";
 
 export type ReconcileReader = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "getMessage" | "getHistory">;
 export interface ReconcileResult {
@@ -9,7 +10,7 @@ export interface ReconcileResult {
   disposition: "STORED" | "PREPARED" | "COMPACT_PENDING" | "COMPLETED" | "FAILED" | "PENDING" | "CONTINUE" | "AMBIGUOUS";
   nextCursor?: string;
 }
-interface ScanState { headId?: string; candidateIds: string[]; complete: boolean }
+interface ScanState { headId?: string; candidateIds: string[]; complete: boolean; links?: OpenCodeMessage[]; linksOverflow?: boolean }
 function scanState(operation: Operation): ScanState {
   const raw = operation.observation?.context?.reconcile;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { candidateIds: [], complete: false };
@@ -17,6 +18,8 @@ function scanState(operation: Operation): ScanState {
     ...(typeof raw.headId === "string" ? { headId: raw.headId } : {}),
     candidateIds: Array.isArray(raw.candidateIds) ? raw.candidateIds.filter((id): id is string => typeof id === "string" && id.startsWith("msg")).slice(0, 2) : [],
     complete: raw.complete === true,
+    ...(Array.isArray(raw.links) ? { links: raw.links as unknown as OpenCodeMessage[] } : {}),
+    linksOverflow: raw.linksOverflow === true,
   };
 }
 function sameDirectory(left: string, right: string): boolean {
@@ -78,14 +81,14 @@ export async function reconcileOperation(
     const context: { [key: string]: Json } = {
       ...current.observation?.context,
       reason,
-      reconcile: { ...scan, candidateIds: [...scan.candidateIds] },
+      reconcile: JSON.parse(JSON.stringify({ ...scan, candidateIds: [...scan.candidateIds] })) as Json,
     };
     if (message?.tokens) { context.tokenObservation = JSON.parse(JSON.stringify(message.tokens)) as Json; context.tokenObservationKind = "LAST_ASSISTANT_CALL"; }
     operation = store.observe(operationId, { observedAt: new Date().toISOString(), activity, ...(cursor === undefined ? {} : { cursor }), context });
     return { operation, disposition, ...(cursor === undefined ? {} : { nextCursor: cursor }) };
   };
   const acknowledgeRoot = () => { operation = store.acknowledge(operationId, { rootMessageId: operation.messageId }); };
-  const finish = (message: OpenCodeMessage): ReconcileResult => {
+  const finish = (message: OpenCodeMessage, proof?: ContinuationProof): ReconcileResult => {
     const current = store.getOperation(operationId);
     if (current.completedAt) return { operation: current, disposition: "STORED" };
     // Identity was checked before this call. Commit correlation before reading semantic prose.
@@ -94,6 +97,11 @@ export async function reconcileOperation(
     cursor = undefined;
     observed("TERMINAL_EXECUTION_OBSERVED", "PENDING", message);
     const outcome = outcomeForMessage(message);
+    if (proof) {
+      // Keep actual immediate parent distinct from the proven original operation root.
+      outcome.response = { ...outcome.response!, rootMessageId: operation.messageId, parentMessageId: message.parentId! };
+      outcome.evidenceReferences.push(`opencode-native-continuation-sha256:${digest(proof.anchors)}`);
+    }
     try { operation = store.finish(operationId, outcome); }
     catch (error) {
       const latest = store.getOperation(operationId);
@@ -122,9 +130,10 @@ export async function reconcileOperation(
   if (responseId) {
     const reply = await read(() => adapter.getMessage(responseId));
     if (!good(reply)) return observed("RESPONSE_READ_UNAVAILABLE");
-    if (reply.value.id !== responseId || !child(reply.value, operation)) return observed("RESPONSE_PARENT_CONFLICT");
-    if (isTerminalMessage(reply.value)) return finish(reply.value);
-    return observed("CORRELATED_EXECUTION_PENDING", "PENDING", reply.value);
+    if (reply.value.id !== responseId) return observed("RESPONSE_PARENT_CONFLICT");
+    if (child(reply.value, operation) && isTerminalMessage(reply.value)) return finish(reply.value);
+    // Acknowledged tool-only responses can later finish under a native continuation.
+    // A different parent still requires the complete proof below, never a bypass.
   }
 
   const newest = await read(() => adapter.getHistory({ limit: pageLimit }));
@@ -134,13 +143,17 @@ export async function reconcileOperation(
   const overlaps = oldHead !== undefined && newestMessages.some(message => message.id === oldHead);
   // If more than a page arrived since the last read, jumping to the saved older
   // cursor would hide a gap. Restart the contiguous scan; the next call can resume.
-  if (!overlaps) { cursor = newest.value.nextCursor; scan.complete = false; }
+  if (!overlaps || !scan.links) { cursor = newest.value.nextCursor; scan.complete = false; scan.links = []; scan.linksOverflow = false; }
   if (newestMessages.length) scan.headId = newestMessages.at(-1)!.id;
   const candidates = new Set(scan.candidateIds);
   const consume = (messages: OpenCodeMessage[]): boolean => {
     let reachedRoot = false;
     for (const message of messages) {
       if (message.session !== operation.action.participant.session) return false;
+      const index = scan.links!.findIndex(item => item.id === message.id);
+      if (index >= 0) scan.links![index] = linkFacts(message);
+      else if (scan.links!.length < 2048) scan.links!.push(linkFacts(message));
+      else scan.linksOverflow = true;
       if (message.id === operation.messageId) {
         if (!exactRoot(message, operation)) return false;
         if (!delivered) { acknowledgeRoot(); delivered = true; }
@@ -172,8 +185,27 @@ export async function reconcileOperation(
   if (!scan.complete) return observed("HISTORY_CONTINUATION", "CONTINUE");
   cursor = undefined;
   if (!delivered) return observed("ROOT_NOT_VERIFIED");
+  const proof = scan.linksOverflow ? undefined : nativeContinuation(scan.links ?? [], operation.messageId, isTerminalMessage);
+  if (proof && proof.candidates.length > 1) return observed("MULTIPLE_CONTINUATION_TERMINALS", "AMBIGUOUS");
   const candidateId = scan.candidateIds[0];
-  if (!candidateId) return observed("NO_TERMINAL_CHILD");
+  if (!candidateId) {
+    if (!proof) return observed("NATIVE_CONTINUATION_SCAN_LIMIT");
+    const continuedId = proof.candidates[0];
+    if (!continuedId) return observed(responseId ? "RESPONSE_PARENT_CONFLICT" : "NO_TERMINAL_CHILD");
+    // Re-read proof identities and latest head; pagination/cache text alone cannot finish.
+    for (const anchor of proof.anchors) {
+      const reply = await read(() => adapter.getMessage(anchor.id));
+      if (!good(reply) || digest(linkFacts(reply.value)) !== digest(anchor)) return observed("CONTINUATION_PROOF_CHANGED");
+    }
+    const reply = await read(() => adapter.getMessage(continuedId));
+    if (!good(reply) || reply.value.id !== continuedId || reply.value.session !== operation.action.participant.session ||
+      reply.value.parentId !== proof.parent || !isTerminalMessage(reply.value)) return observed("CONTINUATION_CANDIDATE_CHANGED");
+    const head = await read(() => adapter.getHistory({ limit: pageLimit }));
+    if (!good(head) || digest(head.value.messages.map(linkFacts)) !== digest(newestMessages.map(linkFacts))) return observed("CONTINUATION_HISTORY_CHANGED");
+    // An earlier tool-call acknowledgement is evidence, not a terminal response pin.
+    if (responseId && responseId !== continuedId) return observed("CONTINUATION_RESPONSE_PIN_CONFLICT", "AMBIGUOUS");
+    return finish(reply.value, proof);
+  }
   // Re-read the selected identity after pagination; never finalize stale page text.
   const candidate = await read(() => adapter.getMessage(candidateId));
   if (!good(candidate)) return observed("CANDIDATE_READ_UNAVAILABLE");

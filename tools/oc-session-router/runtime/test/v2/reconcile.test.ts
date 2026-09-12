@@ -48,6 +48,130 @@ class FakeReader implements ReconcileReader {
   async listCommands(): Promise<never> { throw new Error("Historical recovery must not read today's template"); }
 }
 
+function compactChain(operation: Operation): OpenCodeMessage[] {
+  return [rootMessage(operation), answer(operation, "msg_progress", { finish: "tool-calls", timeCreated: 2, timeCompleted: 3 }),
+    { ...rootMessage(operation), id: "msg_compact", timeCreated: 4, hasCompactionPart: true, autoCompaction: true },
+    answer(operation, "msg_summary", { parentId: "msg_compact", summary: true, timeCreated: 5, timeCompleted: 6 }),
+    { ...rootMessage(operation), id: "msg_continue", timeCreated: 7, compactionContinue: true, text: "" },
+    answer(operation, "msg_final", { parentId: "msg_continue", timeCreated: 8, timeCompleted: 9 })];
+}
+function installHistory(reader: FakeReader, history: OpenCodeMessage[]) {
+  reader.pages.set("newest", ok({ messages: history }));
+  for (const message of history) reader.messages.set(message.id, ok(message));
+}
+
+test("native compaction continuation completes original operation without rewriting actual parent or sending", async t => {
+  const { store, operation, reader } = fixture(t);
+  installHistory(reader, compactChain(operation));
+  const result = await reconcileOperation(store, operation.operationId, reader);
+  assert.equal(result.disposition, "COMPLETED");
+  assert.equal(result.operation.outcome?.response?.rootMessageId, operation.messageId);
+  assert.equal(result.operation.outcome?.response?.parentMessageId, "msg_continue");
+  assert.ok(result.operation.outcome?.evidenceReferences.some(e => e.startsWith("opencode-native-continuation-sha256:")));
+  assert.equal(store.startDispatch(operation.operationId), false);
+  assert.equal((await reconcileOperation(store, operation.operationId, reader)).disposition, "STORED");
+});
+
+test("missing marker, manual compact, failed summary, extra user or missing history cannot donate a result", async t => {
+  for (const mutation of ["marker", "manual", "summary", "user", "gap"] as const) {
+    const { store, operation, reader } = fixture(t);
+    const history = compactChain(operation);
+    if (mutation === "marker") history[4]!.compactionContinue = false;
+    if (mutation === "manual") history[2]!.autoCompaction = false;
+    if (mutation === "summary") history[3]!.error = true;
+    if (mutation === "user") history.splice(4, 0, { ...rootMessage(operation), id: "msg_other", timeCreated: 6.5 });
+    if (mutation === "gap") history.splice(3, 1);
+    installHistory(reader, history);
+    const result = await reconcileOperation(store, operation.operationId, reader);
+    assert.equal(result.operation.completedAt, null, mutation);
+    assert.ok(result.operation.acknowledgedAt, mutation);
+  }
+});
+
+test("multiple continuation terminals are ambiguous; later independent answer is not selected", async t => {
+  const { store, operation, reader } = fixture(t);
+  const history = compactChain(operation);
+  history.push(answer(operation, "msg_second", { parentId: "msg_continue", timeCreated: 10, timeCompleted: 11 }));
+  installHistory(reader, history);
+  assert.equal((await reconcileOperation(store, operation.operationId, reader)).disposition, "AMBIGUOUS");
+  const isolated = fixture(t);
+  const valid = compactChain(isolated.operation);
+  valid.push({ ...rootMessage(isolated.operation), id: "msg_independent", timeCreated: 10 },
+    answer(isolated.operation, "msg_unrelated", { parentId: "msg_independent", timeCreated: 11, timeCompleted: 12 }));
+  installHistory(isolated.reader, valid);
+  const result = await reconcileOperation(isolated.store, isolated.operation.operationId, isolated.reader);
+  assert.equal(result.operation.outcome?.response?.messageId, "msg_final");
+  const mixed = fixture(t);
+  const competing = compactChain(mixed.operation);
+  competing.push(answer(mixed.operation, "msg_late_direct", {timeCreated: 10, timeCompleted: 11}));
+  installHistory(mixed.reader, competing);
+  assert.equal((await reconcileOperation(mixed.store, mixed.operation.operationId, mixed.reader)).disposition, "AMBIGUOUS");
+});
+
+test("continuation metadata spans bounded pages and revalidates anchors before finishing", async t => {
+  const { store, operation, reader } = fixture(t);
+  const history = compactChain(operation);
+  for (const message of history) reader.messages.set(message.id, ok(message));
+  reader.pages.set("newest", ok({ messages: history.slice(4), nextCursor: "middle" }));
+  reader.pages.set("middle", ok({ messages: history.slice(2,4), nextCursor: "root" }));
+  reader.pages.set("root", ok({ messages: history.slice(0,2) }));
+  assert.equal((await reconcileOperation(store, operation.operationId, reader, {pageBudget: 1})).disposition, "CONTINUE");
+  reader.messages.set("msg_continue", ok({...history[4]!, compactionContinue: false}));
+  assert.equal((await reconcileOperation(store, operation.operationId, reader, {pageBudget: 1})).operation.observation?.context?.reason, "CONTINUATION_PROOF_CHANGED");
+  reader.messages.set("msg_continue", ok(history[4]!));
+  assert.equal((await reconcileOperation(store, operation.operationId, reader, {pageBudget: 1})).disposition, "COMPLETED");
+});
+
+test("repeated native compactions retain the original root and release its claim only on completion", async t => {
+  const {store, operation, reader, action} = fixture(t);
+  const history = compactChain(operation);
+  history[5] = {...history[5]!, finish: "tool-calls"};
+  history.push({...rootMessage(operation), id: "msg_compact2", timeCreated: 10, hasCompactionPart: true, autoCompaction: true},
+    answer(operation, "msg_summary2", {parentId: "msg_compact2", summary: true, timeCreated: 11, timeCompleted: 12}),
+    {...rootMessage(operation), id: "msg_continue2", timeCreated: 13, compactionContinue: true},
+    answer(operation, "msg_final2", {parentId: "msg_continue2", timeCreated: 14, timeCompleted: 15}));
+  installHistory(reader, history);
+  store.recordOwnerPause("work", true, "Owner pause remains");
+  const result = await reconcileOperation(store, operation.operationId, reader);
+  assert.equal(result.disposition, "COMPLETED");
+  assert.equal(result.operation.outcome?.response?.rootMessageId, operation.messageId);
+  assert.equal(result.operation.outcome?.response?.parentMessageId, "msg_continue2");
+  assert.equal(store.getWork("work").paused, true);
+  store.recordOwnerPause("work", false, "synthetic test only");
+  assert.ok(store.prepareAction({...action, actionKey: "next-fixture"}).created);
+});
+
+test("changing newest history during proof and foreign-session links never finish", async t => {
+  for (const mode of ["head", "session"] as const) {
+    const {store, operation, reader} = fixture(t);
+    const history = compactChain(operation);
+    if (mode === "session") history[3]!.session = "ses_other";
+    installHistory(reader, history);
+    if (mode === "head") {
+      let calls=0;
+      reader.getHistory = async () => ok({messages: ++calls === 1 ? history : [...history, {...rootMessage(operation), id: "msg_new", timeCreated: 11}]});
+    }
+    const result = await reconcileOperation(store, operation.operationId, reader);
+    assert.equal(result.operation.completedAt, null);
+    assert.equal(result.operation.observation?.context?.reason, mode === "head" ? "CONTINUATION_HISTORY_CHANGED" : "HISTORY_IDENTITY_CONFLICT");
+  }
+});
+
+test("old no-terminal cache is rebuilt and conflicting response pins remain explicit ambiguity", async t => {
+  for (const pinned of [false,true]) {
+    const {store, operation, reader} = fixture(t);
+    const history = compactChain(operation);
+    installHistory(reader, history);
+    store.observe(operation.operationId, {observedAt: new Date().toISOString(), activity: "IDLE", context: {
+      reconcile: {headId: "msg_final", candidateIds: [], complete: true}
+    }});
+    if (pinned) store.acknowledge(operation.operationId, {rootMessageId: operation.messageId, responseMessageId: "msg_progress"});
+    const result = await reconcileOperation(store, operation.operationId, reader);
+    assert.equal(result.disposition, pinned ? "AMBIGUOUS" : "COMPLETED");
+    if (pinned) assert.equal(result.operation.observation?.context?.reason, "CONTINUATION_RESPONSE_PIN_CONFLICT");
+  }
+});
+
 test("prepared and completed operations return without network, compact stays explicitly pending", async t => {
   for (const kind of ["LIFECYCLE", "COMPACT"] as const) {
     const { store, operation, reader } = fixture(t, kind, false);

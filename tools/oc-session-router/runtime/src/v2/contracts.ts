@@ -49,7 +49,7 @@ export interface TerminalOutcome {
   execution: "COMPLETED" | "FAILED";
   /** Actual terminal evidence, not inference from idle, timeout or process death. */
   evidenceReferences: string[];
-  response?: { messageId: string; rootMessageId?: string; text: string };
+  response?: { messageId: string; rootMessageId?: string; parentMessageId?: string; text: string };
   /** Historical accepted artifact; never fabricated as an OpenCode message. */
   artifact?: { text: string; sha256: string };
   reason?: string;

@@ -46,6 +46,9 @@ export interface OpenCodeMessage {
   providerID?: string;
   modelID?: string;
   hasCompactionPart: boolean;
+  /** Narrow native v1.18.30 provenance; visible prose is not continuation proof. */
+  autoCompaction?: boolean;
+  compactionContinue?: boolean;
   /** Visible text only. Completion must also be established from message facts. */
   text: string;
   /** Last assistant-call token counts, not a measured remaining-context budget. */
@@ -133,6 +136,11 @@ function normalizedMessage(value: unknown, session: string, expectedId?: string)
     if (part.synthetic !== true && part.ignored !== true) text.push(part.text);
   }
   const result: OpenCodeMessage = { id: info.id as string, session, role: info.role as "user" | "assistant", text: text.join(""), hasCompactionPart: raw.parts.some(part => (part as RecordValue).type === "compaction") };
+  result.autoCompaction = info.role === "user" && raw.parts.length === 1 &&
+    (raw.parts[0] as RecordValue).type === "compaction" && (raw.parts[0] as RecordValue).auto === true;
+  const only = raw.parts.length === 1 ? raw.parts[0] as RecordValue : undefined;
+  result.compactionContinue = info.role === "user" && only?.type === "text" && only.synthetic === true && only.ignored !== true &&
+    typeof only.metadata === "object" && only.metadata !== null && (only.metadata as RecordValue).compaction_continue === true;
   if (typeof info.parentID === "string") result.parentId = info.parentID;
   const time = info.time && typeof info.time === "object" && !Array.isArray(info.time) ? info.time as RecordValue : {};
   if (finite(time.created)) result.timeCreated = time.created;

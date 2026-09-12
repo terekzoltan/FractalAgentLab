@@ -302,6 +302,7 @@ export class OperationStore {
     if (outcome.response) {
       text(outcome.response.messageId);
       if (outcome.response.rootMessageId !== undefined) text(outcome.response.rootMessageId);
+      if (outcome.response.parentMessageId !== undefined) text(outcome.response.parentMessageId);
       if (typeof outcome.response.text !== "string") throw new StoreError("INVALID_INPUT");
     }
     const encoded = canonical(outcome), resultDigest = digest(outcome);

@@ -42,6 +42,27 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+test("native provenance requires exact synthetic metadata and a pure automatic compaction part", async t => {
+  const cases = [
+    [{ type: "text", text: "Continue", synthetic: true, metadata: { compaction_continue: true } }],
+    [{ type: "text", text: "Continue", metadata: { compaction_continue: true } }],
+    [{ type: "text", text: "Continue", synthetic: true }],
+    [{ type: "compaction", auto: true }],
+    [{ type: "compaction", auto: false }],
+    [{ type: "text", text: "Continue", synthetic: true, metadata: { compaction_continue: true } }, {type: "text", text: "Independent request"}],
+  ];
+  let index = 0;
+  const { adapter } = await fixture(t, (req,res) => {
+    assert.equal(req.method, "GET");
+    json(res, message({id: "msg_native", role: "user", parentID: undefined}, cases[index++]));
+  });
+  for (let i=0;i<cases.length;i++) {
+    const result = (await adapter.getMessage("msg_native")).value!;
+    assert.equal(result.compactionContinue, i === 0);
+    assert.equal(result.autoCompaction, i === 3);
+  }
+});
+
 test("shared GET budget prevents later requests while an expired budget leaves command POST intact", async t => {
   const postStarted = deferred<void>();
   const releasePost = deferred<void>();
