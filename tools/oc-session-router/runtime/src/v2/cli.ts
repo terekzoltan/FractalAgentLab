@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
-import type { Operation, WorkContext } from "./contracts.js";
+import type { Operation, OwnerAmendmentRequest, WorkContext } from "./contracts.js";
 import { StoreError, text } from "./contracts.js";
 import { RouterEngine, type CompactRequest, type SubmitRequest } from "./engine.js";
 import { OperationStore } from "./state-store.js";
@@ -12,6 +12,7 @@ import { importLegacyOperation, type LegacyImportRequest } from "./legacy-import
 import { continuitySummary, type SessionObservation } from "./session-observation.js";
 import { readFrozenSource, type Selection } from "./context-packet.js";
 import { refreshState } from "./state-projection.js";
+import { PreparationDiagnostics, PreparationFailure } from "./preparation-diagnostics.js";
 
 const here = fileURLToPath(import.meta.url);
 function jsonFile<T>(file: string): T {
@@ -40,6 +41,7 @@ export function operationView(operation: Operation, store?: OperationStore) {
   }
   return {
     operationId: operation.operationId, workId: operation.action.workId,
+    authorizationRevision: operation.authorizationRevision ?? null,
     actionKey: operation.action.actionKey, recipientRole: operation.action.recipientRole,
     kind: operation.action.kind, command: operation.action.command,
     delivery: operation.acknowledgedAt ? "DELIVERED" : operation.dispatchStartedAt || operation.action.kind === "LEGACY" ? "POSSIBLE" : "NOT_SENT",
@@ -75,15 +77,21 @@ async function retainExecutor(stateRoot: string, configurationPath: string, oper
 }
 
 export async function runCli(argv: string[]): Promise<unknown> {
+  const diagnostics = ["submit", "restore", "compact"].includes(argv[0] ?? "") ? new PreparationDiagnostics() : undefined;
+  try { return await runCliAction(argv, diagnostics); }
+  catch (error) { throw diagnostics ? diagnostics.failure(error) : error; }
+}
+
+async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics): Promise<unknown> {
   const [action, ...rest] = argv;
   if (!action || action === "help" || action === "--help") return {
-    interface: "fal-router/v2", actions: ["open-work", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy"],
+    interface: "fal-router/v2", actions: ["open-work", "amend-work", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy"],
     configuration: "Private router-config.json; credentials are process environment only.",
   };
-  if (!["open-work", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy", "execute-operation"].includes(action)) throw new RouterError("ACTION_UNSUPPORTED");
+  if (!["open-work", "amend-work", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy", "execute-operation"].includes(action)) throw new RouterError("ACTION_UNSUPPORTED");
   const values = options(rest);
   const actionOptions: Record<string, string[]> = {
-    "open-work": ["--request"], submit: ["--request"], compact: ["--request"], restore: ["--request"],
+    "open-work": ["--request"], "amend-work": ["--request"], submit: ["--request"], compact: ["--request"], restore: ["--request"],
     inspect: ["--operation-id", "--work-id"], "read-result": ["--operation-id"], wait: ["--operation-id", "--wait-ms"],
     reconcile: ["--operation-id"], interpret: ["--request"], "observe-session": ["--work-id", "--role"],
     "record-pause": ["--request"], "import-legacy": ["--request"], "execute-operation": ["--operation-id", "--idle-wait-ms"],
@@ -96,8 +104,10 @@ export async function runCli(argv: string[]): Promise<unknown> {
   if (!path.isAbsolute(stateRoot)) throw new RouterError("STATE_ROOT_MUST_BE_ABSOLUTE");
   const configurationPath = values["--config"] ?? path.join(stateRoot, "router-config.json");
   const database = path.join(stateRoot, "router.sqlite");
+  diagnostics?.at("STORE_OPEN");
   if (action !== "open-work" && !existsSync(database)) throw new RouterError("WORK_STORE_NOT_FOUND");
   const store = new OperationStore(database);
+  diagnostics?.useStore(store);
   const engine = () => {
     const password = process.env.OPENCODE_SERVER_PASSWORD;
     if (!password) throw new RouterError("CREDENTIALS_UNAVAILABLE");
@@ -131,10 +141,16 @@ export async function runCli(argv: string[]): Promise<unknown> {
       const work = localEngine.openWork(context);
       return { workId: work.context.workId, target: work.context.target, paused: work.paused, operationCount: work.operations.length, autoAdvance: false, stateProjection: project(work.context.workId) };
     }
+    if (action === "amend-work") {
+      const amended = store.amendWork(readRequest<OwnerAmendmentRequest>());
+      return { workId: amended.work.context.workId, created: amended.created, authorization: amended.work.authorization,
+        paused: amended.work.paused, lifecycleSend: false, autoAdvance: false };
+    }
     if (action === "inspect") {
       if (values["--operation-id"]) return operationView(store.getOperation(values["--operation-id"]), store);
       const work = store.getWork(required(values, "--work-id"));
-      return { workId: work.context.workId, target: work.context.target, instructionReference: work.context.instructionReference, stoppingPoint: work.context.stoppingPoint,
+      return { workId: work.context.workId, target: work.context.target, instructionReference: work.context.instructionReference, stoppingPoint: work.authorization.stoppingPoint,
+        authorization: work.authorization,
         paused: work.paused, pauseReference: work.pauseReference, observations: work.observations, operations: work.operations.map(operation => operationView(operation, store)), autoAdvance: false };
     }
     if (action === "read-result") {
@@ -162,15 +178,33 @@ export async function runCli(argv: string[]): Promise<unknown> {
       }));
     }
     if (action === "submit" || action === "restore") {
+      diagnostics!.at("REQUEST_READ");
       const request = readRequest<SubmitRequest>();
-      const prepared = await engine().prepare(action === "restore" ? { ...request, kind: "RESTORE" } : request);
-      if (!prepared.operation.dispatchStartedAt && !prepared.operation.completedAt) await retainExecutor(stateRoot, configurationPath, prepared.operation.operationId);
+      diagnostics!.identify(request);
+      diagnostics!.at("CONFIGURATION");
+      const currentEngine = engine();
+      const prepared = await currentEngine.prepare(action === "restore" && request && typeof request === "object" && !Array.isArray(request) ? { ...request, kind: "RESTORE" } : request, diagnostics!.at);
+      diagnostics!.prepared(prepared);
+      if (!prepared.operation.dispatchStartedAt && !prepared.operation.completedAt) {
+        diagnostics!.at("EXECUTOR_START");
+        await retainExecutor(stateRoot, configurationPath, prepared.operation.operationId);
+      }
+      diagnostics!.at("RESULT_VIEW");
       return { ...mutationView(store.getOperation(prepared.operation.operationId)), created: prepared.created };
     }
     if (action === "compact") {
-      const prepared = await engine().prepareCompact(readRequest<CompactRequest>());
+      diagnostics!.at("REQUEST_READ");
+      const request = readRequest<CompactRequest>();
+      diagnostics!.identify(request);
+      diagnostics!.at("CONFIGURATION");
+      const prepared = await engine().prepareCompact(request, diagnostics!.at);
       if (!prepared.operation) return { disposition: prepared.disposition, created: false, delivery: "NOT_SENT", autoAdvance: false };
-      if (!prepared.operation.dispatchStartedAt && !prepared.operation.completedAt) await retainExecutor(stateRoot, configurationPath, prepared.operation.operationId);
+      diagnostics!.prepared(prepared);
+      if (!prepared.operation.dispatchStartedAt && !prepared.operation.completedAt) {
+        diagnostics!.at("EXECUTOR_START");
+        await retainExecutor(stateRoot, configurationPath, prepared.operation.operationId);
+      }
+      diagnostics!.at("RESULT_VIEW");
       return { ...mutationView(store.getOperation(prepared.operation.operationId)), created: prepared.created };
     }
     if (action === "observe-session") return await engine().observe(required(values, "--work-id"), required(values, "--role"));
@@ -220,13 +254,14 @@ export async function runCli(argv: string[]): Promise<unknown> {
       await delay(Math.min(cadence, Math.max(0, deadline - performance.now())));
       cadence = Math.min(15_000, cadence * 2);
     }
-  } finally { store.close(); }
+  } catch (error) { throw diagnostics ? diagnostics.failure(error) : error; }
+  finally { store.close(); }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === here) {
   runCli(process.argv.slice(2)).then(value => process.stdout.write(`${JSON.stringify(value)}\n`)).catch(error => {
     const code = error instanceof RouterError || error instanceof StoreError ? error.code : "ROUTER_ERROR";
-    process.stdout.write(`${JSON.stringify({ error_code: code })}\n`);
+    process.stdout.write(`${JSON.stringify(error instanceof PreparationFailure ? error.view : { error_code: code })}\n`);
     process.exitCode = 1;
   });
 }

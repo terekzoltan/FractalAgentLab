@@ -146,6 +146,17 @@ process.exitCode=Number(process.env.FAL_FIXTURE_EXIT_CODE||0);
   Assert-Launcher ($Inspected.workId -ceq $WorkId -and @($Inspected.operations).Count -eq 0) 'Real V2 inspection must reopen the same local database without credentials.'
   $Passed++
 
+  $Amendment = @{ workId=$WorkId; amendmentKey='fixture-local-commit'; expectedAuthorizationRevision=$Inspected.authorization.revision; instructionReference='fixture/later-owner'; constraints='Commit this fixture only; no push'; addEffects=@('LOCAL_COMMIT'); stoppingPoint='Stop after fixture local commit' }
+  [IO.File]::WriteAllText($RequestPath, ($Amendment | ConvertTo-Json -Depth 10), $Utf8)
+  $Amended = Read-TestJson (Invoke-TestFacade -ScriptPath $Launcher -TestArguments @('-Action','amend-work','-StateRoot',$StateRoot,'-RequestPath',$RequestPath)) 'real offline amend-work'
+  Assert-Launcher ($Amended.created -and -not $Amended.lifecycleSend -and -not $Amended.autoAdvance) 'Amendment records authority offline without starting work.'
+  Assert-Launcher ($Amended.authorization.allowedEffects -contains 'LOCAL_COMMIT') 'Explicit additional effect must be visible.'
+  $Repeated = Read-TestJson (Invoke-TestFacade -ScriptPath $Launcher -TestArguments @('-Action','amend-work','-StateRoot',$StateRoot,'-RequestPath',$RequestPath)) 'idempotent offline amend-work'
+  Assert-Launcher (-not $Repeated.created -and $Repeated.authorization.revision -ceq $Amended.authorization.revision) 'Identical amendment replay must retain its revision.'
+  $Inspected = Read-TestJson (Invoke-TestFacade -ScriptPath $Launcher -TestArguments @('-Action','inspect','-StateRoot',$StateRoot,'-WorkId',$WorkId)) 'inspect amended work'
+  Assert-Launcher ($Inspected.instructionReference -ceq 'fixture/owner' -and $Inspected.stoppingPoint -ceq $Amendment.stoppingPoint -and @($Inspected.operations).Count -eq 0) 'Original instruction and effective stop must remain distinct without a new operation.'
+  $Passed++
+
   $InvalidActionFlag = Invoke-TestFacade -ScriptPath $Launcher -TestArguments @('-Action','inspect','-StateRoot',$StateRoot,'-WorkId',$WorkId,'-Role','review')
   Assert-Launcher ($InvalidActionFlag.code -eq 1) 'V2 CLI must retain authority over action-specific flag validation.'
   Assert-Launcher (($InvalidActionFlag.output | ConvertFrom-Json).error_code -ceq 'INVALID_ARGUMENTS') 'CLI diagnostic JSON must pass through unchanged.'
@@ -153,6 +164,7 @@ process.exitCode=Number(process.env.FAL_FIXTURE_EXIT_CODE||0);
 
   $Help = Read-TestJson (Invoke-TestFacade -ScriptPath $Launcher -TestArguments @('-Action','help')) 'real help'
   Assert-Launcher ($Help.interface -ceq 'fal-router/v2') 'Facade must execute the V2 interface.'
+  Assert-Launcher ($Help.actions -contains 'amend-work') 'Facade help must advertise the supported amendment action.'
   Assert-Launcher (-not (Test-Path -LiteralPath (Join-Path $FixtureLocalAppData 'FractalAgentLab\oc-router\v2\router.sqlite'))) 'Help and fake actions must not touch the default real store.'
   $Passed++
 

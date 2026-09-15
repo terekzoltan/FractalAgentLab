@@ -23,6 +23,7 @@ export function selectSource(content: string, selection: Selection): string {
   if (selection.heading !== undefined && selection.lines !== undefined) throw new RouterError("SOURCE_SELECTION_AMBIGUOUS");
   const lines = content.split(/\r?\n/);
   if (selection.lines !== undefined) {
+    if (!selection.lines || typeof selection.lines !== "object" || Array.isArray(selection.lines)) throw new RouterError("SOURCE_LINES_INVALID");
     const { start, end } = selection.lines;
     if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start || end > lines.length) throw new RouterError("SOURCE_LINES_INVALID");
     return lines.slice(start - 1, end).join("\n");
@@ -59,7 +60,9 @@ export function freezeSources(store: OperationStore, work: WorkContext, referenc
   const seen = new Set<string>();
   const result: SourceSnapshot[] = [];
   for (const reference of references) {
-    if (!reference || ("path" in reference) === ("operationId" in reference)) throw new RouterError("SOURCE_REFERENCE_INVALID");
+    if (!reference || typeof reference !== "object" || Array.isArray(reference) || ("path" in reference) === ("operationId" in reference)) throw new RouterError("SOURCE_REFERENCE_INVALID");
+    if (("path" in reference && (typeof reference.path !== "string" || !reference.path.trim())) ||
+        ("operationId" in reference && (typeof reference.operationId !== "string" || !reference.operationId.trim()))) throw new RouterError("SOURCE_REFERENCE_INVALID");
     const requested = reference.mode ?? "auto";
     if (!["auto", "inline", "reference", "excerpt"].includes(requested)) throw new RouterError("SOURCE_MODE_INVALID");
     const selection: Selection = { ...(reference.heading === undefined ? {} : { heading: reference.heading }), ...(reference.lines === undefined ? {} : { lines: reference.lines }) };

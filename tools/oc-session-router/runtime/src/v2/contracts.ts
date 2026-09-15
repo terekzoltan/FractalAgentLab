@@ -13,6 +13,30 @@ export interface WorkContext {
   stoppingPoint: string;
 }
 
+/** A later, explicit Owner decision within the original target and scope. */
+export interface OwnerAmendmentRequest {
+  workId: string;
+  amendmentKey: string;
+  expectedAuthorizationRevision: string;
+  instructionReference: string;
+  constraints: string;
+  addEffects: Effect[];
+  stoppingPoint?: string;
+}
+
+export interface OwnerAmendment {
+  request: OwnerAmendmentRequest;
+  revision: string;
+  recordedAt: string;
+}
+
+export interface WorkAuthorization {
+  revision: string;
+  allowedEffects: Effect[];
+  stoppingPoint: string;
+  amendments: OwnerAmendment[];
+}
+
 /** Private addressing. Aliases of one session must use the same verified tuple. */
 export interface Participant {
   namespace: string;
@@ -70,6 +94,8 @@ export interface Operation {
   participantKey: string;
   inputDigest: string;
   createdAt: string;
+  /** Absent means the original immutable work context, including imported history. */
+  authorizationRevision?: string;
   dispatchStartedAt: string | null;
   acknowledgedAt: string | null;
   correlation: Correlation;
@@ -82,6 +108,7 @@ export interface Operation {
 
 export interface WorkView {
   context: WorkContext;
+  authorization: WorkAuthorization;
   paused: boolean;
   pauseReference: string | null;
   observations: { [role: string]: Json };
@@ -91,7 +118,7 @@ export interface WorkView {
 export type StoreErrorCode = "STORE_UNAVAILABLE" | "SCHEMA_UNSUPPORTED" |
   "INVALID_INPUT" | "NOT_FOUND" | "INPUT_CONFLICT" | "PARTICIPANT_BUSY" |
   "WORK_PAUSED" | "EFFECT_NOT_ALLOWED" | "DISPATCH_NOT_STARTED" |
-  "RESULT_CONFLICT" | "CORRELATION_CONFLICT";
+  "RESULT_CONFLICT" | "CORRELATION_CONFLICT" | "AUTHORIZATION_CHANGED" | "WORK_HAS_PENDING_OPERATIONS";
 
 export class StoreError extends Error {
   constructor(readonly code: StoreErrorCode) { super(code); this.name = "StoreError"; }

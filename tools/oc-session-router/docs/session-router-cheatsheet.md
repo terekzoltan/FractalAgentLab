@@ -7,6 +7,7 @@ references for already authorized work, not a pilot sequence.
 |---|---|
 | Interface | `-Action help` |
 | Register scope | `-Action open-work -RequestPath <work.json>` |
+| Record later bounded Owner grant | `-Action amend-work -RequestPath <amendment.json>` (local, no send) |
 | One stage or clarification | `-Action submit -RequestPath <action.json>` |
 | Work progress | `-Action inspect -WorkId <work-id>` |
 | Operation facts | `-Action inspect -OperationId <operation-id>` |
@@ -39,6 +40,10 @@ with optional state/config paths. It uses the same V2 observer and store.
   Read the evidence and record responsible interpretation before dependent work.
 - Reuse the same action key to inspect/resume the same request. Changed input is a
   conflict. New keys are for real later stages/repairs, never uncertain resends.
+- `amend-work` appends an actual later Owner instruction within the original
+  scope, using the current authorization revision. Settle pending operations
+  first; history and pause survive. Stage inputs cannot grant effects. Coordinate
+  compatible runtime activation before the first amendment upgrades the store.
 - A wait deadline ends observation. It does not cancel the retaining request or
   prove that work stopped. Agents have no abort/kill/interrupt action.
 - Last-call token pressure is advisory. Missing optional telemetry means unknown.

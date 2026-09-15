@@ -1,4 +1,4 @@
-import type { ActionInput, Effect, Json, Operation, WorkContext } from "./contracts.js";
+import type { ActionInput, Effect, Json, Operation, WorkContext, WorkView } from "./contracts.js";
 import { digest, participantKey, StoreError, text } from "./contracts.js";
 import { OpenCodeAdapter, type Acknowledgement, type AdapterOptions, type AdapterReply, type OpenCodeCredentials, type OpenCodeMessage, type OpenCodeTarget } from "./opencode-adapter.js";
 import { isTerminalMessage, outcomeForMessage, reconcileOperation } from "./reconcile.js";
@@ -9,6 +9,7 @@ import { alreadyCompacted, captureCompactBaseline, observeCompactCompletion, typ
 import { reconcileLegacyOperation } from "./legacy-import.js";
 import { freezeSources, renderSources, packetSummary, type SourceSnapshot, type SourceReference } from "./context-packet.js";
 import { stateAuthorityDigest } from "./state-projection.js";
+import type { PreparationReporter } from "./preparation-diagnostics.js";
 export type { SourceReference } from "./context-packet.js";
 
 export type Adapter = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "listCommands" | "getMessage" | "getHistory" | "submitCommand" | "submitMessage" | "summarize"> & Partial<Pick<OpenCodeAdapter, "getModelInfo">>;
@@ -30,6 +31,15 @@ export interface CompactRequest {
   recipientRole: string;
   predecessor?: string;
   model?: { providerID: string; modelID: string };
+}
+
+function validateRequest(request: unknown, fields: string[]): void {
+  if (!request || typeof request !== "object" || Array.isArray(request) || Object.keys(request).some(key => !fields.includes(key))) throw new StoreError("INVALID_INPUT");
+}
+
+function authorizationContext(work: WorkView): string {
+  if (!work.authorization.amendments.length) return "";
+  return `\n\nCurrent Owner authorization (within the original scope):\nOriginal scope: ${work.context.scope}\nAuthorization revision: ${work.authorization.revision}\nAllowed effects: ${work.authorization.allowedEffects.join(", ")}\nStopping point: ${work.authorization.stoppingPoint}\nOwner amendments and binding constraints: ${JSON.stringify(work.authorization.amendments.map(item => ({ instructionReference: item.request.instructionReference, constraints: item.request.constraints, addEffects: item.request.addEffects })))}`;
 }
 
 
@@ -78,23 +88,30 @@ export class RouterEngine {
     }
   }
 
-  async prepareCompact(request: CompactRequest) {
+  async prepareCompact(request: CompactRequest, phase?: PreparationReporter) {
+    phase?.("REQUEST_VALIDATION");
+    validateRequest(request, ["workId", "actionKey", "recipientRole", "predecessor", "model"]);
     text(request.workId); text(request.actionKey); text(request.recipientRole);
     const normalized = { workId: request.workId, actionKey: request.actionKey, recipientRole: request.recipientRole,
       predecessor: request.predecessor ?? null, model: request.model ?? null };
-    const requestDigest = digest(normalized), work = this.store.getWork(request.workId);
+    const requestDigest = digest(normalized);
+    phase?.("WORK_CONTEXT");
+    const work = this.store.getWork(request.workId);
     const existing = work.operations.find(operation => operation.action.actionKey === request.actionKey);
     if (existing) {
       if (existing.action.kind !== "COMPACT" || existing.action.input.requestDigest !== requestDigest) throw new StoreError("INPUT_CONFLICT");
       return { operation: existing, created: false, disposition: "EXISTING" };
     }
     if (work.paused) throw new StoreError("WORK_PAUSED");
+    phase?.("PARTICIPANT_BINDING");
     const { role, target, participant, adapter } = this.binding(work.context, request.recipientRole);
     if (role.capability === "ORCHESTRATOR") throw new RouterError("ORCHESTRATOR_COMPACT_IS_MANUAL");
-    if (!work.context.allowedEffects.includes("SESSION_MAINTENANCE")) throw new StoreError("EFFECT_NOT_ALLOWED");
+    if (!work.authorization.allowedEffects.includes("SESSION_MAINTENANCE")) throw new StoreError("EFFECT_NOT_ALLOWED");
+    phase?.("PARTICIPANT_VERIFICATION");
     await this.verifyParticipant(adapter, work.context.directory, target.project, role.session, true);
     // Observe after freezing the head: a native compact either becomes visible
     // here or changes the head checked immediately before submission.
+    phase?.("COMPACT_BASELINE");
     const baseline = await captureCompactBaseline(adapter);
     const observation = await this.observe(request.workId, request.recipientRole);
     if (alreadyCompacted(observation)) return { operation: null, created: false, disposition: "ALREADY_COMPACTED", compactionReference: observation.lastCompaction!.messageReference };
@@ -102,13 +119,14 @@ export class RouterEngine {
     const model = request.model ?? observation.model ?? (observation.latestCompletedCall?.providerID && observation.latestCompletedCall.modelID
       ? { providerID: observation.latestCompletedCall.providerID, modelID: observation.latestCompletedCall.modelID } : null);
     if (!model?.providerID || !model.modelID) throw new RouterError("COMPACT_MODEL_UNAVAILABLE");
+    phase?.("PERSISTENCE");
     const prepared = this.store.prepareAction({
       workId: request.workId, actionKey: request.actionKey, participant, recipientRole: request.recipientRole,
       kind: "COMPACT", effect: "SESSION_MAINTENANCE", command: "compact", predecessor: normalized.predecessor,
       input: { requestDigest, address: { origin: target.origin, directory: target.directory, session: role.session },
         profile: role.profile, sources: [], compactBaseline: baseline as unknown as Json,
         summarize: { providerID: model.providerID, modelID: model.modelID, auto: false } },
-    });
+    }, work.authorization.revision);
     return { ...prepared, disposition: "PREPARED" };
   }
 
@@ -132,8 +150,12 @@ export class RouterEngine {
     // Optional context/token telemetry is not a dispatch admission condition.
   }
 
-  async prepare(request: SubmitRequest): Promise<{ operation: Operation; created: boolean }> {
+  async prepare(request: SubmitRequest, phase?: PreparationReporter): Promise<{ operation: Operation; created: boolean }> {
+    phase?.("REQUEST_VALIDATION");
+    validateRequest(request, ["workId", "actionKey", "recipientRole", "command", "kind", "arguments", "predecessor", "sources"]);
     text(request.workId); text(request.actionKey); text(request.recipientRole);
+    if (request.command !== undefined && typeof request.command !== "string") throw new StoreError("INVALID_INPUT");
+    if (request.arguments !== undefined && typeof request.arguments !== "string") throw new StoreError("INVALID_INPUT");
     const kind = request.kind ?? "LIFECYCLE";
     const command = kind === "RESTORE" ? "after-compact" : kind === "CLARIFICATION" ? "clarification" : (request.command ?? "").replace(/^\//, "");
     text(command);
@@ -142,6 +164,7 @@ export class RouterEngine {
       kind, command, arguments: request.arguments ?? "", predecessor: request.predecessor ?? null, sources: request.sources ?? [],
     };
     const requestDigest = digest(normalized);
+    phase?.("WORK_CONTEXT");
     const work = this.store.getWork(request.workId);
     const existing = work.operations.find(operation => operation.action.actionKey === request.actionKey);
     if (existing) {
@@ -149,24 +172,28 @@ export class RouterEngine {
       return { operation: existing, created: false };
     }
     if (work.paused) throw new StoreError("WORK_PAUSED");
+    phase?.("PARTICIPANT_BINDING");
     const { role, target, participant, adapter } = this.binding(work.context, request.recipientRole);
     const effect: Effect = kind === "LIFECYCLE" ? commandRule(command, role, target) : kind === "RESTORE" ? "SESSION_MAINTENANCE" : "READ_ONLY";
-    if (!work.context.allowedEffects.includes(effect)) throw new StoreError("EFFECT_NOT_ALLOWED");
+    if (!work.authorization.allowedEffects.includes(effect)) throw new StoreError("EFFECT_NOT_ALLOWED");
     if (!["LIFECYCLE", "CLARIFICATION", "RESTORE"].includes(kind)) throw new RouterError("ACTION_KIND_UNSUPPORTED");
+    phase?.("PARTICIPANT_VERIFICATION");
     await this.verifyParticipant(adapter, work.context.directory, target.project, role.session, true);
     await this.observeOptional(request.workId, request.recipientRole);
+    phase?.("SOURCE_PACKET");
     const projectionPath = target.stateProjection?.instructionReference?.trim() && /(^|[\\/])PROJECT_STATE\.md$/.test(target.stateProjection.path) ? target.stateProjection.path : undefined;
     const sources = freezeSources(this.store, work.context, normalized.sources, kind === "RESTORE", projectionPath);
     let argument = kind === "RESTORE" ? `${work.context.target} ${role.profile}` : normalized.arguments;
     if (kind === "RESTORE") {
       const recent = work.operations.slice(-3).map(operation => ({ operationId: operation.operationId, role: operation.action.recipientRole,
         command: operation.action.command, completed: operation.completedAt !== null, decision: operation.interpretation?.decision ?? null }));
-      argument += `\n\nRestore context only; do not start or repeat lifecycle work.\nCurrent work reference: ${work.context.workId}\nOwner scope: ${work.context.scope}\nStopping point: ${work.context.stoppingPoint}\nRecent observed operations (not new authority): ${JSON.stringify(recent)}`;
+      argument += `\n\nRestore context only; do not start or repeat lifecycle work.\nCurrent work reference: ${work.context.workId}\nOwner scope: ${work.context.scope}\nStopping point: ${work.authorization.stoppingPoint}\nRecent observed operations (not new authority): ${JSON.stringify(recent)}`;
     }
     if (kind === "CLARIFICATION") {
       text(argument);
       argument = `Clarify the existing work only. Do not implement again, change acceptance, commit, or expand scope.\nOwner scope: ${work.context.scope}\nQuestion: ${argument}`;
     }
+    argument += authorizationContext(work);
     argument += renderSources(request.workId, sources, this.store.databasePath);
     const input: ActionInput["input"] = {
       requestDigest, arguments: argument, sources: sources as unknown as Json,
@@ -175,6 +202,7 @@ export class RouterEngine {
     };
     for (const key of ["agent", "model", "variant"] as const) if (role[key]) input[key] = role[key]!;
     if (kind !== "CLARIFICATION") {
+      phase?.("COMMAND_RESOLUTION");
       const registry = await adapter.listCommands();
       const matches = registry.value?.filter(item => item.name === command) ?? [];
       if (registry.problem || matches.length !== 1) throw new RouterError("COMMAND_UNAVAILABLE");
@@ -185,11 +213,12 @@ export class RouterEngine {
         if (selected[key] !== undefined) (input.commandDefinition as Record<string, Json>)[key] = selected[key]!;
       }
     }
+    phase?.("PERSISTENCE");
     return this.store.prepareAction({
       workId: request.workId, actionKey: request.actionKey, participant,
       recipientRole: request.recipientRole, kind, effect, command,
       predecessor: normalized.predecessor, input,
-    });
+    }, work.authorization.revision);
   }
 
   private adapterForOperation(operation: Operation, sending: boolean): Adapter {

@@ -28,7 +28,7 @@ values returned by the router.
 
 ## Open work
 
-An `open-work` request fixes the target envelope and allowed effects locally. It
+An `open-work` request fixes the original target envelope and allowed effects locally. It
 does not contact the server.
 
 ```json
@@ -49,6 +49,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/oc-session-router/scri
 
 Use only effects granted by the Owner. Reopening the identical envelope is
 idempotent; changing it under the same `workId` is a conflict.
+
+### Record a later Owner grant
+
+If the Owner later permits a bounded effect that the original work lacks, inspect
+the work's current `authorization.revision` and record an `amend-work` request with
+that revision, a stable amendment key, the actual instruction reference, bounded
+constraints, newly granted effects and an optional revised stopping point. The
+[reference example](workflow-orchestrator-reference.md#later-owner-authorization)
+shows the exact fields.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/oc-session-router/scripts/Invoke-OCRouter.ps1 -Action inspect -WorkId $WorkId
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/oc-session-router/scripts/Invoke-OCRouter.ps1 -Action amend-work -RequestPath $AmendmentRequest
+```
+
+Reconcile all pending operations in that work first. This local action sends
+nothing, keeps the original scope/history and pause, and applies the grant only
+to new preparations. Stage requests cannot expand authority. First use upgrades
+the shared store to schema 2, so coordinate compatible runtime/facade activation
+for all its clients before recording a live amendment. Source-only candidate work
+does not authorize that activation or amendment.
 
 ## Submit and observe
 
@@ -191,17 +212,25 @@ Owner does so. The Owner also compacts orchestrator sessions manually.
 
 | Class | Actions | Meaning |
 |---|---|---|
-| Local/no-send | `help`, `open-work`, `inspect`, `read-result`, `interpret`, `record-pause`, `import-legacy`, `wait` with zero | May read or update private local state but does not contact OpenCode |
+| Local/no-send | `help`, `open-work`, `amend-work`, `inspect`, `read-result`, `interpret`, `record-pause`, `import-legacy`, `wait` with zero | May read or update private local state but does not contact OpenCode |
 | GET observation/recovery | `observe-session`, plus nonzero `wait` or `reconcile` for dispatched unresolved work | May read current telemetry/history without resending the operation |
 | Possible delivery | `submit`, `compact`, `restore` | Can initiate a retaining lifecycle or maintenance request after admission checks |
 
 ## Troubleshooting
+
+Preparation failures report a sanitized phase/category plus separate operation
+creation, existence and delivery facts. Inspect their source/time and follow the
+suggested recovery read. `operationCreated: false` does not erase an earlier
+operation; `null` or `UNKNOWN` requires inspection before retry. See the
+[diagnostic fields](workflow-orchestrator-reference.md#preparation-failure-diagnostics).
 
 | Condition | Safe response |
 |---|---|
 | `ROUTER_V2_BUILD_MISSING` | Build separately only under explicit authority; the facade never builds during dispatch |
 | Missing store or credentials | Select the intended private state; credentials are needed only for network work and remain process-private |
 | `WORK_PAUSED` | Preserve the Owner instruction; observe only until an actual Owner resume exists |
+| `AUTHORIZATION_CHANGED` | Inspect the latest Owner amendment and reconcile its constraints before preparing against its revision |
+| `WORK_HAS_PENDING_OPERATIONS` | Reconcile existing work before recording a new grant; preserve uncertain sends |
 | `PARTICIPANT_BUSY` or unavailable activity | Wait/read; never interrupt the participant |
 | Invalid predecessor | Use no predecessor for the first operation, or a completed operation from the same work |
 | Changed source, command, identity, scope, or effect | Stop the affected dispatch and resolve the conflict; do not overwrite frozen provenance |

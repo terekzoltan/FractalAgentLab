@@ -1,7 +1,7 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('help','open-work','submit','compact','restore','inspect','read-result','read-source','refresh-state','wait','reconcile','interpret','observe-session','record-pause','import-legacy')]
+  [ValidateSet('help','open-work','amend-work','submit','compact','restore','inspect','read-result','read-source','refresh-state','wait','reconcile','interpret','observe-session','record-pause','import-legacy')]
   [string]$Action,
   [ValidateNotNullOrEmpty()][string]$StateRoot,
   [ValidateNotNullOrEmpty()][string]$ConfigPath,

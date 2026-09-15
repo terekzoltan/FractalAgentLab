@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { freezeSources, renderSources, readFrozenSource, packetSummary, selectSource } from "../../src/v2/context-packet.js";
+import { freezeSources, renderSources, readFrozenSource, packetSummary, selectSource, type SourceReference } from "../../src/v2/context-packet.js";
 import { OperationStore } from "../../src/v2/state-store.js";
 import type { WorkContext, Json } from "../../src/v2/contracts.js";
 
@@ -56,4 +56,21 @@ test("restore defaults to references; explicit inline is allowed and merely warn
   assert.throws(() => freezeSources(store, work, [{ path: "../outside" }]), { code: "SOURCE_PATH_UNSAFE" });
   writeFileSync(path.join(root, "binary.dat"), Buffer.from([255, 254, 0]));
   assert.throws(() => freezeSources(store, work, [{ path: "binary.dat" }]), { code: "SOURCE_TEXT_ENCODING_INVALID" });
+});
+
+test("malformed source elements and selectors fail with bounded codes before persistence", t => {
+  const root = mkdtempSync(path.join(process.cwd(), ".packet-fixture-"));
+  const store = new OperationStore(path.join(root, "router.sqlite"));
+  t.after(() => { store.close(); rmSync(root, { recursive: true, force: true }); });
+  const work: WorkContext = { workId: "malformed", target: "p", directory: root, instructionReference: "owner", scope: "fixture", allowedEffects: ["READ_ONLY"], stoppingPoint: "return" };
+  store.openWork(work);
+  writeFileSync(path.join(root, "source.md"), "# Plan\nExact fixture source");
+  for (const reference of [null, "private malformed input", 1, true, [], {}, { path: "source.md", operationId: "op-fixture" }, { path: 4 }, { path: null }, { operationId: [] }]) {
+    assert.throws(() => freezeSources(store, work, [reference] as SourceReference[]), { code: "SOURCE_REFERENCE_INVALID" });
+  }
+  for (const lines of [null, "1-2", 4, []]) {
+    assert.throws(() => freezeSources(store, work, [{ path: "source.md", mode: "excerpt", lines }] as unknown as SourceReference[]), { code: "SOURCE_LINES_INVALID" });
+  }
+  assert.equal(freezeSources(store, work, [{ path: "source.md", mode: "excerpt", lines: { start: 2, end: 2 } }])[0]!.content, "# Plan\nExact fixture source");
+  assert.equal(store.getWork(work.workId).operations.length, 0);
 });

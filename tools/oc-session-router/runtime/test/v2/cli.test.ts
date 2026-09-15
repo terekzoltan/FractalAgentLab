@@ -259,6 +259,11 @@ test("CLI missing credentials and missing/malformed config produce bounded error
   const missingCredentials = await runCli(root, "submit", ["--request", requestPath], false);
   assert.equal(missingCredentials.exitCode, 1);
   assert.equal(missingCredentials.value.error_code, "CREDENTIALS_UNAVAILABLE");
+  assert.equal(missingCredentials.value.phase, "CONFIGURATION");
+  assert.equal(missingCredentials.value.category, "CONFIGURATION");
+  assert.equal(missingCredentials.value.operationCreated, false);
+  assert.equal(missingCredentials.value.operationExists, false);
+  assert.equal(missingCredentials.value.delivery, "NOT_SENT");
   const missingConfig = await runCli(root, "submit", ["--request", requestPath, "--config", path.join(root, "missing.json")]);
   assert.equal(missingConfig.value.error_code, "INPUT_FILE_UNREADABLE");
   writeFileSync(configPath, "{invalid-json");
@@ -266,6 +271,86 @@ test("CLI missing credentials and missing/malformed config produce bounded error
   assert.equal(invalid.value.error_code, "INPUT_FILE_UNREADABLE");
   privacy(missingCredentials.stdout + missingConfig.stdout + invalid.stdout, root);
   assert.equal(store.getWork(work.workId).operations.length, 0);
+});
+
+test("missing operation store reports the store-open phase without fabricated operation facts", async t => {
+  const root = mkdtempSync(path.join(process.cwd(), ".router-v2-cli-missing-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const result = await runCli(root, "submit", ["--request", path.join(root, "unused-private-request.json")]);
+  assert.equal(result.value.error_code, "WORK_STORE_NOT_FOUND");
+  assert.equal(result.value.phase, "STORE_OPEN");
+  assert.equal(result.value.category, "STORE");
+  assert.equal(result.value.operationCreated, false);
+  assert.equal(result.value.operationExists, null);
+  assert.equal(result.value.delivery, "UNKNOWN");
+  privacy(result.stdout + result.stderr, root);
+});
+
+test("submit and restore reject malformed source packets with sanitized preparation facts", async t => {
+  const { root, work, request, state, store } = await httpFixture(t);
+  writeFileSync(path.join(root, "source.md"), "# Fixture\nprivate source content");
+  const cases = [
+    { sources: ["private malformed input"], code: "SOURCE_REFERENCE_INVALID" },
+    { sources: [true], code: "SOURCE_REFERENCE_INVALID" },
+    { sources: [null], code: "SOURCE_REFERENCE_INVALID" },
+    { sources: [[]], code: "SOURCE_REFERENCE_INVALID" },
+    { sources: [{ path: "source.md", mode: "excerpt", lines: null }], code: "SOURCE_LINES_INVALID" },
+    { sources: [{ path: path.join(root, "source.md") }], code: "SOURCE_PATH_UNSAFE" },
+  ];
+  for (const action of ["submit", "restore"]) {
+    for (const entry of cases) {
+      const requestPath = writeJson(root, "malformed-source.json", { ...request, sources: entry.sources });
+      const result = await runCli(root, action, ["--request", requestPath]);
+      assert.equal(result.exitCode, 1, result.stdout);
+      assert.equal(result.value.error_code, entry.code);
+      assert.equal(result.value.phase, "SOURCE_PACKET");
+      assert.equal(result.value.category, "SOURCE_INPUT");
+      assert.equal(result.value.operationCreated, false);
+      assert.equal(result.value.operationExists, false);
+      assert.equal(result.value.dispatchStarted, false);
+      assert.equal(result.value.delivery, "NOT_SENT");
+      assert.equal(result.value.factsSource, "STORE_SNAPSHOT");
+      assert.equal(result.value.recovery, "CORRECT_INPUT");
+      privacy(result.stdout + result.stderr, root);
+      assert.doesNotMatch(result.stdout + result.stderr, /private malformed input|private source content|TypeError|at freezeSources/);
+    }
+  }
+  assert.equal(store.getWork(work.workId).operations.length, 0);
+  assert.equal(state.posts.length, 0);
+  assert.equal(state.summaries, 0);
+  assert.ok(state.calls.every(call => call.method === "GET"));
+});
+
+test("malformed request identities stay unknown and existing action conflicts preserve delivery", async t => {
+  const { root, work, request, state, store, engine } = await httpFixture(t);
+  for (const action of ["submit", "restore", "compact"]) {
+    const invalidPath = writeJson(root, "invalid-request.json", null);
+    const invalid = await runCli(root, action, ["--request", invalidPath]);
+    assert.equal(invalid.value.error_code, "INVALID_INPUT");
+    assert.equal(invalid.value.phase, "REQUEST_VALIDATION");
+    assert.equal(invalid.value.operationCreated, false);
+    assert.equal(invalid.value.operationExists, null);
+    assert.equal(invalid.value.delivery, "UNKNOWN");
+  }
+  const prepared = await engine.prepare(request);
+  store.startDispatch(prepared.operation.operationId);
+  const conflictingPath = writeJson(root, "conflict.json", { ...request, arguments: "Changed private fixture input" });
+  const possible = await runCli(root, "submit", ["--request", conflictingPath]);
+  assert.equal(possible.value.error_code, "INPUT_CONFLICT");
+  assert.equal(possible.value.phase, "WORK_CONTEXT");
+  assert.equal(possible.value.operationCreated, false);
+  assert.equal(possible.value.operationExists, true);
+  assert.equal(possible.value.operationId, prepared.operation.operationId);
+  assert.equal(possible.value.dispatchStarted, true);
+  assert.equal(possible.value.delivery, "POSSIBLE");
+  assert.equal(possible.value.recovery, "RECONCILE_EXISTING_OPERATION");
+  store.acknowledge(prepared.operation.operationId, { rootMessageId: prepared.operation.messageId });
+  const delivered = await runCli(root, "submit", ["--request", conflictingPath]);
+  assert.equal(delivered.value.delivery, "DELIVERED");
+  assert.equal(delivered.value.recovery, "INSPECT_EXISTING_OPERATION");
+  privacy(possible.stdout + delivered.stdout, root, [prepared.operation.messageId]);
+  assert.equal(store.getWork(work.workId).operations.length, 1);
+  assert.equal(state.posts.length, 0, "diagnostic lookup must never launch an executor or POST");
 });
 
 test("submit exits while executor retains POST; bounded wait and duplicate CLI calls never interrupt or resend", async t => {

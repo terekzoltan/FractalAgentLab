@@ -37,6 +37,7 @@ from parameters or select a legacy engine.
 |---|---|---|---|
 | `help` | none | none | Local interface description |
 | `open-work` | `-RequestPath` | `--request` | Register local work; no server required |
+| `amend-work` | `-RequestPath` | `--request` | Record a later explicit Owner grant locally; no server or send |
 | `submit` | `-RequestPath` | `--request` | Prepare one lifecycle or clarification action |
 | `compact` | `-RequestPath` | `--request` | Prepare lane maintenance when safe |
 | `restore` | `-RequestPath` | `--request` | Prepare installed `/after-compact` |
@@ -64,7 +65,7 @@ Owner pause or budget expiry; repeated observation uses the same operation.
 Network actions inherit `OPENCODE_SERVER_PASSWORD` and optional
 `OPENCODE_SERVER_USERNAME` (default `opencode`) from the launching process.
 Keep them outside request files and repositories. Local inspection, result reads,
-pause/interpretation and NO_SEND import do not require server credentials.
+work amendment, pause/interpretation and NO_SEND import do not require server credentials.
 Configuration requirements are in [config/README](../config/README.md).
 
 ## Work and action requests
@@ -89,6 +90,55 @@ or Owner approval.
 Include only effects covered by the actual instruction. Reopening an unchanged
 work is idempotent; changing its recorded envelope under the same `workId` is a
 conflict. Project plans may evolve within that envelope.
+
+### Later Owner authorization
+
+When the Owner later grants an additional effect within the same scope, use
+`amend-work`. It preserves the original context and appends the actual instruction,
+bounded constraints and any revised stopping point. It cannot change target,
+directory or scope, remove effects, cancel a pause or rewrite an operation.
+A stage request cannot grant authority. Existing command/role restrictions and
+review/closeout gates still apply; `LOCAL_COMMIT` does not authorize push/deploy.
+
+For a synthetic diagnostic work originally opened without `LOCAL_COMMIT`:
+
+```json
+{
+  "workId": "example-bounded-diagnostic",
+  "amendmentKey": "owner-local-commit-1",
+  "expectedAuthorizationRevision": "<64-hex authorization.revision from inspect>",
+  "instructionReference": "owner-instruction:bounded-diagnostic-local-commit",
+  "constraints": "Commit only the reviewed diagnostic package in the original scope. No runtime repair, broader Epic closeout, push or deploy.",
+  "addEffects": ["LOCAL_COMMIT"],
+  "stoppingPoint": "Stop after the approved diagnostic package local commit and report its identity."
+}
+```
+
+Read `inspect -WorkId ...` immediately before preparing the amendment and use its
+`authorization.revision`. A changed revision produces `AUTHORIZATION_CHANGED`;
+inspect and reconcile the new instruction before preparing a new amendment.
+`addEffects` contains only newly granted effects, without duplicates. It may be
+empty when the Owner changes only the stopping point. `constraints` and
+`instructionReference` are required; `stoppingPoint` is optional. Keep these
+fields suitable for operator inspection, with private evidence stored separately.
+
+The same amendment key and identical request are idempotent, including after later
+amendments. Changed input under that key is `INPUT_CONFLICT`. Every pending or
+unresolved operation in that work blocks a new amendment with
+`WORK_HAS_PENDING_OPERATIONS`; reconcile it first. Do not clear claims, replace
+action keys or infer no-send from a timeout to make an amendment fit. Recording an
+amendment while paused leaves the pause intact and sends nothing.
+
+Work inspection exposes effective `authorization.allowedEffects`, `stoppingPoint`,
+the current revision and append-only `amendments` with their request, revision and
+recording time. The original work context remains unchanged. New preparations pin
+the effective revision atomically and carry the bounded Owner context to the
+recipient. Operation inspection reports that operation's `authorizationRevision`;
+`null` identifies the original immutable context, including imported history.
+An old action, its input digest, outcome and interpretation do
+not acquire a later grant. Reusing its action key still retrieves that old action.
+
+### Stage requests
 
 `submit` accepts `workId`, `actionKey`, `recipientRole`, optional `kind`
 (default `LIFECYCLE`), `command`, `arguments`, `predecessor` and `sources`:
@@ -228,9 +278,40 @@ A retaining executor owns the actual POST connection; a caller's observation
 timeout does not terminate it. Restart/death after dispatch-started leaves possible
 delivery and no automatic replay.
 
+### Preparation failure diagnostics
+
+Failed `submit`, `restore` and `compact` invocations return a sanitized
+`error_code`, `phase` and `category`. Known failures retain their specific code;
+unexpected failures use `PREPARATION_FAILED` / `UNEXPECTED_FAILURE`. Phases identify
+argument/store setup, request/configuration, work context, participant binding or
+verification, compact baseline, source packet, command resolution, persistence,
+executor start or result view. They locate the failure without printing the error
+message, stack, full request, credentials or absolute private paths.
+
+`operationCreated` describes this invocation: `true` or `false` when preparation
+returned that fact, `false` before persistence was entered, otherwise `null`.
+It does not say whether an earlier invocation created an operation. Separate
+`operationExists`, `operationId`, `dispatchStarted` and `delivery` describe the
+matched operation. `factsSource` is `STORE_SNAPSHOT`, `PRIOR_STORE_SNAPSHOT`,
+`PREPARE_RESULT` or `UNAVAILABLE`; `factsObservedAt` records the observation time.
+An earlier snapshot preserves known delivery, but cannot prove an operation is
+still unsent after a later store read failed.
+Missing evidence remains `null` / `UNKNOWN`. Failure after persistence may still
+leave an operation; failure after executor start may still leave a send.
+
+Use `recovery` to choose the next read: `INSPECT_EXISTING_OPERATION`,
+`RECONCILE_EXISTING_OPERATION` or `INSPECT_WORK_BEFORE_RETRY`. `CORRECT_INPUT` is
+returned only when the snapshot found no matching operation and this invocation
+had not entered persistence. These are observation-time facts, never an automatic
+retry instruction. Preserve a known delivery even when request validation or
+result rendering failed. A source-packet check alone does not prove the complete
+preparation/send path or explain a previous incident.
+
 | Condition | Handling |
 |---|---|
 | `WORK_PAUSED` | Preserve the instruction; observation may continue |
+| `AUTHORIZATION_CHANGED` | Inspect the current Owner amendment and prepare against its revision; do not silently retry |
+| `WORK_HAS_PENDING_OPERATIONS` | Reconcile that work's existing operations before recording a new grant |
 | `PARTICIPANT_BUSY` / unavailable required activity | Wait/read; do not interrupt |
 | Address/project/session or scope/effect conflict | Stop affected dispatch and resolve it |
 | `SOURCE_CHANGED` / `COMMAND_CHANGED_BEFORE_SEND` | Review the changed input; do not overwrite frozen provenance |
@@ -249,6 +330,20 @@ backup; copying an active main database alone is not a backup. Never clear claim
 or delete unresolved history to make a resend fit. These safeguards coordinate
 participating clients in a personal system; they do not prevent all manual UI
 activity or provide adversarial OS isolation.
+
+New stores and ordinary use remain schema 1 until the first successful explicit
+`amend-work`. That transaction upgrades the shared store to schema 2 together with
+the amendment. Compatible runtimes read both; older runtimes refuse schema 2 at
+startup. An already-open older writer is fenced from creating an unpinned normal
+operation in an amended work. Historical operations and other work are preserved.
+
+Isolated code, documentation and offline verification are `LIVE_SAFE`. Coordinate
+runtime/facade and affected shared-skill activation at a stable boundary, selecting
+a compatible runtime for every subsequent client of the store before its first amendment.
+Keep existing retaining executors and unresolved evidence intact. First live use
+also requires the actual bounded Owner grant and a settled target work. After
+schema 2 activation, recovery uses a compatible runtime; downgrading the store or
+restoring a snapshot that discards amendments or sends is unsupported.
 
 See the [operating runbook](workflow-orchestrator-runbook.md) and
 [versioned installer](../../workflow-tooling/README.md). Source, installed bytes,

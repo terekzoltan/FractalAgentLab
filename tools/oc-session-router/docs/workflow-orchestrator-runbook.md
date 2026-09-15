@@ -22,6 +22,16 @@ Project plans remain editable within the accepted scope. Each action preserves
 the inputs used for that action; later plan revisions do not rewrite old evidence.
 A materially different work envelope requires the corresponding Owner decision.
 
+If a later explicit Owner decision adds an effect within the original scope or
+changes its stopping point, record it locally with `amend-work` using the current
+authorization revision and bounded constraints. Resolve every pending operation
+in that work first. The original context and operation history stay immutable;
+the amendment applies only to future preparations and leaves Owner pause intact.
+A stage request, amendment key or instruction reference does not manufacture
+approval. Changed target, directory or scope requires a separately authorized work
+envelope. See the [reference](workflow-orchestrator-reference.md#later-owner-authorization)
+for fields, revision conflicts and the coordinated first-use schema boundary.
+
 ## Preserve the lifecycle
 
 Use stage-sized source packets: active Combined section, required plan/result and
@@ -83,6 +93,12 @@ on that operation. They perform bounded GET observation; a wait deadline does no
 abort the target. Preserve the operation and participant claim while uncertain.
 A missing transcript page, an idle session or a dead local process proves neither
 rollback nor permission to resend.
+
+For preparation errors, inspect the reported phase/category and separate
+operation/delivery facts before choosing a retry. A failed CLI invocation can
+still have created an operation or started its executor; unknown facts require
+inspection. Follow the [failure reference](workflow-orchestrator-reference.md#preparation-failure-diagnostics)
+without treating a successful packet check as full send-path evidence.
 
 Native automatic compaction may finish an existing action under a synthetic
 continuation user message. Recovery supports the native metadata-marked path

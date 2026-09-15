@@ -3,7 +3,7 @@ import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { canonical, digest, generateMessageId, participantKey, StoreError, text } from "./contracts.js";
-import type { ActionInput, Correlation, Interpretation, Json, Observation, Operation, TerminalOutcome, WorkContext, WorkView } from "./contracts.js";
+import type { ActionInput, Correlation, Interpretation, Json, Observation, Operation, OwnerAmendment, OwnerAmendmentRequest, TerminalOutcome, WorkAuthorization, WorkContext, WorkView } from "./contracts.js";
 
 type Row = Record<string, string | number | bigint | Uint8Array | null>;
 export type StoreCheckpoint = "PREPARE_OPERATION_INSERTED" | "PREPARE_COMMITTED" |
@@ -39,7 +39,7 @@ export class OperationStore {
       this.db.exec("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;");
       this.transaction(() => {
         const version = Number(this.db.prepare("PRAGMA user_version").get()!.user_version);
-        if (version !== 0 && version !== 1) throw new StoreError("SCHEMA_UNSUPPORTED");
+        if (version !== 0 && version !== 1 && version !== 2) throw new StoreError("SCHEMA_UNSUPPORTED");
         if (version === 0) {
           const existing = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all();
           if (existing.length) throw new StoreError("SCHEMA_UNSUPPORTED");
@@ -73,6 +73,7 @@ export class OperationStore {
         }
         // Validate required structure without scanning history on each CLI start.
         this.db.prepare("SELECT w.context_json, w.observations_json, o.action_json, o.message_id, r.result_digest, s.participant_key FROM work_items w LEFT JOIN operations o ON o.work_id=w.work_id LEFT JOIN results r ON r.operation_id=o.operation_id LEFT JOIN session_claims s ON s.operation_id=o.operation_id LIMIT 0").all();
+        if (version === 2) this.db.prepare("SELECT a.request_json,a.revision,a.recorded_at,o.authorization_revision FROM work_amendments a LEFT JOIN operations o ON o.work_id=a.work_id LIMIT 0").all();
       });
       this.db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;");
     } catch (error) {
@@ -124,6 +125,7 @@ export class OperationStore {
       return {
         operationId: String(row.operation_id), messageId: String(row.message_id), action: JSON.parse(String(row.action_json)) as ActionInput,
         participantKey: String(row.participant_key), inputDigest: String(row.input_digest), createdAt: String(row.created_at),
+        ...(row.authorization_revision ? { authorizationRevision: String(row.authorization_revision) } : {}),
         dispatchStartedAt: row.dispatch_started_at as string | null, acknowledgedAt: row.acknowledged_at as string | null,
         correlation: JSON.parse(String(row.correlation_json)) as Correlation,
         observation: row.observation_json ? JSON.parse(String(row.observation_json)) as Observation : null,
@@ -162,6 +164,7 @@ export class OperationStore {
       const operations = this.db.prepare("SELECT operation_id FROM operations WHERE work_id=? ORDER BY created_at, rowid").all(workId);
       const view: WorkView = {
         context: JSON.parse(String(row.context_json)) as WorkContext,
+        authorization: this.authorization(JSON.parse(String(row.context_json)) as WorkContext),
         paused: row.paused === 1, pauseReference: row.pause_reference as string | null,
         observations: JSON.parse(String(row.observations_json)) as WorkView["observations"],
         operations: operations.map(operation => this.getOperation(String(operation.operation_id))),
@@ -172,6 +175,68 @@ export class OperationStore {
       try { this.db.exec("ROLLBACK"); } catch { /* no transaction may be active */ }
       throw error instanceof StoreError ? error : new StoreError("STORE_UNAVAILABLE");
     }
+  }
+
+  private schemaVersion(): number {
+    return Number(this.db.prepare("PRAGMA user_version").get()!.user_version);
+  }
+
+  /** Called inside the same transaction as the authority-dependent write/read. */
+  private authorization(context: WorkContext): WorkAuthorization {
+    const amendments: OwnerAmendment[] = this.schemaVersion() === 2
+      ? this.db.prepare("SELECT request_json,revision,recorded_at FROM work_amendments WHERE work_id=? ORDER BY rowid").all(context.workId)
+        .map(row => ({ request: JSON.parse(String(row.request_json)) as OwnerAmendmentRequest, revision: String(row.revision), recordedAt: String(row.recorded_at) })) : [];
+    return { revision: amendments.at(-1)?.revision ?? digest(context),
+      allowedEffects: [...new Set([...context.allowedEffects, ...amendments.flatMap(item => item.request.addEffects)])],
+      stoppingPoint: amendments.filter(item => item.request.stoppingPoint !== undefined).at(-1)?.request.stoppingPoint ?? context.stoppingPoint,
+      amendments };
+  }
+
+  /** Records actual Owner authority, never approval manufactured by a stage request. */
+  amendWork(request: OwnerAmendmentRequest): { work: WorkView; created: boolean } {
+    if (!request || typeof request !== "object" || Array.isArray(request)) throw new StoreError("INVALID_INPUT");
+    const accepted = new Set(["workId", "amendmentKey", "expectedAuthorizationRevision", "instructionReference", "constraints", "addEffects", "stoppingPoint"]);
+    if (Object.keys(request).some(key => !accepted.has(key))) throw new StoreError("INVALID_INPUT");
+    for (const field of [request.workId, request.amendmentKey, request.instructionReference, request.constraints]) text(field);
+    if (!/^[a-f0-9]{64}$/.test(request.expectedAuthorizationRevision) || !Array.isArray(request.addEffects) ||
+        request.addEffects.some(effect => !effects.has(effect)) || new Set(request.addEffects).size !== request.addEffects.length) throw new StoreError("INVALID_INPUT");
+    if (request.stoppingPoint !== undefined) text(request.stoppingPoint);
+    const encoded = canonical(request), revision = digest(request);
+    const created = this.transaction(() => {
+      const row = this.db.prepare("SELECT context_json FROM work_items WHERE work_id=?").get(request.workId);
+      if (!row) throw new StoreError("NOT_FOUND");
+      const context = JSON.parse(String(row.context_json)) as WorkContext;
+      const authorization = this.authorization(context);
+      const previous = authorization.amendments.find(item => item.request.amendmentKey === request.amendmentKey);
+      if (previous) {
+        if (canonical(previous.request) !== encoded) throw new StoreError("INPUT_CONFLICT");
+        return false;
+      }
+      if (request.expectedAuthorizationRevision !== authorization.revision) throw new StoreError("AUTHORIZATION_CHANGED");
+      if (request.addEffects.some(effect => authorization.allowedEffects.includes(effect)) ||
+          (!request.addEffects.length && (request.stoppingPoint === undefined || request.stoppingPoint === authorization.stoppingPoint))) throw new StoreError("INVALID_INPUT");
+      // A new grant cannot clear/rebind an uncertain send or alter prepared work.
+      if (this.db.prepare("SELECT 1 FROM operations WHERE work_id=? AND completed_at IS NULL LIMIT 1").get(request.workId)) throw new StoreError("WORK_HAS_PENDING_OPERATIONS");
+      if (this.schemaVersion() === 1) {
+        // Explicit first use only. Older runtimes reject version 2 on startup.
+        this.db.exec(`CREATE TABLE work_amendments (
+          work_id TEXT NOT NULL REFERENCES work_items(work_id), amendment_key TEXT NOT NULL,
+          request_json TEXT NOT NULL, revision TEXT NOT NULL UNIQUE, recorded_at TEXT NOT NULL,
+          PRIMARY KEY(work_id, amendment_key)
+        );
+        ALTER TABLE operations ADD COLUMN authorization_revision TEXT;
+        CREATE TRIGGER amended_work_requires_current_authorization BEFORE INSERT ON operations
+        WHEN json_extract(NEW.action_json,'$.kind') != 'LEGACY'
+          AND EXISTS (SELECT 1 FROM work_amendments WHERE work_id=NEW.work_id)
+          AND NEW.authorization_revision IS NOT (SELECT revision FROM work_amendments WHERE work_id=NEW.work_id ORDER BY rowid DESC LIMIT 1)
+        BEGIN SELECT RAISE(ABORT,'AUTHORIZATION_CHANGED'); END;
+        PRAGMA user_version=2;`);
+      }
+      this.db.prepare("INSERT INTO work_amendments(work_id,amendment_key,request_json,revision,recorded_at) VALUES(?,?,?,?,?)")
+        .run(request.workId, request.amendmentKey, encoded, revision, this.now());
+      return true;
+    });
+    return { work: this.getWork(request.workId), created };
   }
 
   /** The caller must supply the actual Owner instruction, including for resume. */
@@ -200,7 +265,7 @@ export class OperationStore {
     });
   }
 
-  prepareAction(action: ActionInput): { operation: Operation; created: boolean } {
+  prepareAction(action: ActionInput, expectedAuthorizationRevision?: string): { operation: Operation; created: boolean } {
     for (const field of [action.workId, action.actionKey, action.recipientRole, action.command]) text(field);
     if (!kinds.has(action.kind) || !effects.has(action.effect) || !action.input || typeof action.input !== "object" || Array.isArray(action.input)) throw new StoreError("INVALID_INPUT");
     if (action.predecessor !== null) text(action.predecessor);
@@ -214,15 +279,18 @@ export class OperationStore {
       const work = this.db.prepare("SELECT context_json,paused FROM work_items WHERE work_id=?").get(action.workId);
       if (!work) throw new StoreError("NOT_FOUND");
       if (work.paused === 1) throw new StoreError("WORK_PAUSED");
-      if (!(JSON.parse(String(work.context_json)) as WorkContext).allowedEffects.includes(action.effect)) throw new StoreError("EFFECT_NOT_ALLOWED");
+      const authorization = this.authorization(JSON.parse(String(work.context_json)) as WorkContext);
+      if (expectedAuthorizationRevision !== undefined && expectedAuthorizationRevision !== authorization.revision) throw new StoreError("AUTHORIZATION_CHANGED");
+      if (!authorization.allowedEffects.includes(action.effect)) throw new StoreError("EFFECT_NOT_ALLOWED");
       if (action.predecessor) {
         const previous = this.row(action.predecessor);
         if (previous.work_id !== action.workId || !previous.completed_at) throw new StoreError("INPUT_CONFLICT");
       }
       if (this.db.prepare("SELECT operation_id FROM session_claims WHERE participant_key=?").get(key)) throw new StoreError("PARTICIPANT_BUSY");
       const operationId = `op-${randomUUID()}`;
-      this.db.prepare("INSERT INTO operations(operation_id,message_id,work_id,action_key,participant_key,action_json,input_digest,created_at) VALUES(?,?,?,?,?,?,?,?)")
-        .run(operationId, generateMessageId(), action.workId, action.actionKey, key, encoded, inputDigest, this.now());
+      const version2 = this.schemaVersion() === 2;
+      this.db.prepare(`INSERT INTO operations(operation_id,message_id,work_id,action_key,participant_key,action_json,input_digest,created_at${version2 ? ",authorization_revision" : ""}) VALUES(?,?,?,?,?,?,?,?${version2 ? ",?" : ""})`)
+        .run(operationId, generateMessageId(), action.workId, action.actionKey, key, encoded, inputDigest, this.now(), ...(version2 ? [authorization.revision] : []));
       this.options.checkpoint?.("PREPARE_OPERATION_INSERTED");
       this.db.prepare("INSERT INTO session_claims(participant_key,operation_id) VALUES(?,?)").run(key, operationId);
       return { operationId, created: true };
