@@ -8,6 +8,7 @@ import { StoreError, type WorkContext } from "../../src/v2/contracts.js";
 import { RouterError, type RouterConfiguration } from "../../src/v2/routing.js";
 import type { AdapterReply, CommandSubmission, MessageSubmission, OpenCodeCommand, OpenCodeMessage, OpenCodeSession, OpenCodeTarget } from "../../src/v2/opencode-adapter.js";
 import { refreshState, PROGRESS_START, PROGRESS_END } from "../../src/v2/state-projection.js";
+import { readFrozenSource, type SourceSnapshot } from "../../src/v2/context-packet.js";
 
 function reply<T>(value: T): AdapterReply<T> { return { status: 200, bodySha256: "fixture-body-digest", value }; }
 function code(expected: string) { return (error: unknown) => (error instanceof RouterError || error instanceof StoreError) && error.code === expected; }
@@ -85,6 +86,54 @@ function fixture(t: TestContext) {
   const request: SubmitRequest = { workId: work.workId, actionKey: "implement-fixture", recipientRole: "Delivery", command: "/implement", arguments: "Apply the fixture plan" };
   return { root, store, configuration, state, engine, work, request };
 }
+
+test("same-work batch review keeps exact per-Epic excerpts and rejects cross-work or ambiguous routing", async t => {
+  const { engine, store, state, configuration, work, request } = fixture(t);
+  const batchWork = { ...work, workId: "batch-work", scope: "Owner-approved independent Epic A and Epic B" };
+  engine.openWork(batchWork);
+  configuration.targets.fixture!.roles.SecondDelivery = { session: "ses_second_delivery", profile: "second-delivery", capability: "DELIVERY" };
+  const submit = { ...request, workId: batchWork.workId };
+  state.responseText = "Epic A implementation candidate-A";
+  const a = await engine.execute((await engine.prepare({ ...submit, actionKey: "A/implement" })).operation.operationId);
+  state.responseText = "Epic B implementation candidate-B";
+  const b = await engine.execute((await engine.prepare({ ...submit, actionKey: "B/implement", recipientRole: "SecondDelivery" })).operation.operationId);
+  const batchText = "## Epic A\nCandidate: candidate-A\nCloseout disposition: ALLOWED\n\n## Epic B\nCandidate: candidate-B\nCloseout disposition: FIX_REQUIRED\n";
+  state.responseText = batchText;
+  const review = await engine.execute((await engine.prepare({ ...submit, actionKey: "ready-A-B/review", recipientRole: "Meta", command: "step-review",
+    sources: [{ operationId: a.operationId }, { operationId: b.operationId }] })).operation.operationId);
+  assert.equal(review.action.effect, "READ_ONLY");
+  assert.equal(review.outcome?.response?.text, batchText);
+  assert.equal(review.interpretation, null); // Transport does not infer any verdict.
+  const interpretation = { resultDigest: review.resultDigest!, responsibleRole: "Meta", decision: "A: ALLOWED; B: FIX_REQUIRED",
+    evidenceReferences: ["candidate-A", "candidate-B", "## Epic A", "## Epic B"] };
+  store.interpret(review.operationId, interpretation);
+  assert.throws(() => store.interpret(review.operationId, { ...interpretation, decision: "GREEN" }), code("RESULT_CONFLICT"));
+  const respond = { ...submit, command: "step-review-utan", predecessor: review.operationId };
+  const before = state.submissions.length;
+  for (const heading of ["## Missing Epic", "## Epic A\ninvalid"]) {
+    await assert.rejects(engine.prepare({ ...respond, actionKey: "bad/" + heading,
+      sources: [{ operationId: review.operationId, mode: "excerpt", heading }] }));
+  }
+  await assert.rejects(engine.prepare({ ...respond, workId: work.workId, actionKey: "cross-work",
+    sources: [{ operationId: review.operationId, mode: "excerpt", heading: "## Epic A" }] }), code("RESULT_SOURCE_UNAVAILABLE"));
+  assert.equal(state.submissions.length, before);
+  const nextA = await engine.prepare({ ...respond, actionKey: "A/response", sources: [{ operationId: review.operationId, mode: "excerpt", heading: "## Epic A" }] });
+  const nextB = await engine.prepare({ ...respond, actionKey: "B/response", recipientRole: "SecondDelivery",
+    sources: [{ operationId: review.operationId, mode: "excerpt", heading: "## Epic B" }] });
+  assert.match(String(nextA.operation.action.input.arguments), /candidate-A/);
+  assert.doesNotMatch(String(nextA.operation.action.input.arguments), /candidate-B/);
+  assert.match(String(nextB.operation.action.input.arguments), /candidate-B/);
+  assert.doesNotMatch(String(nextB.operation.action.input.arguments), /candidate-A/);
+  const source = (nextA.operation.action.input.sources as unknown as SourceSnapshot[])[0]!;
+  assert.equal(source.sha256, review.resultDigest);
+  assert.equal(readFrozenSource(store, { workId: batchWork.workId, sourceId: source.sourceId }).content, batchText);
+  assert.equal((await engine.prepare({ ...respond, actionKey: "A/response", sources: [{ operationId: review.operationId, mode: "excerpt", heading: "## Epic A" }] })).created, false);
+  store.recordOwnerPause(batchWork.workId, true, "Owner pauses the shared work, not only A");
+  await assert.rejects(engine.execute(nextA.operation.operationId), code("WORK_PAUSED"));
+  await assert.rejects(engine.execute(nextB.operation.operationId), code("WORK_PAUSED"));
+  assert.equal(state.submissions.length, before);
+  assert.equal(store.getOperation(review.operationId).interpretation?.decision, interpretation.decision);
+});
 
 test("enrolled progress refresh does not invalidate a prepared state source, but Owner edits do", { skip: process.platform !== "win32" }, async t => {
   const { root, store, configuration, engine, work, request } = fixture(t);
