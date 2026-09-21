@@ -60,12 +60,53 @@ role's interpretation, then choose the next retained stage. The CLI returns
 a `sources` result reference carries the actual prior output without manual copying.
 
 Use new action keys for genuine later stages and repair cycles in the same work.
+For independent Epics authorized together, use the adopted Canon's
+`canon/PARALLELISM-AND-COORDINATION.md#parallel-command-flow`: retain distinct
+work/action/result references, dispatch ready idle participants before a long
+wait, and observe each pending operation with bounded waits/backoff. Queue shared
+Meta/session and governance use; no global cohort barrier or new router scheduler.
+Each review verdict still binds one frozen Epic candidate. File/worktree isolation
+and accepted project gates remain separate from participant exclusion.
+
 Several substantive repair cycles are allowed when evidence shows progress.
 Unchanged retries retrieve the existing action; changing an uncertain action's key
 to repeat the work defeats recovery and is not permitted. Repeated lack of progress
 calls for a scoped decision, not a hard two-cycle cap or invented findings.
 
 ## Read the evidence before progressing
+
+### Optional same-work review batch
+
+Use only when one existing Owner-authorized work already covers the ready Epics,
+same target/directory, one independent Meta and compatible review budget. The
+router does not parse Epic membership or per-Epic permission: the orchestrator
+and Meta must check the named roster, candidates, sources and stopping points.
+Work pause/effects are work-wide; batching does not create independent machine
+pause controls. A scope amendment cannot turn unrelated work into a batch.
+
+Submit one read-only `/step-review` with all member inputs as same-work source
+references. Follow adopted Canon `canon/NATIVE-REVIEW-ORCHESTRATION.md#optional-batch-review`.
+After completion, verify each full synthesis under a unique heading such as
+`## Epic E17`. Each Delivery response uses the original batch operation as its
+same-work predecessor/source, selecting only its complete block, for example:
+
+```json
+{"operationId":"<completed-batch-operation>","mode":"excerpt","heading":"## Epic E17"}
+```
+
+The full original result/digest stays retained. The excerpt is not a new result
+or fabricated operation. One immutable `interpret` record covers the batch:
+enumerate per-Epic outcomes and exact evidence references, including unresolved
+members, never aggregate GREEN. Do not repeatedly interpret the same operation
+for different members. Clarification has its own operation/result; it cannot
+rewrite a completed peer or the original interpretation.
+
+Different work IDs or directory/authority boundaries use separate reviews.
+`sources.operationId` and `predecessor` are same-work only; never bridge using
+`import-legacy`, copied fabricated results or scope widening. No whole-batch
+retry for a missing block. Completed independent members may proceed while the
+missing member is clarified, subject to their actual scope/pause/shared gates.
+This protocol reuses V2 addressing/selection; it adds no runtime scheduler.
 
 Delivery, execution and interpretation are separate. `DELIVERED` survives unusual
 text. `COMPLETED` says execution ended; `outputAvailable: false` is not a green
