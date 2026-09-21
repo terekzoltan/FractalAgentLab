@@ -1,5 +1,37 @@
 # Router V2: Owner amendment and preparation diagnostics candidate
 
+## Publication update - 2026-09-21
+
+Owner now authorizes publication of the two retained FAL commits and bounded
+updates if stale. The original September 15 envelope and validation below are
+historical, not a current prohibition on this publication. Shared runtime
+activation, live `amend-work`, store migration and lifecycle sends are separate
+and were not performed by this publication task.
+
+Revalidated the combined source at `d62379a` (including the already published
+parallel/batch-review documentation and regression) in an isolated worktree:
+
+- clean build and full runtime tests: **184/184 PASS**, zero skipped;
+- Windows facade fixtures: **11 groups PASS**, zero real-server calls or global changes;
+- current AWC orchestrator source contains the bounded `amend-work` consumer and
+  its installed skill bytes match; no additional skill deployment was needed;
+- no runtime code correction was required. This documentation update distinguishes
+  the old candidate envelope from current publication and pending activation.
+
+Publication preserves the original commit identities `5c95259` and `bd7b093` and
+the separately published batch-review fix `c72552a`. No force push, history
+rewrite, production rebuild or database access is needed to publish them.
+The old 183-test/18-agent inventory below records the original run, not today's
+inventory; no reviewer aliases or retired profiles are reintroduced.
+
+Before actual first use, follow the coordinated activation section below:
+compatible clients, coherent backup and no pending operation in the amended work.
+An amendment can add a real later Owner effect/stop decision; it cannot change
+target, directory or scope, resolve uncertain delivery, or fix an isolated
+worktree `TARGET_DIRECTORY_MISMATCH`. A source push is not proof of activation.
+
+## Original candidate handoff - 2026-09-15
+
 Date: 2026-09-15. Status: reviewable, offline-validated local candidate.
 Publication envelope: local feature commits only. Integration, push, shared
 installation, live store amendment and lifecycle dispatch remain coordinator-owned
