@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import type { Effect, Participant } from "./contracts.js";
 
 export type Capability = "DELIVERY" | "META" | "SUPPORT" | "ORCHESTRATOR";
@@ -13,6 +14,25 @@ export interface RoleBinding {
   model?: string;
   variant?: string;
   contextLimit?: number;
+  /** Owner-enrolled persistent session home, distinct from this target worktree. */
+  sessionHome?: { directory: string; instructionReference: string };
+}
+
+export function sessionDirectory(target: TargetBinding, role: RoleBinding): string {
+  if (!role.sessionHome) return target.directory;
+  const home = role.sessionHome;
+  if (!path.isAbsolute(home.directory) || !home.instructionReference?.trim()) throw new RouterError("SESSION_HOME_NOT_ENROLLED");
+  if (sameDirectory(home.directory, target.directory)) return home.directory;
+  // Verify actual Git worktree membership, not path-prefix/name resemblance.
+  const common = (directory: string) => {
+    try {
+      const root = execFileSync("git", ["-C", directory, "rev-parse", "--show-toplevel"], { encoding: "utf8", windowsHide: true, timeout: 5000, stdio: ["ignore", "pipe", "pipe"] }).trim();
+      if (!sameDirectory(realpathSync(directory), realpathSync(root))) throw new Error("not root");
+      return realpathSync(execFileSync("git", ["-C", directory, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8", windowsHide: true, timeout: 5000, stdio: ["ignore", "pipe", "pipe"] }).trim());
+    } catch { throw new RouterError("SESSION_WORKTREE_RELATION_UNVERIFIED"); }
+  };
+  if (!sameDirectory(common(home.directory), common(target.directory))) throw new RouterError("SESSION_WORKTREE_REPOSITORY_MISMATCH");
+  return home.directory;
 }
 export interface TargetBinding {
   namespace: string;

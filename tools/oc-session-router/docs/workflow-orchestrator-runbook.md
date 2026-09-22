@@ -153,6 +153,19 @@ project enrollment, forced compact or restore is introduced by this recovery.
 
 ## Observe and maintain lane continuity
 
+If the Owner manually continued an interrupted lane, do not regenerate its work
+or disguise the new user root as native continuation. Check the actual candidate,
+scope and required findings; with explicit Owner adoption authority, use
+`adopt-manual-continuation` as specified in the interface reference. Its retained
+artifact supports normal read-result/interpret/predecessor use. Missing remote
+original root remains explicit durable-only provenance, not fabricated correlation.
+
+Reuse persistent sessions by default. For a different execution worktree use the
+private configuration's explicit `sessionHome` enrollment, never a guessed alias
+or new session without Owner agreement. Source reads and lane tool cwd must follow
+the execution worktree, not prior session context. Shared claims serialize the same
+participant across worktrees. This does not change product scope or stopping points.
+
 The runtime attempts advisory status/context observation before new lane work,
 after result handling and during waits with backoff. The orchestrator remains
 responsible for inspecting freshness and deciding whether maintenance is useful.

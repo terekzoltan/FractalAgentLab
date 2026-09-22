@@ -51,6 +51,26 @@ This example is entirely synthetic and must be replaced with verified bindings:
 
 ## Meaning of the binding
 
+### Persistent sessions across worktrees
+
+Default to reusing existing lane/Meta sessions; do not create a session per Epic
+without an explicit Owner decision. `target.directory` stays the exact execution
+worktree. An operator may explicitly enroll a role's different existing home:
+`"sessionHome":{"directory":"C:/projects/example","instructionReference":"owner-approved-reuse"}`.
+Both must be actual roots in the same Git common repository; same names, sibling
+paths and matching titles are insufficient. Keep the same namespace/project/session
+tuple so aliases share one exclusion claim. Independent author and Meta still differ.
+
+OpenCode session GETs/commands/compact use sessionHome; frozen files and execution
+instructions use target.directory. Every addressed work/restore packet names that
+distinction and requires explicit tool cwd/absolute paths, current target AGENTS
+and no branch-switch in the session home. This is personal-workflow coordination,
+not an OS filesystem sandbox: the model/tool retains home access. Freeze and
+recheck addressing before send; changed enrollment cannot retarget prepared work.
+Historical reads use frozen addressing without creating new send authority.
+Existing configurations need no migration. Work envelopes and A4-G-style dedicated
+sessions remain valid; never silently replace active mappings.
+
 ### Optional observed-progress enrollment
 
 Only an actual Owner-approved operator enrollment may add this target field:

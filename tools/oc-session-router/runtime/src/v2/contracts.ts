@@ -76,6 +76,8 @@ export interface TerminalOutcome {
   response?: { messageId: string; rootMessageId?: string; parentMessageId?: string; text: string };
   /** Historical accepted artifact; never fabricated as an OpenCode message. */
   artifact?: { text: string; sha256: string };
+  /** Explicit manual adoption, never fabricated as native command correlation. */
+  manualRecovery?: { [key: string]: Json };
   reason?: string;
 }
 

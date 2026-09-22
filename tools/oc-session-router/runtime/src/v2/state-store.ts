@@ -364,7 +364,7 @@ export class OperationStore {
     return this.getOperation(operationId);
   }
 
-  finish(operationId: string, outcome: TerminalOutcome): Operation {
+  finish(operationId: string, outcome: TerminalOutcome, expectedOperationDigest?: string): Operation {
     if (!["COMPLETED", "FAILED"].includes(outcome.execution) || !Array.isArray(outcome.evidenceReferences) || !outcome.evidenceReferences.length) throw new StoreError("INVALID_INPUT");
     outcome.evidenceReferences.forEach(text);
     if (outcome.response) {
@@ -381,6 +381,7 @@ export class OperationStore {
         if (row.result_digest !== resultDigest) throw new StoreError("RESULT_CONFLICT");
         return false;
       }
+      if (expectedOperationDigest && digest(this.getOperation(operationId)) !== expectedOperationDigest) throw new StoreError("RESULT_CONFLICT");
       const correlation = JSON.parse(String(row.correlation_json)) as Correlation;
       if (outcome.response) {
         if ((correlation.responseMessageId && correlation.responseMessageId !== outcome.response.messageId) ||

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
+import { execFileSync } from "node:child_process";
 import { RouterEngine, type Adapter, type AdapterFactory, type SubmitRequest } from "../../src/v2/engine.js";
 import { OperationStore } from "../../src/v2/state-store.js";
 import { StoreError, type WorkContext } from "../../src/v2/contracts.js";
@@ -70,7 +71,7 @@ function fixture(t: TestContext) {
         const found = state.history.find(message => message.id === id);
         return found ? reply(found) : { status: 404, bodySha256: "fixture-missing", problem: "HTTP_ERROR" };
       },
-      getHistory: async () => { state.historyReads += 1; return reply({ messages: state.history }); },
+      getHistory: async options => { state.historyReads += 1; return reply({ messages: state.history.slice(-options.limit) }); },
       submitCommand: async submission => submitted(submission),
       submitMessage: async submission => submitted(submission),
       summarize: async () => { throw new Error("Unexpected summarize path"); },
@@ -86,6 +87,60 @@ function fixture(t: TestContext) {
   const request: SubmitRequest = { workId: work.workId, actionKey: "implement-fixture", recipientRole: "Delivery", command: "/implement", arguments: "Apply the fixture plan" };
   return { root, store, configuration, state, engine, work, request };
 }
+
+test("persistent lane uses enrolled same-repository worktree while transport and exclusion stay at session home", async t => {
+  const { root, store, configuration, state, engine, work, request } = fixture(t);
+  const git = (...args: string[]) => execFileSync("git", ["-C", root, ...args], { stdio: "pipe", windowsHide: true });
+  git("init"); git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-m", "fixture");
+  const isolated = path.join(root, "isolated");
+  git("worktree", "add", "-b", "fixture-worktree", isolated);
+  const sharedRole = { ...configuration.targets.fixture!.roles.Delivery!, sessionHome: { directory: root, instructionReference: "Owner enrolled worktree reuse" } };
+  configuration.targets.isolated = { ...configuration.targets.fixture!, directory: isolated, roles: { Delivery: sharedRole } };
+  engine.openWork({ ...work, target: "isolated", directory: isolated, workId: "isolated" });
+  writeFileSync(path.join(isolated, "plan.md"), "worktree-specific plan");
+  const prepared = await engine.prepare({ ...request, workId: "isolated", sources: [{ path: "plan.md" }] });
+  assert.equal((prepared.operation.action.input.address as { directory: string }).directory, root);
+  assert.equal(prepared.operation.action.input.executionDirectory, isolated);
+  assert.match(String(prepared.operation.action.input.arguments), /Execution worktree:/);
+  assert.ok(String(prepared.operation.action.input.arguments).includes(isolated));
+  assert.match(String(prepared.operation.action.input.arguments), /worktree-specific plan/);
+  await assert.rejects(engine.prepare(request), code("PARTICIPANT_BUSY"));
+  const completed = await engine.execute(prepared.operation.operationId);
+  assert.equal(completed.outcome?.execution, "COMPLETED");
+  assert.equal(state.submissions[0]!.target.directory, root);
+  state.returnUnavailable = true;
+  const lost = await engine.execute((await engine.prepare({ ...request, workId: "isolated", actionKey: "lost-response" })).operation.operationId);
+  state.history = [
+    { id: lost.messageId, session: sharedRole.session, role: "user", text: "fixture", hasCompactionPart: false, timeCreated: 1 },
+    { id: "msg_recovered_home", session: sharedRole.session, role: "assistant", parentId: lost.messageId, text: "recovered worktree result", hasCompactionPart: false, timeCreated: 2, timeCompleted: 3, finish: "stop" },
+  ];
+  assert.equal((await engine.reconcile(lost.operationId)).operation.outcome?.execution, "COMPLETED");
+  state.returnUnavailable = false;
+  const restore = await engine.prepare({ workId: "isolated", actionKey: "restore", recipientRole: "Delivery", kind: "RESTORE" });
+  assert.ok(String(restore.operation.action.input.arguments).includes(isolated));
+  assert.equal((await engine.execute(restore.operation.operationId)).outcome?.execution, "COMPLETED");
+  const compact = await engine.prepareCompact({ workId: "isolated", actionKey: "compact", recipientRole: "Delivery", model: { providerID: "fixture", modelID: "fixture" } });
+  assert.equal((compact.operation!.action.input.address as { directory: string }).directory, root);
+  assert.equal(compact.operation!.action.input.executionDirectory, isolated);
+  store.abandonPrepared(compact.operation!.operationId, "NO_SEND_FIXTURE_COMPLETE");
+  // Frozen home identity cannot silently change between prepare and execute.
+  const pending = await engine.prepare({ ...request, workId: "isolated", actionKey: "next" });
+  delete configuration.targets.isolated!.roles.Delivery!.sessionHome;
+  await assert.rejects(engine.execute(pending.operation.operationId), code("PARTICIPANT_BINDING_CHANGED"));
+  assert.equal(store.getOperation(pending.operation.operationId).dispatchStartedAt, null);
+});
+
+test("session-home enrollment rejects unrelated repositories and missing authority", async t => {
+  const { root, configuration, engine, request } = fixture(t);
+  const role = configuration.targets.fixture!.roles.Delivery!;
+  role.sessionHome = { directory: root, instructionReference: "" };
+  await assert.rejects(engine.prepare(request), code("SESSION_HOME_NOT_ENROLLED"));
+  const unrelated = mkdtempSync(path.join(process.cwd(), ".unrelated-git-"));
+  t.after(() => rmSync(unrelated, { recursive: true, force: true }));
+  for (const directory of [root, unrelated]) execFileSync("git", ["-C", directory, "init"], { stdio: "pipe", windowsHide: true });
+  role.sessionHome = { directory: unrelated, instructionReference: "Owner" };
+  await assert.rejects(engine.prepare(request), code("SESSION_WORKTREE_REPOSITORY_MISMATCH"));
+});
 
 test("same-work batch review keeps exact per-Epic excerpts and rejects cross-work or ambiguous routing", async t => {
   const { engine, store, state, configuration, work, request } = fixture(t);

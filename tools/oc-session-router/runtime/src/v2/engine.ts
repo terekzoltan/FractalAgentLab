@@ -3,7 +3,8 @@ import { digest, participantKey, StoreError, text } from "./contracts.js";
 import { OpenCodeAdapter, type Acknowledgement, type AdapterOptions, type AdapterReply, type OpenCodeCredentials, type OpenCodeMessage, type OpenCodeTarget } from "./opencode-adapter.js";
 import { isTerminalMessage, outcomeForMessage, reconcileOperation } from "./reconcile.js";
 import { OperationStore } from "./state-store.js";
-import { commandRule, readContainedSource, resolveRole, RouterError, sameDirectory, type RouterConfiguration } from "./routing.js";
+import { commandRule, readContainedSource, resolveRole, RouterError, sameDirectory, sessionDirectory, type RouterConfiguration } from "./routing.js";
+import { adoptManualContinuation, type ManualContinuationRequest } from "./manual-continuation.js";
 import { observeSession, continuitySummary, type SessionObservationOptions } from "./session-observation.js";
 import { alreadyCompacted, captureCompactBaseline, observeCompactCompletion, type CompactBaseline } from "./session-maintenance.js";
 import { reconcileLegacyOperation } from "./legacy-import.js";
@@ -64,7 +65,7 @@ export class RouterEngine {
 
   async observe(workId: string, roleName: string, budgetMs?: number) {
     const work = this.store.getWork(workId);
-    const { adapter, role, target } = this.binding(work.context, roleName, budgetMs);
+    const { adapter, role, home } = this.binding(work.context, roleName, budgetMs);
     const options: SessionObservationOptions = { criticalRatio: this.configuration.compactThresholdRatio ?? 0.60 };
     if (role.model) {
       const slash = role.model.indexOf("/");
@@ -73,7 +74,7 @@ export class RouterEngine {
         if (role.contextLimit) options.modelOverride = { ...options.model, contextLimit: role.contextLimit };
       }
     }
-    const snapshot = await observeSession(adapter, { session: role.session, directory: target.directory }, options);
+    const snapshot = await observeSession(adapter, { session: role.session, directory: home }, options);
     const { nextCursor, ...coverage } = snapshot.history;
     const visible = { ...snapshot, history: { ...coverage, hasMore: nextCursor !== undefined }, continuity: continuitySummary(snapshot) };
     this.store.recordSessionObservation(workId, roleName, visible as unknown as Record<string, Json>);
@@ -104,11 +105,11 @@ export class RouterEngine {
     }
     if (work.paused) throw new StoreError("WORK_PAUSED");
     phase?.("PARTICIPANT_BINDING");
-    const { role, target, participant, adapter } = this.binding(work.context, request.recipientRole);
+    const { role, target, participant, adapter, home } = this.binding(work.context, request.recipientRole);
     if (role.capability === "ORCHESTRATOR") throw new RouterError("ORCHESTRATOR_COMPACT_IS_MANUAL");
     if (!work.authorization.allowedEffects.includes("SESSION_MAINTENANCE")) throw new StoreError("EFFECT_NOT_ALLOWED");
     phase?.("PARTICIPANT_VERIFICATION");
-    await this.verifyParticipant(adapter, work.context.directory, target.project, role.session, true);
+    await this.verifyParticipant(adapter, home, target.project, role.session, true);
     // Observe after freezing the head: a native compact either becomes visible
     // here or changes the head checked immediately before submission.
     phase?.("COMPACT_BASELINE");
@@ -123,7 +124,7 @@ export class RouterEngine {
     const prepared = this.store.prepareAction({
       workId: request.workId, actionKey: request.actionKey, participant, recipientRole: request.recipientRole,
       kind: "COMPACT", effect: "SESSION_MAINTENANCE", command: "compact", predecessor: normalized.predecessor,
-      input: { requestDigest, address: { origin: target.origin, directory: target.directory, session: role.session },
+      input: { requestDigest, executionDirectory: work.context.directory, address: { origin: target.origin, directory: home, session: role.session },
         profile: role.profile, sources: [], compactBaseline: baseline as unknown as Json,
         summarize: { providerID: model.providerID, modelID: model.modelID, auto: false } },
     }, work.authorization.revision);
@@ -133,9 +134,10 @@ export class RouterEngine {
   private binding(work: WorkContext, roleName: string, getBudgetMs?: number) {
     const resolved = resolveRole(this.configuration, work.target, roleName);
     if (!sameDirectory(resolved.target.directory, work.directory)) throw new RouterError("TARGET_DIRECTORY_MISMATCH");
-    const adapter = this.adapterFactory({ origin: resolved.target.origin, directory: resolved.target.directory, session: resolved.role.session }, this.credentials,
+    const home = sessionDirectory(resolved.target, resolved.role);
+    const adapter = this.adapterFactory({ origin: resolved.target.origin, directory: home, session: resolved.role.session }, this.credentials,
       getBudgetMs === undefined ? undefined : { getBudgetMs });
-    return { ...resolved, adapter };
+    return { ...resolved, adapter, home };
   }
 
   private async verifyParticipant(adapter: Adapter, directory: string, project: string, sessionId: string, requireIdle: boolean): Promise<void> {
@@ -173,12 +175,12 @@ export class RouterEngine {
     }
     if (work.paused) throw new StoreError("WORK_PAUSED");
     phase?.("PARTICIPANT_BINDING");
-    const { role, target, participant, adapter } = this.binding(work.context, request.recipientRole);
+    const { role, target, participant, adapter, home } = this.binding(work.context, request.recipientRole);
     const effect: Effect = kind === "LIFECYCLE" ? commandRule(command, role, target) : kind === "RESTORE" ? "SESSION_MAINTENANCE" : "READ_ONLY";
     if (!work.authorization.allowedEffects.includes(effect)) throw new StoreError("EFFECT_NOT_ALLOWED");
     if (!["LIFECYCLE", "CLARIFICATION", "RESTORE"].includes(kind)) throw new RouterError("ACTION_KIND_UNSUPPORTED");
     phase?.("PARTICIPANT_VERIFICATION");
-    await this.verifyParticipant(adapter, work.context.directory, target.project, role.session, true);
+    await this.verifyParticipant(adapter, home, target.project, role.session, true);
     await this.observeOptional(request.workId, request.recipientRole);
     phase?.("SOURCE_PACKET");
     const projectionPath = target.stateProjection?.instructionReference?.trim() && /(^|[\\/])PROJECT_STATE\.md$/.test(target.stateProjection.path) ? target.stateProjection.path : undefined;
@@ -194,10 +196,14 @@ export class RouterEngine {
       argument = `Clarify the existing work only. Do not implement again, change acceptance, commit, or expand scope.\nOwner scope: ${work.context.scope}\nQuestion: ${argument}`;
     }
     argument += authorizationContext(work);
+    if (!sameDirectory(home, work.context.directory)) {
+      argument += `\n\nExecution worktree: ${work.context.directory}\nSession home: ${home} (transport only, NOT the execution directory).\nRead AGENTS.md, project authority and all files from the execution worktree. Use absolute paths or explicit cwd for every tool/Git command. Never switch branches in the session home. Prior session context from other work is not authority for this work.\nOwner scope: ${work.context.scope}\nStopping point: ${work.authorization.stoppingPoint}`;
+    }
     argument += renderSources(request.workId, sources, this.store.databasePath);
     const input: ActionInput["input"] = {
       requestDigest, arguments: argument, sources: sources as unknown as Json,
-      address: { origin: target.origin, directory: target.directory, session: role.session },
+      executionDirectory: work.context.directory,
+      address: { origin: target.origin, directory: home, session: role.session },
       profile: role.profile, packet: packetSummary(argument, sources) as unknown as Json,
     };
     for (const key of ["agent", "model", "variant"] as const) if (role[key]) input[key] = role[key]!;
@@ -226,6 +232,8 @@ export class RouterEngine {
     try {
       const configured = this.binding(work, operation.action.recipientRole);
       if (participantKey(configured.participant) !== operation.participantKey) throw new RouterError("PARTICIPANT_BINDING_CHANGED");
+      const frozen = operation.action.input.address as unknown as OpenCodeTarget;
+      if (!sameDirectory(frozen.directory, configured.home)) throw new RouterError("PARTICIPANT_BINDING_CHANGED");
       if (sending && operation.action.kind === "LIFECYCLE" && commandRule(operation.action.command, configured.role, configured.target) !== operation.action.effect) {
         throw new RouterError("COMMAND_EFFECT_CHANGED");
       }
@@ -234,7 +242,7 @@ export class RouterEngine {
       if (sending) throw error;
       // Historical reads may use the frozen address; no new send authority follows.
       const address = operation.action.input.address as unknown as OpenCodeTarget;
-      if (!address || !sameDirectory(address.directory, work.directory) || address.session !== operation.action.participant.session) throw new RouterError("RECOVERY_ADDRESS_UNAVAILABLE");
+      if (!address || !sameDirectory(String(operation.action.input.executionDirectory ?? address.directory), work.directory) || address.session !== operation.action.participant.session) throw new RouterError("RECOVERY_ADDRESS_UNAVAILABLE");
       return this.adapterFactory(address, this.credentials);
     }
   }
@@ -261,7 +269,7 @@ export class RouterEngine {
     const work = this.store.getWork(operation.action.workId);
     if (work.paused) throw new StoreError("WORK_PAUSED");
     const adapter = this.adapterForOperation(operation, true);
-    await this.verifyParticipant(adapter, work.context.directory, operation.action.participant.project, operation.action.participant.session, true);
+    await this.verifyParticipant(adapter, (operation.action.input.address as unknown as OpenCodeTarget).directory, operation.action.participant.project, operation.action.participant.session, true);
     for (const source of operation.action.input.sources as unknown as SourceSnapshot[]) {
       if (source.sourceClass === "FILE") {
         const current = readContainedSource(work.context.directory, source.reference);
@@ -353,13 +361,17 @@ export class RouterEngine {
     return reconcileOperation(this.store, operationId, adapter);
   }
 
+  async adoptManual(request: ManualContinuationRequest) {
+    const operation = this.store.getOperation(request.operationId);
+    return adoptManualContinuation(this.store, request, this.adapterForOperation(operation, false));
+  }
+
   private async reconcileCompact(operationId: string, adapter: Adapter) {
     const operation = this.store.getOperation(operationId);
     if (operation.completedAt) return { operation, disposition: "STORED" };
-    const work = this.store.getWork(operation.action.workId);
     const model = operation.action.input.summarize as unknown as { providerID: string; modelID: string };
     const result = await observeCompactCompletion(adapter, operation.action.input.compactBaseline as unknown as CompactBaseline,
-      { session: operation.action.participant.session, directory: work.context.directory, providerID: model.providerID, modelID: model.modelID });
+      { session: operation.action.participant.session, directory: (operation.action.input.address as unknown as OpenCodeTarget).directory, providerID: model.providerID, modelID: model.modelID });
     const latest = this.store.getOperation(operationId);
     if (latest.completedAt) return { operation: latest, disposition: "STORED" };
     this.store.observe(operationId, { observedAt: new Date().toISOString(), activity: result.activity,

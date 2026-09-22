@@ -348,3 +348,39 @@ restoring a snapshot that discards amendments or sends is unsupported.
 See the [operating runbook](workflow-orchestrator-runbook.md) and
 [versioned installer](../../workflow-tooling/README.md). Source, installed bytes,
 loaded behavior, qualification and project resumption remain distinct.
+# Explicit manual continuation adoption
+
+`adopt-manual-continuation -RequestPath <private.json>` performs GET verification
+and one local immutable result write. It sends nothing, does not refresh project
+files, lift pause, change scope or accept a plan. It only supports an existing
+DELIVERED, pending lifecycle/clarification/restore operation. Never use it for
+POSSIBLE delivery, arbitrary imported prose, or replacing an existing result.
+
+The private request contains `operationId`, `expectedInputDigest`,
+`manualRootMessageId`, `manualRootTextSha256`, `terminalMessageId`,
+`terminalTextSha256`, `instructionReference`, and `intentVerificationReference`.
+Text hashes are SHA-256 of exact UTF-8 visible text, not JSON-encoded text. Resolve
+IDs from bounded live GETs, never names/time proximity. Keep IDs/text private.
+Use `inspect -OperationId` for the original immutable `inputDigest`; no database
+query or copied old stage packet is needed to build the request.
+The Owner instruction authorizes adopting this manual continuation; the intent
+reference records the responsible check of original scope, candidate, required
+findings and intended action. The program proves addressing/provenance, not meaning.
+
+Verification requires idle exact participant, stable bounded contiguous history,
+one successful direct terminal child of the specified manual root, matching text
+hashes and unchanged original operation. Competing successful original results,
+later manual requests, competing terminals, incomplete paging or changing history
+remain explicit conflicts. A missing remote original root is supported only on
+404 with complete bounded history and prior durable delivery acknowledgement;
+the result explicitly records `DURABLE_ACKNOWLEDGEMENT_REMOTE_ROOT_NOT_FOUND`.
+Network failure is not 404 evidence. No delivery fact is inferred or rewritten.
+
+The retained result is a recovered artifact with `MANUAL_CONTINUATION_ADOPTED`
+and immutable manual provenance. Original message/input/correlation and the prior
+observation remain intact. Repeating the exact request returns the stored result;
+a different adoption cannot overwrite it. Existing read-result, interpret and
+same-work predecessor/source references then work normally. Review and product
+acceptance still belong to the responsible roles. Limits: at most 1,000 messages,
+direct manual child only, no automatic adoption or resend. An unresolved ambiguity
+requires a scoped decision, never direct SQLite edits.

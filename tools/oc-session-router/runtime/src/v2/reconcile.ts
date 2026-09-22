@@ -115,7 +115,8 @@ export async function reconcileOperation(
   const session = await read(() => adapter.getSession());
   if (!good(session)) return observed("SESSION_READ_UNAVAILABLE");
   const work = store.getWork(operation.action.workId);
-  if (session.value.id !== operation.action.participant.session || session.value.projectID !== operation.action.participant.project || !sameDirectory(session.value.directory, work.context.directory)) return observed("SESSION_ADDRESS_CONFLICT");
+  const address = operation.action.input.address as { directory?: string } | undefined;
+  if (session.value.id !== operation.action.participant.session || session.value.projectID !== operation.action.participant.project || !sameDirectory(session.value.directory, address?.directory ?? work.context.directory)) return observed("SESSION_ADDRESS_CONFLICT");
   const status = await read(() => adapter.getStatus());
   if (good(status)) activity = status.value;
 

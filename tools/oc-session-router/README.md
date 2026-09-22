@@ -40,6 +40,12 @@ state, raw IDs and task results outside Git.
 
 ## What the router establishes
 
+Explicit `adopt-manual-continuation` recovers an Owner-designated manual result
+without resend or rewriting the original correlation. See the interface reference.
+Optional per-role `sessionHome` enrollment reuses persistent sessions for another
+verified worktree of the same repository; target.directory remains execution scope.
+Neither feature grants product acceptance, new scope or automatic progression.
+
 | Fact | Meaning |
 |---|---|
 | Delivery | `NOT_SENT`, `POSSIBLE` or attributable `DELIVERED` |
