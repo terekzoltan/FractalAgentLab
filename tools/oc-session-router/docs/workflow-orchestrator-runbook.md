@@ -85,6 +85,17 @@ calls for a scoped decision, not a hard two-cycle cap or invented findings.
 
 ## Read the evidence before progressing
 
+For separately authorized post-closeout publication/integration, use the target's
+adopted Canon `canon/GIT-DELIVERY-AND-INTEGRATION.md`. The existing orchestrator
+coordinates branch push, PR, current CI/composition verification, merge and target
+checks within one exact Owner envelope. The router still records local lifecycle
+and session effects only; do not invent PUSH/MERGE effects or lifecycle commands.
+Remote Git/provider calls belong to an explicitly authorized executor, not a
+direct OpenCode-send bypass. Keep local acceptance/closeout and publication facts
+separate. An uncertain remote outcome is queried before retry; no closeout replay
+or replacement work to recover a push/PR/merge. Branch policy and PR references
+live in existing project handoffs, not a second router scheduler/store.
+
 ### Optional same-work review batch
 
 Use only when one existing Owner-authorized work already covers the ready Epics,
