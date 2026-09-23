@@ -15,6 +15,13 @@ Load `tools/oc-session-router/docs/workflow-orchestrator-runbook.md` only for
 router mechanics. Basic role/status reads remain available while work is paused
 or blocked; successful hydration grants no execution permission.
 
+For new independently integrable FAL changes, adopt the Canon's
+`canon/GIT-DELIVERY-AND-INTEGRATION.md`: short-lived branch + PR to verified `main`,
+authorized worktree isolation for concurrent writers, and one named integration
+owner. Existing maintenance tooling/operators may execute only their explicit
+publication envelope. This grants no push/merge, session interruption or product
+dispatch; local closeout and remote integration remain separately evidenced.
+
 The relative Canon locator is portable for the saved repositories. In isolated
 worktrees, use the coordinator's explicitly supplied combined Canon candidate
 root for read-only hydration and validation. Verify the selected source root;
