@@ -11,7 +11,12 @@ context. Error/aborted placeholders are not usage observations. Successful calls
 without usage do not cause fallback to an older token-rich call; zero-only usage
 remains unconfirmed, not evidence of empty context. Summary-call usage is stale
 pre-compaction evidence, not a new compact trigger.
-The default compact threshold is 60% of usable input budget. The orchestrator
+The default compact threshold is the earlier of 60% of usable input budget or
+225,000 last-call tokens (`compactThresholdRatio` / `compactTokenCap` overrides).
+`compactThresholdTokens` and `thresholdBasis` expose the effective threshold.
+Unknown budget permits cap-based advice with reliable usage, not a guessed ratio.
+Pending operations are reconciled first; busy sessions are never interrupted.
+The orchestrator
 checks advice before new work and runs existing compact -> restore when warranted.
 Advice does not grant maintenance authority or send a successor.
 

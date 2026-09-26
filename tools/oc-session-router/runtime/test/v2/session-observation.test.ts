@@ -186,7 +186,7 @@ test("matching override is explicit and a mismatched override cannot replace act
   assert.ok(mismatch.limitations.includes("MODEL_LIMIT_OVERRIDE_MISMATCH"));
   reader.model = unavailable();
   const absent = await observeSession(reader, expected, { modelOverride: { providerID: "different", modelID: "model", contextLimit: 1000000 } });
-  assert.equal(absent.pressure.state, "unknown");
+  assert.equal(absent.pressure.state, "critical");
   assert.equal(absent.model?.contextLimit, undefined);
 });
 
@@ -196,7 +196,7 @@ test("missing optional catalog and history remain unavailable telemetry without 
   const withoutCatalog = await observeSession(reader, expected);
   assert.equal(withoutCatalog.identity.verified, true);
   assert.equal(withoutCatalog.pressure.bestAvailableTokens, 280000);
-  assert.equal(withoutCatalog.pressure.state, "unknown");
+  assert.equal(withoutCatalog.pressure.state, "critical");
   assert.ok(withoutCatalog.limitations.includes("CONTEXT_LIMIT_UNAVAILABLE"));
   reader.pages.set("newest", unavailable());
   const withoutHistory = await observeSession(reader, expected);
@@ -238,7 +238,7 @@ test("catalog identity mismatch and unknown status remain visibly unavailable", 
   reader.status = unavailable();
   const snapshot = await observeSession(reader, expected);
   assert.equal(snapshot.activity, "UNKNOWN");
-  assert.equal(snapshot.pressure.state, "unknown");
+  assert.equal(snapshot.pressure.state, "critical");
   assert.ok(snapshot.limitations.includes("MODEL_CATALOG_IDENTITY_CONFLICT"));
   assert.ok(snapshot.limitations.includes("ACTIVITY_UNAVAILABLE"));
 });
@@ -288,7 +288,7 @@ test("catalog diagnostics retain sanitized cause without turning absence into a 
   reader.model = unavailable();
   const snapshot = await observeSession(reader, expected);
   assert.ok(snapshot.limitations.includes("MODEL_CATALOG_HTTP_ERROR"));
-  assert.equal(continuitySummary(snapshot).recommendation, "INSPECT_TELEMETRY_NOT_A_COMPACT_BAN");
+  assert.equal(continuitySummary(snapshot).recommendation, "COMPACT_THEN_RESTORE_BEFORE_WORK");
   reader.model = ok(null);
   assert.ok((await observeSession(reader, expected)).limitations.includes("MODEL_CATALOG_MODEL_ABSENT"));
   reader.model = { status: 200, bodySha256: "fixture", problem: "INVALID_RESPONSE" };
@@ -312,6 +312,33 @@ test("an aborted zero-token placeholder does not replace successful provider usa
   assert.equal(zero.latestCompletedCall?.tokens?.input, 0);
   assert.equal(zero.pressure.state, "unknown");
   assert.equal(zero.pressure.bestAvailableTokens, null);
+});
+
+test("225k cap triggers below 60 percent, with unknown-budget and safe-boundary controls", async () => {
+  const reader = new FakeReader();
+  reader.model = ok({ providerID: "provider", modelID: "model", inputLimit: 922000, contextLimit: 1000000 });
+  for (const total of [224999, 225000, 431850]) {
+    reader.pages.set("newest", ok({ messages: [assistant("msg_cap", { tokens: { total } })] }));
+    const snapshot = await observeSession(reader, expected);
+    const summary = continuitySummary(snapshot);
+    assert.equal(summary.compactThresholdTokens, 225000);
+    assert.equal(summary.thresholdBasis, "absolute_token_cap");
+    assert.equal(summary.recommendation, total < 225000 ? "CONTINUE_AND_MONITOR" : "COMPACT_THEN_RESTORE_BEFORE_WORK");
+    assert.equal(continuitySummary({ ...snapshot, activity: "BUSY" }).recommendation, "WAIT_FOR_IDLE_NO_INTERRUPTION");
+    assert.equal(continuitySummary({ ...snapshot, latestCompletedCall: { ...snapshot.latestCompletedCall!, freshness: "NEWER_ACTIVITY_OBSERVED" } }).recommendation, "REFRESH_TELEMETRY");
+  }
+  reader.model = unavailable();
+  const unknown = await observeSession(reader, expected);
+  assert.equal(unknown.pressure.usageRatio, null);
+  assert.equal(continuitySummary(unknown).recommendation, "COMPACT_THEN_RESTORE_BEFORE_WORK");
+  reader.pages.set("newest", ok({ messages: [assistant("msg_low", { tokens: { total: 100000 } })] }));
+  assert.equal(continuitySummary(await observeSession(reader, expected)).recommendation, "INSPECT_TELEMETRY_NOT_A_COMPACT_BAN");
+  reader.pages.set("newest", ok({ messages: [assistant("msg_missing", { tokens: {} })] }));
+  assert.equal((await observeSession(reader, expected)).pressure.state, "unknown");
+  await assert.rejects(() => observeSession(reader, expected, { compactTokenCap: 0 }), { code: "INVALID_INPUT" });
+  await assert.rejects(() => observeSession(reader, expected, { compactTokenCap: NaN }), { code: "INVALID_INPUT" });
+  reader.pages.set("newest", ok({ messages: [assistant("msg_custom", { tokens: { total: 100000 } })] }));
+  assert.equal(continuitySummary(await observeSession(reader, expected, { compactTokenCap: 100000 })).recommendation, "COMPACT_THEN_RESTORE_BEFORE_WORK");
 });
 
 test("completed native summary survives a later abort without another compact trigger", async () => {

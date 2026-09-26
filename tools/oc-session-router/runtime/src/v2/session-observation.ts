@@ -13,6 +13,7 @@ export interface SessionObservationOptions {
   modelOverride?: ModelIdentity & { contextLimit: number; inputLimit?: number; outputLimit?: number };
   warnRatio?: number;
   criticalRatio?: number;
+  compactTokenCap?: number;
 }
 export interface PressureObservation {
   bestAvailableTokens: number | null;
@@ -24,6 +25,8 @@ export interface PressureObservation {
   criticalRatio: number;
   warnTokens: number | null;
   criticalTokens: number | null;
+  compactTokenCap?: number;
+  thresholdBasis?: "input_budget_ratio" | "absolute_token_cap";
   state: "unknown" | "normal" | "warn" | "critical" | "over_limit";
   recommendation: "inspect_telemetry_do_not_guess" | "none" | "monitor_and_prepare_boundary" | "recommend_at_next_safe_boundary" | "urgent_recovery_required_no_automatic_compact";
 }
@@ -85,6 +88,9 @@ export function continuitySummary(snapshot: SessionObservation | null | undefine
     lastCallTokens: snapshot?.pressure?.bestAvailableTokens ?? null,
     budgetTokens: snapshot?.budget?.tokens ?? null, budgetBasis: snapshot?.budget?.basis ?? "unavailable",
     usageRatio: snapshot?.pressure?.usageRatio ?? null, compactThresholdRatio: snapshot?.pressure?.criticalRatio ?? null,
+    compactThresholdTokens: snapshot?.pressure?.criticalTokens ?? null,
+    compactTokenCap: snapshot?.pressure?.compactTokenCap ?? null,
+    thresholdBasis: snapshot?.pressure?.thresholdBasis ?? null,
     recommendation, authority: "ADVISORY_RECHECK_WORK_EFFECTS_IDLE_AND_CLAIM",
   };
 }
@@ -137,6 +143,22 @@ export function calculatePressure(tokens?: MessageTokens, contextLimit?: number,
   else { result.state = "normal"; result.recommendation = "none"; }
   return result;
 }
+/** V2 maintenance policy, separate from the legacy pressure-arithmetic parity helper. */
+export function maintenancePressure(tokens?: MessageTokens, budget?: number, options: SessionObservationOptions = {}): PressureObservation {
+  const cap = options.compactTokenCap ?? 225_000;
+  if (!positive(cap)) throw new AdapterError("INVALID_INPUT");
+  const pressure = calculatePressure(tokens, budget, options);
+  const ratioThreshold = pressure.criticalTokens;
+  pressure.compactTokenCap = cap;
+  pressure.criticalTokens = Math.min(ratioThreshold ?? cap, cap);
+  pressure.thresholdBasis = ratioThreshold !== null && ratioThreshold <= cap ? "input_budget_ratio" : "absolute_token_cap";
+  // Do not invent a percentage or reassuring low-pressure state when the budget is unknown.
+  if (pressure.bestAvailableTokens !== null && pressure.bestAvailableTokens >= pressure.criticalTokens) {
+    if (pressure.state !== "over_limit") pressure.state = "critical";
+    pressure.recommendation = "recommend_at_next_safe_boundary";
+  }
+  return pressure;
+}
 function iso(value: number | undefined): string | null { return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 8.64e15 ? new Date(value).toISOString() : null; }
 async function read<T>(call: () => Promise<AdapterReply<T>>): Promise<T | undefined> {
   try { const reply = await call(); return reply.status >= 200 && reply.status < 300 && !reply.problem ? reply.value : undefined; } catch { return undefined; }
@@ -170,7 +192,7 @@ export async function observeSession(adapter: ObservationReader, expected: { ses
     activity: "UNKNOWN", latestCompletedCall: null, lastCompaction: null,
     history: { coverage: "UNAVAILABLE", pagesRead: 0, messagesRead: 0 }, model: null,
     activeContext: { status: "unavailable", estimatedTokens: null, reason: "NORMALIZED_HISTORY_IS_NOT_ACTIVE_CONTEXT" },
-    pressure: calculatePressure(undefined, undefined, options), capabilities: { readOnly: true, maySend: false, mayCompact: false, mayMutate: false },
+    pressure: maintenancePressure(undefined, undefined, options), capabilities: { readOnly: true, maySend: false, mayCompact: false, mayMutate: false },
     budget: inputBudget(), capabilityScope: "OBSERVATION_ACTION_ONLY_NOT_MAINTENANCE_ELIGIBILITY",
     limitations: ["LAST_COMPLETED_CALL_IS_NOT_EXACT_LIVE_CONTEXT", "NORMALIZED_HISTORY_EXCLUDES_PROVIDER_SYSTEM_AND_TOOL_OVERHEAD", "PRESSURE_NEVER_AUTHORIZES_COMPACTION"],
   };
@@ -271,13 +293,13 @@ export async function observeSession(adapter: ObservationReader, expected: { ses
   }
   if (!snapshot.model?.contextLimit) limitation("CONTEXT_LIMIT_UNAVAILABLE");
   snapshot.budget = inputBudget(snapshot.model);
-  snapshot.pressure = calculatePressure(tokens, snapshot.budget.tokens ?? undefined, options);
+  snapshot.pressure = maintenancePressure(tokens, snapshot.budget.tokens ?? undefined, options);
   // Legacy arithmetic helper retains its historical labels for parity. V2's
   // actionable advice must not contradict safe idle maintenance at high pressure.
   if (snapshot.pressure.state === "over_limit") snapshot.pressure.recommendation = "recommend_at_next_safe_boundary";
   if (snapshot.pressure.bestAvailableTokens === 0) {
     // A zero-filled provider placeholder is not evidence of an empty context.
-    snapshot.pressure = calculatePressure(undefined, snapshot.budget.tokens ?? undefined, options);
+    snapshot.pressure = maintenancePressure(undefined, snapshot.budget.tokens ?? undefined, options);
     limitation("ZERO_USAGE_IS_NOT_ACTIVE_CONTEXT_EVIDENCE");
   }
   snapshot.observedAt = new Date().toISOString();
