@@ -187,8 +187,13 @@ tool-call steps), not exact current context. Aborted/failed empty assistant
 records do not replace it; newer activity remains visible as stale/unknown.
 Even successful zero-only telemetry does not prove an empty context.
 The default advisory warning/compact ratios are `0.5`/`0.60` of the usable input
-budget, not blindly the whole context window. `compactThresholdRatio` is the one
-optional configuration override. Reports distinguish input-limit from estimated
+budget, not blindly the whole context window. Compact is additionally capped at
+225,000 last-call tokens: the earlier threshold wins. `compactThresholdRatio` and
+`compactTokenCap` are optional configuration overrides. Continuity exposes
+`compactThresholdTokens` and `thresholdBasis` (input_budget_ratio or absolute_token_cap).
+The cap is maintenance policy, not model capacity. Reliable usage at or above it
+can recommend maintenance even when the budget is unknown; below it, unknown
+budget remains unknown pressure. Reports distinguish input-limit from estimated
 context-minus-output/context-only basis; they never claim exact active context.
 Missing optional catalog/tokens/history stays visibly unavailable; it is not a universal lifecycle
 blocker. A new send still needs verified addressing, permitted scope/effect and a
@@ -209,7 +214,8 @@ the original intended action. BUSY means wait without interruption; already
 compacted means check/finish restoration rather than compact again. Unknown
 telemetry is neither a compact ban nor a green pressure result: inspect its cause,
 use matching known limits when available, and make a bounded evidence-based
-decision. No universal guessed token threshold or mandatory telemetry gate.
+decision. No invented model limits or mandatory telemetry gate. Resolve pending
+operations first. A long call may overshoot the threshold; never interrupt it.
 
 At an idle boundary, preserve the continuation/result references, request one
 `compact` operation, and observe its actual completion. The shared SQL claim and

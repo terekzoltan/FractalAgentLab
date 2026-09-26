@@ -66,7 +66,7 @@ export class RouterEngine {
   async observe(workId: string, roleName: string, budgetMs?: number) {
     const work = this.store.getWork(workId);
     const { adapter, role, home } = this.binding(work.context, roleName, budgetMs);
-    const options: SessionObservationOptions = { criticalRatio: this.configuration.compactThresholdRatio ?? 0.60 };
+    const options: SessionObservationOptions = { criticalRatio: this.configuration.compactThresholdRatio ?? 0.60, compactTokenCap: this.configuration.compactTokenCap ?? 225_000 };
     if (role.model) {
       const slash = role.model.indexOf("/");
       if (slash > 0 && slash < role.model.length - 1) {
