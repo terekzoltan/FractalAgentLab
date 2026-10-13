@@ -8,6 +8,38 @@ import { AdapterError, OpenCodeAdapter, generateMessageId, type Acknowledgement,
 const session = "ses_fixture";
 const root = "msg_fixture_root";
 const directory = "C:\\synthetic\\project with space";
+
+test("pending lists are GET-only, exact-session, bounded and content-free", async t => {
+  const seen: string[] = [];
+  const { adapter } = await fixture(t, (req, res) => {
+    const url = new URL(req.url!, "http://fixture");
+    assert.equal(req.method, "GET");
+    assert.equal(url.searchParams.get("directory"), directory);
+    seen.push(url.pathname);
+    json(res, [
+      { id: "per_private", sessionID: session, patterns: ["secret path"], metadata: { password: "do-not-return" } },
+      { id: "per_other", sessionID: "ses_other", questions: ["do-not-return"] },
+    ]);
+  });
+  assert.deepEqual(await adapter.getPendingInteractions(), { permissions: 1, questions: 1 });
+  assert.deepEqual(seen, ["/permission", "/question"]);
+});
+
+test("unavailable permission list does not hide a known pending question", async t => {
+  const { adapter } = await fixture(t, (req, res) => {
+    if (req.url!.startsWith("/permission")) json(res, {}, 404);
+    else json(res, [{ id: "que_fixture", sessionID: session }]);
+  });
+  assert.deepEqual(await adapter.getPendingInteractions(), { permissions: null, questions: 1 });
+});
+
+test("malformed and oversized pending lists remain unavailable, never clear", async t => {
+  const { adapter } = await fixture(t, (req, res) => {
+    if (req.url!.startsWith("/permission")) json(res, [{ id: "per_bad" }]);
+    else json(res, [{ id: "que_big", sessionID: session, questions: ["x".repeat(1024 * 1024)] }]);
+  });
+  assert.deepEqual(await adapter.getPendingInteractions(), { permissions: null, questions: null });
+});
 function message(overrides: Record<string, unknown> = {}, parts?: unknown[]) {
   return {
     info: { id: "msg_fixture_answer", sessionID: session, parentID: root, role: "assistant", time: { created: 100, completed: 200 }, finish: "stop", ...overrides },

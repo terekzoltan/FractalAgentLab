@@ -55,6 +55,7 @@ export interface OpenCodeMessage {
   tokens?: MessageTokens;
 }
 export interface OpenCodeSession { id: string; directory: string; projectID?: string; parentID?: string }
+export interface PendingInteractionCounts { permissions: number | null; questions: number | null }
 export interface OpenCodeModelInfo {
   providerID: string;
   modelID: string;
@@ -267,6 +268,28 @@ export class OpenCodeAdapter {
   async getMessage(messageId: string): Promise<AdapterReply<OpenCodeMessage>> {
     input(identity(messageId, "msg"));
     return this.#read(`${this.#sessionPath()}/message/${encodeURIComponent(messageId)}`, value => normalizedMessage(value, this.#session, messageId));
+  }
+
+  /** v1.18 GET lists only; discard all prompts, paths, commands, metadata and IDs.
+   * Counts concern the exact addressed session, not its children or one operation.
+   * Missing/unsupported/failed lists remain null, never a misleading zero. */
+  async getPendingInteractions(): Promise<PendingInteractionCounts> {
+    const count = async (endpoint: string): Promise<number | null> => {
+      try {
+        const reply = await this.#read(endpoint, value => {
+          if (!Array.isArray(value) || value.length > 4096) throw new ShapeError("INVALID_RESPONSE");
+          let total = 0;
+          for (const item of value) {
+            const row = record(item);
+            if (!identity(row.sessionID, "ses") || !nonempty(row.id)) throw new ShapeError("INVALID_RESPONSE");
+            if (row.sessionID === this.#session) total++;
+          }
+          return total;
+        }, 1024 * 1024);
+        return reply.problem ? null : reply.value ?? null;
+      } catch { return null; }
+    };
+    return { permissions: await count("/permission"), questions: await count("/question") };
   }
 
   async getHistory(options: { limit: number; before?: string }): Promise<AdapterReply<MessageHistory>> {

@@ -14,6 +14,7 @@ import { readFrozenSource, type Selection } from "./context-packet.js";
 import { refreshState } from "./state-projection.js";
 import { PreparationDiagnostics, PreparationFailure } from "./preparation-diagnostics.js";
 import type { ManualContinuationRequest } from "./manual-continuation.js";
+import { waitingForOwner } from "./owner-attention.js";
 
 const here = fileURLToPath(import.meta.url);
 function jsonFile<T>(file: string): T {
@@ -55,7 +56,7 @@ export function operationView(operation: Operation, store?: OperationStore) {
     // activity remains separately available in the work's session observations.
     activity: operation.completedAt ? operation.outcome?.execution ?? "UNKNOWN" : operation.observation?.activity ?? "UNKNOWN",
     reason: operation.completedAt ? operation.outcome?.reason ?? null : operation.observation?.context?.reason ?? null,
-    ...(store ? { continuity } : {}),
+    ...(store ? { continuity, ownerAttention: snapshot?.ownerAttention ?? null } : {}),
     ...(operation.action.input.packet ? { packet: operation.action.input.packet } : {}),
     autoAdvance: false,
     recovery: operation.outcome?.manualRecovery ? { kind: "MANUAL_CONTINUATION", instructionReference: operation.outcome.manualRecovery.request && typeof operation.outcome.manualRecovery.request === "object" && !Array.isArray(operation.outcome.manualRecovery.request) ? operation.outcome.manualRecovery.request.instructionReference : null } : null,
@@ -256,6 +257,12 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
         ...operationView(result.operation, store), disposition: result.disposition, observationEnded: true, sessionInterrupted: false,
       };
       await currentEngine.observeOptional(result.operation.action.workId, result.operation.action.recipientRole, Math.min(15_000, Math.max(0, deadline - performance.now())));
+      const latest = store.getOperation(operationId);
+      const snapshot = store.getWork(latest.action.workId).observations[latest.action.recipientRole] as unknown as SessionObservation | undefined;
+      if (!latest.completedAt && snapshot?.identity?.verified && waitingForOwner(snapshot.ownerAttention)) return {
+        ...operationView(latest, store), disposition: "OWNER_ATTENTION_REQUIRED",
+        observationEnded: true, sessionInterrupted: false,
+      };
       await delay(Math.min(cadence, Math.max(0, deadline - performance.now())));
       cadence = Math.min(15_000, cadence * 2);
     }
