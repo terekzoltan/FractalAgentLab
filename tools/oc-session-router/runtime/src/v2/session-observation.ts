@@ -1,8 +1,9 @@
 import path from "node:path";
+import { observeOwnerAttention, waitingForOwner, type OwnerAttention } from "./owner-attention.js";
 import { digest } from "./contracts.js";
 import { AdapterError, type AdapterReply, type MessageTokens, type OpenCodeAdapter, type OpenCodeMessage, type OpenCodeModelInfo } from "./opencode-adapter.js";
 
-export type ObservationReader = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "getHistory"> & Partial<Pick<OpenCodeAdapter, "getModelInfo">>;
+export type ObservationReader = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "getHistory"> & Partial<Pick<OpenCodeAdapter, "getModelInfo" | "getPendingInteractions">>;
 export interface ModelIdentity { providerID: string; modelID: string }
 export interface SessionObservationOptions {
   pageLimit?: number;
@@ -55,6 +56,7 @@ export interface SessionObservation {
   capabilityScope: "OBSERVATION_ACTION_ONLY_NOT_MAINTENANCE_ELIGIBILITY";
   capabilities: { readOnly: true; maySend: false; mayCompact: false; mayMutate: false };
   limitations: string[];
+  ownerAttention?: OwnerAttention;
 }
 
 export function inputBudget(model?: OpenCodeModelInfo | null): SessionObservation["budget"] {
@@ -74,7 +76,8 @@ export function continuitySummary(snapshot: SessionObservation | null | undefine
   const freshness = snapshot?.latestCompletedCall?.freshness ?? "UNKNOWN";
   let recommendation = "OBSERVE_BEFORE_WORK";
   if (snapshot?.schemaVersion === "session-observation/v2" && snapshot.budget && Number.isFinite(age) && age >= 0 && age <= 120_000 && snapshot.identity?.verified) {
-    if (snapshot.activity === "BUSY") recommendation = "WAIT_FOR_IDLE_NO_INTERRUPTION";
+    if (waitingForOwner(snapshot.ownerAttention, now)) recommendation = "OWNER_ATTENTION_REQUIRED";
+    else if (snapshot.activity === "BUSY") recommendation = "WAIT_FOR_IDLE_NO_INTERRUPTION";
     else if (snapshot.activity !== "IDLE") recommendation = "OBSERVE_ACTIVITY_BEFORE_MAINTENANCE";
     else if (freshness === "COMPACTION_AFTER_CALL" && snapshot.lastCompaction?.completed) recommendation = "CHECK_RESTORE_NOT_ANOTHER_COMPACT";
     else if (freshness !== "NO_NEWER_MESSAGES_OBSERVED") recommendation = "REFRESH_TELEMETRY";
@@ -202,6 +205,7 @@ export async function observeSession(adapter: ObservationReader, expected: { ses
   const normalize = (value: string) => process.platform === "win32" ? path.resolve(value).toLowerCase() : path.resolve(value);
   if (session.id !== expected.session || !path.isAbsolute(session.directory) || normalize(session.directory) !== normalize(expected.directory)) { limitation("SESSION_IDENTITY_CONFLICT"); return snapshot; }
   snapshot.identity.verified = true;
+  snapshot.ownerAttention = await observeOwnerAttention(adapter);
   const messages = new Map<string, OpenCodeMessage>();
   let cursor: string | undefined;
   const cursors = new Set<string>();

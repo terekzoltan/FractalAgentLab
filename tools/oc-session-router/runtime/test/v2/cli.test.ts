@@ -71,7 +71,7 @@ async function httpFixture(t: TestContext) {
   const fixture = localFixture(t);
   const session = "ses_cli_fixture";
   const state = {
-    busy: false, hold: true, postClosedEarly: false, summaries: 0,
+    busy: false, hold: true, postClosedEarly: false, summaries: 0, permissions: 0,
     posts: [] as Array<{ body: { messageID: string; command: string; arguments: string }; response: ServerResponse; operationId: string; released: boolean }>,
     calls: [] as Array<{ method: string; path: string; directory: string | null; authorized: boolean }>,
     messages: [] as Array<{ info: Record<string, unknown>; parts: Array<{ type: string; text?: string }> }>,
@@ -94,6 +94,8 @@ async function httpFixture(t: TestContext) {
     const send = (status: number, value: unknown) => { response.writeHead(status, { "content-type": "application/json", connection: "close" }); response.end(JSON.stringify(value)); };
     if (request.method === "GET" && url.pathname === `/session/${session}`) return send(200, { id: session, directory: fixture.root, projectID: "cli-fixture-project" });
     if (request.method === "GET" && url.pathname === "/session/status") return send(200, { [session]: { type: state.busy ? "busy" : "idle" } });
+    if (request.method === "GET" && url.pathname === "/permission") return send(200, Array.from({ length: state.permissions }, (_, i) => ({ id: `per_${i}`, sessionID: session, patterns: ["private-path"], metadata: { secret: "never-output" } })));
+    if (request.method === "GET" && url.pathname === "/question") return send(200, []);
     if (request.method === "GET" && url.pathname === "/command") return send(200, [{ name: "implement", template: state.template }, { name: "after-compact", template: "Restore $ARGUMENTS" }]);
     if (request.method === "GET" && url.pathname === "/provider") return send(200, { all: [{ id: "fixture", models: { model: { id: "model", limit: { context: 400000, input: 272000, output: 128000 } } } }] });
     if (request.method === "GET" && url.pathname === `/session/${session}/message`) return send(200, state.messages.slice(-Number(url.searchParams.get("limit") ?? 40)));
@@ -157,6 +159,29 @@ function privacy(output: string, root: string, messageIds: string[] = []): void 
   for (const secret of [credentials.username, credentials.password, "ses_cli_fixture", root, ...messageIds]) assert.ok(!output.includes(secret), "Normal projection exposed a private fixture value");
   assert.doesNotMatch(output, /http:\/\/|Private fixture result|Apply the local fixture/);
 }
+
+test("wait returns pending Owner attention without interrupt, resend or completion fabrication", async t => {
+  const f = await httpFixture(t);
+  const submitted = await runCli(f.root, "submit", ["--request", f.requestPath]);
+  const id = submitted.value.operationId as string;
+  await eventually(() => f.state.posts.length === 1, "command delivery");
+  f.state.permissions = 1;
+  const result = await runCli(f.root, "wait", ["--operation-id", id, "--wait-ms", "10000"]);
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.value.disposition, "OWNER_ATTENTION_REQUIRED");
+  assert.equal(result.value.execution, "PENDING");
+  assert.equal(result.value.sessionInterrupted, false);
+  assert.equal(f.state.posts.length, 1);
+  assert.equal(f.state.postClosedEarly, false);
+  assert.equal(f.store.getOperation(id).completedAt, null);
+  privacy(result.stdout, f.root);
+  assert.doesNotMatch(result.stdout, /never-output|private-path|per_0/);
+  f.state.permissions = 0;
+  f.release();
+  await eventually(() => f.store.getOperation(id).completedAt !== null, "same operation completes");
+  const completed = await runCli(f.root, "wait", ["--operation-id", id, "--wait-ms", "0"]);
+  assert.equal(completed.value.execution, "COMPLETED");
+});
 
 test("read-source is offline and refresh-state only writes the enrolled observed block", async t => {
   const { root, work, workPath, store, configuration, configPath } = localFixture(t);

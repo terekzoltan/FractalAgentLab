@@ -239,6 +239,35 @@ or failed execution; it does not imply rollback.
 
 ## Restart, import and closure
 
+For final human handoffs follow the adopted AWC `fal-orchestrate-target` skill's
+"This run" trail: command/event, responsible lane, brief work and actual outcome,
+grouped by workstream in time order. Include fixes and substantive clarification;
+compact -> restore may share a maintenance row with partial completion visible.
+Git delivery is separately labeled. Preserve the ordinary summary, exact stop,
+missing evidence and first unfinished action; a report never creates acceptance.
+
+### Pending Owner interaction
+
+Fresh `observe-session` returns `ownerAttention`: exact-session permission and
+question counts, `observedAt`, and WAITING_FOR_OWNER / CLEAR / UNAVAILABLE.
+The bounded GET /permission and GET /question lists are filtered to the verified
+session home; their prompts, paths, metadata and request/session IDs are discarded.
+An unavailable channel is null, not zero. Counts do not cover child sessions or
+prove that a request belongs to a particular operation.
+
+`wait` returns early with disposition OWNER_ATTENTION_REQUIRED when a fresh
+verified observation has pending interaction. This ends only the local wait:
+the existing operation and retaining executor remain intact. OpenCode activity
+and execution facts are unchanged. `inspect` shows cached attention, not a live
+query; refresh stale observations. Once the Owner resolves the UI request,
+observe/reconcile the same operation, never resend from a timeout or this notice.
+
+Report the affected lane promptly and ask the Owner to inspect its existing UI.
+Do not approve/reject requests, expand permissions, interrupt or compact around
+them. Notify once per waiting episode, keep independent work moving and retain
+unknown coverage on old servers. No background desktop notification or permanent
+poller is added; an inactive orchestrator cannot promise immediate alerts.
+
 Ordinary restart needs fresh read-only addressing/activity/command compatibility
 checks, not a new P0B approval. Historical result recovery uses preserved
 provenance rather than today's command template. A real addressing or scope

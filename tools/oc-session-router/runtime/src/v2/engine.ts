@@ -13,7 +13,7 @@ import { stateAuthorityDigest } from "./state-projection.js";
 import type { PreparationReporter } from "./preparation-diagnostics.js";
 export type { SourceReference } from "./context-packet.js";
 
-export type Adapter = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "listCommands" | "getMessage" | "getHistory" | "submitCommand" | "submitMessage" | "summarize"> & Partial<Pick<OpenCodeAdapter, "getModelInfo">>;
+export type Adapter = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "listCommands" | "getMessage" | "getHistory" | "submitCommand" | "submitMessage" | "summarize"> & Partial<Pick<OpenCodeAdapter, "getModelInfo" | "getPendingInteractions">>;
 export type AdapterFactory = (target: OpenCodeTarget, credentials: OpenCodeCredentials, options?: AdapterOptions) => Adapter;
 export interface SubmitRequest {
   workId: string;
