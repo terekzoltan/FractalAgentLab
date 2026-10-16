@@ -355,6 +355,40 @@ See the [operating runbook](workflow-orchestrator-runbook.md) and
 loaded behavior, qualification and project resumption remain distinct.
 # Explicit manual continuation adoption
 
+## Explicit Owner resolution of a stopped implementation
+
+`resolve-owner-stopped -RequestPath <private.json>` is a distinct negative
+disposition, not manual adoption or native recovery. It supports only a known
+DELIVERED pending `implement` operation whose original remote root and any
+pinned response both return 404. The Owner explicitly accepts a separately
+identified, stable same-session terminal answer as evidence that implementation
+stopped before authoring, and accepts the unverified native lineage limitation.
+
+Request fields: `operationId`, `expectedInputDigest`, `terminalMessageId`,
+`terminalTextSha256`, `instructionReference`, `ownerDecision`,
+`disposition: "STOPPED_BEFORE_IMPLEMENTATION"`, and
+`acknowledgeUnverifiedNativeLineage: true`. This is a trusted operator action:
+instruction/decision must represent the actual human grant, never inferred
+permission from lane prose. Secret IDs/requests remain private.
+
+The action verifies exact participant/address, idle state, missing originals,
+the specified terminal and its actual separate user parent, a bounded fresh
+12-message head without newer activity, and stability before atomic finish.
+It deliberately does not assert exhaustive history or original native ancestry.
+Owner semantic acceptance is recorded, not proved by matching terminal keywords.
+
+Result: `execution: FAILED`, reason
+`OWNER_RESOLVED_STOPPED_BEFORE_IMPLEMENTATION`, preserved answer artifact and
+separate `ownerResolution` provenance. Original input, correlation, observation
+and Owner decision/limitations are retained; only this operation's claim is
+released by the existing atomic result transaction. Product acceptance is false.
+Pause and scope are unchanged. Same request is idempotent; conflicting decisions,
+completed operations, POSSIBLE sends, busy/wrong sessions, non-404 originals,
+changed evidence and concurrent operation changes reject without a result write.
+No session message, lifecycle, projection refresh or new work follows automatically.
+An explicit subsequent planning-only envelope may use an existing verified target;
+old failed implementation is not a successful prerequisite or a scope override.
+
 `adopt-manual-continuation -RequestPath <private.json>` performs GET verification
 and one local immutable result write. It sends nothing, does not refresh project
 files, lift pause, change scope or accept a plan. It only supports an existing

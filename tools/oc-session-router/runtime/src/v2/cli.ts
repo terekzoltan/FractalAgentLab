@@ -14,6 +14,7 @@ import { readFrozenSource, type Selection } from "./context-packet.js";
 import { refreshState } from "./state-projection.js";
 import { PreparationDiagnostics, PreparationFailure } from "./preparation-diagnostics.js";
 import type { ManualContinuationRequest } from "./manual-continuation.js";
+import type { OwnerStoppedRequest } from "./owner-resolution.js";
 import { waitingForOwner } from "./owner-attention.js";
 
 const here = fileURLToPath(import.meta.url);
@@ -59,6 +60,7 @@ export function operationView(operation: Operation, store?: OperationStore) {
     ...(store ? { continuity, ownerAttention: snapshot?.ownerAttention ?? null } : {}),
     ...(operation.action.input.packet ? { packet: operation.action.input.packet } : {}),
     autoAdvance: false,
+    ownerResolution: operation.outcome?.ownerResolution ? { disposition: "STOPPED_BEFORE_IMPLEMENTATION", nativeLineageRestored: false, implementationAccepted: false } : null,
     recovery: operation.outcome?.manualRecovery ? { kind: "MANUAL_CONTINUATION", instructionReference: operation.outcome.manualRecovery.request && typeof operation.outcome.manualRecovery.request === "object" && !Array.isArray(operation.outcome.manualRecovery.request) ? operation.outcome.manualRecovery.request.instructionReference : null } : null,
   };
 }
@@ -89,10 +91,10 @@ export async function runCli(argv: string[]): Promise<unknown> {
 async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics): Promise<unknown> {
   const [action, ...rest] = argv;
   if (!action || action === "help" || action === "--help") return {
-    interface: "fal-router/v2", actions: ["open-work", "amend-work", "adopt-manual-continuation", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy"],
+    interface: "fal-router/v2", actions: ["open-work", "amend-work", "adopt-manual-continuation", "resolve-owner-stopped", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy"],
     configuration: "Private router-config.json; credentials are process environment only.",
   };
-  if (!["open-work", "amend-work", "adopt-manual-continuation", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy", "execute-operation"].includes(action)) throw new RouterError("ACTION_UNSUPPORTED");
+  if (!["open-work", "amend-work", "adopt-manual-continuation", "resolve-owner-stopped", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy", "execute-operation"].includes(action)) throw new RouterError("ACTION_UNSUPPORTED");
   const values = options(rest);
   const actionOptions: Record<string, string[]> = {
     "open-work": ["--request"], "amend-work": ["--request"], submit: ["--request"], compact: ["--request"], restore: ["--request"],
@@ -102,6 +104,7 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
     "read-source": ["--request", "--work-id", "--source-id", "--heading", "--start-line", "--end-line"],
     "refresh-state": ["--work-id"],
     "adopt-manual-continuation": ["--request"],
+    "resolve-owner-stopped": ["--request"],
   };
   const accepted = new Set(["--state-root", "--config", ...actionOptions[action]!]);
   if (Object.keys(values).some(key => !accepted.has(key))) throw new RouterError("INVALID_ARGUMENTS");
@@ -127,6 +130,7 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
   };
   const mutationView = (operation: Operation) => ({ ...operationView(operation, store), stateProjection: project(operation.action.workId) });
   try {
+    if (action === "resolve-owner-stopped") return { ...operationView(await engine().resolveStopped(readRequest<OwnerStoppedRequest>()), store), lifecycleSend: false };
     if (action === "adopt-manual-continuation") return { ...operationView(await engine().adoptManual(readRequest<ManualContinuationRequest>()), store), lifecycleSend: false };
     if (action === "read-source") {
       const direct = ["--work-id", "--source-id", "--heading", "--start-line", "--end-line"];
