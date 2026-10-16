@@ -78,6 +78,8 @@ export interface TerminalOutcome {
   artifact?: { text: string; sha256: string };
   /** Explicit manual adoption, never fabricated as native command correlation. */
   manualRecovery?: { [key: string]: Json };
+  /** Negative Owner disposition, not successful implementation or native lineage. */
+  ownerResolution?: { [key: string]: Json };
   reason?: string;
 }
 
