@@ -52,7 +52,10 @@ function Invoke-TestLauncher {
     ForEach-Object { ConvertTo-TestNativeArgument $_ }) -join ' ')
   $Start.EnvironmentVariables.Remove('OPENCODE_SERVER_PASSWORD')
   $Start.EnvironmentVariables.Remove('OPENCODE_SERVER_USERNAME')
-  foreach ($Name in $ChildEnvironment.Keys) { $Start.EnvironmentVariables[$Name] = $ChildEnvironment[$Name] }
+  foreach ($Name in $ChildEnvironment.Keys) {
+    if ($null -eq $ChildEnvironment[$Name]) { $Start.EnvironmentVariables.Remove($Name) }
+    else { $Start.EnvironmentVariables[$Name] = $ChildEnvironment[$Name] }
+  }
   $TestProcess = New-Object System.Diagnostics.Process
   $TestProcess.StartInfo = $Start
   $Started = $false
@@ -186,6 +189,17 @@ process.stdin.on("end",()=>{
   $Exit = Invoke-TestLauncher -ScriptPath $FakeLauncher -TestArguments $Arguments -ChildEnvironment @{ FAL_FIXTURE_EXIT_CODE='7' }
   Assert-HandoffLauncher ($Exit.code -eq 7) 'Launcher must preserve child exit code.'
   $Passed++
+
+  # MCP hosts may omit OS from the inherited environment. Platform detection
+  # must use the runtime, not an optional (and caller-controlled) string.
+  foreach ($OsValue in @($null, 'not-a-platform')) {
+    $WithoutOs = Invoke-TestLauncher -ScriptPath $FakeLauncher -TestArguments $Arguments -InputText $InputText -ChildEnvironment @{ OS=$OsValue }
+    Assert-HandoffLauncher ($WithoutOs.code -eq 0) ('Actual Windows must work without a trustworthy OS environment variable: ' + $WithoutOs.error)
+    $WithoutOsEcho = $WithoutOs.output | ConvertFrom-Json
+    Assert-HandoffLauncher $WithoutOsEcho.credentialMatches 'Filtered environment must preserve scoped credential injection.'
+    Assert-HandoffLauncher ([string]::Equals($WithoutOsEcho.rawBase64, [Convert]::ToBase64String($Utf8.GetBytes($InputText)), [StringComparison]::Ordinal)) 'Filtered environment must preserve wire bytes.'
+    $Passed++
+  }
 
   $MissingArguments = @('-StateRoot',$StateRoot,'-ConfigurationPath',$ConfigurationPath,'-CredentialPath',(Join-Path $FixtureRoot 'PRIVATE-PATH-MUST-NOT-LEAK.xml'))
   $Missing = Invoke-TestLauncher -ScriptPath $FakeLauncher -TestArguments $MissingArguments

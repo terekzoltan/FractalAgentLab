@@ -30,7 +30,9 @@ function ConvertTo-HandoffNativeArgument {
 
 try {
   $FailureCode = 'HANDOFF_LAUNCH_ARGUMENTS_INVALID'
-  if ($env:OS -ne 'Windows_NT' -or
+  # MCP hosts filter inherited variables; OS may be absent or misleading.
+  # Determine the platform from .NET, independent of host environment policy.
+  if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT -or
       -not (Test-HandoffAbsolutePath $StateRoot) -or
       -not (Test-HandoffAbsolutePath $ConfigurationPath) -or
       -not (Test-HandoffAbsolutePath $CredentialPath)) { throw 'Invalid arguments' }
