@@ -9,14 +9,27 @@ type Row = Record<string, string | number | bigint | Uint8Array | null>;
 export type StoreCheckpoint = "PREPARE_OPERATION_INSERTED" | "PREPARE_COMMITTED" |
   "DISPATCH_COMMITTED" | "RESULT_INSERTED" | "RESULT_COMMITTED";
 interface StoreOptions {
+  /** No initialization, schema migration, journal changes or write transaction. */
+  readOnly?: boolean;
   /** Test seam only. Not configurable from CLI or a submitted work request. */
   checkpoint?: (point: StoreCheckpoint) => void;
   now?: () => string;
 }
 
-const effects = new Set(["READ_ONLY", "WORKSPACE_WRITE", "LOCAL_COMMIT", "SESSION_MAINTENANCE"]);
-const kinds = new Set(["LIFECYCLE", "CLARIFICATION", "COMPACT", "RESTORE"]);
+const effects = new Set(["READ_ONLY", "WORKSPACE_WRITE", "LOCAL_COMMIT", "SESSION_MAINTENANCE", "ORCHESTRATOR_HANDOFF"]);
+const kinds = new Set(["LIFECYCLE", "CLARIFICATION", "COMPACT", "RESTORE", "ORCHESTRATOR_HANDOFF"]);
 const activities = new Set(["BUSY", "IDLE", "UNKNOWN", "COMPLETED", "FAILED"]);
+function physicalAddress(action: ActionInput): string | null {
+  const address = action.input.address;
+  if (!address || typeof address !== "object" || Array.isArray(address) ||
+      typeof address.origin !== "string" || typeof address.session !== "string") return null;
+  try {
+    const origin = new URL(address.origin);
+    if (origin.protocol !== "http:" || !["127.0.0.1", "localhost", "[::1]"].includes(origin.hostname) ||
+        origin.username || origin.password || origin.pathname !== "/" || origin.search || origin.hash) return null;
+    return digest([origin.port || "80", address.session]);
+  } catch { return null; }
+}
 
 /** All transactions are synchronous and short; HTTP/model work belongs outside. */
 export class OperationStore {
@@ -33,6 +46,15 @@ export class OperationStore {
     }
     let opened: DatabaseSync | undefined;
     try {
+      if (options.readOnly) {
+        if (!existsSync(resolved)) throw new StoreError("NOT_FOUND");
+        opened = new DatabaseSync(resolved, { readOnly: true });
+        this.db = opened;
+        this.db.exec("PRAGMA query_only=ON; PRAGMA busy_timeout=5000;");
+        const version = Number(this.db.prepare("PRAGMA user_version").get()!.user_version);
+        if (version !== 1 && version !== 2) throw new StoreError("SCHEMA_UNSUPPORTED");
+        return;
+      }
       mkdirSync(path.dirname(resolved), { recursive: true, mode: 0o700 });
       opened = new DatabaseSync(resolved);
       this.db = opened;
@@ -268,6 +290,7 @@ export class OperationStore {
   prepareAction(action: ActionInput, expectedAuthorizationRevision?: string): { operation: Operation; created: boolean } {
     for (const field of [action.workId, action.actionKey, action.recipientRole, action.command]) text(field);
     if (!kinds.has(action.kind) || !effects.has(action.effect) || !action.input || typeof action.input !== "object" || Array.isArray(action.input)) throw new StoreError("INVALID_INPUT");
+    if ((action.kind === "ORCHESTRATOR_HANDOFF") !== (action.effect === "ORCHESTRATOR_HANDOFF")) throw new StoreError("INVALID_INPUT");
     if (action.predecessor !== null) text(action.predecessor);
     const key = participantKey(action.participant), inputDigest = digest(action), encoded = canonical(action);
     const prepared = this.transaction(() => {
@@ -287,6 +310,18 @@ export class OperationStore {
         if (previous.work_id !== action.workId || !previous.completed_at) throw new StoreError("INPUT_CONFLICT");
       }
       if (this.db.prepare("SELECT operation_id FROM session_claims WHERE participant_key=?").get(key)) throw new StoreError("PARTICIPANT_BUSY");
+      // A replacement namespace/target must not bypass a retained handoff claim.
+      // Keep this additional collision rule scoped to pairs involving handoffs;
+      // ordinary lane-to-lane identity policy remains unchanged.
+      const physical = physicalAddress(action);
+      if (action.kind === "ORCHESTRATOR_HANDOFF" && !physical) throw new StoreError("INVALID_INPUT");
+      if (physical) {
+        const retained = this.db.prepare(`SELECT action_json FROM operations WHERE completed_at IS NULL
+          AND json_extract(action_json,'$.participant.session')=?
+          AND (?='ORCHESTRATOR_HANDOFF' OR json_extract(action_json,'$.kind')='ORCHESTRATOR_HANDOFF')`)
+          .all(action.participant.session, action.kind);
+        if (retained.some(row => physicalAddress(JSON.parse(String(row.action_json)) as ActionInput) === physical)) throw new StoreError("PARTICIPANT_BUSY");
+      }
       const operationId = `op-${randomUUID()}`;
       const version2 = this.schemaVersion() === 2;
       this.db.prepare(`INSERT INTO operations(operation_id,message_id,work_id,action_key,participant_key,action_json,input_digest,created_at${version2 ? ",authorization_revision" : ""}) VALUES(?,?,?,?,?,?,?,?${version2 ? ",?" : ""})`)

@@ -65,7 +65,7 @@ export function operationView(operation: Operation, store?: OperationStore) {
   };
 }
 
-async function retainExecutor(stateRoot: string, configurationPath: string, operationId: string): Promise<void> {
+export async function retainExecutor(stateRoot: string, configurationPath: string, operationId: string): Promise<void> {
   // A transport waiter, not a daemon or scheduler. It exits after this one request.
   const environment: NodeJS.ProcessEnv = {};
   for (const name of ["PATH", "SystemRoot", "WINDIR", "TEMP", "TMP", "LOCALAPPDATA", "USERPROFILE", "OPENCODE_SERVER_USERNAME", "OPENCODE_SERVER_PASSWORD"]) {
@@ -128,7 +128,8 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
     try { return refreshState(store, jsonFile<RouterConfiguration>(configurationPath), workId); }
     catch { return { status: "DEFERRED", reason: "PROJECTION_CONFIG_UNAVAILABLE" }; }
   };
-  const mutationView = (operation: Operation) => ({ ...operationView(operation, store), stateProjection: project(operation.action.workId) });
+  const mutationView = (operation: Operation) => ({ ...operationView(operation, store),
+    stateProjection: operation.action.kind === "ORCHESTRATOR_HANDOFF" ? { status: "NOT_APPLICABLE" } : project(operation.action.workId) });
   try {
     if (action === "resolve-owner-stopped") return { ...operationView(await engine().resolveStopped(readRequest<OwnerStoppedRequest>()), store), lifecycleSend: false };
     if (action === "adopt-manual-continuation") return { ...operationView(await engine().adoptManual(readRequest<ManualContinuationRequest>()), store), lifecycleSend: false };
@@ -233,6 +234,7 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
           store.observe(operationId, { observedAt: new Date().toISOString(), activity: code === "PARTICIPANT_BUSY" ? "BUSY" : "UNKNOWN",
             context: { ...previous?.context, reason: code } });
           const mayObserveAgain = !operation.dispatchStartedAt && !operation.completedAt &&
+            operation.action.kind !== "ORCHESTRATOR_HANDOFF" &&
             ["PARTICIPANT_BUSY", "SESSION_ACTIVITY_UNAVAILABLE"].includes(code) && performance.now() < idleDeadline;
           if (mayObserveAgain) {
             await delay(Math.min(cadence, Math.max(0, idleDeadline - performance.now())));
@@ -240,7 +242,8 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
             continue; // Pre-send GET observation only; no POST has been attempted.
           }
           const permanentPreparationFailure = ["SOURCE_CHANGED", "SOURCE_UNAVAILABLE", "COMMAND_CHANGED_BEFORE_SEND", "COMMAND_EFFECT_CHANGED", "PARTICIPANT_BINDING_CHANGED", "PARTICIPANT_IDENTITY_MISMATCH", "ROLE_COMMAND_NOT_ALLOWED", "MODEL_CONFIGURATION_INVALID", "MAINTENANCE_BASELINE_CHANGED", "ORCHESTRATOR_COMPACT_IS_MANUAL"].includes(code);
-          if (!operation.dispatchStartedAt && !operation.completedAt && permanentPreparationFailure) store.abandonPrepared(operationId, code);
+          if (!operation.dispatchStartedAt && !operation.completedAt &&
+              (permanentPreparationFailure || operation.action.kind === "ORCHESTRATOR_HANDOFF")) store.abandonPrepared(operationId, code);
           return mutationView(store.getOperation(operationId));
         }
       }

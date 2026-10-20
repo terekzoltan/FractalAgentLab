@@ -45,6 +45,8 @@ export interface OpenCodeMessage {
   error?: boolean;
   providerID?: string;
   modelID?: string;
+  agent?: string;
+  variant?: string;
   hasCompactionPart: boolean;
   /** Narrow native v1.18.30 provenance; visible prose is not continuation proof. */
   autoCompaction?: boolean;
@@ -54,7 +56,7 @@ export interface OpenCodeMessage {
   /** Last assistant-call token counts, not a measured remaining-context budget. */
   tokens?: MessageTokens;
 }
-export interface OpenCodeSession { id: string; directory: string; projectID?: string; parentID?: string }
+export interface OpenCodeSession { id: string; directory: string; projectID?: string; parentID?: string; reverted?: boolean }
 export interface PendingInteractionCounts { permissions: number | null; questions: number | null }
 export interface OpenCodeModelInfo {
   providerID: string;
@@ -151,6 +153,13 @@ function normalizedMessage(value: unknown, session: string, expectedId?: string)
   if (info.error !== undefined && info.error !== null) result.error = true;
   if (typeof info.providerID === "string") result.providerID = info.providerID;
   if (typeof info.modelID === "string") result.modelID = info.modelID;
+  if (typeof info.agent === "string") result.agent = info.agent;
+  if (typeof info.variant === "string") result.variant = info.variant;
+  if (info.role === "user" && info.model && typeof info.model === "object" && !Array.isArray(info.model)) {
+    const model = info.model as RecordValue;
+    if (typeof model.providerID === "string") result.providerID = model.providerID;
+    if (typeof model.modelID === "string") result.modelID = model.modelID;
+  }
   if (info.tokens && typeof info.tokens === "object" && !Array.isArray(info.tokens)) {
     const source = info.tokens as RecordValue;
     const tokens: MessageTokens = {};
@@ -201,6 +210,7 @@ export class OpenCodeAdapter {
       const result: OpenCodeSession = { id: session.id, directory: session.directory };
       if (typeof session.projectID === "string") result.projectID = session.projectID;
       if (typeof session.parentID === "string") result.parentID = session.parentID;
+      if (session.revert !== undefined && session.revert !== null) result.reverted = true;
       return result;
     });
   }
@@ -316,7 +326,7 @@ export class OpenCodeAdapter {
     return this.#submittedMessage(response, command.messageID, onAcknowledgement);
   }
 
-  /** Clarification prompt only; this endpoint does not perform installed /command expansion. */
+  /** Typed router messages only; this endpoint does not perform installed /command expansion. */
   async submitMessage(message: MessageSubmission, onAcknowledgement?: Acknowledge): Promise<AdapterReply<OpenCodeMessage>> {
     input(identity(message.messageID, "msg") && nonempty(message.text));
     const body: RecordValue = { messageID: message.messageID, parts: [{ type: "text", text: message.text }] };

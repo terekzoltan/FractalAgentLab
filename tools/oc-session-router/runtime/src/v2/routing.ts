@@ -46,7 +46,21 @@ export interface TargetBinding {
   commands?: Record<string, { capability: Capability; effect: Effect }>;
 }
 /** Private configuration, enrolled once; not a per-stage capability receipt. */
-export interface RouterConfiguration { schemaVersion: 2; targets: Record<string, TargetBinding>; compactThresholdRatio?: number; compactTokenCap?: number }
+export interface OrchestratorEnrollment {
+  /** Real control repository/home, never a weakened product sessionHome. */
+  controlTarget: string;
+  recipientRole: string;
+  governedTarget: string;
+  instructionReference: string;
+}
+export interface RouterConfiguration {
+  schemaVersion: 2;
+  targets: Record<string, TargetBinding>;
+  compactThresholdRatio?: number;
+  compactTokenCap?: number;
+  /** Operator-managed private enrollment; absent/false means no bridge sends. */
+  orchestratorBridge?: { enabled: boolean; projects: Record<string, OrchestratorEnrollment> };
+}
 export class RouterError extends Error {
   constructor(readonly code: string) { super(code); this.name = "RouterError"; }
 }

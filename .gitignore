@@ -68,6 +68,7 @@ __pycache__/
 !/tools/oc-session-router/docs/workflow-orchestrator-reference.md
 !/tools/oc-session-router/docs/workflow-orchestrator-runbook.md
 !/tools/oc-session-router/docs/v2-quickstart.md
+!/tools/oc-session-router/docs/orchestrator-handoff-bridge.md
 !/tools/oc-session-router/scripts/
 /tools/oc-session-router/scripts/*
 !/tools/oc-session-router/scripts/Invoke-OCRouter.ps1
@@ -75,6 +76,8 @@ __pycache__/
 !/tools/oc-session-router/scripts/session-context-status-core.ps1
 !/tools/oc-session-router/scripts/test-session-context-status.ps1
 !/tools/oc-session-router/scripts/test-v2-launcher.ps1
+!/tools/oc-session-router/scripts/Start-OrchestratorHandoff.ps1
+!/tools/oc-session-router/scripts/test-handoff-launcher.ps1
 !/tools/oc-session-router/runtime/
 /tools/oc-session-router/runtime/*
 !/tools/oc-session-router/runtime/package.json

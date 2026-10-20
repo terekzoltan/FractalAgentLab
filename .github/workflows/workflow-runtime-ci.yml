@@ -28,6 +28,7 @@ jobs:
         run: |
           & ./tools/oc-session-router/scripts/test-v2-launcher.ps1
           & ./tools/oc-session-router/scripts/test-session-context-status.ps1
+          & ./tools/oc-session-router/scripts/test-handoff-launcher.ps1
       - name: Managed-tooling transaction fixtures only
         shell: powershell
         run: ./tools/workflow-tooling/tests/Test-WorkflowTooling.ps1
