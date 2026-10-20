@@ -12,6 +12,7 @@ import { reconcileLegacyOperation } from "./legacy-import.js";
 import { freezeSources, renderSources, packetSummary, type SourceSnapshot, type SourceReference } from "./context-packet.js";
 import { stateAuthorityDigest } from "./state-projection.js";
 import type { PreparationReporter } from "./preparation-diagnostics.js";
+import { assertPreviewCurrent, handoffBinding, inspectHandoffBoundary, renderHandoff, validatePreview, type HandoffPreview } from "./orchestrator-handoff.js";
 export type { SourceReference } from "./context-packet.js";
 
 export type Adapter = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "listCommands" | "getMessage" | "getHistory" | "submitCommand" | "submitMessage" | "summarize"> & Partial<Pick<OpenCodeAdapter, "getModelInfo" | "getPendingInteractions">>;
@@ -62,6 +63,40 @@ export class RouterEngine {
     const target = this.configuration.targets[context.target];
     if (!target || !sameDirectory(target.directory, context.directory)) throw new RouterError("TARGET_DIRECTORY_MISMATCH");
     return this.store.openWork(context);
+  }
+
+  /** The frozen handoff is a separate control work, not a product-scope amendment. */
+  async prepareHandoff(preview: HandoffPreview): Promise<{ operation: Operation; created: boolean }> {
+    validatePreview(preview);
+    const workId = preview.handoffId;
+    // Duplicate lookup precedes activation, stale/idle checks and all remote GETs.
+    // A prior POSSIBLE send can never be reported as a fresh no-send refusal.
+    try {
+      const existing = this.store.getWork(workId).operations.find(operation => operation.action.actionKey === "handoff");
+      if (existing) {
+        if (existing.action.kind !== "ORCHESTRATOR_HANDOFF" || existing.action.input.previewDigest !== preview.previewDigest) throw new StoreError("INPUT_CONFLICT");
+        return { operation: existing, created: false };
+      }
+    } catch (error) { if (!(error instanceof StoreError && error.code === "NOT_FOUND")) throw error; }
+    const binding = handoffBinding(this.configuration, preview.request.project, true);
+    const adapter = this.adapterFactory({ origin: binding.target.origin, directory: binding.home, session: binding.role.session }, this.credentials, { getBudgetMs: 20_000 });
+    if (!adapter.getPendingInteractions) throw new RouterError("HANDOFF_ATTENTION_UNAVAILABLE");
+    const boundary = await inspectHandoffBoundary(adapter as Required<Pick<Adapter, "getSession" | "getStatus" | "getHistory" | "getMessage" | "getPendingInteractions">>,
+      { session: binding.role.session, project: binding.target.project, directory: binding.home });
+    assertPreviewCurrent(preview, binding.bindingDigest, boundary);
+    const work = this.openWork({ workId, target: binding.enrollment.controlTarget, directory: binding.target.directory,
+      instructionReference: preview.request.instructionReference,
+      scope: `Single orchestrator handoff for ${preview.request.project}. Downstream scope: ${preview.request.scope}\nExclusions: ${preview.request.exclusions}`,
+      allowedEffects: ["ORCHESTRATOR_HANDOFF"], stoppingPoint: "Retain the addressed response; no automatic successor or downstream grant." });
+    return this.store.prepareAction({
+      workId, actionKey: "handoff", participant: binding.participant, recipientRole: binding.enrollment.recipientRole,
+      kind: "ORCHESTRATOR_HANDOFF", effect: "ORCHESTRATOR_HANDOFF", command: "orchestrator-handoff", predecessor: null,
+      input: { preview: preview as unknown as Json, previewDigest: preview.previewDigest,
+        executionDirectory: binding.target.directory, address: { origin: binding.target.origin, directory: binding.home, session: binding.role.session },
+        profile: binding.role.profile, sources: [], arguments: renderHandoff(preview.request),
+        agent: boundary.selection.agent, model: `${boundary.selection.providerID}/${boundary.selection.modelID}`,
+        ...(boundary.selection.variant === null ? {} : { variant: boundary.selection.variant }) },
+    }, work.authorization.revision);
   }
 
   async observe(workId: string, roleName: string, budgetMs?: number) {
@@ -269,8 +304,19 @@ export class RouterEngine {
     if (operation.completedAt || operation.dispatchStartedAt) return operation;
     const work = this.store.getWork(operation.action.workId);
     if (work.paused) throw new StoreError("WORK_PAUSED");
+    if (operation.action.kind === "ORCHESTRATOR_HANDOFF") {
+      handoffBinding(this.configuration, (operation.action.input.preview as unknown as HandoffPreview).request.project, true);
+    }
     const adapter = this.adapterForOperation(operation, true);
     await this.verifyParticipant(adapter, (operation.action.input.address as unknown as OpenCodeTarget).directory, operation.action.participant.project, operation.action.participant.session, true);
+    if (operation.action.kind === "ORCHESTRATOR_HANDOFF") {
+      const preview = operation.action.input.preview as unknown as HandoffPreview;
+      const binding = handoffBinding(this.configuration, preview.request.project, true);
+      if (!adapter.getPendingInteractions) throw new RouterError("HANDOFF_ATTENTION_UNAVAILABLE");
+      const boundary = await inspectHandoffBoundary(adapter as Required<Pick<Adapter, "getSession" | "getStatus" | "getHistory" | "getMessage" | "getPendingInteractions">>,
+        { session: binding.role.session, project: binding.target.project, directory: binding.home });
+      assertPreviewCurrent(preview, binding.bindingDigest, boundary);
+    }
     for (const source of operation.action.input.sources as unknown as SourceSnapshot[]) {
       if (source.sourceClass === "FILE") {
         const current = readContainedSource(work.context.directory, source.reference);
@@ -305,7 +351,7 @@ export class RouterEngine {
       await this.observeOptional(operation.action.workId, operation.action.recipientRole);
       return result.operation;
     }
-    if (operation.action.kind !== "CLARIFICATION") {
+    if (operation.action.kind !== "CLARIFICATION" && operation.action.kind !== "ORCHESTRATOR_HANDOFF") {
       const registry = await adapter.listCommands();
       const matches = registry.value?.filter(command => command.name === operation.action.command) ?? [];
       if (registry.problem || matches.length !== 1) throw new RouterError("COMMAND_UNAVAILABLE");
@@ -320,7 +366,7 @@ export class RouterEngine {
     if (typeof input.variant === "string") common.variant = input.variant;
     const onAcknowledgement = (fact: Acknowledgement) => this.recordHttpFact(operation, fact);
     let submit: () => Promise<AdapterReply<OpenCodeMessage>>;
-    if (operation.action.kind === "CLARIFICATION") {
+    if (operation.action.kind === "CLARIFICATION" || operation.action.kind === "ORCHESTRATOR_HANDOFF") {
       const message: Parameters<Adapter["submitMessage"]>[0] = { ...common, text: String(input.arguments) };
       if (typeof input.model === "string") {
         const slash = input.model.indexOf("/");

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-export type Effect = "READ_ONLY" | "WORKSPACE_WRITE" | "LOCAL_COMMIT" | "SESSION_MAINTENANCE";
+export type Effect = "READ_ONLY" | "WORKSPACE_WRITE" | "LOCAL_COMMIT" | "SESSION_MAINTENANCE" | "ORCHESTRATOR_HANDOFF";
 
 export interface WorkContext {
   workId: string;
@@ -49,7 +49,7 @@ export interface ActionInput {
   actionKey: string;
   participant: Participant;
   recipientRole: string;
-  kind: "LIFECYCLE" | "CLARIFICATION" | "COMPACT" | "RESTORE" | "LEGACY";
+  kind: "LIFECYCLE" | "CLARIFICATION" | "COMPACT" | "RESTORE" | "LEGACY" | "ORCHESTRATOR_HANDOFF";
   effect: Effect;
   command: string;
   predecessor: string | null;
