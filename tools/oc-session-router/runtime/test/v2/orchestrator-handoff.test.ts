@@ -88,6 +88,38 @@ test("handoff uses explicit type/effect, separate control work, exact frozen mes
   assert.deepEqual(f.store.getWork("product-existing"), original);
 });
 
+test("omitted user variant preserves the effective variant from the exact completed assistant", async t => {
+  const f = fixture(t);
+  delete f.state.messages[0]!.variant;
+  f.state.messages[1]!.variant = "medium";
+  const preview = await f.preview();
+  assert.equal(preview.boundary.selection.variant, "medium");
+  const prepared = await f.engine.prepareHandoff(preview);
+  await f.engine.execute(prepared.operation.operationId);
+  assert.equal(f.state.submissions[0]!.variant, "medium");
+  assert.equal(f.state.messages[0]!.variant, undefined);
+});
+
+test("explicit variant conflict remains a no-send refusal", async t => {
+  const f = fixture(t);
+  f.state.messages[1]!.variant = "medium";
+  await assert.rejects(f.preview(), code("HANDOFF_SELECTION_CONFLICT"));
+  assert.equal(f.state.submissions.length, 0);
+  assert.equal(f.store.listRecentWorkIds("control").length, 0);
+});
+
+test("a changed observed default variant invalidates a frozen preview", async t => {
+  const f = fixture(t);
+  delete f.state.messages[0]!.variant;
+  f.state.messages[1]!.variant = "medium";
+  const preview = await f.preview();
+  const operation = (await f.engine.prepareHandoff(preview)).operation;
+  f.state.messages[1]!.variant = "high";
+  await assert.rejects(f.engine.execute(operation.operationId), code("HANDOFF_STALE_PREVIEW"));
+  assert.equal(f.state.submissions.length, 0);
+  assert.equal(f.store.getOperation(operation.operationId).dispatchStartedAt, null);
+});
+
 test("activation absent/disabled rejects a new send, while prepare stays no-send", async t => {
   const f = fixture(t);
   const preview = await f.preview();

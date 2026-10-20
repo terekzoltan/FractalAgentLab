@@ -24,6 +24,9 @@ receives the exact displayed message plus displayed scope/stop/exclusions and
 an instruction to load the current orchestration skill. No installed command is
 invoked. Recorded agent/model/variant from the last completed normal user turn are frozen;
 missing/conflicting evidence fails closed, not back to global/command defaults.
+If the user message omits a variant override, use the effective variant recorded
+on its exact, stable completed assistant response. Two explicit conflicting
+variants still fail; no current provider/configuration default is guessed.
 This is not a claim about current unsent UI selection: the Owner must confirm
 that selection for the quiescent pilot, because changing it without a new message
 is as unobservable to GET history as an unsent browser draft.
