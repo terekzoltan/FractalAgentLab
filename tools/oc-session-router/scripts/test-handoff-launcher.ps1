@@ -15,6 +15,16 @@ function Assert-HandoffLauncher {
   param([bool]$Condition, [string]$Message)
   if (-not $Condition) { throw $Message }
 }
+function Test-InitializeEnvelope {
+  param($Envelope)
+  return $Envelope -is [System.Collections.IDictionary] -and
+    $Envelope.jsonrpc -is [string] -and $Envelope.jsonrpc -ceq '2.0' -and
+    $Envelope.id -is [int] -and $Envelope.id -eq 1 -and
+    -not $Envelope.ContainsKey('error') -and
+    $Envelope.result -is [System.Collections.IDictionary] -and
+    $Envelope.result.protocolVersion -is [string] -and
+    $Envelope.result.protocolVersion -ceq '2025-03-26'
+}
 function ConvertTo-TestNativeArgument {
   param([AllowEmptyString()][string]$Value)
   $Escaped = [regex]::Replace($Value, '(\\*)"', '$1$1\"')
@@ -75,6 +85,23 @@ function Invoke-TestLauncher {
 }
 
 try {
+  # This Windows PowerShell 5.1 fixture tests JSON wire literals, not host-specific
+  # ConvertFrom-Json date conversion. Framework JavaScriptSerializer preserves an
+  # ISO-looking protocolVersion as its actual JSON string without coercing dates.
+  Add-Type -AssemblyName System.Web.Extensions
+  $WireJson = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+  $ValidInitialize = '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26"}}'
+  Assert-HandoffLauncher (Test-InitializeEnvelope ($WireJson.DeserializeObject($ValidInitialize))) 'Initialize validator must accept the exact string version.'
+  foreach ($WrongInitialize in @(
+      '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-27"}}',
+      '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26T00:00:00Z"}}',
+      '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":20250326}}',
+      '{"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2025-03-26"}}',
+      '{"jsonrpc":"2.0","id":2,"result":{"protocolVersion":"2025-03-26"}}',
+      '{"jsonrpc":"2.0","id":1,"error":{},"result":{"protocolVersion":"2025-03-26"}}')) {
+    Assert-HandoffLauncher (-not (Test-InitializeEnvelope ($WireJson.DeserializeObject($WrongInitialize)))) 'Initialize validator must reject wrong versions, non-strings, wrong ids and errors.'
+  }
+  $Passed++
   [void](New-Item -ItemType Directory -Path $FixtureRoot)
   $StateRoot = (Join-Path $FixtureRoot 'explicit state') + '\'
   $ConfigurationPath = Join-Path $FixtureRoot "config 'quoted' with spaces.json"
@@ -162,9 +189,13 @@ process.stdin.on("end",()=>{
     '{"jsonrpc":"2.0","id":99,"method":"tools/list"}'
   $Actual = Invoke-TestLauncher -ScriptPath $Launcher -TestArguments $Arguments -InputText $Wire -VerifyBeforeEof
   Assert-HandoffLauncher ($Actual.code -eq 0) ('Real MCP startup failed: ' + $Actual.error)
-  $Lines = @($Actual.output -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_ | ConvertFrom-Json })
+  $RawLines = @($Actual.output -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  $Lines = @($RawLines | ForEach-Object { $WireJson.DeserializeObject($_) })
   Assert-HandoffLauncher ($Lines.Count -eq 3) 'Only newline-complete requests may execute; EOF fragment must be ignored.'
-  Assert-HandoffLauncher ($Lines[0].result.protocolVersion -ceq '2025-03-26') 'Real MCP must negotiate expected version.'
+  # This is a non-sensitive fixture-only initialize envelope, not a tool result.
+  # Preserve it on failure to distinguish a wire regression from parsing errors.
+  Assert-HandoffLauncher (Test-InitializeEnvelope $Lines[0]) ('Real MCP must negotiate exact string version for id 1. First response: ' + $RawLines[0])
+  Assert-HandoffLauncher ($Lines[1].jsonrpc -ceq '2.0' -and $Lines[1].id -is [int] -and $Lines[1].id -eq 2) 'Tools response must correlate to numeric id 2.'
   $Tools = @($Lines[1].result.tools | ForEach-Object { $_.name })
   Assert-HandoffLauncher ($Tools.Count -eq 5 -and $Tools -contains 'inspect_orchestrator' -and $Tools -contains 'prepare_handoff') 'Real MCP must list the five documented tools.'
   Assert-HandoffLauncher ($Lines[2].id -ceq $Unicode) 'Real MCP response must preserve the Unicode request id.'
