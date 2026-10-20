@@ -18,12 +18,12 @@ function Assert-HandoffLauncher {
 function Test-InitializeEnvelope {
   param($Envelope)
   return $Envelope -is [System.Collections.IDictionary] -and
-    $Envelope.jsonrpc -is [string] -and $Envelope.jsonrpc -ceq '2.0' -and
+    $Envelope.jsonrpc -is [string] -and [string]::Equals($Envelope.jsonrpc, '2.0', [StringComparison]::Ordinal) -and
     $Envelope.id -is [int] -and $Envelope.id -eq 1 -and
     -not $Envelope.ContainsKey('error') -and
     $Envelope.result -is [System.Collections.IDictionary] -and
     $Envelope.result.protocolVersion -is [string] -and
-    $Envelope.result.protocolVersion -ceq '2025-03-26'
+    [string]::Equals($Envelope.result.protocolVersion, '2025-03-26', [StringComparison]::Ordinal)
 }
 function ConvertTo-TestNativeArgument {
   param([AllowEmptyString()][string]$Value)
@@ -32,7 +32,7 @@ function ConvertTo-TestNativeArgument {
   return '"' + $Escaped + '"'
 }
 function Invoke-TestLauncher {
-  param([string]$ScriptPath, [string[]]$TestArguments, [string]$InputText = '', [hashtable]$ChildEnvironment = @{}, [switch]$VerifyBeforeEof)
+  param([string]$ScriptPath, [string[]]$TestArguments, [string]$InputText = '', [hashtable]$ChildEnvironment = @{}, [switch]$VerifyBeforeEof, [switch]$BomfulLauncherInput)
   $Start = New-Object System.Diagnostics.ProcessStartInfo
   $Start.FileName = $PowerShellExecutable
   $Start.UseShellExecute = $false
@@ -43,7 +43,12 @@ function Invoke-TestLauncher {
   $Start.StandardOutputEncoding = $Utf8
   $Start.StandardErrorEncoding = $Utf8
   $Start.WorkingDirectory = $FixtureRoot
-  $Start.Arguments = (@(@('-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$ScriptPath) + $TestArguments |
+  $EntryScript = $ScriptPath
+  if ($BomfulLauncherInput) {
+    $EntryScript = $BomfulEntry
+    $Start.EnvironmentVariables['FAL_FIXTURE_LAUNCHER'] = $ScriptPath
+  }
+  $Start.Arguments = (@(@('-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$EntryScript) + $TestArguments |
     ForEach-Object { ConvertTo-TestNativeArgument $_ }) -join ' ')
   $Start.EnvironmentVariables.Remove('OPENCODE_SERVER_PASSWORD')
   $Start.EnvironmentVariables.Remove('OPENCODE_SERVER_USERNAME')
@@ -52,11 +57,22 @@ function Invoke-TestLauncher {
   $TestProcess.StartInfo = $Start
   $Started = $false
   try {
-    [void]$TestProcess.Start()
+    # .NET Framework takes child stdin encoding from Console.InputEncoding and
+    # may emit a preamble even when the test writes only StandardInput.BaseStream.
+    # Keep the fixture producer byte-exact, independently of the launcher setting.
+    $PreviousEncoding = [Console]::InputEncoding
+    try {
+      [Console]::InputEncoding = $Utf8
+      [void]$TestProcess.Start()
+    } finally { [Console]::InputEncoding = $PreviousEncoding }
     $Started = $true
+    # Do not let StreamReader silently consume a protocol BOM. Strict UTF-8 with
+    # BOM detection disabled makes an injected prefix visible to the assertions.
+    $StrictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
+    $OutputReader = New-Object IO.StreamReader($TestProcess.StandardOutput.BaseStream, $StrictUtf8, $false)
     $PrefixOutput = ''
-    if ($VerifyBeforeEof) { $FirstLine = $TestProcess.StandardOutput.ReadLineAsync() }
-    else { $Output = $TestProcess.StandardOutput.ReadToEndAsync() }
+    if ($VerifyBeforeEof) { $FirstLine = $OutputReader.ReadLineAsync() }
+    else { $Output = $OutputReader.ReadToEndAsync() }
     $ErrorOutput = $TestProcess.StandardError.ReadToEndAsync()
     $Bytes = $Utf8.GetBytes($InputText)
     $TestProcess.StandardInput.BaseStream.Write($Bytes, 0, $Bytes.Length)
@@ -64,7 +80,7 @@ function Invoke-TestLauncher {
     if ($VerifyBeforeEof) {
       Assert-HandoffLauncher ($FirstLine.Wait(10000)) 'MCP must answer while host input remains open.'
       $PrefixOutput = $FirstLine.GetAwaiter().GetResult() + "`n"
-      $Output = $TestProcess.StandardOutput.ReadToEndAsync()
+      $Output = $OutputReader.ReadToEndAsync()
     }
     $TestProcess.StandardInput.Close()
     if (-not $TestProcess.WaitForExit(30000)) {
@@ -94,6 +110,7 @@ try {
   Assert-HandoffLauncher (Test-InitializeEnvelope ($WireJson.DeserializeObject($ValidInitialize))) 'Initialize validator must accept the exact string version.'
   foreach ($WrongInitialize in @(
       '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-27"}}',
+      '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"\ufeff2025-03-26"}}',
       '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26T00:00:00Z"}}',
       '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":20250326}}',
       '{"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2025-03-26"}}',
@@ -103,6 +120,12 @@ try {
   }
   $Passed++
   [void](New-Item -ItemType Directory -Path $FixtureRoot)
+  $BomfulEntry = Join-Path $FixtureRoot 'bomful-console-entry.ps1'
+  [IO.File]::WriteAllText($BomfulEntry, @'
+[Console]::InputEncoding = New-Object Text.UTF8Encoding($true)
+& $env:FAL_FIXTURE_LAUNCHER @args
+exit $LASTEXITCODE
+'@, $Utf8)
   $StateRoot = (Join-Path $FixtureRoot 'explicit state') + '\'
   $ConfigurationPath = Join-Path $FixtureRoot "config 'quoted' with spaces.json"
   $CredentialPath = Join-Path $FixtureRoot 'fixture-only.credential.xml'
@@ -122,14 +145,14 @@ try {
   Copy-Item -LiteralPath $Launcher -Destination $FakeLauncher
   $FakeEntry = Join-Path $FakeDist 'handoff-mcp.js'
   $FakeCode = @'
-let raw="";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data",chunk=>raw+=chunk);
+const chunks=[];
+process.stdin.on("data",chunk=>chunks.push(chunk));
 process.stdin.on("end",()=>{
+  const bytes=Buffer.concat(chunks);
   process.stdout.write(JSON.stringify({
     args:process.argv.slice(2),
     credentialMatches:process.env.OPENCODE_SERVER_USERNAME==="fixture-user"&&process.env.OPENCODE_SERVER_PASSWORD==="fixture-password-never-emit",
-    raw
+    raw:bytes.toString("utf8"), rawBase64:bytes.toString("base64")
   })+"\n");
   process.exitCode=Number(process.env.FAL_FIXTURE_EXIT_CODE||0);
 });
@@ -137,14 +160,27 @@ process.stdin.on("end",()=>{
   [IO.File]::WriteAllText($FakeEntry, $FakeCode, $Utf8)
   $Unicode = 'UTF8 ' + [char]0x00e1 + [char]0x0171 + [char]0x00f6 + [char]0x4e16 + [char]0x754c
   $InputText = '{"jsonrpc":"2.0","id":"' + $Unicode + '","method":"ping"}' + "`n"
-  $Fake = Invoke-TestLauncher -ScriptPath $FakeLauncher -TestArguments $Arguments -InputText $InputText
+  foreach ($Bomful in @($false,$true)) {
+  $Fake = Invoke-TestLauncher -ScriptPath $FakeLauncher -TestArguments $Arguments -InputText $InputText -BomfulLauncherInput:$Bomful
   Assert-HandoffLauncher ($Fake.code -eq 0) ('Fixture launcher failed: ' + $Fake.error)
+  Assert-HandoffLauncher ($Fake.output.Length -gt 0 -and $Fake.output[0] -ne [char]0xfeff) 'Launcher stdout must not inject a UTF-8 BOM.'
   $Echo = $Fake.output | ConvertFrom-Json
   Assert-HandoffLauncher $Echo.credentialMatches 'Child must receive only the fixture credential.'
-  Assert-HandoffLauncher ($Echo.raw -ceq $InputText) 'Inherited MCP input must preserve UTF-8 bytes and EOF.'
+  $ExpectedBytes = [Convert]::ToBase64String($Utf8.GetBytes($InputText))
+  Assert-HandoffLauncher ([string]::Equals($Echo.rawBase64, $ExpectedBytes, [StringComparison]::Ordinal)) ('MCP stdin must preserve exact bytes without injected BOM; bomful launcher console: ' + $Bomful)
+  Assert-HandoffLauncher ([string]::Equals($Echo.raw, $InputText, [StringComparison]::Ordinal)) 'MCP input must preserve Unicode with ordinal equality.'
   Assert-HandoffLauncher ($Echo.args[0] -ceq '--state-root' -and $Echo.args[1] -ceq $StateRoot -and
     $Echo.args[2] -ceq '--config' -and $Echo.args[3] -ceq $ConfigurationPath -and $Echo.args.Count -eq 4) 'Paths must survive exact native argv quoting.'
   Assert-HandoffLauncher ($Fake.output -notmatch 'fixture-password-never-emit' -and $Fake.error -notmatch 'fixture-password-never-emit') 'No credential may reach protocol/error output.'
+  $Passed++
+  }
+
+  # Deliberately supplied bytes are forwarded, not stripped to hide transport
+  # defects. The MCP parser, not this launcher, decides whether they are valid.
+  $WithBom = [char]0xfeff + $InputText
+  $Forwarded = Invoke-TestLauncher -ScriptPath $FakeLauncher -TestArguments $Arguments -InputText $WithBom -BomfulLauncherInput
+  $ForwardedEcho = $Forwarded.output | ConvertFrom-Json
+  Assert-HandoffLauncher ($Forwarded.code -eq 0 -and [string]::Equals($ForwardedEcho.rawBase64, [Convert]::ToBase64String($Utf8.GetBytes($WithBom)), [StringComparison]::Ordinal)) 'Launcher must not remove or duplicate an explicitly supplied input BOM.'
   $Passed++
 
   $Exit = Invoke-TestLauncher -ScriptPath $FakeLauncher -TestArguments $Arguments -ChildEnvironment @{ FAL_FIXTURE_EXIT_CODE='7' }
@@ -187,8 +223,10 @@ process.stdin.on("end",()=>{
     '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' + "`n" +
     '{"jsonrpc":"2.0","id":"' + $Unicode + '","method":"ping"}' + "`n" +
     '{"jsonrpc":"2.0","id":99,"method":"tools/list"}'
-  $Actual = Invoke-TestLauncher -ScriptPath $Launcher -TestArguments $Arguments -InputText $Wire -VerifyBeforeEof
+  foreach ($Bomful in @($false,$true)) {
+  $Actual = Invoke-TestLauncher -ScriptPath $Launcher -TestArguments $Arguments -InputText $Wire -VerifyBeforeEof -BomfulLauncherInput:$Bomful
   Assert-HandoffLauncher ($Actual.code -eq 0) ('Real MCP startup failed: ' + $Actual.error)
+  Assert-HandoffLauncher ($Actual.output.Length -gt 0 -and $Actual.output[0] -ne [char]0xfeff) 'Real MCP stdout must not contain a UTF-8 BOM.'
   $RawLines = @($Actual.output -split "`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
   $Lines = @($RawLines | ForEach-Object { $WireJson.DeserializeObject($_) })
   Assert-HandoffLauncher ($Lines.Count -eq 3) 'Only newline-complete requests may execute; EOF fragment must be ignored.'
@@ -198,10 +236,11 @@ process.stdin.on("end",()=>{
   Assert-HandoffLauncher ($Lines[1].jsonrpc -ceq '2.0' -and $Lines[1].id -is [int] -and $Lines[1].id -eq 2) 'Tools response must correlate to numeric id 2.'
   $Tools = @($Lines[1].result.tools | ForEach-Object { $_.name })
   Assert-HandoffLauncher ($Tools.Count -eq 5 -and $Tools -contains 'inspect_orchestrator' -and $Tools -contains 'prepare_handoff') 'Real MCP must list the five documented tools.'
-  Assert-HandoffLauncher ($Lines[2].id -ceq $Unicode) 'Real MCP response must preserve the Unicode request id.'
+  Assert-HandoffLauncher ([string]::Equals($Lines[2].id, $Unicode, [StringComparison]::Ordinal)) 'Real MCP response must preserve the Unicode request id.'
   Assert-HandoffLauncher (-not (Test-Path -LiteralPath $StateRoot)) 'Handshake must not create a state root, DB, operation or preview.'
   Assert-HandoffLauncher (($Actual.output + $Actual.error) -notmatch 'fixture-password-never-emit') 'Real MCP must not log credential.'
   $Passed++
+  }
 
   Assert-HandoffLauncher ($env:OPENCODE_SERVER_USERNAME -ceq $ParentUsername -and
     $env:OPENCODE_SERVER_PASSWORD -ceq $ParentPassword) 'Launcher tests must not alter parent credential environment.'

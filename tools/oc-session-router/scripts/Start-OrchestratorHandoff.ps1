@@ -85,7 +85,19 @@ try {
   $StartInfo.EnvironmentVariables['OPENCODE_SERVER_PASSWORD'] = $Credential.GetNetworkCredential().Password
   $Process = New-Object System.Diagnostics.Process
   $Process.StartInfo = $StartInfo
-  if (-not $Process.Start()) { throw 'Could not start runtime' }
+  # .NET Framework initializes its redirected stdin StreamWriter using the
+  # console encoding, even when all our writes use BaseStream. A BOM-bearing
+  # UTF-8 default would inject EF BB BF before the first JSON-RPC request.
+  # Select a BOM-free writer before Start; never strip bytes supplied by the host.
+  $PreviousConsoleInputEncoding = [Console]::InputEncoding
+  try {
+    $PipeEncoding = New-Object System.Text.UTF8Encoding($false)
+    [Console]::InputEncoding = $PipeEncoding
+    if ($null -ne $StartInfo.PSObject.Properties['StandardInputEncoding']) {
+      $StartInfo.StandardInputEncoding = $PipeEncoding
+    }
+    if (-not $Process.Start()) { throw 'Could not start runtime' }
+  } finally { [Console]::InputEncoding = $PreviousConsoleInputEncoding }
   # Erase the managed launch copy after Windows has inherited the environment.
   $StartInfo.EnvironmentVariables.Remove('OPENCODE_SERVER_PASSWORD')
   $Credential = $null
