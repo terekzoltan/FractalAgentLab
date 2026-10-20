@@ -117,7 +117,10 @@ export async function inspectHandoffBoundary(reader: Reader, expected: { session
   const turn = messages.slice(Math.max(0, messages.indexOf(user)));
   if (turn.some(message => message.hasCompactionPart || message.summary || message.error)) throw new RouterError("HANDOFF_TURN_NOT_QUIESCENT");
   if (!user.agent?.trim() || !user.providerID?.trim() || !user.modelID?.trim()) throw new RouterError("HANDOFF_SELECTION_UNAVAILABLE");
-  const selection = { agent: user.agent, providerID: user.providerID, modelID: user.modelID, variant: user.variant ?? null };
+  // OpenCode may omit the user override while recording the effective variant
+  // on this exact completed assistant turn. Preserve that observed value, not
+  // today's configured default. An explicit conflicting override still fails.
+  const selection = { agent: user.agent, providerID: user.providerID, modelID: user.modelID, variant: user.variant ?? head.variant ?? null };
   if (head.providerID && head.providerID !== selection.providerID || head.modelID && head.modelID !== selection.modelID ||
       head.agent && head.agent !== selection.agent || head.variant && head.variant !== selection.variant) throw new RouterError("HANDOFF_SELECTION_CONFLICT");
   // Catch a head change during observation; no UI-draft visibility is claimed.
