@@ -88,6 +88,66 @@ test("handoff uses explicit type/effect, separate control work, exact frozen mes
   assert.deepEqual(f.store.getWork("product-existing"), original);
 });
 
+function manualCompact(messages: OpenCodeMessage[]) {
+  messages.push(
+    { id: "msg_compact", session: "ses_orchestrator", role: "user", text: "", hasCompactionPart: true,
+      manualCompaction: true, autoCompaction: false, agent: "build", providerID: "fixture", modelID: "selected" },
+    { id: "msg_summary", session: "ses_orchestrator", role: "assistant", parentId: "msg_compact", text: "Frozen summary, not authority",
+      hasCompactionPart: false, summary: true, agent: "compaction", providerID: "fixture", modelID: "selected", finish: "stop", timeCompleted: 200 },
+  );
+}
+
+test("completed manual compact retains normal-turn selection and sends exactly once", async t => {
+  const f = fixture(t);
+  delete f.state.messages[0]!.variant;
+  f.state.messages[1]!.variant = "medium";
+  manualCompact(f.state.messages);
+  const preview = await f.preview();
+  assert.equal(preview.boundary.manualCompactCompleted, true);
+  assert.equal(preview.boundary.selection.agent, "build");
+  assert.equal(preview.boundary.selection.variant, "medium");
+  const op = (await f.engine.prepareHandoff(preview)).operation;
+  await f.engine.execute(op.operationId);
+  await f.engine.execute(op.operationId);
+  assert.equal(f.state.submissions.length, 1);
+  assert.equal(f.state.submissions[0]!.agent, "build");
+  assert.equal(f.state.submissions[0]!.variant, "medium");
+});
+
+for (const condition of ["auto", "no-marker", "mixed-text", "parent", "unfinished", "error", "summary-agent", "prior-unfinished", "missing-prior", "selection", "new-user"] as const) {
+  test(`manual compact rejects ${condition} without send`, async t => {
+    const f = fixture(t);
+    manualCompact(f.state.messages);
+    const marker = f.state.messages[2]!, summary = f.state.messages[3]!;
+    if (condition === "auto") { marker.autoCompaction = true; marker.manualCompaction = false; }
+    if (condition === "no-marker") delete marker.manualCompaction;
+    if (condition === "mixed-text") marker.text = "Also do other work";
+    if (condition === "parent") summary.parentId = "msg_elsewhere";
+    if (condition === "unfinished") delete summary.timeCompleted;
+    if (condition === "error") summary.error = true;
+    if (condition === "summary-agent") summary.agent = "build";
+    if (condition === "prior-unfinished") f.state.messages[1]!.finish = "tool-calls";
+    if (condition === "missing-prior") f.state.messages.splice(0, 2);
+    if (condition === "selection") marker.modelID = "other";
+    if (condition === "new-user") f.state.messages.push({ ...f.state.messages[0]!, id: "msg_new" });
+    await assert.rejects(f.preview());
+    assert.equal(f.state.submissions.length, 0);
+    assert.equal(f.store.listRecentWorkIds("control").length, 0);
+  });
+}
+
+test("manual compact supports exact old root read, pins summary and refuses missing root", async t => {
+  const f = fixture(t);
+  manualCompact(f.state.messages);
+  f.adapter.getHistory = async () => reply({ messages: structuredClone(f.state.messages.slice(1)) });
+  const preview = await f.preview();
+  f.state.messages[3]!.text = "Changed summary";
+  await assert.rejects(f.engine.prepareHandoff(preview), code("HANDOFF_STALE_PREVIEW"));
+  f.adapter.getMessage = async () => ({ status: 404, bodySha256: "fixture", problem: "HTTP_ERROR" });
+  await assert.rejects(f.preview());
+  assert.equal(f.state.submissions.length, 0);
+});
+
 test("omitted user variant preserves the effective variant from the exact completed assistant", async t => {
   const f = fixture(t);
   delete f.state.messages[0]!.variant;

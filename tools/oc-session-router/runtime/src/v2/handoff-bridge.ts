@@ -16,6 +16,7 @@ function previewView(preview: HandoffPreview) {
     stoppingPoint: preview.request.stoppingPoint, exclusions: preview.request.exclusions,
     instructionReference: preview.request.instructionReference, exactMessage: renderHandoff(preview.request),
     selection: preview.boundary.selection, selectionBasis: "LAST_COMPLETED_NORMAL_USER_TURN_NOT_UI_SELECTION",
+    manualCompactCompleted: preview.boundary.manualCompactCompleted === true,
     previewDigest: preview.previewDigest, expiresAt: preview.expiresAt,
     remoteSendPerformedByThisCall: false, previewOnlyCall: true,
     hostApprovalRequiredForSend: true, authorityAttestedByServer: false };
@@ -58,6 +59,7 @@ export async function callHandoffTool(tool: HandoffTool, args: unknown, stateRoo
     const boundary = await inspectHandoffBoundary(adapter, { session: binding.role.session, project: binding.target.project, directory: binding.home });
     if (tool === "inspect_orchestrator") return { project: args.project, identityVerified: true, activity: "IDLE",
       ownerAttention: "CLEAR", completedLatestTurn: true, selection: boundary.selection,
+      manualCompactCompleted: boundary.manualCompactCompleted === true,
       selectionBasis: "LAST_COMPLETED_NORMAL_USER_TURN_NOT_UI_SELECTION", observedAt: new Date().toISOString(),
       sendEnabled: config.orchestratorBridge?.enabled === true, browserDraftVisibility: false, remoteMutation: false };
     return previewView(savePreview(stateRoot, request, binding.bindingDigest, boundary));

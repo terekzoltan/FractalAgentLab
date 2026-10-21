@@ -81,6 +81,8 @@ test("native provenance requires exact synthetic metadata and a pure automatic c
     [{ type: "text", text: "Continue", synthetic: true }],
     [{ type: "compaction", auto: true }],
     [{ type: "compaction", auto: false }],
+    [{ type: "compaction" }],
+    [{ type: "compaction", auto: false }, { type: "text", text: "Extra instruction" }],
     [{ type: "text", text: "Continue", synthetic: true, metadata: { compaction_continue: true } }, {type: "text", text: "Independent request"}],
   ];
   let index = 0;
@@ -92,6 +94,7 @@ test("native provenance requires exact synthetic metadata and a pure automatic c
     const result = (await adapter.getMessage("msg_native")).value!;
     assert.equal(result.compactionContinue, i === 0);
     assert.equal(result.autoCompaction, i === 3);
+    assert.equal(result.manualCompaction, i === 4);
   }
 });
 
