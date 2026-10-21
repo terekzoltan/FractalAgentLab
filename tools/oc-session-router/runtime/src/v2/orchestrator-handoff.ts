@@ -18,6 +18,7 @@ export interface HandoffRequest {
 }
 export interface HandoffBoundary {
   headDigest: string;
+  manualCompactCompleted?: boolean;
   selection: { agent: string; providerID: string; modelID: string; variant: string | null };
 }
 export interface HandoffPreview {
@@ -81,7 +82,7 @@ function messageBoundary(message: OpenCodeMessage): Json {
   return { id: message.id, parentId: message.parentId ?? null, role: message.role,
     created: message.timeCreated ?? null, completed: message.timeCompleted ?? null, finish: message.finish ?? null,
     error: message.error ?? false, summary: message.summary ?? false, compact: message.hasCompactionPart,
-    autoCompact: message.autoCompaction ?? false, continuation: message.compactionContinue ?? false,
+    autoCompact: message.autoCompaction ?? false, manualCompact: message.manualCompaction ?? false, continuation: message.compactionContinue ?? false,
     agent: message.agent ?? null, providerID: message.providerID ?? null, modelID: message.modelID ?? null,
     variant: message.variant ?? null, textDigest: digest(message.text) };
 }
@@ -101,8 +102,29 @@ export async function inspectHandoffBoundary(reader: Reader, expected: { session
   if (page.problem || !page.value || page.value.messages.length > 12 ||
       page.value.messages.some(message => message.session !== expected.session)) throw new RouterError("HANDOFF_HEAD_UNAVAILABLE");
   const messages = page.value.messages;
-  const head = messages.at(-1);
-  let user = [...messages].reverse().find(message => message.role === "user");
+  let head = messages.at(-1);
+  let effectiveMessages = messages;
+  let compactRoot: OpenCodeMessage | undefined;
+  // A completed native manual compact is an idle maintenance boundary, not a
+  // new normal user turn. Only the adjacent exact marker/summary pair is allowed.
+  // Preserve selection from the preceding completed normal turn; never dispatch
+  // with the summary's compaction agent or infer intent from summary prose.
+  if (head?.summary === true) {
+    const marker = messages.at(-2);
+    const previous = messages.at(-3);
+    if (!marker?.manualCompaction || marker.autoCompaction || marker.compactionContinue || marker.error || marker.parentId ||
+        marker.role !== "user" || !marker.hasCompactionPart || marker.text.trim() ||
+        head.role !== "assistant" || head.parentId !== marker.id || head.agent !== "compaction" ||
+        head.finish !== "stop" || typeof head.timeCompleted !== "number" || !Number.isFinite(head.timeCompleted) ||
+        head.timeCompleted < 0 || head.error || head.hasCompactionPart || !head.text.trim() ||
+        !previous || previous.role !== "assistant" || !isTerminalMessage(previous) || previous.error || previous.summary) {
+      throw new RouterError("HANDOFF_TURN_NOT_QUIESCENT");
+    }
+    compactRoot = marker;
+    effectiveMessages = messages.slice(0, -2);
+    head = previous;
+  }
+  let user = [...effectiveMessages].reverse().find(message => message.role === "user");
   // Long completed turns may place their root outside the newest page. Retrieve
   // that exact parent once; never scan older history or infer it from prose.
   if (!user && head?.role === "assistant" && head.parentId?.startsWith("msg")) {
@@ -113,14 +135,18 @@ export async function inspectHandoffBoundary(reader: Reader, expected: { session
   // Last assistant-call success is not enough: the head must terminate the latest
   // normal user turn. An unavailable exact parent remains explicitly unavailable.
   if (!head || !user || head.role !== "assistant" || !isTerminalMessage(head) || head.error ||
-      head.parentId !== user.id || user.hasCompactionPart || user.compactionContinue || head.summary) throw new RouterError("HANDOFF_TURN_NOT_QUIESCENT");
-  const turn = messages.slice(Math.max(0, messages.indexOf(user)));
+      head.parentId !== user.id || user.parentId || user.error || user.hasCompactionPart || user.compactionContinue || head.summary) throw new RouterError("HANDOFF_TURN_NOT_QUIESCENT");
+  const turn = effectiveMessages.slice(Math.max(0, effectiveMessages.indexOf(user)));
   if (turn.some(message => message.hasCompactionPart || message.summary || message.error)) throw new RouterError("HANDOFF_TURN_NOT_QUIESCENT");
   if (!user.agent?.trim() || !user.providerID?.trim() || !user.modelID?.trim()) throw new RouterError("HANDOFF_SELECTION_UNAVAILABLE");
   // OpenCode may omit the user override while recording the effective variant
   // on this exact completed assistant turn. Preserve that observed value, not
   // today's configured default. An explicit conflicting override still fails.
   const selection = { agent: user.agent, providerID: user.providerID, modelID: user.modelID, variant: user.variant ?? head.variant ?? null };
+  if (compactRoot && (compactRoot.agent !== selection.agent || compactRoot.providerID !== selection.providerID ||
+      compactRoot.modelID !== selection.modelID || (compactRoot.variant !== undefined && compactRoot.variant !== selection.variant))) {
+    throw new RouterError("HANDOFF_SELECTION_CONFLICT");
+  }
   if (head.providerID && head.providerID !== selection.providerID || head.modelID && head.modelID !== selection.modelID ||
       head.agent && head.agent !== selection.agent || head.variant && head.variant !== selection.variant) throw new RouterError("HANDOFF_SELECTION_CONFLICT");
   // Catch a head change during observation; no UI-draft visibility is claimed.
@@ -133,7 +159,7 @@ export async function inspectHandoffBoundary(reader: Reader, expected: { session
   if (confirmedRoot.problem || !confirmedRoot.value || digest(messageBoundary(confirmedRoot.value)) !== digest(messageBoundary(user))) throw new RouterError("HANDOFF_STALE_PREVIEW");
   const finalStatus = await reader.getStatus();
   if (finalStatus.problem || finalStatus.value !== "IDLE") throw new RouterError("PARTICIPANT_BUSY");
-  return { headDigest, selection };
+  return { headDigest, selection, ...(compactRoot ? { manualCompactCompleted: true } : {}) };
 }
 
 function previewPath(stateRoot: string, id: string): string {

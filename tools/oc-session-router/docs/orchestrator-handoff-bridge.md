@@ -89,6 +89,15 @@ newline-delimited JSON-RPC initialization/ping/tools, bounds input lines to 64 K
 and emits only protocol JSON on stdout. It does not advertise resources/prompts.
 Host compatibility and the human approval UI still require the live pilot.
 
+A completed manual compact may be the latest idle boundary when the bounded
+history contains an adjacent pure native manual-compaction marker and its exact
+completed summary child, immediately after a completed normal turn. The summary
+agent/prose is never used as the next dispatch selection or project authority.
+Agent/model/reasoning come from the preceding normal turn (one exact parent GET
+if necessary), must agree with the manual marker, and all evidence is pinned and
+rechecked. Automatic/incomplete/ambiguous compaction remains blocked; no wider
+history scan, session mutation, synthetic restore or lifecycle replay is added.
+
 For a connection-only rollout before the first-send grant, keep the private
 `enabled` switch false and restrict the host's enabled tools to inspection and
 preparation. Keep both `send_handoff` and `reconcile_handoff` unavailable.
