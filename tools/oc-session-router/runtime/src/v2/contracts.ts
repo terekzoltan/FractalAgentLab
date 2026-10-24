@@ -80,6 +80,8 @@ export interface TerminalOutcome {
   manualRecovery?: { [key: string]: Json };
   /** Negative Owner disposition, not successful implementation or native lineage. */
   ownerResolution?: { [key: string]: Json };
+  /** Explicit documentation acceptance with unverified native ancestry. */
+  ownerFiling?: { [key: string]: Json };
   reason?: string;
 }
 

@@ -6,6 +6,7 @@ import { OperationStore } from "./state-store.js";
 import { commandRule, readContainedSource, resolveRole, RouterError, sameDirectory, sessionDirectory, type RouterConfiguration } from "./routing.js";
 import { adoptManualContinuation, type ManualContinuationRequest } from "./manual-continuation.js";
 import { resolveOwnerStopped, type OwnerStoppedRequest } from "./owner-resolution.js";
+import { resolveOwnerFiling, type OwnerFilingRequest } from "./owner-filing.js";
 import { observeSession, continuitySummary, type SessionObservationOptions } from "./session-observation.js";
 import { alreadyCompacted, captureCompactBaseline, observeCompactCompletion, type CompactBaseline } from "./session-maintenance.js";
 import { reconcileLegacyOperation } from "./legacy-import.js";
@@ -416,6 +417,11 @@ export class RouterEngine {
   async resolveStopped(request: OwnerStoppedRequest) {
     const operation = this.store.getOperation(request.operationId);
     return resolveOwnerStopped(this.store, request, this.adapterForOperation(operation, false));
+  }
+
+  async resolveFiling(request: OwnerFilingRequest, apply = true) {
+    const operation = this.store.getOperation(request.operationId);
+    return resolveOwnerFiling(this.store, request, this.adapterForOperation(operation, false), apply);
   }
 
   private async reconcileCompact(operationId: string, adapter: Adapter) {
