@@ -355,6 +355,36 @@ See the [operating runbook](workflow-orchestrator-runbook.md) and
 loaded behavior, qualification and project resumption remain distinct.
 # Explicit manual continuation adoption
 
+## Owner acceptance of completed documentation filing
+
+`check-owner-filing -RequestPath <private.json>` performs a read-only preflight;
+`resolve-owner-filing` repeats it before one atomic result insertion/claim release.
+Only a DELIVERED pending Meta CLARIFICATION is eligible, not lifecycle work or
+POSSIBLE delivery. Owner must explicitly accept this documentation result while
+acknowledging that native message ancestry is unverified. This is not manual
+continuation and does not infer the origin of the separate root.
+
+Request: operationId, expectedInputDigest, terminalMessageId, terminalTextSha256,
+instructionReference, ownerDecision, disposition `ACCEPT_DOCUMENTATION_FILING`,
+acknowledgeUnverifiedNativeLineage true, and files (1–8 exact relative Markdown
+paths under ops/docs/Docs with SHA-256). IDs and requests remain private.
+The tool verifies live exact participant/home/project, IDLE/CLEAR, original root
+and any pinned response missing by404, a successful exact terminal whose separate
+user parent byte-matches the frozen request, stable bounded12-message window,
+no newer/competing terminal in that window, and unchanged non-linked file hashes.
+It does not claim exhaustive history. File semantics and Owner acceptance are
+explicit human decisions, not inferred from hash equality or terminal keywords.
+
+Result is COMPLETED with reason OWNER_ACCEPTED_DOCUMENTATION_FILING_UNVERIFIED_LINEAGE,
+artifact text/hash and separate immutable `ownerFiling` evidence (Owner request,
+original correlation/observation, actual parent/terminal, file pins and limitations).
+No response reparenting, native-lineage claim, manual-origin assertion or product
+acceptance. Original IDs, input, delivery, work scope and pause remain unchanged.
+No refresh-state, unpause, new message or successor lifecycle follows. Same request
+is idempotent; conflicting result, changed evidence or concurrent operation rejects.
+Older readers still expose reason/artifact without mislabeling this as a stopped
+implementation. No database schema migration or global runtime restart required.
+
 ## Explicit Owner resolution of a stopped implementation
 
 `resolve-owner-stopped -RequestPath <private.json>` is a distinct negative
