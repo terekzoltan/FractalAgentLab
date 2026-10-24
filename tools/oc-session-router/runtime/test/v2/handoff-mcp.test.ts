@@ -31,8 +31,8 @@ test("MCP actual newline wire negotiates tools only and separates readonly from 
   assert.equal(output[0]!.result.protocolVersion, "2025-03-26");
   assert.deepEqual(Object.keys(output[0]!.result.capabilities), ["tools"]);
   assert.deepEqual(output[1]!.result.tools.map((tool: { name: string }) => tool.name),
-    ["inspect_orchestrator", "prepare_handoff", "send_handoff", "inspect_handoff", "reconcile_handoff"]);
-  assert.deepEqual(toolDefinitions.filter(tool => tool.annotations.readOnlyHint).map(tool => tool.name), ["inspect_orchestrator", "inspect_handoff"]);
+    ["read_session_context", "inspect_orchestrator", "prepare_handoff", "send_handoff", "inspect_handoff", "reconcile_handoff"]);
+  assert.deepEqual(toolDefinitions.filter(tool => tool.annotations.readOnlyHint).map(tool => tool.name), ["read_session_context", "inspect_orchestrator", "inspect_handoff"]);
   assert.equal(toolDefinitions.find(tool => tool.name === "send_handoff")!.annotations.destructiveHint, true);
 });
 
