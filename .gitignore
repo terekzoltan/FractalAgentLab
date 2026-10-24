@@ -69,6 +69,7 @@ __pycache__/
 !/tools/oc-session-router/docs/workflow-orchestrator-runbook.md
 !/tools/oc-session-router/docs/v2-quickstart.md
 !/tools/oc-session-router/docs/orchestrator-handoff-bridge.md
+!/tools/oc-session-router/docs/session-context-mcp.md
 !/tools/oc-session-router/scripts/
 /tools/oc-session-router/scripts/*
 !/tools/oc-session-router/scripts/Invoke-OCRouter.ps1

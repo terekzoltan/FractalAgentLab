@@ -5,12 +5,13 @@ import { RouterEngine } from "./engine.js";
 import { OpenCodeAdapter, type OpenCodeCredentials } from "./opencode-adapter.js";
 import { RouterError, type RouterConfiguration } from "./routing.js";
 import { StoreError } from "./contracts.js";
+import { contextBinding, contextRequest, readSessionContext } from "./session-context.js";
 import { operationView, retainExecutor } from "./cli.js";
 import { exactFields, existingPreview, handoffBinding, inspectHandoffBoundary, readHandoffPreview, renderHandoff, savePreview,
   validateHandoffRequest, type HandoffRequest, type HandoffPreview } from "./orchestrator-handoff.js";
 
-export type HandoffTool = "inspect_orchestrator" | "prepare_handoff" | "send_handoff" | "inspect_handoff" | "reconcile_handoff";
-export const handoffTools: HandoffTool[] = ["inspect_orchestrator", "prepare_handoff", "send_handoff", "inspect_handoff", "reconcile_handoff"];
+export type HandoffTool = "read_session_context" | "inspect_orchestrator" | "prepare_handoff" | "send_handoff" | "inspect_handoff" | "reconcile_handoff";
+export const handoffTools: HandoffTool[] = ["read_session_context", "inspect_orchestrator", "prepare_handoff", "send_handoff", "inspect_handoff", "reconcile_handoff"];
 function previewView(preview: HandoffPreview) {
   return { handoffId: preview.handoffId, project: preview.request.project, scope: preview.request.scope,
     stoppingPoint: preview.request.stoppingPoint, exclusions: preview.request.exclusions,
@@ -44,6 +45,14 @@ function existingOperation(store: OperationStore, preview: HandoffPreview) {
 /** Narrow facade only. Dispatch/recovery remain in RouterEngine and its one store. */
 export async function callHandoffTool(tool: HandoffTool, args: unknown, stateRoot: string, configPath: string): Promise<unknown> {
   if (!path.isAbsolute(stateRoot) || !path.isAbsolute(configPath)) throw new StoreError("INVALID_INPUT");
+  if (tool === "read_session_context") {
+    const request = contextRequest(args);
+    const binding = contextBinding(configuration(configPath), request.project, request.role);
+    const auth = credentials();
+    const adapter = new OpenCodeAdapter({ origin: binding.target.origin, directory: binding.home, session: binding.role.session }, auth, { getBudgetMs: 20_000, maxResponseBytes: 4 * 1024 * 1024 });
+    return { project: request.project, role: request.role, ...await readSessionContext(adapter,
+      { session: binding.role.session, project: binding.target.project, directory: binding.home }, request.count, [auth.password]) };
+  }
   if (tool === "inspect_orchestrator" || tool === "prepare_handoff") {
     exactFields(args, tool === "inspect_orchestrator" ? ["project"] :
       ["project", "handoffKey", "scope", "stoppingPoint", "exclusions", "message", "instructionReference"]);

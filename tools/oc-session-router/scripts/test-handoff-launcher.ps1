@@ -249,7 +249,10 @@ process.stdin.on("end",()=>{
   Assert-HandoffLauncher (Test-InitializeEnvelope $Lines[0]) ('Real MCP must negotiate exact string version for id 1. First response: ' + $RawLines[0])
   Assert-HandoffLauncher ($Lines[1].jsonrpc -ceq '2.0' -and $Lines[1].id -is [int] -and $Lines[1].id -eq 2) 'Tools response must correlate to numeric id 2.'
   $Tools = @($Lines[1].result.tools | ForEach-Object { $_.name })
-  Assert-HandoffLauncher ($Tools.Count -eq 5 -and $Tools -contains 'inspect_orchestrator' -and $Tools -contains 'prepare_handoff') 'Real MCP must list the five documented tools.'
+  $ExpectedTools = @('read_session_context','inspect_orchestrator','prepare_handoff','send_handoff','inspect_handoff','reconcile_handoff')
+  Assert-HandoffLauncher ($Tools.Count -eq $ExpectedTools.Count -and @(Compare-Object $ExpectedTools $Tools).Count -eq 0) 'Real MCP must list exactly the six documented tools, including read-only context.'
+  $ContextTool = @($Lines[1].result.tools | Where-Object { $_.name -ceq 'read_session_context' })
+  Assert-HandoffLauncher ($ContextTool.Count -eq 1 -and $ContextTool[0].annotations.readOnlyHint -eq $true) 'Context observation must remain read-only in the actual launcher catalog.'
   Assert-HandoffLauncher ([string]::Equals($Lines[2].id, $Unicode, [StringComparison]::Ordinal)) 'Real MCP response must preserve the Unicode request id.'
   Assert-HandoffLauncher (-not (Test-Path -LiteralPath $StateRoot)) 'Handshake must not create a state root, DB, operation or preview.'
   Assert-HandoffLauncher (($Actual.output + $Actual.error) -notmatch 'fixture-password-never-emit') 'Real MCP must not log credential.'
