@@ -107,6 +107,7 @@ the primary runtime underneath existing project workers.
 
 | Tool | Effect |
 |---|---|
+| `read_session_context(project, role, count?)` | Bounded GET-only completed output, activity and attention for enrolled orchestrator/Meta/lanes; [limits and evidence semantics](session-context-mcp.md). No store open/write. |
 | `inspect_orchestrator(project)` | Bounded GET readiness/selection check; no store open/write. |
 | `prepare_handoff(project, handoffKey, scope, stoppingPoint, exclusions, message, instructionReference)` | Local immutable preview only; no operation or participant claim. |
 | `send_handoff(handoffId)` | Approval-required exact send through FAL; returns promptly. |
