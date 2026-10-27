@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { operationView } from '../../src/v2/cli.js';
+import { operationMutationView, operationView } from '../../src/v2/cli.js';
 import type { Operation } from '../../src/v2/contracts.js';
 
 test('terminal facts do not display an earlier busy/no-terminal observation as a current blocker', () => {
@@ -21,4 +21,14 @@ test('terminal facts do not display an earlier busy/no-terminal observation as a
   const failed: Operation = { ...done, outcome: { execution: 'FAILED', evidenceReferences: ['fixture'], reason: 'REMOTE_EXECUTION_FAILED' } };
   assert.equal(operationView(failed).activity, 'FAILED');
   assert.equal(operationView(failed).reason, 'REMOTE_EXECUTION_FAILED');
+
+  let projectionWrites = 0;
+  const project = () => { projectionWrites++; return { status: 'UPDATED' }; };
+  for (const kind of ['COMPACT', 'RESTORE'] as const) {
+    const maintenance = { ...done, action: { ...done.action, kind, input: { orchestratorMaintenance: true } } };
+    assert.deepEqual(operationMutationView(maintenance, undefined, project).stateProjection, { status: 'NOT_APPLICABLE' });
+  }
+  assert.equal(projectionWrites, 0, 'Neither orchestrator maintenance phase may invoke a project writer');
+  assert.deepEqual(operationMutationView(done, undefined, project).stateProjection, { status: 'UPDATED' });
+  assert.equal(projectionWrites, 1, 'Ordinary product projection behavior remains available');
 });
