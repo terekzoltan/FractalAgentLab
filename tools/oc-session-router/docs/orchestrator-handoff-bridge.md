@@ -19,7 +19,8 @@ control work; it never amends/unpauses the product work, selects a successor,
 accepts a product or grants commit/push rights.
 
 There is no lane-send, arbitrary URL/session, SQL/shell proxy, session creation,
-permission answer, interrupt, compact or model-selection tool. The recipient
+permission answer, interrupt or model-selection tool. Explicit Owner-delegated
+compact/restore uses the separately activated maintenance interface below. The recipient
 receives the exact displayed message plus displayed scope/stop/exclusions and
 an instruction to load the current orchestration skill. No installed command is
 invoked. Recorded agent/model/variant from the last completed normal user turn are frozen;
@@ -48,6 +49,7 @@ Optional `router-config.json` addition, disabled by default:
 {
   "orchestratorBridge": {
     "enabled": false,
+    "maintenanceEnabled": false,
     "projects": {
       "named-project": {
         "controlTarget": "existing-control-target",
@@ -113,6 +115,11 @@ the primary runtime underneath existing project workers.
 | `send_handoff(handoffId)` | Approval-required exact send through FAL; returns promptly. |
 | `inspect_handoff(handoffId)` | Retained facts via explicitly read-only SQLite connection; no migration/reconciliation. |
 | `reconcile_handoff(handoffId)` | Explicit local evidence mutation from bounded GETs; no POST/resend. |
+| `prepare_orchestrator_maintenance(project, maintenanceKey, mode, instructionReference, packet)` | Freeze named-work context and exact restore preview; no operation/claim/send. |
+| `compact_orchestrator(maintenanceId)` | Approval-required one native compact; no restore successor. |
+| `restore_orchestrator(maintenanceId)` | Approval-required exact context-only message, preserving selection. |
+| `inspect_orchestrator_maintenance(maintenanceId)` | Read both retained phase facts without writes. |
+| `reconcile_orchestrator_maintenance(maintenanceId, phase)` | Bounded GET recovery of the named compact/restore phase; local evidence mutation. |
 
 Configure the host to **prompt for `send_handoff` and `reconcile_handoff`**.
 Do not treat tool annotations (`readOnlyHint: false`) as enforced approval.
@@ -120,6 +127,92 @@ Do not treat tool annotations (`readOnlyHint: false`) as enforced approval.
 that the host displays the exact preview and that deliberate authorization
 covers that target/scope/stop. If it cannot, retain copyable/browser handoff mode.
 No `approved: true` field or instruction-reference string is an attestation.
+
+## Owner-delegated orchestrator maintenance
+
+This capability requires both bridge `enabled:true` and the additional private
+`maintenanceEnabled:true`; absence defaults to off. Installation does not activate
+it. Configure the host to require approval for `compact_orchestrator`,
+`restore_orchestrator` and `reconcile_orchestrator_maintenance`. The exact preview
+and current Owner instruction must cover the phase. There is no background trigger
+or self-compaction policy. Ordinary lane `compact` remains forbidden for an
+ORCHESTRATOR, and ordinary `restore` cannot bypass this preview boundary.
+
+The private bridge may additionally set `orchestratorBridge.frontierConfigurationPath`
+to the absolute path of its existing canonical Router V2 configuration. This is
+read-only lookup of the **explicitly named work targets only**, so later enrolled
+worktrees do not require copying every target into the bridge snapshot. It never
+merges targets, discovers recipients, changes bridge activation, or uses that file
+for the orchestrator's send address/model. The bridge's own governed-project and
+control-session enrollment remain authoritative. Named target project/namespace
+and work-directory identity must agree. The selected target entry and configuration
+reference are digest-bound in the preview; changing an unrelated canonical target
+does not invalidate it. Missing/invalid source or named target blocks preparation,
+without fallback. Relative paths and symlink/reparse traversal are rejected.
+When this optional pointer is absent, existing bridge-target lookup is unchanged;
+operators must then refresh its explicit snapshot for newly enrolled work targets.
+
+Example prepare input (illustrative names, not runtime identity):
+
+```json
+{
+  "project": "named-project",
+  "maintenanceKey": "owner-maintenance-1",
+  "mode": "compact_restore",
+  "instructionReference": "current-owner-request",
+  "packet": {
+    "frontiers": [
+      {"workId": "existing-data-work", "statePath": "ops/PROJECT_STATE.md", "combinedPath": "docs/Combined.md"},
+      {"workId": "existing-ui-work", "statePath": "ops/PROJECT_STATE.md"}
+    ],
+    "note": "OCoS observation at <time>, source <retained result/file section>: <short excerpt>. Interpretation: <uncertainty and first unfinished action>. This is advisory, not new authority."
+  }
+}
+```
+
+`mode` is `compact_restore` or `restore` (including after Owner manual compact).
+The packet accepts 1–8 explicit work references and an optional note of at most
+4096 UTF-8 bytes. Relative `.md` State/Combined locators are optional and pinned
+under each verified configured execution root; no arbitrary path or project is
+accepted. Named works must belong to the governed project/namespace.
+The configured root is not execution-readiness attestation: the packet explicitly
+reports `executionRootVerified:false`. A missing contained Markdown source is
+recorded as UNAVAILABLE, preserving basic role restore and the dependent stream's
+blocker; unsafe traversal/symlink paths are rejected. Availability changes invalidate
+the frozen preview just like content changes.
+Authority, pause and operation facts are derived from FAL, not supplied by the note. The
+packet retains every pending operation and latest completed result per role,
+explicit total/omitted-history counts and a digest of retained operation facts.
+It does not attest all project work was selected, product acceptance or loaded
+instructions. OCoS must choose the full relevant parallel frontier using fresh
+session context and durable references. No transcript crawl or primary-root guess.
+
+Flow: prepare exact preview → explicitly approved compact call → inspect and,
+if needed, reconcile the **same** compact → after verified native marker/summary
+completion, explicitly approved restore call → inspect/reconcile the same restore.
+Restore is an ordinary message using the captured agent/model/reasoning; it loads
+the shared orchestrator restore method without invoking command model defaults.
+The dedicated control work has only SESSION_MAINTENANCE. Product works, pauses,
+scope, results and claims are not amended. No lifecycle is sent automatically.
+
+Fresh idle/attention/head/enrollment/selection and named-frontier checks happen
+before preparation and again in the retained executor. Missing terminal output,
+busy/unknown state, a pending handoff claim or a changed frontier blocks mutation.
+Do not dismiss a handoff claim merely because its session is idle: recover that
+existing operation through its supported path first. Native summarize has no
+caller-chosen root; completion uses the existing unique post-baseline effect proof,
+not a universal exactly-once claim. A timeout retains uncertainty, never a retry.
+
+Previews expire after ten minutes. Same key/content returns the same preview and
+same dispatched phase returns its retained operation even after expiry or disable.
+If compact completed but a lane/frontier changed or the preview expired, preserve
+the completed compact and prepare a **new `restore`-only preview**, referencing
+that prior maintenance/result in the advisory note and freshly gathered context.
+Never compact again to refresh a packet. If a pre-send worker check fails, it
+records unsent FAILED and releases only its own claim; possible sends keep theirs.
+Inspect this disposition before preparing any replacement. Changed context is not
+permission to unpause works or widen continuation. Restore reports context quality
+and stops; a separate authorized handoff may continue the lifecycle afterward.
 
 ## Safety, recovery and limits
 

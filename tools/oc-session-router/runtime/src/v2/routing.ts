@@ -59,7 +59,7 @@ export interface RouterConfiguration {
   compactThresholdRatio?: number;
   compactTokenCap?: number;
   /** Operator-managed private enrollment; absent/false means no bridge sends. */
-  orchestratorBridge?: { enabled: boolean; projects: Record<string, OrchestratorEnrollment> };
+  orchestratorBridge?: { enabled: boolean; maintenanceEnabled?: boolean; frontierConfigurationPath?: string; projects: Record<string, OrchestratorEnrollment> };
 }
 export class RouterError extends Error {
   constructor(readonly code: string) { super(code); this.name = "RouterError"; }

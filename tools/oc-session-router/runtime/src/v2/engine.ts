@@ -14,6 +14,7 @@ import { freezeSources, renderSources, packetSummary, type SourceSnapshot, type 
 import { stateAuthorityDigest } from "./state-projection.js";
 import type { PreparationReporter } from "./preparation-diagnostics.js";
 import { assertPreviewCurrent, handoffBinding, inspectHandoffBoundary, renderHandoff, validatePreview, type HandoffPreview } from "./orchestrator-handoff.js";
+import { assertMaintenanceSnapshot, assertMaintenanceEnabled, validateMaintenancePreview, type MaintenancePreview } from "./orchestrator-maintenance.js";
 export type { SourceReference } from "./context-packet.js";
 
 export type Adapter = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "listCommands" | "getMessage" | "getHistory" | "submitCommand" | "submitMessage" | "summarize"> & Partial<Pick<OpenCodeAdapter, "getModelInfo" | "getPendingInteractions">>;
@@ -118,6 +119,59 @@ export class RouterEngine {
     return visible;
   }
 
+  /** Explicit Owner-approved bridge maintenance; never an automatic successor. */
+  async prepareOrchestratorMaintenance(preview: MaintenancePreview, phase: "compact" | "restore") {
+    validateMaintenancePreview(preview);
+    if (!["compact", "restore"].includes(phase) || (phase === "compact" && preview.request.mode !== "compact_restore")) throw new StoreError("INVALID_INPUT");
+    let prior: WorkView | undefined;
+    try { prior = this.store.getWork(preview.maintenanceId); } catch (e) { if (!(e instanceof StoreError && e.code === "NOT_FOUND")) throw e; }
+    const old = prior?.operations.find(o => o.action.actionKey === phase);
+    if (old) {
+      if (old.action.input.maintenancePreviewDigest !== preview.previewDigest) throw new StoreError("INPUT_CONFLICT");
+      return { operation: old, created: false };
+    }
+    assertMaintenanceSnapshot(this.store, this.configuration, preview);
+    const binding = assertMaintenanceEnabled(this.configuration, preview.request.project);
+    const adapter = this.adapterFactory({ origin: binding.target.origin, directory: binding.home, session: binding.role.session }, this.credentials, { getBudgetMs: 20_000 });
+    if (!adapter.getPendingInteractions) throw new RouterError("HANDOFF_ATTENTION_UNAVAILABLE");
+    const boundary = await inspectHandoffBoundary(adapter as Required<Pick<Adapter, "getSession" | "getStatus" | "getHistory" | "getMessage" | "getPendingInteractions">>,
+      { session: binding.role.session, project: binding.target.project, directory: binding.home });
+    const baseline = await captureCompactBaseline(adapter);
+    let predecessor: string | null = null;
+    if (phase === "restore" && preview.request.mode === "compact_restore") {
+      const compact = prior?.operations.find(o => o.action.actionKey === "compact");
+      if (!compact || compact.outcome?.execution !== "COMPLETED" || !compact.correlation?.responseMessageId ||
+          baseline.headMessageId !== compact.correlation.responseMessageId || !boundary.manualCompactCompleted ||
+          digest(boundary.selection) !== digest(preview.boundary.selection)) throw new RouterError("ORCHESTRATOR_COMPACT_NOT_CONFIRMED");
+      predecessor = compact.operationId;
+    } else if (digest(boundary) !== digest(preview.boundary)) throw new RouterError("MAINTENANCE_STALE_PREVIEW");
+    if (phase === "compact" && boundary.manualCompactCompleted) throw new RouterError("ORCHESTRATOR_ALREADY_COMPACTED_USE_RESTORE");
+    // Another caller may have prepared this same phase while GETs were awaited.
+    // Return that immutable identity, not a new timestamped compact baseline.
+    try {
+      const concurrent = this.store.getWork(preview.maintenanceId).operations.find(o => o.action.actionKey === phase);
+      if (concurrent) {
+        if (concurrent.action.input.maintenancePreviewDigest !== preview.previewDigest) throw new StoreError("INPUT_CONFLICT");
+        return { operation: concurrent, created: false };
+      }
+    } catch (e) { if (!(e instanceof StoreError && e.code === "NOT_FOUND")) throw e; }
+    const work = this.openWork({ workId: preview.maintenanceId, target: binding.enrollment.controlTarget, directory: binding.target.directory,
+      instructionReference: preview.request.instructionReference, scope: `Explicit ${preview.request.mode} context maintenance for ${preview.request.project}; no lifecycle effects.`,
+      allowedEffects: ["SESSION_MAINTENANCE"], stoppingPoint: "Restore context and stop. No automatic continuation or product grant." });
+    const selection = preview.boundary.selection;
+    return this.store.prepareAction({ workId: preview.maintenanceId, actionKey: phase, participant: binding.participant,
+      recipientRole: binding.enrollment.recipientRole, kind: phase === "compact" ? "COMPACT" : "RESTORE", effect: "SESSION_MAINTENANCE",
+      command: phase === "compact" ? "compact" : "orchestrator-after-compact", predecessor,
+      input: { orchestratorMaintenance: true, maintenancePreview: preview as unknown as Json, maintenancePreviewDigest: preview.previewDigest,
+        maintenanceBoundary: boundary as unknown as Json, executionDirectory: binding.target.directory,
+        address: { origin: binding.target.origin, directory: binding.home, session: binding.role.session }, profile: binding.role.profile,
+        sources: [], arguments: phase === "restore" ? preview.exactRestoreMessage : "",
+        compactBaseline: baseline as unknown as Json, summarize: { providerID: selection.providerID, modelID: selection.modelID, auto: false },
+        agent: selection.agent, model: `${selection.providerID}/${selection.modelID}`,
+        ...(selection.variant === null ? {} : { variant: selection.variant }) },
+    }, work.authorization.revision);
+  }
+
   async observeOptional(workId: string, roleName: string, budgetMs = 15_000): Promise<void> {
     try { await this.observe(workId, roleName, Math.max(0, budgetMs)); }
     catch {
@@ -214,6 +268,7 @@ export class RouterEngine {
     phase?.("PARTICIPANT_BINDING");
     const { role, target, participant, adapter, home } = this.binding(work.context, request.recipientRole);
     const effect: Effect = kind === "LIFECYCLE" ? commandRule(command, role, target) : kind === "RESTORE" ? "SESSION_MAINTENANCE" : "READ_ONLY";
+    if (kind === "RESTORE" && role.capability === "ORCHESTRATOR") throw new RouterError("ORCHESTRATOR_RESTORE_REQUIRES_PREVIEW");
     if (!work.authorization.allowedEffects.includes(effect)) throw new StoreError("EFFECT_NOT_ALLOWED");
     if (!["LIFECYCLE", "CLARIFICATION", "RESTORE"].includes(kind)) throw new RouterError("ACTION_KIND_UNSUPPORTED");
     phase?.("PARTICIPANT_VERIFICATION");
@@ -310,6 +365,17 @@ export class RouterEngine {
     }
     const adapter = this.adapterForOperation(operation, true);
     await this.verifyParticipant(adapter, (operation.action.input.address as unknown as OpenCodeTarget).directory, operation.action.participant.project, operation.action.participant.session, true);
+    if (operation.action.input.orchestratorMaintenance === true) {
+      if (!["COMPACT", "RESTORE"].includes(operation.action.kind) || operation.action.effect !== "SESSION_MAINTENANCE") throw new StoreError("INVALID_INPUT");
+      const preview = operation.action.input.maintenancePreview as unknown as MaintenancePreview;
+      assertMaintenanceSnapshot(this.store, this.configuration, preview);
+      if (operation.action.input.maintenancePreviewDigest !== preview.previewDigest || operation.action.workId !== preview.maintenanceId) throw new StoreError("INPUT_CONFLICT");
+      const binding = assertMaintenanceEnabled(this.configuration, preview.request.project);
+      if (participantKey(binding.participant) !== operation.participantKey || !adapter.getPendingInteractions) throw new RouterError("PARTICIPANT_BINDING_CHANGED");
+      const boundary = await inspectHandoffBoundary(adapter as Required<Pick<Adapter, "getSession" | "getStatus" | "getHistory" | "getMessage" | "getPendingInteractions">>,
+        { session: binding.role.session, project: binding.target.project, directory: binding.home });
+      if (digest(boundary) !== digest(operation.action.input.maintenanceBoundary)) throw new RouterError("MAINTENANCE_STALE_PREVIEW");
+    }
     if (operation.action.kind === "ORCHESTRATOR_HANDOFF") {
       const preview = operation.action.input.preview as unknown as HandoffPreview;
       const binding = handoffBinding(this.configuration, preview.request.project, true);
@@ -331,7 +397,7 @@ export class RouterEngine {
     }
     if (operation.action.kind === "COMPACT") {
       const configured = this.binding(work.context, operation.action.recipientRole);
-      if (configured.role.capability === "ORCHESTRATOR") throw new RouterError("ORCHESTRATOR_COMPACT_IS_MANUAL");
+      if (configured.role.capability === "ORCHESTRATOR" && operation.action.input.orchestratorMaintenance !== true) throw new RouterError("ORCHESTRATOR_COMPACT_IS_MANUAL");
       const baseline = operation.action.input.compactBaseline as unknown as CompactBaseline;
       const current = await captureCompactBaseline(adapter);
       if (!baseline || current.session !== baseline.session || !sameDirectory(current.directory, baseline.directory) || current.headMessageId !== baseline.headMessageId) {
@@ -339,6 +405,7 @@ export class RouterEngine {
       }
       const payload = operation.action.input.summarize as unknown as Parameters<Adapter["summarize"]>[0];
       if (!payload?.providerID || !payload.modelID || payload.auto !== false) throw new RouterError("MODEL_CONFIGURATION_INVALID");
+      if (operation.action.input.orchestratorMaintenance === true) assertMaintenanceSnapshot(this.store, this.configuration, operation.action.input.maintenancePreview as unknown as MaintenancePreview);
       if (!this.store.startDispatch(operationId)) return this.store.getOperation(operationId);
       try {
         const reply = await adapter.summarize(payload, fact => this.recordHttpFact(operation, fact));
@@ -352,7 +419,7 @@ export class RouterEngine {
       await this.observeOptional(operation.action.workId, operation.action.recipientRole);
       return result.operation;
     }
-    if (operation.action.kind !== "CLARIFICATION" && operation.action.kind !== "ORCHESTRATOR_HANDOFF") {
+    if (operation.action.kind !== "CLARIFICATION" && operation.action.kind !== "ORCHESTRATOR_HANDOFF" && operation.action.input.orchestratorMaintenance !== true) {
       const registry = await adapter.listCommands();
       const matches = registry.value?.filter(command => command.name === operation.action.command) ?? [];
       if (registry.problem || matches.length !== 1) throw new RouterError("COMMAND_UNAVAILABLE");
@@ -367,7 +434,7 @@ export class RouterEngine {
     if (typeof input.variant === "string") common.variant = input.variant;
     const onAcknowledgement = (fact: Acknowledgement) => this.recordHttpFact(operation, fact);
     let submit: () => Promise<AdapterReply<OpenCodeMessage>>;
-    if (operation.action.kind === "CLARIFICATION" || operation.action.kind === "ORCHESTRATOR_HANDOFF") {
+    if (operation.action.kind === "CLARIFICATION" || operation.action.kind === "ORCHESTRATOR_HANDOFF" || operation.action.input.orchestratorMaintenance === true) {
       const message: Parameters<Adapter["submitMessage"]>[0] = { ...common, text: String(input.arguments) };
       if (typeof input.model === "string") {
         const slash = input.model.indexOf("/");
@@ -380,6 +447,7 @@ export class RouterEngine {
       if (typeof input.model === "string") command.model = input.model;
       submit = () => adapter.submitCommand(command, onAcknowledgement);
     }
+    if (operation.action.input.orchestratorMaintenance === true) assertMaintenanceSnapshot(this.store, this.configuration, operation.action.input.maintenancePreview as unknown as MaintenancePreview);
     if (!this.store.startDispatch(operationId)) return this.store.getOperation(operationId);
     try {
       const reply = await submit();

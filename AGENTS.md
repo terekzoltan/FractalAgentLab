@@ -33,7 +33,11 @@ what was prepared, possibly sent, delivered and observed; they do not decide
 acceptance or the next lifecycle step. Owner pauses remain explicit.
 
 The Meta Coordinator does not write production code. Only the Owner interrupts
-sessions or compacts orchestrators. Preserve private data and unrelated work.
+sessions. Orchestrator compaction is Owner-manual by default; an explicit current
+Owner request may delegate one compact/restore to Codex through the activated
+FAL orchestrator-maintenance bridge. Ordinary lane compact cannot target an
+orchestrator. No autonomous compact, interruption or lifecycle successor follows.
+Preserve private data and unrelated work.
 The protected Python router sync source/tests remain outside this assignment.
 
 W8-A and the unopened W8-W10 program are SUPERSEDED, not completed. See
