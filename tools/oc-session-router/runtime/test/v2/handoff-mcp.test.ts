@@ -31,8 +31,9 @@ test("MCP actual newline wire negotiates tools only and separates readonly from 
   assert.equal(output[0]!.result.protocolVersion, "2025-03-26");
   assert.deepEqual(Object.keys(output[0]!.result.capabilities), ["tools"]);
   assert.deepEqual(output[1]!.result.tools.map((tool: { name: string }) => tool.name),
-    ["read_session_context", "inspect_orchestrator", "prepare_handoff", "send_handoff", "inspect_handoff", "reconcile_handoff"]);
-  assert.deepEqual(toolDefinitions.filter(tool => tool.annotations.readOnlyHint).map(tool => tool.name), ["read_session_context", "inspect_orchestrator", "inspect_handoff"]);
+    ["prepare_orchestrator_maintenance", "compact_orchestrator", "restore_orchestrator", "inspect_orchestrator_maintenance", "reconcile_orchestrator_maintenance", "read_session_context", "inspect_orchestrator", "prepare_handoff", "send_handoff", "inspect_handoff", "reconcile_handoff"]);
+  assert.deepEqual(toolDefinitions.filter(tool => tool.annotations.readOnlyHint).map(tool => tool.name), ["inspect_orchestrator_maintenance", "read_session_context", "inspect_orchestrator", "inspect_handoff"]);
+  for (const name of ["compact_orchestrator", "restore_orchestrator"]) assert.equal(toolDefinitions.find(tool => tool.name === name)!.annotations.destructiveHint, true);
   assert.equal(toolDefinitions.find(tool => tool.name === "send_handoff")!.annotations.destructiveHint, true);
 });
 

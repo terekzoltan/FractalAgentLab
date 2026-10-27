@@ -233,7 +233,10 @@ successor send or a model call per telemetry sample.
 Continue the original authorized lifecycle only
 when the actual Owner pause permits it.
 
-The Owner compacts orchestrator sessions manually. Agents never abort, kill or
+The Owner compacts orchestrator sessions manually by default. Explicit current
+Owner delegation may use the separately activated
+[maintenance bridge](orchestrator-handoff-bridge.md#owner-delegated-orchestrator-maintenance);
+ordinary lane compact cannot target orchestrators. Agents never abort, kill or
 interrupt a busy lane to compact it. Observing Owner interruption records partial
 or failed execution; it does not imply rollback.
 

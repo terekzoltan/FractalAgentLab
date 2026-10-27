@@ -65,7 +65,9 @@ Orchestrator observes lane status/context before dispatch, after results and
 during long waits with backoff. At safe idle it may request one compact and
 minimal project/role restore through the same participant coordination, within
 its envelope. Restore preserves results and pauses and sends no lifecycle work.
-Only the Owner compacts orchestrators or aborts, kills or interrupts sessions.
+Only the Owner aborts, kills or interrupts sessions. Orchestrator compact is
+Owner-manual by default; explicit current Owner delegation permits the activated
+FAL compact/restore bridge at a verified idle boundary, without auto-continuation.
 Ordinary restart calls for read-only compatibility checks, not a new P0B gate.
 
 ## Safety and private evidence

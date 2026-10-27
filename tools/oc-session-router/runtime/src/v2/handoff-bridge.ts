@@ -7,11 +7,55 @@ import { RouterError, type RouterConfiguration } from "./routing.js";
 import { StoreError } from "./contracts.js";
 import { contextBinding, contextRequest, readSessionContext } from "./session-context.js";
 import { operationView, retainExecutor } from "./cli.js";
+import { existingMaintenancePreview, maintenanceFrontier, readMaintenancePreview, saveMaintenancePreview, validateMaintenanceRequest, type MaintenanceRequest } from "./orchestrator-maintenance.js";
 import { exactFields, existingPreview, handoffBinding, inspectHandoffBoundary, readHandoffPreview, renderHandoff, savePreview,
   validateHandoffRequest, type HandoffRequest, type HandoffPreview } from "./orchestrator-handoff.js";
 
-export type HandoffTool = "read_session_context" | "inspect_orchestrator" | "prepare_handoff" | "send_handoff" | "inspect_handoff" | "reconcile_handoff";
-export const handoffTools: HandoffTool[] = ["read_session_context", "inspect_orchestrator", "prepare_handoff", "send_handoff", "inspect_handoff", "reconcile_handoff"];
+export type HandoffTool = "read_session_context" | "inspect_orchestrator" | "prepare_handoff" | "send_handoff" | "inspect_handoff" | "reconcile_handoff" |
+  "prepare_orchestrator_maintenance" | "compact_orchestrator" | "restore_orchestrator" | "inspect_orchestrator_maintenance" | "reconcile_orchestrator_maintenance";
+export const handoffTools: HandoffTool[] = ["read_session_context", "inspect_orchestrator", "prepare_handoff", "send_handoff", "inspect_handoff", "reconcile_handoff",
+  "prepare_orchestrator_maintenance", "compact_orchestrator", "restore_orchestrator", "inspect_orchestrator_maintenance", "reconcile_orchestrator_maintenance"];
+
+async function callMaintenance(tool: HandoffTool, args: unknown, stateRoot: string, configPath: string): Promise<unknown> {
+  const database = path.join(stateRoot, "router.sqlite");
+  if (tool === "prepare_orchestrator_maintenance") {
+    const request = args as MaintenanceRequest; validateMaintenanceRequest(request);
+    let preview = existingMaintenancePreview(stateRoot, request);
+    if (!preview) {
+      const config = configuration(configPath), binding = handoffBinding(config, request.project);
+      const adapter = new OpenCodeAdapter({ origin: binding.target.origin, directory: binding.home, session: binding.role.session }, credentials(), { getBudgetMs: 20_000 });
+      const boundary = await inspectHandoffBoundary(adapter, { session: binding.role.session, project: binding.target.project, directory: binding.home });
+      const reader = new OperationStore(database, { readOnly: true });
+      try { preview = saveMaintenancePreview(stateRoot, request, binding.bindingDigest, boundary, maintenanceFrontier(reader, config, request)); }
+      finally { reader.close(); }
+    }
+    return { maintenanceId: preview.maintenanceId, project: preview.request.project, mode: preview.request.mode,
+      instructionReference: preview.request.instructionReference, exactRestoreMessage: preview.exactRestoreMessage,
+      selection: preview.boundary.selection, previewDigest: preview.previewDigest, expiresAt: preview.expiresAt,
+      compactEffect: preview.request.mode === "compact_restore" ? "One native compact, auto:false; completion must be verified before separate restore send." : "NONE",
+      noAutomaticSuccessor: true, hostApprovalRequiredForMutation: true, authorityAttestedByServer: false, remoteMutation: false };
+  }
+  exactFields(args, tool === "reconcile_orchestrator_maintenance" ? ["maintenanceId", "phase"] : ["maintenanceId"]);
+  const p = readMaintenancePreview(stateRoot, String(args.maintenanceId ?? ""));
+  const phase = tool === "compact_orchestrator" ? "compact" : tool === "restore_orchestrator" ? "restore" : args.phase;
+  if (tool !== "inspect_orchestrator_maintenance" && phase !== "compact" && phase !== "restore") throw new StoreError("INVALID_INPUT");
+  const reader = new OperationStore(database, { readOnly: true });
+  let operations: ReturnType<OperationStore["getWork"]>["operations"] = [];
+  try { try { operations = reader.getWork(p.maintenanceId).operations; } catch(e) { if (!(e instanceof StoreError && e.code === "NOT_FOUND")) throw e; } }
+  finally { reader.close(); }
+  if (tool === "inspect_orchestrator_maintenance") return { maintenanceId: p.maintenanceId, mode: p.request.mode, operations: operations.map(o => operationView(o)), remoteMutation: false, localEvidenceMutation: false, autoAdvance: false };
+  const old = operations.find(o => o.action.actionKey === phase);
+  if (tool !== "reconcile_orchestrator_maintenance" && old && (old.dispatchStartedAt || old.completedAt)) return { maintenanceId: p.maintenanceId, ...operationView(old), created: false };
+  if (tool === "reconcile_orchestrator_maintenance" && !old) throw new RouterError("MAINTENANCE_NOT_SUBMITTED");
+  const config = configuration(configPath), store = new OperationStore(database);
+  try {
+    const engine = new RouterEngine(store, config, credentials());
+    if (tool === "reconcile_orchestrator_maintenance") return { maintenanceId: p.maintenanceId, ...operationView((await engine.reconcile(old!.operationId)).operation), remoteMutation: false, localEvidenceMutation: true };
+    const prepared = await engine.prepareOrchestratorMaintenance(p, phase as "compact" | "restore");
+    await retainExecutor(stateRoot, configPath, prepared.operation.operationId);
+    return { maintenanceId: p.maintenanceId, ...operationView(store.getOperation(prepared.operation.operationId)), created: prepared.created, executorRequested: true, autoAdvance: false };
+  } finally { store.close(); }
+}
 function previewView(preview: HandoffPreview) {
   return { handoffId: preview.handoffId, project: preview.request.project, scope: preview.request.scope,
     stoppingPoint: preview.request.stoppingPoint, exclusions: preview.request.exclusions,
@@ -45,6 +89,7 @@ function existingOperation(store: OperationStore, preview: HandoffPreview) {
 /** Narrow facade only. Dispatch/recovery remain in RouterEngine and its one store. */
 export async function callHandoffTool(tool: HandoffTool, args: unknown, stateRoot: string, configPath: string): Promise<unknown> {
   if (!path.isAbsolute(stateRoot) || !path.isAbsolute(configPath)) throw new StoreError("INVALID_INPUT");
+  if (["prepare_orchestrator_maintenance", "compact_orchestrator", "restore_orchestrator", "inspect_orchestrator_maintenance", "reconcile_orchestrator_maintenance"].includes(tool)) return callMaintenance(tool, args, stateRoot, configPath);
   if (tool === "read_session_context") {
     const request = contextRequest(args);
     const binding = contextBinding(configuration(configPath), request.project, request.role);

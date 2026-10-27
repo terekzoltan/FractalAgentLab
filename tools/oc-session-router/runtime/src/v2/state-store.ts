@@ -314,12 +314,13 @@ export class OperationStore {
       // Keep this additional collision rule scoped to pairs involving handoffs;
       // ordinary lane-to-lane identity policy remains unchanged.
       const physical = physicalAddress(action);
-      if (action.kind === "ORCHESTRATOR_HANDOFF" && !physical) throw new StoreError("INVALID_INPUT");
+      const control = action.kind === "ORCHESTRATOR_HANDOFF" || action.input.orchestratorMaintenance === true;
+      if (control && !physical) throw new StoreError("INVALID_INPUT");
       if (physical) {
         const retained = this.db.prepare(`SELECT action_json FROM operations WHERE completed_at IS NULL
           AND json_extract(action_json,'$.participant.session')=?
-          AND (?='ORCHESTRATOR_HANDOFF' OR json_extract(action_json,'$.kind')='ORCHESTRATOR_HANDOFF')`)
-          .all(action.participant.session, action.kind);
+          AND (?=1 OR json_extract(action_json,'$.kind')='ORCHESTRATOR_HANDOFF' OR json_extract(action_json,'$.input.orchestratorMaintenance')=1)`)
+          .all(action.participant.session, control ? 1 : 0);
         if (retained.some(row => physicalAddress(JSON.parse(String(row.action_json)) as ActionInput) === physical)) throw new StoreError("PARTICIPANT_BUSY");
       }
       const operationId = `op-${randomUUID()}`;

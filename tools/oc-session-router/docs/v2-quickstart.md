@@ -206,7 +206,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/oc-session-router/scri
 Restore may send installed `/after-compact`, but only to rebuild minimal role/work
 context. It never selects or repeats lifecycle work. The orchestrator selects the
 next authorized action. Agents do not abort, kill, or interrupt sessions; only the
-Owner does so. The Owner also compacts orchestrator sessions manually.
+Owner does so. Orchestrator compact is Owner-manual by default; explicit Owner
+delegation may use the separately activated [maintenance bridge](orchestrator-handoff-bridge.md#owner-delegated-orchestrator-maintenance).
 
 ## Action effects
 
