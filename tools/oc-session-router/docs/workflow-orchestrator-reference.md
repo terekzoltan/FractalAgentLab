@@ -419,6 +419,54 @@ No session message, lifecycle, projection refresh or new work follows automatica
 An explicit subsequent planning-only envelope may use an existing verified target;
 old failed implementation is not a successful prerequisite or a scope override.
 
+### Late review evidence after a terminal failure
+
+For an Owner-designated late result of an already DELIVERED/FAILED `terv-review`,
+use `check-late-result -RequestPath <private.json>` first. This opens the store
+read-only and makes bounded GETs only. `attach-late-result` repeats verification
+and atomically adds a separate local `RECOVERED_RESULT` evidence record. It does
+not overwrite, reopen or mark the original failed review successful.
+
+The private request contains `operationId`, `expectedInputDigest`,
+`expectedResultDigest`, `rootMessageId`, `rootTextSha256`, `terminalMessageId`,
+`terminalTextSha256`, `instructionReference`, and `intentVerificationReference`.
+Pin the original values using `inspect`; resolve exact message identities and
+UTF-8 visible-text hashes with bounded GET observation. Owner authority must
+cover attaching this exact review; the intent reference records candidate/scope
+and review-artifact correspondence. Neither prose similarity nor the reference
+string independently establishes Owner approval or native ancestry.
+
+Verification checks the original delivered failure, exact idle/attention-clear
+session/home/project, a normal user root and its direct successful terminal child,
+completion later than the retained failure, exact text hashes and an unchanged
+newest contiguous history window of at most100messages containing both. A different
+root is not asserted to be a manual continuation. An original root missing by404
+is recorded as such; transport errors are not absence. Incomplete/competing or
+changed evidence fails closed. This adds no paging/history-limit expansion.
+
+The receipt is `NOT_SENT / COMPLETED`, `evidenceOnly:true`: only its local evidence
+attachment is complete. Original input, result digest, failed outcome, message
+correlation, work authorization/pause and every session claim remain unchanged.
+The receipt is non-dispatchable and cannot serve as a lifecycle predecessor.
+Same exact request is idempotent; competing attachments to one original conflict.
+An already attached exact request returns retained evidence with
+`verificationPerformed:false`, `verifiedOnly:false`, `attached:true`, without fresh
+GET checks. Only `verificationPerformed:true` reports verification in that call;
+an idempotent receipt is not evidence of the session's current state.
+No new work/session, database schema migration, global runtime restart,
+project-state refresh, product acceptance or automatic successor is performed.
+
+Read the receipt with `read-result` and its new operation ID. For separately
+authorized work in the same work envelope, it can be an explicit `operationId`
+source; source rendering and `read-source` carry original pins and the evidence-only,
+unverified-native-lineage limitation without changing the exact artifact text.
+The responsible role must still interpret the review, and the Owner must authorize
+the continuation/unpause normally. Do not use the receipt as a successful stage,
+cross-work source shortcut, implementation approval or reason to repeat the review.
+Old readers can read the artifact; use the updated reader/rendering facade to
+retain the provenance label in new downstream packets. Other recovery actions
+and their immutable-result guards are unchanged.
+
 `adopt-manual-continuation -RequestPath <private.json>` performs GET verification
 and one local immutable result write. It sends nothing, does not refresh project
 files, lift pause, change scope or accept a plan. It only supports an existing

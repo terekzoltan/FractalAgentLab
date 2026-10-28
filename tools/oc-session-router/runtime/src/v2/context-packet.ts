@@ -14,6 +14,8 @@ export interface SourceSnapshot {
   sourceClass: "FILE" | "RESULT"; reference: string; sha256: string; content: string;
   sourceId: string; mode: "inline" | "reference" | "excerpt"; selection: Selection;
   authoritySha256?: string;
+  recoveryProvenance?: { originalOperationId: string; originalInputDigest: string; originalResultDigest: string;
+    evidenceOnly: true; nativeLineageRestored: false; productAcceptance: false };
 }
 const bytes = (value: string) => Buffer.byteLength(value, "utf8");
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -68,6 +70,7 @@ export function freezeSources(store: OperationStore, work: WorkContext, referenc
     const selection: Selection = { ...(reference.heading === undefined ? {} : { heading: reference.heading }), ...(reference.lines === undefined ? {} : { lines: reference.lines }) };
     if ((requested === "excerpt") !== !!Object.keys(selection).length) throw new RouterError("SOURCE_SELECTION_MODE_INVALID");
     let raw: Pick<SourceSnapshot, "sourceClass" | "reference" | "sha256" | "content">;
+    let recoveryProvenance: SourceSnapshot["recoveryProvenance"];
     if ("path" in reference) {
       const source = readContainedSource(work.directory, reference.path);
       if (sha(source.content) !== source.sha256) throw new RouterError("SOURCE_TEXT_ENCODING_INVALID");
@@ -78,6 +81,13 @@ export function freezeSources(store: OperationStore, work: WorkContext, referenc
       const content = operation.outcome?.response?.text ?? operation.outcome?.artifact?.text;
       if (operation.action.workId !== work.workId || !operation.completedAt || content === undefined || !operation.resultDigest) throw new RouterError("RESULT_SOURCE_UNAVAILABLE");
       raw = { sourceClass: "RESULT", reference: operation.operationId, sha256: operation.resultDigest, content };
+      if (operation.action.kind === "RECOVERED_RESULT") {
+        const proof = operation.outcome?.lateRecovery;
+        if (!proof || typeof proof.originalOperationId !== "string" || typeof proof.originalInputDigest !== "string" ||
+            typeof proof.originalResultDigest !== "string") throw new RouterError("RESULT_SOURCE_UNAVAILABLE");
+        recoveryProvenance = { originalOperationId: proof.originalOperationId, originalInputDigest: proof.originalInputDigest,
+          originalResultDigest: proof.originalResultDigest, evidenceOnly: true, nativeLineageRestored: false, productAcceptance: false };
+      }
     }
     selectSource(raw.content, selection); // Fail ambiguous caller selection before creating an operation.
     const sourceId = sourceIdentity(work.workId, raw);
@@ -94,6 +104,7 @@ export function freezeSources(store: OperationStore, work: WorkContext, referenc
       // are projection debt, not a new lifecycle admission requirement.
     }
     result.push({ ...raw, sourceId, selection, mode,
+      ...(recoveryProvenance ? { recoveryProvenance } : {}),
       ...(authoritySha256 ? { authoritySha256 } : {}) });
   }
   return result;
@@ -103,7 +114,8 @@ export function renderSources(workId: string, sources: SourceSnapshot[], databas
   const readerContext = sources.some(source => source.mode !== "inline") ? `\n\nFrozen-source reader (local, read-only): ${JSON.stringify({ entryPoint: fileURLToPath(new URL("../../../../scripts/Invoke-OCRouter.ps1", import.meta.url)), ...(databasePath ? { stateRoot: path.dirname(databasePath) } : {}) })}. Use these explicit paths, not a guessed default store.` : "";
   return readerContext + sources.map(source => {
     const reader = JSON.stringify({ workId, sourceId: source.sourceId });
-    const prefix = `\n\nReference data (${source.reference}):`;
+    const prefix = `\n\nReference data (${source.reference}):` + (source.recoveryProvenance
+      ? `\n[RECOVERED LATE EVIDENCE ONLY] ${JSON.stringify(source.recoveryProvenance)}. The original FAILED result is unchanged. This is not a completed lifecycle stage, native lineage restoration, or product acceptance.` : "");
     if (source.mode === "inline") return `${prefix}\n${source.content}`;
     const handle = `Frozen source SHA-256: ${source.sha256}; full bytes: ${bytes(source.content)}.\nFAL Invoke-OCRouter.ps1 -Action read-source accepts -WorkId and -SourceId from ${reader}; optionally -Heading or -StartLine/-EndLine. No JSON file, credential or new operation is needed. No selector returns the complete snapshot.`;
     return source.mode === "reference" ? `${prefix} [REFERENCE ONLY]\n${handle}\nAvailable context, not an instruction to read everything. Retrieve the plan/evidence required for this stage; use targeted sections for roadmap/history and do not eagerly reload all references.`
@@ -125,7 +137,8 @@ export function readFrozenSource(store: OperationStore, request: { workId: strin
       if (source.sourceId !== request.sourceId) continue;
       if (sourceIdentity(request.workId, source) !== request.sourceId) throw new RouterError("SOURCE_SNAPSHOT_CORRUPT");
       const content = selectSource(source.content, request);
-      return { sourceId: source.sourceId, reference: source.reference, sourceSha256: source.sha256, selectedTextSha256: sha(content), content, lifecycleSend: false };
+      return { sourceId: source.sourceId, reference: source.reference, sourceSha256: source.sha256, selectedTextSha256: sha(content), content,
+        ...(source.recoveryProvenance ? { recoveryProvenance: source.recoveryProvenance } : {}), lifecycleSend: false };
     }
   }
   throw new RouterError("SOURCE_SNAPSHOT_NOT_FOUND");

@@ -16,6 +16,7 @@ import { PreparationDiagnostics, PreparationFailure } from "./preparation-diagno
 import type { ManualContinuationRequest } from "./manual-continuation.js";
 import type { OwnerStoppedRequest } from "./owner-resolution.js";
 import type { OwnerFilingRequest } from "./owner-filing.js";
+import type { LateResultRequest } from "./late-result.js";
 import { waitingForOwner } from "./owner-attention.js";
 
 const here = fileURLToPath(import.meta.url);
@@ -61,6 +62,8 @@ export function operationView(operation: Operation, store?: OperationStore) {
     ...(store ? { continuity, ownerAttention: snapshot?.ownerAttention ?? null } : {}),
     ...(operation.action.input.packet ? { packet: operation.action.input.packet } : {}),
     autoAdvance: false,
+    ...(operation.action.kind === "RECOVERED_RESULT" ? { evidenceOnly: true, originalOperationId: operation.action.input.originalOperationId,
+      nativeLineageRestored: false, productAcceptance: false } : {}),
     ownerResolution: operation.outcome?.ownerResolution ? { disposition: "STOPPED_BEFORE_IMPLEMENTATION", nativeLineageRestored: false, implementationAccepted: false } : null,
     ...(operation.outcome?.ownerFiling ? { ownerFiling: { disposition: "ACCEPT_DOCUMENTATION_FILING", nativeLineageRestored: false, productAcceptance: false, filingAcceptedByOwner: true } } : {}),
     recovery: operation.outcome?.manualRecovery ? { kind: "MANUAL_CONTINUATION", instructionReference: operation.outcome.manualRecovery.request && typeof operation.outcome.manualRecovery.request === "object" && !Array.isArray(operation.outcome.manualRecovery.request) ? operation.outcome.manualRecovery.request.instructionReference : null } : null,
@@ -87,7 +90,7 @@ export async function retainExecutor(stateRoot: string, configurationPath: strin
 /** Control-session maintenance must never refresh an enrolled project file. */
 export function operationMutationView(operation: Operation, store: OperationStore | undefined, project: (workId: string) => unknown) {
   return { ...operationView(operation, store), stateProjection:
-    operation.action.kind === "ORCHESTRATOR_HANDOFF" || operation.action.input.orchestratorMaintenance === true
+    operation.action.kind === "ORCHESTRATOR_HANDOFF" || operation.action.kind === "RECOVERED_RESULT" || operation.action.input.orchestratorMaintenance === true
       ? { status: "NOT_APPLICABLE" } : project(operation.action.workId) };
 }
 
@@ -100,10 +103,10 @@ export async function runCli(argv: string[]): Promise<unknown> {
 async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics): Promise<unknown> {
   const [action, ...rest] = argv;
   if (!action || action === "help" || action === "--help") return {
-    interface: "fal-router/v2", actions: ["open-work", "amend-work", "adopt-manual-continuation", "resolve-owner-stopped", "check-owner-filing", "resolve-owner-filing", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy"],
+    interface: "fal-router/v2", actions: ["open-work", "amend-work", "adopt-manual-continuation", "resolve-owner-stopped", "check-owner-filing", "resolve-owner-filing", "check-late-result", "attach-late-result", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy"],
     configuration: "Private router-config.json; credentials are process environment only.",
   };
-  if (!["open-work", "amend-work", "adopt-manual-continuation", "resolve-owner-stopped", "check-owner-filing", "resolve-owner-filing", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy", "execute-operation"].includes(action)) throw new RouterError("ACTION_UNSUPPORTED");
+  if (!["open-work", "amend-work", "adopt-manual-continuation", "resolve-owner-stopped", "check-owner-filing", "resolve-owner-filing", "check-late-result", "attach-late-result", "submit", "compact", "restore", "inspect", "read-result", "read-source", "refresh-state", "wait", "reconcile", "interpret", "observe-session", "record-pause", "import-legacy", "execute-operation"].includes(action)) throw new RouterError("ACTION_UNSUPPORTED");
   const values = options(rest);
   const actionOptions: Record<string, string[]> = {
     "open-work": ["--request"], "amend-work": ["--request"], submit: ["--request"], compact: ["--request"], restore: ["--request"],
@@ -115,6 +118,7 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
     "adopt-manual-continuation": ["--request"],
     "resolve-owner-stopped": ["--request"],
     "check-owner-filing": ["--request"], "resolve-owner-filing": ["--request"],
+    "check-late-result": ["--request"], "attach-late-result": ["--request"],
   };
   const accepted = new Set(["--state-root", "--config", ...actionOptions[action]!]);
   if (Object.keys(values).some(key => !accepted.has(key))) throw new RouterError("INVALID_ARGUMENTS");
@@ -124,7 +128,7 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
   const database = path.join(stateRoot, "router.sqlite");
   diagnostics?.at("STORE_OPEN");
   if (action !== "open-work" && !existsSync(database)) throw new RouterError("WORK_STORE_NOT_FOUND");
-  const store = new OperationStore(database, { readOnly: action === "check-owner-filing" });
+  const store = new OperationStore(database, { readOnly: action === "check-owner-filing" || action === "check-late-result" });
   diagnostics?.useStore(store);
   const engine = () => {
     const password = process.env.OPENCODE_SERVER_PASSWORD;
@@ -140,6 +144,11 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
   };
   const mutationView = (operation: Operation) => operationMutationView(operation, store, project);
   try {
+    if (action === "check-late-result" || action === "attach-late-result") {
+      const result = await engine().attachLate(readRequest<LateResultRequest>(), action === "attach-late-result");
+      return { ...operationView(result.operation, store), verifiedOnly: result.verifiedOnly,
+        attached: result.attached, verificationPerformed: result.verificationPerformed, lifecycleSend: false, originalResultReplaced: false };
+    }
     if (action === "check-owner-filing" || action === "resolve-owner-filing") return { ...operationView(await engine().resolveFiling(readRequest<OwnerFilingRequest>(), action === "resolve-owner-filing"), store), verifiedOnly: action === "check-owner-filing", lifecycleSend: false };
     if (action === "resolve-owner-stopped") return { ...operationView(await engine().resolveStopped(readRequest<OwnerStoppedRequest>()), store), lifecycleSend: false };
     if (action === "adopt-manual-continuation") return { ...operationView(await engine().adoptManual(readRequest<ManualContinuationRequest>()), store), lifecycleSend: false };
@@ -177,7 +186,10 @@ async function runCliAction(argv: string[], diagnostics?: PreparationDiagnostics
     if (action === "read-result") {
       const operation = store.getOperation(required(values, "--operation-id"));
       // Explicit private artifact read, not normal status or a full history export.
-      return { operationId: operation.operationId, resultDigest: operation.resultDigest, text: operation.outcome?.response?.text ?? operation.outcome?.artifact?.text ?? null };
+      return { operationId: operation.operationId, resultDigest: operation.resultDigest, text: operation.outcome?.response?.text ?? operation.outcome?.artifact?.text ?? null,
+        ...(operation.action.kind === "RECOVERED_RESULT" ? { evidenceOnly: true, originalOperationId: operation.action.input.originalOperationId,
+          originalInputDigest: operation.action.input.originalInputDigest, originalResultDigest: operation.action.input.originalResultDigest,
+          nativeLineageRestored: false, productAcceptance: false } : {}) };
     }
     if (action === "import-legacy") {
       const imported = importLegacyOperation(store, jsonFile<RouterConfiguration>(configurationPath), readRequest<LegacyImportRequest>());
