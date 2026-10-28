@@ -42,6 +42,11 @@ state, raw IDs and task results outside Git.
 
 Explicit `adopt-manual-continuation` recovers an Owner-designated manual result
 without resend or rewriting the original correlation. See the interface reference.
+For an already failed delivered plan review, `check-late-result` / `attach-late-result`
+can preserve an Owner-designated late answer as a separate local evidence record.
+The original FAILED result stays unchanged; the receipt is neither a completed
+lifecycle stage nor a native-lineage or product-acceptance claim. Use the updated
+source reader/rendering to carry its provenance to later authorized planning.
 Optional per-role `sessionHome` enrollment reuses persistent sessions for another
 verified worktree of the same repository; target.directory remains execution scope.
 Neither feature grants product acceptance, new scope or automatic progression.

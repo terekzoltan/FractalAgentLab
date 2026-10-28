@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -307,7 +307,8 @@ export class OperationStore {
       if (!authorization.allowedEffects.includes(action.effect)) throw new StoreError("EFFECT_NOT_ALLOWED");
       if (action.predecessor) {
         const previous = this.row(action.predecessor);
-        if (previous.work_id !== action.workId || !previous.completed_at) throw new StoreError("INPUT_CONFLICT");
+        if (previous.work_id !== action.workId || !previous.completed_at ||
+            (JSON.parse(String(previous.action_json)) as ActionInput).kind === "RECOVERED_RESULT") throw new StoreError("INPUT_CONFLICT");
       }
       if (this.db.prepare("SELECT operation_id FROM session_claims WHERE participant_key=?").get(key)) throw new StoreError("PARTICIPANT_BUSY");
       // A replacement namespace/target must not bypass a retained handoff claim.
@@ -339,7 +340,7 @@ export class OperationStore {
   startDispatch(operationId: string): boolean {
     const started = this.transaction(() => {
       const operation = this.row(operationId);
-      if ((JSON.parse(String(operation.action_json)) as ActionInput).kind === "LEGACY") return false;
+      if (["LEGACY", "RECOVERED_RESULT"].includes((JSON.parse(String(operation.action_json)) as ActionInput).kind)) return false;
       if (operation.dispatch_started_at !== null || operation.completed_at !== null) return false;
       const work = this.db.prepare("SELECT paused FROM work_items WHERE work_id=?").get(String(operation.work_id))!;
       if (work.paused === 1) throw new StoreError("WORK_PAUSED");
@@ -434,6 +435,64 @@ export class OperationStore {
       return true;
     });
     if (changed) this.options.checkpoint?.("RESULT_COMMITTED");
+    return this.getOperation(operationId);
+  }
+
+  /** One immutable evidence receipt per failed review, with no dispatch or claim mutation. */
+  getRecoveredResult(originalOperationId: string): Operation | null {
+    text(originalOperationId);
+    const source = this.getOperation(originalOperationId);
+    const row = this.db.prepare("SELECT operation_id FROM operations WHERE work_id=? AND action_key=?")
+      .get(source.action.workId, `late-result/${originalOperationId}`);
+    return row ? this.getOperation(String(row.operation_id)) : null;
+  }
+
+  attachRecoveredResult(originalOperationId: string, requestDigest: string, outcome: TerminalOutcome,
+    expectedOperationDigest: string, expectedWorkDigest: string): Operation {
+    for (const value of [requestDigest, expectedOperationDigest, expectedWorkDigest]) {
+      if (!/^[a-f0-9]{64}$/.test(value)) throw new StoreError("INVALID_INPUT");
+    }
+    const provenance = outcome.lateRecovery;
+    if (outcome.execution !== "COMPLETED" || outcome.response || !outcome.artifact?.text.trim() ||
+        createHash("sha256").update(outcome.artifact.text).digest("hex") !== outcome.artifact.sha256 ||
+        !Array.isArray(outcome.evidenceReferences) || !outcome.evidenceReferences.length ||
+        !provenance || provenance.requestDigest !== requestDigest || provenance.originalOperationId !== originalOperationId ||
+        provenance.evidenceOnly !== true || provenance.nativeLineageRestored !== false || provenance.productAcceptance !== false) throw new StoreError("INVALID_INPUT");
+    outcome.evidenceReferences.forEach(text);
+    const encodedOutcome = canonical(outcome);
+    const operationId = this.transaction(() => {
+      const original = this.getOperation(originalOperationId);
+      if (!original.dispatchStartedAt || !original.acknowledgedAt || !original.completedAt ||
+          original.correlation.rootMessageId !== original.messageId || original.outcome?.execution !== "FAILED" ||
+          original.action.kind !== "LIFECYCLE" || original.action.command !== "terv-review" ||
+          provenance.originalInputDigest !== original.inputDigest || provenance.originalResultDigest !== original.resultDigest) throw new StoreError("INPUT_CONFLICT");
+      const prior = this.getRecoveredResult(originalOperationId);
+      if (prior) {
+        if (prior.action.kind !== "RECOVERED_RESULT" || prior.outcome?.lateRecovery?.requestDigest !== requestDigest) throw new StoreError("RESULT_CONFLICT");
+        return prior.operationId;
+      }
+      if (digest(original) !== expectedOperationDigest) throw new StoreError("RESULT_CONFLICT");
+      const row = this.db.prepare("SELECT context_json,paused,pause_reference FROM work_items WHERE work_id=?").get(original.action.workId)!;
+      const context = JSON.parse(String(row.context_json)) as WorkContext;
+      const authorization = this.authorization(context);
+      if (digest({ context, authorization, paused: row.paused === 1, pauseReference: row.pause_reference }) !== expectedWorkDigest) throw new StoreError("AUTHORIZATION_CHANGED");
+      const action: ActionInput = {
+        workId: original.action.workId, actionKey: `late-result/${originalOperationId}`,
+        participant: original.action.participant, recipientRole: original.action.recipientRole,
+        kind: "RECOVERED_RESULT", effect: "READ_ONLY", command: "late-review-evidence", predecessor: null,
+        input: { evidenceOnly: true, originalOperationId, originalInputDigest: original.inputDigest,
+          originalResultDigest: original.resultDigest, requestDigest },
+      };
+      const now = this.now(), id = `op-${randomUUID()}`, version2 = this.schemaVersion() === 2;
+      // A local receipt has no OpenCode request identity or delivery acknowledgement.
+      this.db.prepare(`INSERT INTO operations(operation_id,message_id,work_id,action_key,participant_key,action_json,input_digest,created_at,completed_at${version2 ? ",authorization_revision" : ""}) VALUES(?,?,?,?,?,?,?,?,?${version2 ? ",?" : ""})`)
+        .run(id, `recovered-${randomUUID()}`, action.workId, action.actionKey, original.participantKey,
+          canonical(action), digest(action), now, now, ...(version2 ? [authorization.revision] : []));
+      this.options.checkpoint?.("PREPARE_OPERATION_INSERTED");
+      this.db.prepare("INSERT INTO results(operation_id,outcome_json,result_digest) VALUES(?,?,?)").run(id, encodedOutcome, digest(outcome));
+      this.options.checkpoint?.("RESULT_INSERTED");
+      return id;
+    });
     return this.getOperation(operationId);
   }
 

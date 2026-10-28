@@ -49,7 +49,7 @@ export interface ActionInput {
   actionKey: string;
   participant: Participant;
   recipientRole: string;
-  kind: "LIFECYCLE" | "CLARIFICATION" | "COMPACT" | "RESTORE" | "LEGACY" | "ORCHESTRATOR_HANDOFF";
+  kind: "LIFECYCLE" | "CLARIFICATION" | "COMPACT" | "RESTORE" | "LEGACY" | "ORCHESTRATOR_HANDOFF" | "RECOVERED_RESULT";
   effect: Effect;
   command: string;
   predecessor: string | null;
@@ -82,6 +82,8 @@ export interface TerminalOutcome {
   ownerResolution?: { [key: string]: Json };
   /** Explicit documentation acceptance with unverified native ancestry. */
   ownerFiling?: { [key: string]: Json };
+  /** Separate late evidence receipt; never replaces the original result or proves native lineage. */
+  lateRecovery?: { [key: string]: Json };
   reason?: string;
 }
 

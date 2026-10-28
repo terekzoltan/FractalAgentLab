@@ -7,6 +7,7 @@ import { commandRule, readContainedSource, resolveRole, RouterError, sameDirecto
 import { adoptManualContinuation, type ManualContinuationRequest } from "./manual-continuation.js";
 import { resolveOwnerStopped, type OwnerStoppedRequest } from "./owner-resolution.js";
 import { resolveOwnerFiling, type OwnerFilingRequest } from "./owner-filing.js";
+import { attachLateResult, type LateResultRequest } from "./late-result.js";
 import { observeSession, continuitySummary, type SessionObservationOptions } from "./session-observation.js";
 import { alreadyCompacted, captureCompactBaseline, observeCompactCompletion, type CompactBaseline } from "./session-maintenance.js";
 import { reconcileLegacyOperation } from "./legacy-import.js";
@@ -356,7 +357,7 @@ export class RouterEngine {
   /** Runs in the retaining transport process, never under an observation deadline. */
   async execute(operationId: string): Promise<Operation> {
     const operation = this.store.getOperation(operationId);
-    if (operation.action.kind === "LEGACY") return operation; // Imported history is never executable.
+    if (operation.action.kind === "LEGACY" || operation.action.kind === "RECOVERED_RESULT") return operation; // Local evidence is never executable.
     if (operation.completedAt || operation.dispatchStartedAt) return operation;
     const work = this.store.getWork(operation.action.workId);
     if (work.paused) throw new StoreError("WORK_PAUSED");
@@ -490,6 +491,11 @@ export class RouterEngine {
   async resolveFiling(request: OwnerFilingRequest, apply = true) {
     const operation = this.store.getOperation(request.operationId);
     return resolveOwnerFiling(this.store, request, this.adapterForOperation(operation, false), apply);
+  }
+
+  async attachLate(request: LateResultRequest, apply = true) {
+    const operation = this.store.getOperation(request.operationId);
+    return attachLateResult(this.store, request, this.adapterForOperation(operation, false), apply);
   }
 
   private async reconcileCompact(operationId: string, adapter: Adapter) {
