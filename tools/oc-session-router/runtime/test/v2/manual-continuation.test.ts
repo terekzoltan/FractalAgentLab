@@ -9,14 +9,16 @@ import type { ReconcileReader } from "../../src/v2/reconcile.js";
 import { operationView } from "../../src/v2/cli.js";
 
 const reply = <T>(value: T): AdapterReply<T> => ({ status: 200, value, bodySha256: "fixture" });
-function fixture(t: TestContext) {
+function fixture(t: TestContext, handoff = false) {
   const directory = mkdtempSync(path.join(process.cwd(), ".manual-recovery-"));
   const store = new OperationStore(path.join(directory, "router.sqlite"));
   t.after(() => { store.close(); rmSync(directory, { recursive: true, force: true }); });
-  store.openWork({ workId: "work", target: "fixture", directory, instructionReference: "owner", scope: "fix plan", allowedEffects: ["WORKSPACE_WRITE"], stoppingPoint: "review" });
+  store.openWork({ workId: "work", target: "fixture", directory, instructionReference: "owner", scope: "fix plan", allowedEffects: [handoff ? "ORCHESTRATOR_HANDOFF" : "WORKSPACE_WRITE"], stoppingPoint: "review" });
   const action = { workId: "work", actionKey: "fix-plan", participant: { namespace: "fixture", project: "project", session: "ses_delivery" }, recipientRole: "Delivery", kind: "LIFECYCLE" as const, effect: "WORKSPACE_WRITE" as const, command: "step-review-utan", predecessor: null,
     input: { address: { origin: "http://fixture.invalid", directory, session: "ses_delivery" }, sources: [] } };
-  let operation = store.prepareAction(action).operation;
+  const selected = handoff ? { ...action, kind: "ORCHESTRATOR_HANDOFF" as const, effect: "ORCHESTRATOR_HANDOFF" as const, command: "orchestrator-handoff",
+    input: { ...action.input, address: { ...action.input.address, origin: "http://127.0.0.1:4096" }, arguments: "Original fix plan request" } } : action;
+  let operation = store.prepareAction(selected).operation;
   store.startDispatch(operation.operationId);
   operation = store.acknowledge(operation.operationId, { rootMessageId: operation.messageId });
   const message = (id: string, role: "user" | "assistant", at: number, extra: Partial<OpenCodeMessage> = {}): OpenCodeMessage => ({ id, role, session: "ses_delivery", text: "", timeCreated: at, hasCompactionPart: false, ...extra });
@@ -35,7 +37,45 @@ function fixture(t: TestContext) {
     },
   };
   const request = { operationId: operation.operationId, expectedInputDigest: operation.inputDigest, manualRootMessageId: root.id, manualRootTextSha256: textSha256(root.text), terminalMessageId: terminal.id, terminalTextSha256: textSha256(terminal.text), instructionReference: "Owner approves manual adoption", intentVerificationReference: "Responsible lane verified same scope, candidate and all seven findings" };
-  return { store, action, operation, original, root, terminal, state, adapter, request };
+  return { store, action, selected, operation, original, root, terminal, state, adapter, request };
+}
+
+test("handoff: release the held claim only after stable manual evidence, preserve original correlation", async t => {
+  const f = fixture(t, true);
+  const next = { ...f.selected, actionKey: "new-handoff" };
+  assert.throws(() => f.store.prepareAction(next));
+  const result = await adoptManualContinuation(f.store, f.request, f.adapter);
+  assert.deepEqual(result.correlation, f.operation.correlation);
+  assert.equal(result.outcome?.response, undefined);
+  assert.equal(result.outcome?.manualRecovery?.nativeLineageRestored, false);
+  assert.equal(result.outcome?.manualRecovery?.originalTerminalChildObserved, false);
+  assert.equal(result.outcome?.manualRecovery?.productAcceptance, false);
+  assert.equal(result.outcome?.artifact?.text, f.terminal.text);
+  assert.equal((await adoptManualContinuation(f.store, f.request, f.adapter)).resultDigest, result.resultDigest);
+  assert.equal(f.store.prepareAction(next).created, true);
+});
+
+for (const scenario of ["missing-root", "changed-prompt", "intervening-root", "late-assistant", "original-error", "length", "wrong-parent", "race"]) {
+  test(`handoff: reject ${scenario} and retain the claim`, async t => {
+    const f = fixture(t, true);
+    if (scenario === "missing-root") {
+      f.state.messages.shift();
+      const get = f.adapter.getMessage;
+      f.adapter.getMessage = async id => id === f.original.id ? { status: 404, bodySha256: "missing" } : get(id);
+      const now = Date.now() + 1000;
+      f.root.timeCreated = now; f.terminal.timeCreated = now + 1; f.terminal.timeCompleted = now + 2;
+    }
+    if (scenario === "changed-prompt") f.original.text = "other request";
+    if (scenario === "intervening-root") f.state.messages.push({ ...f.root, id: "msg_intervening", timeCreated: 2 });
+    if (scenario === "late-assistant") f.state.messages.push({ ...f.terminal, id: "msg_later", parentId: "msg_else", timeCreated: 6 });
+    if (scenario === "original-error") f.state.messages.push({ ...f.terminal, id: "msg_error", parentId: f.original.id, timeCreated: 2, error: true });
+    if (scenario === "length") f.terminal.finish = "length";
+    if (scenario === "wrong-parent") f.terminal.parentId = "msg_else";
+    if (scenario === "race") f.state.race = true;
+    await assert.rejects(adoptManualContinuation(f.store, f.request, f.adapter));
+    assert.equal(f.store.getOperation(f.operation.operationId).resultDigest, null);
+    assert.throws(() => f.store.prepareAction({ ...f.selected, actionKey: "new-handoff" }));
+  });
 }
 
 test("manual adoption retains original history, pause, provenance and unlocks same-work result without resend", async t => {

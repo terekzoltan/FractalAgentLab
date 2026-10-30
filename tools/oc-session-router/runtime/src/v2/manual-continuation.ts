@@ -28,26 +28,29 @@ export async function adoptManualContinuation(store: OperationStore, request: Ma
   for (const key of fields) text(request[key as keyof ManualContinuationRequest]);
   for (const value of [request.expectedInputDigest, request.manualRootTextSha256, request.terminalTextSha256]) if (!/^[a-f0-9]{64}$/.test(value)) throw new RouterError("MANUAL_REQUEST_INVALID");
   const operation = store.getOperation(request.operationId);
+  const handoff = operation.action.kind === "ORCHESTRATOR_HANDOFF";
   const requestDigest = digest(request);
   if (operation.completedAt) {
     if (operation.outcome?.manualRecovery?.requestDigest === requestDigest) return operation;
     throw new RouterError("MANUAL_RESULT_CONFLICT");
   }
   if (!operation.dispatchStartedAt || !operation.acknowledgedAt || operation.correlation.rootMessageId !== operation.messageId ||
-      operation.inputDigest !== request.expectedInputDigest || !["LIFECYCLE", "CLARIFICATION", "RESTORE"].includes(operation.action.kind)) throw new RouterError("MANUAL_OPERATION_INELIGIBLE");
+      operation.inputDigest !== request.expectedInputDigest ||
+      !(handoff || ["LIFECYCLE", "CLARIFICATION", "RESTORE"].includes(operation.action.kind))) throw new RouterError("MANUAL_OPERATION_INELIGIBLE");
   const address = operation.action.input.address as { directory?: string } | undefined;
   const work = store.getWork(operation.action.workId);
   const verify = async () => {
     const session = requireValue(await adapter.getSession());
-    if (session.id !== operation.action.participant.session || session.projectID !== operation.action.participant.project ||
+    if ((handoff && session.reverted) || session.id !== operation.action.participant.session || session.projectID !== operation.action.participant.project ||
         !sameDirectory(session.directory, address?.directory ?? work.context.directory)) throw new RouterError("MANUAL_SESSION_MISMATCH");
     if (requireValue(await adapter.getStatus()) !== "IDLE") throw new RouterError("MANUAL_SESSION_NOT_IDLE");
   };
+  const pageSize = handoff ? 12 : 100;
   const scan = async (): Promise<OpenCodeMessage[]> => {
     const messages: OpenCodeMessage[] = [], seen = new Set<string>(), cursors = new Set<string>();
     let cursor: string | undefined;
     for (let page = 0; page < 10; page++) {
-      const history = requireValue(await adapter.getHistory({ limit: 100, ...(cursor ? { before: cursor } : {}) }));
+      const history = requireValue(await adapter.getHistory({ limit: pageSize, ...(cursor ? { before: cursor } : {}) }));
       for (const message of history.messages) {
         if (message.session !== operation.action.participant.session || seen.has(message.id)) throw new RouterError("MANUAL_HISTORY_AMBIGUOUS");
         seen.add(message.id); messages.push(message);
@@ -77,6 +80,13 @@ export async function adoptManualContinuation(store: OperationStore, request: Ma
   if (!terminal || terminal.role !== "assistant" || terminal.parentId !== root.id || !isTerminalMessage(terminal) || terminal.error ||
       !terminal.text.trim() || textSha256(terminal.text) !== request.terminalTextSha256 ||
       !Number.isFinite(terminal.timeCreated) || terminal.timeCreated! < root.timeCreated! || terminal.timeCompleted! < terminal.timeCreated!) throw new RouterError("MANUAL_TERMINAL_MISMATCH");
+  // Handoffs require the delivered prompt itself and exactly one continuation
+  // root after it. Never attach across intervening prompts or a native ending.
+  if (handoff && (!original || original.text !== operation.action.input.arguments ||
+      terminal.finish !== "stop" || first.some(m => !Number.isFinite(m.timeCreated) ||
+        (m.id !== original.id && m.id !== root.id && m.role === "user" && m.timeCreated! >= original.timeCreated!) ||
+        (m.parentId === original.id && isTerminalMessage(m)) ||
+        (m.id !== terminal.id && m.timeCreated! >= terminal.timeCreated!)))) throw new RouterError("MANUAL_HANDOFF_LINEAGE_UNVERIFIED");
   // No guessing between competing successful originals or manual continuations.
   if (first.some(m => m.role === "assistant" && m.parentId === operation.messageId && isTerminalMessage(m) && !m.error) ||
       first.filter(m => m.role === "assistant" && m.parentId === root.id && isTerminalMessage(m) && !m.error).length !== 1 ||
@@ -89,7 +99,7 @@ export async function adoptManualContinuation(store: OperationStore, request: Ma
     if (currentRoot.status !== 404 || currentRoot.value !== undefined) throw new RouterError("MANUAL_HISTORY_CHANGED");
   }
   await verify();
-  const head = requireValue(await adapter.getHistory({ limit: 100 }));
+  const head = requireValue(await adapter.getHistory({ limit: pageSize }));
   if (digest(head.messages) !== digest(first.slice(0, head.messages.length))) throw new RouterError("MANUAL_HISTORY_CHANGED");
   // Caller attests meaning within the Owner envelope; the router verifies identity,
   // not plan acceptance, findings or semantic equivalence using string heuristics.
@@ -98,6 +108,7 @@ export async function adoptManualContinuation(store: OperationStore, request: Ma
     artifact: { text: terminal.text, sha256: request.terminalTextSha256 },
     evidenceReferences: [`manual-continuation-request-sha256:${requestDigest}`, `manual-history-sha256:${digest(first)}`],
     manualRecovery: {
+      ...(handoff ? { nativeLineageRestored: false, productAcceptance: false, originalTerminalChildObserved: false } : {}),
       requestDigest, request: request as unknown as Json,
       originalMessageId: operation.messageId, inputDigest: operation.inputDigest,
       originalCorrelation: operation.correlation as unknown as Json,

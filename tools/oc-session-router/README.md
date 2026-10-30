@@ -42,6 +42,11 @@ state, raw IDs and task results outside Git.
 
 Explicit `adopt-manual-continuation` recovers an Owner-designated manual result
 without resend or rewriting the original correlation. See the interface reference.
+For a delivered, pending orchestrator handoff, the live original must still match
+the dispatched prompt. Recovery verifies the single following manual user root
+and its final stop reply in a stable bounded session slice. The retained artifact
+records manual provenance and the absent original terminal child. Completion and
+release of that operation's claim occur in the same transaction.
 For an already failed delivered plan review, `check-late-result` / `attach-late-result`
 can preserve an Owner-designated late answer as a separate local evidence record.
 The original FAILED result stays unchanged; the receipt is neither a completed
