@@ -1,0 +1,18 @@
+{
+  "studyId": "synthetic-review-pilot",
+  "workId": "synthetic-work",
+  "candidateDigest": "a0e73ca6889248d7a07197ce139ebb21a4fa7e4454079f0d91c4dc92718a50de",
+  "reviewCycle": "review-family-0",
+  "stratumId": "docs-small",
+  "taskType": "documentation",
+  "risk": "low",
+  "difficulty": "small",
+  "versions": {
+    "workflow": "31b6a985b23c66c60eb02a957e106fe97b7fb96c952fe2a1deefd413afc6be7d",
+    "model": "6eaee6486ce977064cf87caf17f9780f9917920c8bae9f26ddb7c78444716877",
+    "prompt": "4eb05d0554a7aee59b8e4829b9a009f58a929cda80fee581b407f5aaccfffa52"
+  },
+  "carryover": "none",
+  "eligibilityEvidenceHash": "bb042c640f3540181076ef85e2414a7216a4cfbe384ee0405d95e69fc8109919",
+  "preOutcome": true
+}

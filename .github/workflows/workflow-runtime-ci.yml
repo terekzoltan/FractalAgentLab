@@ -1,13 +1,27 @@
 name: Workflow runtime source checks
 on:
   push:
-    paths: ['tools/oc-session-router/**', 'tools/workflow-tooling/**', '.github/workflows/workflow-runtime-ci.yml']
+    paths: ['tools/oc-session-router/**', 'tools/workflow-tooling/**', 'tools/workflow-experiments/**', '.github/workflows/workflow-runtime-ci.yml']
   pull_request:
-    paths: ['tools/oc-session-router/**', 'tools/workflow-tooling/**', '.github/workflows/workflow-runtime-ci.yml']
+    paths: ['tools/oc-session-router/**', 'tools/workflow-tooling/**', 'tools/workflow-experiments/**', '.github/workflows/workflow-runtime-ci.yml']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
+  optional-measurement-fixtures:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Standard-library measurement tests
+        run: python -B -m unittest discover -s tools/workflow-experiments -p "test_*.py" -v
+      - name: Isolated synthetic technical pilot, no live activation
+        shell: pwsh
+        run: |
+          python -B tools/workflow-experiments/workflow_experiments.py technical-pilot --ledger "$env:RUNNER_TEMP/experiment-technical-pilot.sqlite"
+          if ($LASTEXITCODE -ne 0) { throw 'Technical pilot failed' }
   windows-offline-fixtures:
     runs-on: windows-latest
     steps:
