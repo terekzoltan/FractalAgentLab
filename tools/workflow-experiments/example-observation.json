@@ -1,0 +1,45 @@
+{
+  "unitId": "0000000000000000000000000000000000000000000000000000000000000000",
+  "observationKey": "initial-outcome",
+  "supersedes": null,
+  "currentCandidateDigest": "a0e73ca6889248d7a07197ce139ebb21a4fa7e4454079f0d91c4dc92718a50de",
+  "candidateLineageEvidenceHash": null,
+  "state": "completed",
+  "actualVariant": "B",
+  "versions": {
+    "workflow": "31b6a985b23c66c60eb02a957e106fe97b7fb96c952fe2a1deefd413afc6be7d",
+    "model": "6eaee6486ce977064cf87caf17f9780f9917920c8bae9f26ddb7c78444716877",
+    "prompt": "4eb05d0554a7aee59b8e4829b9a009f58a929cda80fee581b407f5aaccfffa52"
+  },
+  "deviations": [],
+  "carryover": "none",
+  "independentEvaluation": true,
+  "evaluationBlinded": true,
+  "evaluatorRef": "0a5d59d2bdedbb29d39a687ca4e54601eb5f582cd98c84b3c6ca858e064fad10",
+  "evaluationEvidenceHash": "976ee32eb3e7e006edf351f2ff5a511c73351bb03596f49cd74a92abe64652fc",
+  "findings": [
+    {
+      "findingHash": "8b8ec420c3f708445caaeca6379e05c98ed36e41039684dbdbc5c4415f95c08e",
+      "disposition": "accepted",
+      "material": true
+    }
+  ],
+  "elapsedSeconds": null,
+  "usage": {
+    "tokens": null,
+    "costUSD": null,
+    "quality": "unknown",
+    "evidenceHash": null
+  },
+  "followup": {
+    "observedDays": null,
+    "regressions": null,
+    "evidenceHash": null
+  },
+  "reviewer": {
+    "modelHash": null,
+    "effort": "unknown",
+    "sourceQuality": "unknown",
+    "evidenceHash": null
+  }
+}

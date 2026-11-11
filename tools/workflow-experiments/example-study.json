@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "studyId": "synthetic-review-pilot",
+  "mode": "synthetic",
+  "question": "Does the measurement pipeline preserve eight known synthetic cases?",
+  "variants": {
+    "A": "Required baseline checks",
+    "B": "Same required checks plus synthetic extra reviewer"
+  },
+  "mandatoryChecks": [
+    "Existing mandatory independent review and acceptance remain unchanged"
+  ],
+  "allowedWorkIds": [
+    "synthetic-work"
+  ],
+  "eligibleTaskTypes": [
+    "documentation"
+  ],
+  "eligibleRisks": [
+    "low"
+  ],
+  "strata": [
+    {
+      "id": "docs-small",
+      "taskType": "documentation",
+      "risk": "low",
+      "difficulty": "small"
+    }
+  ],
+  "primaryOutcome": "verified_material_findings",
+  "maxUnits": 8,
+  "followupDays": 7,
+  "stopRule": "Eight fixed synthetic cases; no live sessions or provider calls",
+  "expiresAt": "2099-01-01T00:00:00Z",
+  "budget": "Local standard-library fixtures only; zero paid calls",
+  "evaluationRule": "Known synthetic oracle, identical for both labels",
+  "ownerApprovalRef": "fbb4717e436b2b9510a103b29b9f69c597015b96c3f2c3878e2d58aaddfa19c0",
+  "versions": {
+    "workflow": "31b6a985b23c66c60eb02a957e106fe97b7fb96c952fe2a1deefd413afc6be7d",
+    "model": "6eaee6486ce977064cf87caf17f9780f9917920c8bae9f26ddb7c78444716877",
+    "prompt": "4eb05d0554a7aee59b8e4829b9a009f58a929cda80fee581b407f5aaccfffa52"
+  }
+}
