@@ -376,3 +376,27 @@ test("read-only store inspections cannot initialize or write", async t => {
   assert.throws(() => new OperationStore(unsupported, { readOnly: true }), code("SCHEMA_UNSUPPORTED"));
   assert.deepEqual(readFileSync(unsupported), bytes);
 });
+
+test("explicit Fast changes only tier alias and survives duplicate delivery", async t => {
+ const f=fixture(t);
+ for(const m of f.state.messages){m.providerID="openai";m.modelID="gpt-6.1-sol";}
+ f.request.speedMode="fast";
+ const p=await f.preview();const prepared=await f.engine.prepareHandoff(p);
+ assert.equal(prepared.operation.action.input.model,"openai/gpt-6.1-sol-fast");
+ assert.equal(prepared.operation.action.input.variant,"high");
+ await f.engine.execute(prepared.operation.operationId);
+ assert.equal(f.state.submissions[0]!.model!.modelID,"gpt-6.1-sol-fast");
+ assert.equal((await f.engine.prepareHandoff(p)).created,false);
+ assert.equal(f.state.submissions.length,1);
+});
+test("speed amendment is prospective, revision-bound and cannot cross pending work", async t=>{
+ const f=fixture(t);
+ f.engine.openWork({workId:"speed",target:"product",directory:f.configuration.targets.product!.directory,instructionReference:"owner",scope:"scope",stoppingPoint:"stop",allowedEffects:["READ_ONLY"],speedMode:"standard"});
+ const old=f.store.getWork("speed");
+ const req={workId:"speed",amendmentKey:"fast",expectedAuthorizationRevision:old.authorization.revision,instructionReference:"owner-fast",constraints:"same scope",addEffects:[],speedMode:"fast" as const};
+ const updated=f.store.amendWork(req);
+ assert.equal(updated.work.authorization.speedMode,"fast");
+ assert.equal(updated.work.context.speedMode,"standard");
+ assert.equal(f.store.amendWork(req).created,false);
+ assert.throws(()=>f.store.amendWork({...req,amendmentKey:"stale",speedMode:"standard"}),code("AUTHORIZATION_CHANGED"));
+});

@@ -7,6 +7,7 @@ import { isTerminalMessage } from "./reconcile.js";
 import { resolveRole, RouterError, sameDirectory, sessionDirectory, type RouterConfiguration } from "./routing.js";
 
 export interface HandoffRequest {
+  speedMode?: "standard" | "fast";
   project: string;
   handoffKey: string;
   scope: string;
@@ -38,8 +39,9 @@ export function exactFields(value: unknown, fields: string[]): asserts value is 
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !fields.includes(key))) throw new StoreError("INVALID_INPUT");
 }
 export function validateHandoffRequest(request: HandoffRequest): void {
-  exactFields(request, ["project", "handoffKey", "scope", "stoppingPoint", "exclusions", "message", "instructionReference"]);
+  exactFields(request, ["speedMode", "project", "handoffKey", "scope", "stoppingPoint", "exclusions", "message", "instructionReference"]);
   for (const value of Object.values(request)) text(value);
+  if (request.speedMode !== undefined && request.speedMode !== "standard" && request.speedMode !== "fast") throw new StoreError("INVALID_INPUT");
   for (const key of ["project", "handoffKey", "scope", "stoppingPoint", "exclusions", "message", "instructionReference"] as const) text(request[key]);
   if (request.project.length > 128 || request.handoffKey.length > 256 || Buffer.byteLength(request.message, "utf8") > 16_384 ||
       Buffer.byteLength(JSON.stringify(request), "utf8") > 24_576) throw new StoreError("INVALID_INPUT");
@@ -173,7 +175,7 @@ function previewPath(stateRoot: string, id: string): string {
 }
 export function handoffId(request: HandoffRequest): string { return `handoff-${digest([request.project, request.handoffKey])}`; }
 export function renderHandoff(request: HandoffRequest): string {
-  return `${request.message}\n\nApproved scope: ${request.scope}\nStopping point: ${request.stoppingPoint}\nExclusions: ${request.exclusions}\nOwner instruction reference: ${request.instructionReference}\nUse the current fal-orchestrate-target skill. Record downstream work authority normally; this handoff does not amend or unpause an existing work.`;
+  return `${request.message}${request.speedMode === undefined ? "" : `\n\nOwner speed mode: ${request.speedMode}. Preserve base model and reasoning. Carry this mode into the downstream work and matching reviewer profiles. It does not authorize a provider call or change already prepared operations.`}\n\nApproved scope: ${request.scope}\nStopping point: ${request.stoppingPoint}\nExclusions: ${request.exclusions}\nOwner instruction reference: ${request.instructionReference}\nUse the current fal-orchestrate-target skill. Record downstream work authority normally; this handoff does not amend or unpause an existing work.`;
 }
 export function readHandoffPreview(stateRoot: string, id: string): HandoffPreview {
   const file = previewPath(stateRoot, id);

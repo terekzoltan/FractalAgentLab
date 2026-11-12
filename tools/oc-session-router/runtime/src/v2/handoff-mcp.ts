@@ -33,7 +33,7 @@ export const toolDefinitions = [
     inputSchema: { type: "object", properties: { project: string }, required: ["project"], additionalProperties: false },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
   { name: "prepare_handoff", description: "Freeze an exact Owner-authorized preview locally. No remote send, no session claim. The reference is not approval attestation.",
-    inputSchema: { type: "object", properties: { project: string, handoffKey: string, scope: string, stoppingPoint: string, exclusions: string, message: string, instructionReference: string },
+    inputSchema: { type: "object", properties: { project: string, handoffKey: string, speedMode: { enum: ["standard", "fast"], default: "standard" }, scope: string, stoppingPoint: string, exclusions: string, message: string, instructionReference: string },
       required: ["project", "handoffKey", "scope", "stoppingPoint", "exclusions", "message", "instructionReference"], additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
   { name: "send_handoff", description: "MUTATION: send the exact frozen preview to its enrolled orchestrator through FAL. Host approval of the exact send is required. No new downstream grant.",
