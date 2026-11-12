@@ -1,3 +1,4 @@
+import { speedModel } from "./speed-mode.js";
 import type { ActionInput, Effect, Json, Operation, WorkContext, WorkView } from "./contracts.js";
 import { digest, participantKey, StoreError, text } from "./contracts.js";
 import { OpenCodeAdapter, type Acknowledgement, type AdapterOptions, type AdapterReply, type OpenCodeCredentials, type OpenCodeMessage, type OpenCodeTarget } from "./opencode-adapter.js";
@@ -97,7 +98,7 @@ export class RouterEngine {
       input: { preview: preview as unknown as Json, previewDigest: preview.previewDigest,
         executionDirectory: binding.target.directory, address: { origin: binding.target.origin, directory: binding.home, session: binding.role.session },
         profile: binding.role.profile, sources: [], arguments: renderHandoff(preview.request),
-        agent: boundary.selection.agent, model: `${boundary.selection.providerID}/${boundary.selection.modelID}`,
+        agent: boundary.selection.agent, model: preview.request.speedMode === undefined ? `${boundary.selection.providerID}/${boundary.selection.modelID}` : speedModel(`${boundary.selection.providerID}/${boundary.selection.modelID}`, preview.request.speedMode),
         ...(boundary.selection.variant === null ? {} : { variant: boundary.selection.variant }) },
     }, work.authorization.revision);
   }
@@ -212,6 +213,7 @@ export class RouterEngine {
     const model = request.model ?? observation.model ?? (observation.latestCompletedCall?.providerID && observation.latestCompletedCall.modelID
       ? { providerID: observation.latestCompletedCall.providerID, modelID: observation.latestCompletedCall.modelID } : null);
     if (!model?.providerID || !model.modelID) throw new RouterError("COMPACT_MODEL_UNAVAILABLE");
+    if (work.authorization.speedMode !== undefined) model.modelID = speedModel(`${model.providerID}/${model.modelID}`, work.authorization.speedMode).split("/")[1]!;
     phase?.("PERSISTENCE");
     const prepared = this.store.prepareAction({
       workId: request.workId, actionKey: request.actionKey, participant, recipientRole: request.recipientRole,
@@ -300,6 +302,9 @@ export class RouterEngine {
       profile: role.profile, packet: packetSummary(argument, sources) as unknown as Json,
     };
     for (const key of ["agent", "model", "variant"] as const) if (role[key]) input[key] = role[key]!;
+    if (role.model && work.authorization.speedMode !== undefined) input.model = speedModel(role.model, work.authorization.speedMode);
+    input.speedMode = work.authorization.speedMode ?? "standard";
+    if (work.authorization.speedMode !== undefined) input.arguments += `\n\nWork speed mode: ${input.speedMode}. Preserve reasoning and use matching reviewer speed profiles; no new authority follows.`;
     if (kind !== "CLARIFICATION") {
       phase?.("COMMAND_RESOLUTION");
       const registry = await adapter.listCommands();

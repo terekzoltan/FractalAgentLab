@@ -160,6 +160,7 @@ export class OperationStore {
   }
 
   openWork(context: WorkContext): WorkView {
+    if (context.speedMode !== undefined && context.speedMode !== "standard" && context.speedMode !== "fast") throw new StoreError("INVALID_INPUT");
     for (const field of [context.workId, context.target, context.directory, context.instructionReference, context.scope, context.stoppingPoint]) text(field);
     if (!path.isAbsolute(context.directory) || !Array.isArray(context.allowedEffects) ||
         !context.allowedEffects.length || context.allowedEffects.some(effect => !effects.has(effect))) throw new StoreError("INVALID_INPUT");
@@ -209,6 +210,7 @@ export class OperationStore {
       ? this.db.prepare("SELECT request_json,revision,recorded_at FROM work_amendments WHERE work_id=? ORDER BY rowid").all(context.workId)
         .map(row => ({ request: JSON.parse(String(row.request_json)) as OwnerAmendmentRequest, revision: String(row.revision), recordedAt: String(row.recorded_at) })) : [];
     return { revision: amendments.at(-1)?.revision ?? digest(context),
+      ...((amendments.some(item => item.request.speedMode !== undefined) || context.speedMode !== undefined) ? { speedMode: amendments.filter(item => item.request.speedMode !== undefined).at(-1)?.request.speedMode ?? context.speedMode! } : {}),
       allowedEffects: [...new Set([...context.allowedEffects, ...amendments.flatMap(item => item.request.addEffects)])],
       stoppingPoint: amendments.filter(item => item.request.stoppingPoint !== undefined).at(-1)?.request.stoppingPoint ?? context.stoppingPoint,
       amendments };
@@ -217,11 +219,12 @@ export class OperationStore {
   /** Records actual Owner authority, never approval manufactured by a stage request. */
   amendWork(request: OwnerAmendmentRequest): { work: WorkView; created: boolean } {
     if (!request || typeof request !== "object" || Array.isArray(request)) throw new StoreError("INVALID_INPUT");
-    const accepted = new Set(["workId", "amendmentKey", "expectedAuthorizationRevision", "instructionReference", "constraints", "addEffects", "stoppingPoint"]);
+    const accepted = new Set(["workId", "amendmentKey", "expectedAuthorizationRevision", "instructionReference", "constraints", "addEffects", "stoppingPoint", "speedMode"]);
     if (Object.keys(request).some(key => !accepted.has(key))) throw new StoreError("INVALID_INPUT");
     for (const field of [request.workId, request.amendmentKey, request.instructionReference, request.constraints]) text(field);
     if (!/^[a-f0-9]{64}$/.test(request.expectedAuthorizationRevision) || !Array.isArray(request.addEffects) ||
         request.addEffects.some(effect => !effects.has(effect)) || new Set(request.addEffects).size !== request.addEffects.length) throw new StoreError("INVALID_INPUT");
+    if (request.speedMode !== undefined && request.speedMode !== "standard" && request.speedMode !== "fast") throw new StoreError("INVALID_INPUT");
     if (request.stoppingPoint !== undefined) text(request.stoppingPoint);
     const encoded = canonical(request), revision = digest(request);
     const created = this.transaction(() => {
@@ -236,7 +239,7 @@ export class OperationStore {
       }
       if (request.expectedAuthorizationRevision !== authorization.revision) throw new StoreError("AUTHORIZATION_CHANGED");
       if (request.addEffects.some(effect => authorization.allowedEffects.includes(effect)) ||
-          (!request.addEffects.length && (request.stoppingPoint === undefined || request.stoppingPoint === authorization.stoppingPoint))) throw new StoreError("INVALID_INPUT");
+          (!request.addEffects.length && (request.stoppingPoint === undefined || request.stoppingPoint === authorization.stoppingPoint) && (request.speedMode === undefined || request.speedMode === authorization.speedMode))) throw new StoreError("INVALID_INPUT");
       // A new grant cannot clear/rebind an uncertain send or alter prepared work.
       if (this.db.prepare("SELECT 1 FROM operations WHERE work_id=? AND completed_at IS NULL LIMIT 1").get(request.workId)) throw new StoreError("WORK_HAS_PENDING_OPERATIONS");
       if (this.schemaVersion() === 1) {

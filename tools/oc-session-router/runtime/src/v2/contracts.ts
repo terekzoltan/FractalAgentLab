@@ -4,6 +4,8 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 export type Effect = "READ_ONLY" | "WORKSPACE_WRITE" | "LOCAL_COMMIT" | "SESSION_MAINTENANCE" | "ORCHESTRATOR_HANDOFF";
 
 export interface WorkContext {
+  /** Owner-selected mode frozen with the work; omitted means Standard. */
+  speedMode?: "standard" | "fast";
   workId: string;
   target: string;
   directory: string;
@@ -15,6 +17,7 @@ export interface WorkContext {
 
 /** A later, explicit Owner decision within the original target and scope. */
 export interface OwnerAmendmentRequest {
+  speedMode?: "standard" | "fast";
   workId: string;
   amendmentKey: string;
   expectedAuthorizationRevision: string;
@@ -31,6 +34,7 @@ export interface OwnerAmendment {
 }
 
 export interface WorkAuthorization {
+  speedMode?: "standard" | "fast" | undefined;
   revision: string;
   allowedEffects: Effect[];
   stoppingPoint: string;

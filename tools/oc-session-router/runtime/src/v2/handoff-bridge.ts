@@ -1,3 +1,4 @@
+import { speedModel } from "./speed-mode.js";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { OperationStore } from "./state-store.js";
@@ -60,7 +61,7 @@ function previewView(preview: HandoffPreview) {
   return { handoffId: preview.handoffId, project: preview.request.project, scope: preview.request.scope,
     stoppingPoint: preview.request.stoppingPoint, exclusions: preview.request.exclusions,
     instructionReference: preview.request.instructionReference, exactMessage: renderHandoff(preview.request),
-    selection: preview.boundary.selection, selectionBasis: "LAST_COMPLETED_NORMAL_USER_TURN_NOT_UI_SELECTION",
+    selection: { ...preview.boundary.selection, modelID: preview.request.speedMode === undefined ? preview.boundary.selection.modelID : speedModel(`${preview.boundary.selection.providerID}/${preview.boundary.selection.modelID}`, preview.request.speedMode).split("/")[1] }, capturedSelection: preview.boundary.selection, speedMode: preview.request.speedMode ?? "legacy-preserve", selectionBasis: "LAST_COMPLETED_NORMAL_USER_TURN_NOT_UI_SELECTION",
     manualCompactCompleted: preview.boundary.manualCompactCompleted === true,
     previewDigest: preview.previewDigest, expiresAt: preview.expiresAt,
     remoteSendPerformedByThisCall: false, previewOnlyCall: true,
@@ -100,8 +101,8 @@ export async function callHandoffTool(tool: HandoffTool, args: unknown, stateRoo
   }
   if (tool === "inspect_orchestrator" || tool === "prepare_handoff") {
     exactFields(args, tool === "inspect_orchestrator" ? ["project"] :
-      ["project", "handoffKey", "scope", "stoppingPoint", "exclusions", "message", "instructionReference"]);
-    const request = args as unknown as HandoffRequest;
+      ["project", "handoffKey", "scope", "stoppingPoint", "exclusions", "message", "instructionReference", "speedMode"]);
+    const request = { ...args, ...(tool === "prepare_handoff" ? { speedMode: args.speedMode ?? "standard" } : {}) } as unknown as HandoffRequest;
     if (tool === "prepare_handoff") {
       validateHandoffRequest(request);
       const previous = existingPreview(stateRoot, request);
