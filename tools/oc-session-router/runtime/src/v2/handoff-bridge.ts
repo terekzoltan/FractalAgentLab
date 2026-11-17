@@ -61,7 +61,7 @@ function previewView(preview: HandoffPreview) {
   return { handoffId: preview.handoffId, project: preview.request.project, scope: preview.request.scope,
     stoppingPoint: preview.request.stoppingPoint, exclusions: preview.request.exclusions,
     instructionReference: preview.request.instructionReference, exactMessage: renderHandoff(preview.request),
-    selection: { ...preview.boundary.selection, modelID: preview.request.speedMode === undefined ? preview.boundary.selection.modelID : speedModel(`${preview.boundary.selection.providerID}/${preview.boundary.selection.modelID}`, preview.request.speedMode).split("/")[1] }, capturedSelection: preview.boundary.selection, speedMode: preview.request.speedMode ?? "legacy-preserve", selectionBasis: "LAST_COMPLETED_NORMAL_USER_TURN_NOT_UI_SELECTION",
+    selection: { ...preview.boundary.selection, modelID: preview.effectiveModel?.split("/")[1] ?? (preview.request.speedMode === undefined ? preview.boundary.selection.modelID : speedModel(`${preview.boundary.selection.providerID}/${preview.boundary.selection.modelID}`, preview.request.speedMode).split("/")[1]) }, capturedSelection: preview.boundary.selection, speedMode: preview.request.speedMode ?? "legacy-preserve", selectionBasis: "LAST_COMPLETED_NORMAL_USER_TURN_NOT_UI_SELECTION",
     manualCompactCompleted: preview.boundary.manualCompactCompleted === true,
     previewDigest: preview.previewDigest, expiresAt: preview.expiresAt,
     remoteSendPerformedByThisCall: false, previewOnlyCall: true,

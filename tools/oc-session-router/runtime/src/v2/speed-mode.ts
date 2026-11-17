@@ -5,7 +5,7 @@ export function speedMode(value: unknown): SpeedMode {
   if (value !== "standard" && value !== "fast") throw new StoreError("INVALID_INPUT");
   return value;
 }
-const models = new Set(["gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra"]);
+const models = new Set(["gpt-6.2-sol", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra"]);
 /** Catalog aliases request a tier; they are not proof of the tier served. */
 export function speedModel(model: string, value: unknown): string {
   const mode = speedMode(value), base = model.replace(/-fast$/, "");
