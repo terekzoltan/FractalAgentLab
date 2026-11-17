@@ -382,10 +382,10 @@ test("explicit Fast changes only tier alias and survives duplicate delivery", as
  for(const m of f.state.messages){m.providerID="openai";m.modelID="gpt-6.1-sol";}
  f.request.speedMode="fast";
  const p=await f.preview();const prepared=await f.engine.prepareHandoff(p);
- assert.equal(prepared.operation.action.input.model,"openai/gpt-6.1-sol-fast");
+ assert.equal(prepared.operation.action.input.model,"openai/gpt-6.2-sol-fast");
  assert.equal(prepared.operation.action.input.variant,"high");
  await f.engine.execute(prepared.operation.operationId);
- assert.equal(f.state.submissions[0]!.model!.modelID,"gpt-6.1-sol-fast");
+ assert.equal(f.state.submissions[0]!.model!.modelID,"gpt-6.2-sol-fast");
  assert.equal((await f.engine.prepareHandoff(p)).created,false);
  assert.equal(f.state.submissions.length,1);
 });

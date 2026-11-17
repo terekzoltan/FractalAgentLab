@@ -98,7 +98,7 @@ export class RouterEngine {
       input: { preview: preview as unknown as Json, previewDigest: preview.previewDigest,
         executionDirectory: binding.target.directory, address: { origin: binding.target.origin, directory: binding.home, session: binding.role.session },
         profile: binding.role.profile, sources: [], arguments: renderHandoff(preview.request),
-        agent: boundary.selection.agent, model: preview.request.speedMode === undefined ? `${boundary.selection.providerID}/${boundary.selection.modelID}` : speedModel(`${boundary.selection.providerID}/${boundary.selection.modelID}`, preview.request.speedMode),
+        agent: boundary.selection.agent, model: preview.effectiveModel ?? (preview.request.speedMode === undefined ? `${boundary.selection.providerID}/${boundary.selection.modelID}` : speedModel(`${boundary.selection.providerID}/${boundary.selection.modelID}`, preview.request.speedMode)),
         ...(boundary.selection.variant === null ? {} : { variant: boundary.selection.variant }) },
     }, work.authorization.revision);
   }

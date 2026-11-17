@@ -6,7 +6,7 @@ test("speed mode defaults Standard and rejects unknown policy", () => {
  for(const bad of [null, "auto", "ultrafast", {}, 1]) assert.throws(()=>speedMode(bad));
 });
 test("speed aliases preserve base model and reverse without suffix accumulation", () => {
- for(const m of ["gpt-6.1-sol","gpt-6.1-terra","gpt-6-luna"]){
+ for(const m of ["gpt-6.2-sol","gpt-6.1-sol","gpt-6.1-terra","gpt-6-luna"]){
  const base="openai/"+m;
  assert.equal(speedModel(base,"fast"),base+"-fast");
  assert.equal(speedModel(base+"-fast","fast"),base+"-fast");

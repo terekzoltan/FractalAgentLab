@@ -1,4 +1,5 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { speedModel } from "./speed-mode.js";
 import path from "node:path";
 import { digest, StoreError, text, type Json } from "./contracts.js";
 import type { OpenCodeAdapter, OpenCodeMessage } from "./opencode-adapter.js";
@@ -31,6 +32,7 @@ export interface HandoffPreview {
   boundary: HandoffBoundary;
   createdAt: string;
   expiresAt: string;
+  effectiveModel?: string;
   previewDigest: string;
 }
 type Reader = Pick<OpenCodeAdapter, "getSession" | "getStatus" | "getHistory" | "getMessage" | "getPendingInteractions">;
@@ -189,7 +191,7 @@ export function readHandoffPreview(stateRoot: string, id: string): HandoffPrevie
   return preview;
 }
 export function validatePreview(preview: HandoffPreview): void {
-  exactFields(preview, ["version", "handoffId", "request", "requestDigest", "bindingDigest", "boundary", "createdAt", "expiresAt", "previewDigest"]);
+  exactFields(preview, ["version", "handoffId", "request", "requestDigest", "bindingDigest", "boundary", "createdAt", "expiresAt", "effectiveModel", "previewDigest"]);
   validateHandoffRequest(preview.request);
   const { previewDigest, ...body } = preview;
   if (preview.version !== 1 || preview.handoffId !== handoffId(preview.request) ||
@@ -208,7 +210,9 @@ export function savePreview(stateRoot: string, request: HandoffRequest, bindingD
   const previous = existingPreview(stateRoot, request);
   if (previous) return previous;
   const now = Date.now();
-  const body = { version: 1 as const, handoffId: handoffId(request), request, requestDigest: digest(request), bindingDigest, boundary,
+  const captured = boundary.selection.providerID + "/" + boundary.selection.modelID;
+  const selected = captured.replace(/^openai\/gpt-6\.1-sol(?=-fast$|$)/, "openai/gpt-6.2-sol");
+  const body = { ...(request.speedMode === undefined ? {} : { effectiveModel: speedModel(selected, request.speedMode) }), version: 1 as const, handoffId: handoffId(request), request, requestDigest: digest(request), bindingDigest, boundary,
     createdAt: new Date(now).toISOString(), expiresAt: new Date(now + 600_000).toISOString() };
   const preview = { ...body, previewDigest: digest(body) };
   const file = previewPath(stateRoot, preview.handoffId);
