@@ -30,6 +30,7 @@ export interface SubmitRequest {
   arguments?: string;
   predecessor?: string;
   sources?: SourceReference[];
+  trackEffort?: { variant: "medium" | "high" | "xhigh"; reason: string };
 }
 
 export interface CompactRequest {
@@ -248,16 +249,26 @@ export class RouterEngine {
 
   async prepare(request: SubmitRequest, phase?: PreparationReporter): Promise<{ operation: Operation; created: boolean }> {
     phase?.("REQUEST_VALIDATION");
-    validateRequest(request, ["workId", "actionKey", "recipientRole", "command", "kind", "arguments", "predecessor", "sources"]);
+    validateRequest(request, ["workId", "actionKey", "recipientRole", "command", "kind", "arguments", "predecessor", "sources", "trackEffort"]);
     text(request.workId); text(request.actionKey); text(request.recipientRole);
     if (request.command !== undefined && typeof request.command !== "string") throw new StoreError("INVALID_INPUT");
     if (request.arguments !== undefined && typeof request.arguments !== "string") throw new StoreError("INVALID_INPUT");
     const kind = request.kind ?? "LIFECYCLE";
+    const effort = request.trackEffort;
+    if (effort !== undefined) {
+      if (!effort || !["medium", "high", "xhigh"].includes(effort.variant) ||
+          typeof effort.reason !== "string" || !effort.reason.trim() || effort.reason.length > 240 ||
+          Object.keys(effort).some(key => key !== "variant" && key !== "reason")) {
+        throw new RouterError("INVALID_TRACK_EFFORT");
+      }
+      if (kind !== "LIFECYCLE" && kind !== "CLARIFICATION") throw new RouterError("TRACK_EFFORT_ACTION_NOT_ALLOWED");
+    }
     const command = kind === "RESTORE" ? "after-compact" : kind === "CLARIFICATION" ? "clarification" : (request.command ?? "").replace(/^\//, "");
     text(command);
     const normalized = {
       workId: request.workId, actionKey: request.actionKey, recipientRole: request.recipientRole,
       kind, command, arguments: request.arguments ?? "", predecessor: request.predecessor ?? null, sources: request.sources ?? [],
+      ...(effort ? { trackEffort: effort } : {}),
     };
     const requestDigest = digest(normalized);
     phase?.("WORK_CONTEXT");
@@ -270,6 +281,9 @@ export class RouterEngine {
     if (work.paused) throw new StoreError("WORK_PAUSED");
     phase?.("PARTICIPANT_BINDING");
     const { role, target, participant, adapter, home } = this.binding(work.context, request.recipientRole);
+    if (effort && (role.capability !== "DELIVERY" || !/^Track [A-Z]$/.test(request.recipientRole))) {
+      throw new RouterError("TRACK_EFFORT_ROLE_NOT_ALLOWED");
+    }
     const effect: Effect = kind === "LIFECYCLE" ? commandRule(command, role, target) : kind === "RESTORE" ? "SESSION_MAINTENANCE" : "READ_ONLY";
     if (kind === "RESTORE" && role.capability === "ORCHESTRATOR") throw new RouterError("ORCHESTRATOR_RESTORE_REQUIRES_PREVIEW");
     if (!work.authorization.allowedEffects.includes(effect)) throw new StoreError("EFFECT_NOT_ALLOWED");
@@ -304,6 +318,17 @@ export class RouterEngine {
     for (const key of ["agent", "model", "variant"] as const) if (role[key]) input[key] = role[key]!;
     if (role.model && work.authorization.speedMode !== undefined) input.model = speedModel(role.model, work.authorization.speedMode);
     input.speedMode = work.authorization.speedMode ?? "standard";
+    if (effort) {
+      if (input.model !== "openai/gpt-6.2-sol" && input.model !== "openai/gpt-6.2-sol-fast") {
+        throw new RouterError("TRACK_EFFORT_MODEL_UNSUPPORTED");
+      }
+      const catalog = await adapter.getModelInfo?.("openai", input.model.slice("openai/".length));
+      if (catalog && !catalog.problem && catalog.value === null) throw new RouterError("TRACK_EFFORT_MODEL_UNSUPPORTED");
+      if (!catalog || catalog.problem || !catalog.value?.variants) throw new RouterError("TRACK_EFFORT_CATALOG_UNAVAILABLE");
+      if (!catalog.value.variants.includes(effort.variant)) throw new RouterError("TRACK_EFFORT_VARIANT_UNSUPPORTED");
+      input.trackEffort = { variant: effort.variant, reason: effort.reason };
+      input.variant = effort.variant;
+    }
     if (work.authorization.speedMode !== undefined) input.arguments += `\n\nWork speed mode: ${input.speedMode}. Preserve reasoning and use matching reviewer speed profiles; no new authority follows.`;
     if (kind !== "CLARIFICATION") {
       phase?.("COMMAND_RESOLUTION");

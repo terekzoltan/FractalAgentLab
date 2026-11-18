@@ -61,6 +61,7 @@ export interface OpenCodeMessage {
 export interface OpenCodeSession { id: string; directory: string; projectID?: string; parentID?: string; reverted?: boolean }
 export interface PendingInteractionCounts { permissions: number | null; questions: number | null }
 export interface OpenCodeModelInfo {
+  variants?: string[];
   providerID: string;
   modelID: string;
   contextLimit?: number;
@@ -256,6 +257,11 @@ export class OpenCodeAdapter {
       const model = record(models[modelID]);
       if (model.id !== modelID || (model.providerID !== undefined && model.providerID !== providerID)) throw new ShapeError("IDENTITY_MISMATCH");
       const selected: OpenCodeModelInfo = { providerID, modelID };
+      if (model.variants && typeof model.variants === "object" && !Array.isArray(model.variants)) {
+        selected.variants = Object.entries(model.variants).filter(([, config]) =>
+          config && typeof config === "object" && !Array.isArray(config) && (config as RecordValue).disabled !== true
+        ).map(([name]) => name);
+      }
       if (model.limit && typeof model.limit === "object" && !Array.isArray(model.limit)) {
         const limits = model.limit as RecordValue;
         for (const [source, destination] of [["context", "contextLimit"], ["input", "inputLimit"], ["output", "outputLimit"]] as const) {

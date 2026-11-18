@@ -1,4 +1,9 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import path from "node:path";
+import { RouterEngine, type SubmitRequest } from "../../src/v2/engine.js";
+import { OperationStore } from "../../src/v2/state-store.js";
+import type { RouterConfiguration } from "../../src/v2/routing.js";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
@@ -8,6 +13,78 @@ import { AdapterError, OpenCodeAdapter, generateMessageId, type Acknowledgement,
 const session = "ses_fixture";
 const root = "msg_fixture_root";
 const directory = "C:\\synthetic\\project with space";
+
+test("Track effort is frozen before dispatch and reaches the command HTTP body over high defaults", async t => {
+  const rootDir = mkdtempSync(path.join(process.cwd(), ".track-effort-"));
+  const db = path.join(rootDir, "pilot.sqlite");
+  const store = new OperationStore(db);
+  t.after(() => { store.close(); rmSync(rootDir, { recursive: true, force: true }); });
+  const base = "gpt-6.2-sol";
+  const posted: Record<string, unknown>[] = [];
+  const variants: Record<string, object> = { medium: {}, high: {}, xhigh: {} };
+  const { origin } = await fixture(t, async (req, res) => {
+    const route = new URL(req.url!, "http://localhost").pathname;
+    if (route === "/command") return json(res, [{ name: "implement", template: "$ARGUMENTS", model: "openai/" + base, variant: "high" }]);
+    if (route === "/provider") {
+      const models = Object.fromEntries([base, base + "-fast"].map(id => [id, { id, variants }]));
+      return json(res, { all: [{ id: "openai", models }] });
+    }
+    if (route === "/session/status") return json(res, {});
+    if (route === "/session/" + session) return json(res, { id: session, directory: rootDir, projectID: "pilot" });
+    if (route === "/session/" + session + "/command" && req.method === "POST") {
+      const payload = await body(req);
+      posted.push(payload);
+      return json(res, message({ parentID: payload.messageID }));
+    }
+    return json(res, []);
+  });
+  const lane = { capability: "DELIVERY" as const, profile: "pilot.track-b", session, model: "openai/" + base, variant: "high" };
+  const config: RouterConfiguration = { schemaVersion: 2, targets: { pilot: {
+    namespace: "pilot", project: "pilot", directory: rootDir, origin,
+    roles: { "Track B": lane, Meta: { ...lane, capability: "META", session: "ses_meta" } },
+  } } };
+  const engine = new RouterEngine(store, config, { username: "fixture-user", password: "fixture-password" });
+  for (const speedMode of ["standard", "fast"] as const) {
+    for (const variant of [undefined, "medium", "high", "xhigh"] as const) {
+      const workId = "pilot-" + speedMode + "-" + (variant ?? "default");
+      engine.openWork({ workId, target: "pilot", directory: rootDir, scope: "offline pilot", stoppingPoint: "receipt",
+        instructionReference: "test", allowedEffects: ["WORKSPACE_WRITE"], speedMode });
+      const request: SubmitRequest = { workId, recipientRole: "Track B", command: "implement", actionKey: "first",
+        ...(variant ? { trackEffort: { variant, reason: "fixture assignment" } } : {}) };
+      const { operation } = await engine.prepare(request);
+      lane.variant = "low";
+      try {
+        assert.equal((await engine.prepare(request)).created, false);
+        assert.equal(store.getOperation(operation.operationId).action.input.variant, variant ?? "high");
+        assert.deepEqual(operation.action.input.trackEffort, request.trackEffort);
+        assert.equal((await engine.execute(operation.operationId)).outcome?.execution, "COMPLETED");
+        assert.equal(posted.at(-1)?.variant, variant ?? "high");
+        assert.equal(posted.at(-1)?.model, "openai/" + base + (speedMode === "fast" ? "-fast" : ""));
+      } finally { lane.variant = "high"; }
+      const explicit = { ...request, actionKey: "another", trackEffort: { variant: "medium" as const, reason: "inventory" } };
+      await assert.rejects(engine.prepare({ ...explicit, recipientRole: "Meta" }), /TRACK_EFFORT_ROLE_NOT_ALLOWED/);
+      await assert.rejects(engine.prepare({ ...explicit, kind: "RESTORE" }), /TRACK_EFFORT_ACTION_NOT_ALLOWED/);
+    }
+  }
+  assert.equal(posted.length, 8);
+  const oldStore = new OperationStore(db);
+  try {
+    const legacy = oldStore.getWork("pilot-standard-default").operations[0]!;
+    assert.equal(legacy.action.input.trackEffort, undefined);
+    assert.equal(legacy.action.input.variant, "high");
+    const frozen = oldStore.getWork("pilot-fast-medium").operations[0]!;
+    assert.equal(frozen.action.input.variant, "medium");
+    assert.deepEqual(frozen.action.input.trackEffort, { variant: "medium", reason: "fixture assignment" });
+  } finally { oldStore.close(); }
+
+  const explicit: SubmitRequest = { workId: "pilot-standard-medium", actionKey: "unsupported",
+    command: "implement", recipientRole: "Track B", trackEffort: { variant: "medium", reason: "inventory" } };
+  await assert.rejects(engine.prepare({ ...explicit, actionKey: "first" }), /INPUT_CONFLICT/);
+  variants.medium = { disabled: true };
+  await assert.rejects(engine.prepare(explicit), /TRACK_EFFORT_VARIANT_UNSUPPORTED/);
+  lane.model = "openai/other";
+  await assert.rejects(engine.prepare(explicit), /TRACK_EFFORT_MODEL_UNSUPPORTED/);
+});
 
 test("pending lists are GET-only, exact-session, bounded and content-free", async t => {
   const seen: string[] = [];
