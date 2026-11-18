@@ -61,6 +61,7 @@ export function operationView(operation: Operation, store?: OperationStore) {
     reason: operation.completedAt ? operation.outcome?.reason ?? null : operation.observation?.context?.reason ?? null,
     ...(store ? { continuity, ownerAttention: snapshot?.ownerAttention ?? null } : {}),
     ...(operation.action.input.packet ? { packet: operation.action.input.packet } : {}),
+    ...(operation.action.input.trackEffort ? { trackEffort: operation.action.input.trackEffort, effectiveVariant: operation.action.input.variant } : {}),
     autoAdvance: false,
     ...(operation.action.kind === "RECOVERED_RESULT" ? { evidenceOnly: true, originalOperationId: operation.action.input.originalOperationId,
       nativeLineageRestored: false, productAcceptance: false } : {}),
