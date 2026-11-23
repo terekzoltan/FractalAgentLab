@@ -12,7 +12,7 @@ without usage do not cause fallback to an older token-rich call; zero-only usage
 remains unconfirmed, not evidence of empty context. Summary-call usage is stale
 pre-compaction evidence, not a new compact trigger.
 The default compact threshold is the earlier of 60% of usable input budget or
-225,000 last-call tokens (`compactThresholdRatio` / `compactTokenCap` overrides).
+275,000 last-call tokens (`compactThresholdRatio` / `compactTokenCap` overrides).
 `compactThresholdTokens` and `thresholdBasis` expose the effective threshold.
 Unknown budget permits cap-based advice with reliable usage, not a guessed ratio.
 Pending operations are reconciled first; busy sessions are never interrupted.

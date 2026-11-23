@@ -188,7 +188,7 @@ records do not replace it; newer activity remains visible as stale/unknown.
 Even successful zero-only telemetry does not prove an empty context.
 The default advisory warning/compact ratios are `0.5`/`0.60` of the usable input
 budget, not blindly the whole context window. Compact is additionally capped at
-225,000 last-call tokens: the earlier threshold wins. `compactThresholdRatio` and
+275,000 last-call tokens: the earlier threshold wins. `compactThresholdRatio` and
 `compactTokenCap` are optional configuration overrides. Continuity exposes
 `compactThresholdTokens` and `thresholdBasis` (input_budget_ratio or absolute_token_cap).
 The cap is maintenance policy, not model capacity. Reliable usage at or above it
