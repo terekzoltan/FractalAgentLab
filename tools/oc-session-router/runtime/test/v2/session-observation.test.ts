@@ -314,16 +314,16 @@ test("an aborted zero-token placeholder does not replace successful provider usa
   assert.equal(zero.pressure.bestAvailableTokens, null);
 });
 
-test("225k cap triggers below 60 percent, with unknown-budget and safe-boundary controls", async () => {
+test("275k cap triggers below 60 percent, with unknown-budget and safe-boundary controls", async () => {
   const reader = new FakeReader();
   reader.model = ok({ providerID: "provider", modelID: "model", inputLimit: 922000, contextLimit: 1000000 });
-  for (const total of [224999, 225000, 431850]) {
+  for (const total of [274999, 275000, 431850]) {
     reader.pages.set("newest", ok({ messages: [assistant("msg_cap", { tokens: { total } })] }));
     const snapshot = await observeSession(reader, expected);
     const summary = continuitySummary(snapshot);
-    assert.equal(summary.compactThresholdTokens, 225000);
+    assert.equal(summary.compactThresholdTokens, 275000);
     assert.equal(summary.thresholdBasis, "absolute_token_cap");
-    assert.equal(summary.recommendation, total < 225000 ? "CONTINUE_AND_MONITOR" : "COMPACT_THEN_RESTORE_BEFORE_WORK");
+    assert.equal(summary.recommendation, total < 275000 ? "CONTINUE_AND_MONITOR" : "COMPACT_THEN_RESTORE_BEFORE_WORK");
     assert.equal(continuitySummary({ ...snapshot, activity: "BUSY" }).recommendation, "WAIT_FOR_IDLE_NO_INTERRUPTION");
     assert.equal(continuitySummary({ ...snapshot, latestCompletedCall: { ...snapshot.latestCompletedCall!, freshness: "NEWER_ACTIVITY_OBSERVED" } }).recommendation, "REFRESH_TELEMETRY");
   }

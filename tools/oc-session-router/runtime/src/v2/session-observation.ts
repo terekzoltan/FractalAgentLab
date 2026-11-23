@@ -148,7 +148,7 @@ export function calculatePressure(tokens?: MessageTokens, contextLimit?: number,
 }
 /** V2 maintenance policy, separate from the legacy pressure-arithmetic parity helper. */
 export function maintenancePressure(tokens?: MessageTokens, budget?: number, options: SessionObservationOptions = {}): PressureObservation {
-  const cap = options.compactTokenCap ?? 225_000;
+  const cap = options.compactTokenCap ?? 275_000;
   if (!positive(cap)) throw new AdapterError("INVALID_INPUT");
   const pressure = calculatePressure(tokens, budget, options);
   const ratioThreshold = pressure.criticalTokens;
